@@ -1,0 +1,13 @@
+defaults:
+  - data: swissprot_pfam
+  - model: transformer
+  - optimizer: adamw
+  - scheduler: coswarmup
+  - runtime: polaris
+  - logging: stage3
+  - wandb: default
+
+seed: 42
+epochs: 100
+valid_size: 0.2
+enter_eval: 1000

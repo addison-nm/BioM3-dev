@@ -1,0 +1,5 @@
+device: cuda
+precision: 32
+gpu_devices: 4
+num_nodes: 1
+acc_grad_batches: 1

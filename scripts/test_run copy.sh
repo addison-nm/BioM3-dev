@@ -1,0 +1,38 @@
+
+# module use /soft/modulefiles
+# module load conda
+# conda activate /grand/NLDesignProtein/biom3_env
+
+datetime=$(date +%Y%m%d_%H%M%S)
+NNODES=1
+NRANKS=8 # Number of MPI ranks to spawn per node
+export version_name="V${datetime}_${NNODES}_nodes"
+export resume_from_checkpoint='None' #'/lus/grand/projects/mm_protein/Project_TextDiffEDP/history/history/Stage3_history/checkpoints/V20240805_final_phase2/last.ckpt'
+
+
+export epoch=10 # number of epochs
+export max_steps=3500000 # number of steps
+export val_check_interval=100 # checkpoint interval
+export limit_val_batches=0.00005 #0.0001 #0.25 # validation size # TN: kept to a small value in scaling study 
+export log_every_n_steps=10 #1000
+export start_pfam_trainer='false' # starting checkpoint: 'true'; continue checkpoint: 'false'
+
+# cd ${PBS_O_WORKDIR}
+
+# export num_nodes=$NNODES
+
+# NTOTRANKS=$(( NNODES * NRANKS ))
+
+# echo "NUM_OF_NODES= ${NNODES} TOTAL_NUM_RANKS= ${NTOTRANKS} RANKS_PER_NODE= ${NRANKS} MASTER_ADDR= ${MASTER_ADDR} MASTER_PORT= ${MASTER_PORT}"
+
+# mpiexec -n ${NTOTRANKS} -ppn ${NRANKS} \
+
+sh ./scripts/PL_train_transformer.sh \
+$version_name \
+$epoch \
+$resume_from_checkpoint \
+$max_steps \
+$val_check_interval \
+$limit_val_batches \
+$start_pfam_trainer \
+$num_nodes \

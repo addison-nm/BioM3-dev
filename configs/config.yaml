@@ -1,13 +1,32 @@
 defaults:
-  - data: swissprot_pfam
   - model: transformer
+  - data: swissprot_pfam
   - optimizer: adamw
-  - scheduler: coswarmup
   - runtime: polaris
   - logging: stage3
-  - wandb: default
+  # - wandb: default
+  # - deepspeed: default
+  - _self_
 
 seed: 42
 epochs: 100
 valid_size: 0.2
 enter_eval: 1000
+scheduler_gamma: coswarmup
+resume_from_checkpoint: null
+batch_size: 16
+output_folder: null
+model_option: transformer
+diffusion_steps: 1024
+warmup_steps: 500
+image_size: 32
+ema_inv_gamma: 1.0
+ema_power: 0.75
+ema_max_value: 0.95
+task: proteins
+max_steps: 500
+val_check_interval: 100
+limit_val_batches: 0.05
+log_every_n_steps: 10
+start_pfam_trainer: false
+num_workers: 4

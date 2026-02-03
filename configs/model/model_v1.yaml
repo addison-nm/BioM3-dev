@@ -1,0 +1,3 @@
+defaults:
+  - transformer: transformer
+name: model_v1

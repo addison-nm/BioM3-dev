@@ -1,0 +1,74 @@
+seed: 42
+epochs: 100
+valid_size: 0.2
+enter_eval: 1000
+scheduler_gamma: coswarmup
+resume_from_checkpoint: null
+batch_size: 16
+output_folder: null
+model_option: transformer
+diffusion_steps: 1024
+warmup_steps: 500
+image_size: 32
+ema_inv_gamma: 1.0
+ema_power: 0.75
+ema_max_value: 0.95
+task: proteins
+max_steps: 500
+val_check_interval: 100
+limit_val_batches: 0.05
+log_every_n_steps: 10
+start_pfam_trainer: false
+num_workers: 4
+
+
+# Flow params
+num_steps: 1
+actnorm: False
+perm_channel: none
+perm_length: reverse
+
+input_dp_rate: 0.0
+
+# Transformer params
+transformer_dim: 1024
+transformer_heads: 16
+transformer_depth: 32
+transformer_blocks: 1
+transformer_dropout: 0.1
+transformer_reversible: False
+transformer_local_heads: 8
+transformer_local_size: 128
+
+text_emb_dim: 512
+facilitator: MMD
+
+optimizer_choice: AdamW
+lr: 1e-4
+weight_decay: 1e-6
+
+
+
+swissprot_data_root: ./data/Stage2_MMD_swissprot_embedding_subset_1000.hdf5
+pfam_data_root: ./data/Stage2_MMD_pfam_embedding_subset_1000.hdf5
+sequence_keyname: sequence
+num_classes: 29
+num_y_class_labels: 6
+
+
+device: cuda
+precision: 32
+gpu_devices: 4
+num_nodes: 1
+acc_grad_batches: 1
+
+
+version_name: ${hydra:job.name}
+output_hist_folder: ./logs/history/test_stage3
+tb_logger_path: ./logs/history
+tb_logger_folder: Stage3_history
+save_hist_path: null
+
+choose_optim: AdamW
+
+traindata_len: null

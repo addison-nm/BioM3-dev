@@ -416,6 +416,9 @@ def save_model(
     Returns:
         None
     """
+    image_size = args.image_size
+    num_classes = args.num_classes
+
     # once saved via the model checkpoint callback...
     # we have a saved folder containing the deepspeed checkpoint rather than a single file
     checkpoint_folder_path = checkpoint_path + '/last.ckpt'
@@ -426,8 +429,8 @@ def save_model(
         print('Save model')
         new_temp_model = mod.get_model(
             args=args,
-            data_shape=(args.image_size, args.image_size),
-            num_classes=args.num_classes
+            data_shape=(image_size, image_size),
+            num_classes=num_classes
         ).cpu()
         loaded_model = PL_mod.PL_ProtARDM.load_from_checkpoint(single_ckpt_path, args=args, model=new_temp_model)
         # make sure that datatypes or the same ...
@@ -573,23 +576,31 @@ def load_model(
     Returns:
         A configured PyTorch Lightning model ready for training
     """
-    args.traindata_len = len(data_module.train_dataloader()) // args.gpu_devices // args.acc_grad_batches
+    gpu_devices = args.gpu_devices
+    acc_grad_batches = args.acc_grad_batches
+    diffusion_steps = args.diffusion_steps
+    image_size = args.image_size
+    num_classes = args.num_classes
+    num_nodes = args.num_nodes
+    batch_size = args.batch_size
+
+    args.traindata_len = len(data_module.train_dataloader()) // gpu_devices // acc_grad_batches
     print('Length of dataloader:', len(data_module.train_dataloader()))
-    print('Numer of devices:', args.gpu_devices)
-    print('Number of nodes:', args.num_nodes)
-    print('Batch size:', args.batch_size)
-    print('Length of dataloader per device:', len(data_module.train_dataloader()) // args.gpu_devices)
+    print('Numer of devices:', gpu_devices)
+    print('Number of nodes:', num_nodes)
+    print('Batch size:', batch_size)
+    print('Length of dataloader per device:', len(data_module.train_dataloader()) // gpu_devices)
     print(f'Length of a training epoch in batch gradient updates: {args.traindata_len}')
-    w, h = args.image_size, args.image_size
+    w, h = image_size, image_size
     # Ensure diffusion steps are sufficient for data dimensions
-    if args.diffusion_steps < int(w*h):
+    if diffusion_steps < int(w*h):
         print('Make sure that the number of diffusion steps is equal to or greather than the data cardinality')
     help_tools.print_gpu_initialization()
     # Compile model architecture
     PL_model = compile_model(
             args=args,
-            data_shape=(args.image_size,args.image_size),
-            num_classes=args.num_classes
+            data_shape=(image_size, image_size),
+            num_classes=num_classes,
     )
     print('Model size:', sum(p.numel() for p in PL_model.model.parameters()))
     return PL_model
@@ -622,27 +633,44 @@ def train_model(
         None - results are saved to the paths specified in args
     """
 
+    tb_logger_path = args.tb_logger_path
+    tb_logger_folder = args.tb_logger_folder
+    version_name = args.version_name
+    log_every_n_steps = args.log_every_n_steps
+    pfam_data_root = args.pfam_data_root
+    gpu_devices = args.gpu_devices
+    num_nodes = args.num_nodes
+    acc_grad_batches = args.acc_grad_batches
+    epochs = args.epochs
+    start_pfam_trainer = args.start_pfam_trainer
+    max_steps = args.max_steps
+    val_check_interval = args.val_check_interval
+    limit_val_batches = args.limit_val_batches
+    lr = args.lr
+    resume_from_checkpoint = args.resume_from_checkpoint
+    
+
     # Configure DeepSpeed optimization settings
     ds_config = {
-    "zero_optimization": {
-    "stage": 1,
-    "allgather_bucket_size": 5e8,
-    "reduce_bucket_size": 5e8,
-    "offload_optimizer": {
-            "device": "cpu",
-            "pin_memory": False
+        "zero_optimization": {
+            "stage": 1,
+            "allgather_bucket_size": 5e8,
+            "reduce_bucket_size": 5e8,
+            "offload_optimizer": {
+                "device": "cpu",
+                "pin_memory": False
             },
-    "offload_param": {
-            "device": "cpu",
-            "pin_memory": False
+            "offload_param": {
+                "device": "cpu",
+                "pin_memory": False
+            },
+            "overlap_comm": True,
+            "contiguous_gradients": True
         },
-    "overlap_comm": True,
-    "contiguous_gradients": True
-    },
-    "stage3_max_live_parameters": 1e9,
-    "stage3_max_reuse_distance": 1e8,
-    "stage3_prefetch_bucket_size": 5e8,
-    "stage3_param_persistence_threshold": 1e6,
+        "stage3_max_live_parameters": 1e9,
+        "stage3_max_reuse_distance": 1e8,
+        "stage3_prefetch_bucket_size": 5e8,
+        "stage3_param_persistence_threshold": 1e6,
     }
 
     strategy = DeepSpeedStrategy(
@@ -650,25 +678,25 @@ def train_model(
     )
 
     # Set up TensorBoard logging
-    logger = TensorBoardLogger(args.tb_logger_path + args.tb_logger_folder, version=args.version_name)
+    logger = TensorBoardLogger(tb_logger_path + tb_logger_folder, version=version_name)
 
     # Monitor learning rate changes
     lr_monitor = pl.callbacks.LearningRateMonitor(logging_interval='step')
 
     # Configure checkpoint strategy based on dataset type
-    if args.pfam_data_root != 'None':
+    if pfam_data_root != 'None':
         checkpoint_callback = ModelCheckpoint(
-            dirpath=args.tb_logger_path + args.tb_logger_folder + '/checkpoints/' + args.version_name,
+            dirpath=tb_logger_path + tb_logger_folder + '/checkpoints/' + version_name,
             save_top_k=2,
             verbose=True,
             monitor='val_loss',
             mode="min",
             save_last=True,
-            every_n_train_steps=args.log_every_n_steps  # Save checkpoints periodically by steps
+            every_n_train_steps=log_every_n_steps  # Save checkpoints periodically by steps
         )
     else:
         checkpoint_callback = ModelCheckpoint(
-            dirpath=args.tb_logger_path + args.tb_logger_folder + '/checkpoints/' + args.version_name,
+            dirpath=tb_logger_path + tb_logger_folder + '/checkpoints/' + version_name,
             save_top_k=2,
             verbose=True,
             monitor='val_loss',
@@ -681,53 +709,53 @@ def train_model(
         'enable_progress_bar': True,
         'enable_model_summary': True,
         'enable_checkpointing': True,
-        'devices': args.gpu_devices,
-        'num_nodes': args.num_nodes,
+        'devices': gpu_devices,
+        'num_nodes': num_nodes,
         'accelerator': 'cuda',
         'strategy': 'deepspeed_stage_2',
-        'accumulate_grad_batches': args.acc_grad_batches,
+        'accumulate_grad_batches': acc_grad_batches,
         'logger': logger,
-        'log_every_n_steps': args.log_every_n_steps,
+        'log_every_n_steps': log_every_n_steps,
         'callbacks': [checkpoint_callback, lr_monitor],
     }
 
     # Configure training mode: epoch-based or step-based
-    if args.pfam_data_root == 'None':
-        trainer_params['max_epochs'] = args.epochs
+    if pfam_data_root == 'None':
+        trainer_params['max_epochs'] = epochs
     else:
-        if args.start_pfam_trainer.lower() == 'true':
+        if start_pfam_trainer:
             print('load weights from swissprot phase...')
             PL_model = get_deepspeed_model(
                     args=args,
                     PL_model=PL_model
             )
 
-        trainer_params['max_steps'] = args.max_steps
-        trainer_params['val_check_interval'] = args.val_check_interval
-        trainer_params['limit_val_batches'] = args.limit_val_batches
+        trainer_params['max_steps'] = max_steps
+        trainer_params['val_check_interval'] = val_check_interval
+        trainer_params['limit_val_batches'] = limit_val_batches
 
         trainer_params['accelerator'] = 'auto'
-        trainer_params['devices'] = args.gpu_devices
-        # trainer_params['num_nodes'] = args.num_nodes
+        trainer_params['devices'] = gpu_devices
+        # trainer_params['num_nodes'] = num_nodes
         trainer_params['precision'] = 16
 
     # Initialize trainer with configured parameters
     trainer = Trainer(**trainer_params)
 
     # wrap optimizer and model with intel extension for pytorch 
-    optimizer = torch.optim.AdamW(PL_model.parameters(), lr=args.lr)
+    optimizer = torch.optim.AdamW(PL_model.parameters(), lr=lr)
     # PL_model, optimizer = ipex.optimize(PL_model, optimizer=optimizer, dtype=torch.float32)
 
     # Handle different training scenarios
-    if args.resume_from_checkpoint == "None":
+    if resume_from_checkpoint == "None":
         print("Train from scratch")
         trainer.fit(PL_model, data_module)
-    elif args.resume_from_checkpoint != 'None' and args.start_pfam_trainer.lower() =='true':
+    elif resume_from_checkpoint != 'None' and start_pfam_trainer:
         print('Start training Proteoscribe in phase 2 ...')
         trainer.fit(PL_model, data_module)
     else:
         print('Continue training Proteoscribe in phase 2 ...')
-        trainer.fit(PL_model, data_module, ckpt_path=args.resume_from_checkpoint)
+        trainer.fit(PL_model, data_module, ckpt_path=resume_from_checkpoint)
 
     help_tools.print_gpu_initialization()
 
@@ -742,9 +770,21 @@ def train_model(
     )
 
 
-@hydra.main(config_path="configs", config_name="config", version_base=None)
+def print_config(cfg):
+    for k in sorted(list(cfg.keys())):
+        if hasattr(cfg[k], "keys"):
+            print(f"{k}:")
+            for kk in sorted(list(cfg[k].keys())):
+                print(f"\t{kk}: {cfg[k][kk]}")
+        else:
+            print(f"{k}: {cfg[k]}")
+
+
+@hydra.main(config_path="../configs", config_name="flat_config", version_base=None)
 def main(cfg: DictConfig):
     print("Starting")
+    print_config(cfg)
+        
 
     #######################
     # Clear the GPU cache #

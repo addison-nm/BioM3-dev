@@ -3,3 +3,4 @@ output_hist_folder: ./logs/history/test_stage3
 tb_logger_path: ./logs/history
 tb_logger_folder: Stage3_history
 log_every_n_steps: 1000
+save_hist_path: null

@@ -1,0 +1,16 @@
+zero_optimization:
+    stage: 1
+    allgather_bucket_size: 5e8
+    reduce_bucket_size: 5e8
+    offload_optimizer:
+        device: cpu
+        pin_memory: False
+    offload_param:
+        device: cpu
+        pin_memory: False
+    overlap_comm: True
+    contiguous_gradients: True
+stage3_max_live_parameters: 1e9
+stage3_max_reuse_distance: 1e8
+stage3_prefetch_bucket_size: 5e8
+stage3_param_persistence_threshold: 1e6

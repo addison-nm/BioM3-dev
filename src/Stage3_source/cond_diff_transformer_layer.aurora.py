@@ -372,16 +372,16 @@ def get_model(args, data_shape, num_classes):
     transformer_heads = args.transformer_heads
     transformer_depth = args.transformer_depth
     transformer_blocks = args.transformer_blocks
-    diffusion_steps = args.diffusion_steps
     input_dp_rate = args.input_dp_rate
+    diffusion_steps = args.diffusion_steps
 
-    C, L = num_classes, args.diffusion_steps
+    C, L = num_classes, diffusion_steps
 
     class DiffTransformer(nn.Module):
         def __init__(self):
             super().__init__()
             self.transformer = StandardDiffusionTransformer(
-                args=args,
+                args=args.model,
                 input_dim=C,
                 output_dim=C,
                 dim=transformer_dim,

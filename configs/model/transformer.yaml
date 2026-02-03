@@ -1,6 +1,0 @@
-name: transformer
-dim: 1024
-heads: 16
-depth: 32
-text_emb_dim: 512
-facilitator: MMD

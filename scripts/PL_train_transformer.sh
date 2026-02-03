@@ -30,7 +30,6 @@ export ema_power=0.75 # (not needed with pl for now)
 export ema_max_value=0.95 # (not needed with pl for now)
 export precision='32' # (not needed with pl for now)
 export device='cuda' # Use GPU
-export model_option='transformer' # (artifact from mnist)
 export num_classes=29 #24 #29 # 20 aa labels, 1 deletion padded token, 1 start token, 1 end token
 export num_y_class_labels=6 # conditional variables
 export task='proteins' # (artifact from mnist)

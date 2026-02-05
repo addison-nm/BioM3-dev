@@ -1,0 +1,3 @@
+entity: thenaturalmachine
+project: BioM3
+wandb_logging_dir: ./logs/wandb

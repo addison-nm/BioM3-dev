@@ -536,7 +536,7 @@ def clear_gpu_cache():
     gc.collect()
     return
 
-def retieve_all_args();
+def retieve_all_args():
     """
     Collect and consolidate all command line arguments from various components.
     
@@ -679,7 +679,7 @@ def train_model(
     }
 
     strategy = DeepSpeedStrategy(
-                config=ds_config
+        config=ds_config
     )
 
     # Set up TensorBoard logging
@@ -793,11 +793,11 @@ if __name__ == '__main__':
     data_module = load_data(args=args)
 
     ##############
-    # Load Model #
+    # Load Model #``
     ##############
     PL_model = load_model(
-            args=args,
-            data_module
+        args=args,
+        data_module=data_module
     )
     
     ###############

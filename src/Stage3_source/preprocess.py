@@ -309,6 +309,8 @@ def HDF5_prepare_protein_data(args, sequences):
         list: A list containing one element - the numerically encoded, 
               filtered, and padded sequence
     """
+    diffusion_steps = args["diffusion_steps"]
+    image_size = args["image_size"]
     #print('Prepare dataset')
     sequences = sequences.decode('utf-8')
     # Prepare sequences: Remove gaps and add start/end tokens
@@ -316,13 +318,13 @@ def HDF5_prepare_protein_data(args, sequences):
     seq_list = ['<START>'] + [aa for aa in seq_list] + ['<END>']
     seq_lens = [len(seq) for seq in seq_list]
     # Determine the maximum sequence length based on context window size
-    max_seq_len = int(args.diffusion_steps)
+    max_seq_len = int(diffusion_steps)
     # Get indices of sequences that meet the criteria
     valid_indices = [i for i, seq in enumerate(seq_list) if len(seq) <= max_seq_len]
     # Filter sequences based on these indices
     filter_seq_list = [seq_list[i] for i in valid_indices]
     # Padding sequences to a uniform length
-    padded_seq_list = pad_ends(seqs=filter_seq_list, max_seq_length=int(args.image_size * args.image_size))
+    padded_seq_list = pad_ends(seqs=filter_seq_list, max_seq_length=int(image_size * image_size))
     num_seq_list = create_num_seqs(padded_seq_list)  # Numerical representations
     return [num_seq_list]
 

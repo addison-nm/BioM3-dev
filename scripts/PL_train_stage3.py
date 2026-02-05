@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+
+"""Training script for BioM3 Stage 3
+
+Support for PyTorch Lightning, Hydra, and Weights&Biases
+
+"""
+
 import os
 import numpy as np
 import random
@@ -16,6 +23,7 @@ import pytorch_lightning as pl
 from pytorch_lightning import Trainer
 from pytorch_lightning.strategies import DeepSpeedStrategy
 from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
 from pytorch_lightning.callbacks import ModelCheckpoint
 
@@ -37,6 +45,9 @@ import deepspeed
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
+# WandB
+import wandb
+
 
 # Custom modules
 import Stage3_source.preprocess as prep
@@ -45,179 +56,7 @@ import Stage3_source.helper_funcs as help_tools
 import Stage3_source.PL_wrapper as PL_mod
 
 
-def get_args(parser):
-    """
-    Configure argument parser with all training, model, and data parameters.
-    
-    This function adds a comprehensive set of arguments to the provided parser,
-    including data paths, training hyperparameters, checkpointing options,
-    model architecture settings, diffusion parameters, and dataset configurations.
-    It serves as the central configuration point for the entire training pipeline.
-    
-    Args:
-        parser: ArgumentParser object to which arguments will be added
-        
-    Returns:
-        The parser with the complete set of arguments added
-    """
-    parser.add_argument('--data-root', default="./data/ARDM_temp_homolog_family_dataset.csv", type=Path,
-                        help='path to dataset root director')
-
-    parser.add_argument('--tb_logger_path', default=None, type=str,
-                        help='checkpoint path to pretrained weights')
-    parser.add_argument('--tb_logger_folder', default=None, type=str,
-                        help='tensorboard path containing checkpoints')
-    parser.add_argument('--resume_from_checkpoint', default=None, type=str,
-                        help='checkpoint path to last model iteration (usually last.ckpt)')
-
-
-    parser.add_argument('--dataset', default="normal", type=str,
-                        choices=['normal', 'sequence'],
-                        help='which dataset to train on')
-    parser.add_argument('--workers', default=0, type=int,
-                        help='number of data loader workers')
-    parser.add_argument('--warmup-steps', default=500, type=int,
-                        help='number of learning rate warmup steps')
-    parser.add_argument('--total-steps', default=1000, type=int,
-                        help='total number of steps of minibatch gradient descent')
-    parser.add_argument('--batch-size', default=16, type=int,
-                        help='mini-batch size')
-    parser.add_argument('--weight-decay', default=1e-6, type=float,
-                        help='weight decay')
-    parser.add_argument('--lr', default=3e-4, type=float,
-                        help='learning rate')
-    parser.add_argument('--ema_inv_gamma', default=1.0, type=float,
-                        help='inverse gamma parameter for exponential moving average')
-    parser.add_argument('--ema_power', default=0.75, type=float,
-                        help='power parameter for exponential moving average')
-    parser.add_argument('--ema_max_value', default=0.999, type=float,
-                        help='max value parameter for exponential moving average')
-    parser.add_argument('--precision', default='no', type=str, choices=['no', 'fp16', 'bf16', '32'],
-                        help='whether to use 16-bit or 32-bit training')
-    parser.add_argument('--seed', default=0, type=int,
-                        help='random number seed')
-    parser.add_argument('--checkpoint-dir', default='./checkpoint/', type=Path,
-                        help='path to checkpoint directory')
-    parser.add_argument('--checkpoint-prefix', default='channels',
-                        help='prefix for local checkpoint')
-    parser.add_argument('--device', default='cuda', type=str,
-                        help='computational device')
-    parser.add_argument('--model_option', default='transformer', type=str,
-                        choices=['Unet', 'transformer'],
-                        help='Choose model architecture')
-    parser.add_argument('--download', default=True, type=bool,
-                        help='Download dataset')
-    parser.add_argument('--swissprot_data_root', default=None, type=str,
-                        help='path to SwissProt data')
-    parser.add_argument('--pfam_data_root', default=None, type=str,
-                        help='path to Pfam data')
-
-
-    # diffusion param
-    parser.add_argument('--diffusion_steps', default=256, type=int,
-                        help='number of timesteps, should be as long as the sequence')
-    parser.add_argument('--task', default='MNIST', type=str,
-                        help='problem system: MNIST or proteins')
-    parser.add_argument('--enter_eval', default=1000, type=int,
-                        help='iteration step to evaluation performance.')
-
-
-    # number of epochs
-    parser.add_argument('--epochs', default=1, type=int,
-                        help='number of epochs for training...')
-    parser.add_argument('--sequence_keyname', default='seq', type=str,
-                        help='key name that belongs to the sequence list..')
-    parser.add_argument('--facilitator', default='None', type=str,
-                choices=['MSE', 'MMD', 'Default', 'None'],
-                help='Option whether facilitator was used')
-    parser.add_argument('--valid_size', default=0.1, type=float,
-                        help='Validation dataset size...')
-    parser.add_argument('--num_workers', default=4, type=int,
-                        help='Number of dataloader workers...')
-
-    # training on pfam database...
-    parser.add_argument('--max_steps', default=100000, type=int,
-                        help='number of iteration steps for training...')
-    parser.add_argument('--val_check_interval', default=10000, type=int,
-                        help='number of steps before starting evaluation on validation...')
-    parser.add_argument('--limit_val_batches', default=0.05, type=float,
-                        help='number of samples to validate on...')
-    parser.add_argument('--log_every_n_steps', default=10001, type=float,
-                        help='number of samples to validate on...')
-    parser.add_argument('--start_pfam_trainer', default='False', type=str,
-                        help='decide whether we are running script that transitions from swissprot to swissprot+pfam')
-
-
-    return parser
-
-
-def get_model_args(parser):
-    """
-    Configure argument parser with model-specific parameters.
-    
-    This function adds arguments to the provided parser for configuring 
-    model training settings including image size, class counts, embedding dimensions,
-    optimization parameters, and hardware utilization options.
-    
-    Args:
-        parser: ArgumentParser object to which arguments will be added
-        
-    Returns:
-        The parser with added model-specific arguments
-    """
-    parser.add_argument('--image-size', default=16, type=int,
-                        help='size of training images, for rescaling')
-    parser.add_argument('--num_classes', default=3, type=int,
-                        help='No. of classes for transformer')
-    parser.add_argument('--text_emb_dim', default=256, type=int,
-                        help='size of the text embedding')
-    parser.add_argument('--num_y_class_labels', default=10, type=int,
-            help='No. of y class labels for conditioning tranformer')
-    parser.add_argument('--choose_optim', default='AdamW', type=str,
-            help='Choose optimizer for training')
-    parser.add_argument('--acc_grad_batches', default=4, type=int,
-            help='Choose how many gradient steps to accumulate')
-    parser.add_argument('--gpu_devices', default=1, type=int,
-            help='Number of GPUs to used for training')
-    parser.add_argument('--num_nodes', default=1, type=int,
-            help='Number of nodes to used for training')
-    def float_or_str(value):
-        try:
-            return float(value)
-        except ValueError:
-            return value
-    parser.add_argument('--scheduler_gamma', default=None, type=float_or_str,
-                        help='Define the learning rate scheduler')
-    return parser
-
-
-def get_path_args(parser):
-    """
-    Configure argument parser with path-related parameters.
-    
-    This function adds arguments to the provided parser for specifying 
-    various file paths and directories needed for training outputs, 
-    checkpoints, logs, and version tracking.
-    
-    Args:
-        parser: ArgumentParser object to which arguments will be added
-        
-    Returns:
-        The parser with added path-specific arguments
-    """
-    parser.add_argument('--output_hist_folder', default='./outputs/training_history', type=str,
-                        help='Path to save model weights')
-    parser.add_argument('--output_folder', default='./outputs/', type=str,
-                        help='Folder containing all the necessary subfolders')
-    parser.add_argument('--save_hist_path', default='./outputs/training_history/transformer_MNIST_train_hist.csv', type=str,
-                        help='Path to save history training logs')
-    parser.add_argument('--version_name', default=None, type=str,
-                        help='Name of version sub-directory')
-    parser.add_argument('--resume_from_checkpoint_state_dict_path', default=None, type=str,
-                        help='Path to the deepspeed pytorch ckpt saved as state dict...')
-    return parser
-
-def set_seed(args: any):
+def set_seed(seed):
     """
     Set random seeds for reproducibility across different libraries.
     
@@ -226,14 +65,14 @@ def set_seed(args: any):
     the seed value specified in the arguments.
     
     Args:
-        args: Configuration object containing a 'seed' attribute
+        seed: Random seed
         
     Returns:
         None
     """
-    torch.manual_seed(args.seed)
-    np.random.seed(args.seed)
-    random.seed(args.seed)
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
     return
 
 
@@ -276,6 +115,7 @@ def compile_model(
     )
     return PL_model
 
+
 def save_history_log(
         args: any,
         hist_log: dict
@@ -297,6 +137,7 @@ def save_history_log(
     hist_df = pd.DataFrame(hist_log)
     hist_df.to_csv(args.save_hist_path, index=False)
     return
+
 
 def get_model_params(
         model_param_df_path,
@@ -361,6 +202,7 @@ def get_protein_dataloader(args=any) -> DataLoader:
     )
     return protein_dataloader
 
+
 def get_deepspeed_model(args: any, PL_model) -> pl.LightningModule:
     """
     Load a model from a DeepSpeed checkpoint.
@@ -390,6 +232,7 @@ def get_deepspeed_model(args: any, PL_model) -> pl.LightningModule:
     )
     return loaded_model
 
+
 def save_model(
         args: any,
         checkpoint_path: str,
@@ -417,7 +260,7 @@ def save_model(
         None
     """
     image_size = args.image_size
-    num_classes = args.num_classes
+    num_classes = args.dataset["num_classes"]
 
     # once saved via the model checkpoint callback...
     # we have a saved folder containing the deepspeed checkpoint rather than a single file
@@ -435,19 +278,22 @@ def save_model(
         loaded_model = PL_mod.PL_ProtARDM.load_from_checkpoint(single_ckpt_path, args=args, model=new_temp_model)
         # make sure that datatypes or the same ...
         if PL_model.dtype != loaded_model.dtype:
-            assert False, "Data types are not matching"
+            msg = "Data types are not matching."
+            msg += f" Expected {PL_model.dtype}. Got: {loaded_model.dtype} (from loaded)"
+            assert False, msg
         else:
             # save model state dict without pytorch lightning wrapper
-            torch.save(loaded_model.model.state_dict(), checkpoint_path + '/state_dict.pth', weights_only=False)
+            torch.save(loaded_model.model.state_dict(), checkpoint_path + '/state_dict.pth')
             if hasattr(loaded_model, 'ema_model'):
                 print('Also saving EMA model...')
-                torch.save(loaded_model.ema_model.state_dict(), checkpoint_path + '/state_dict_ema.pth', weights_only=False)
+                torch.save(loaded_model.ema_model.state_dict(), checkpoint_path + '/state_dict_ema.pth')
             # check model params
             get_model_params(
                     checkpoint_path + '/params.csv',
                     model=loaded_model.model
             )
     return
+
 
 def str_to_bool(s):
     """
@@ -501,33 +347,13 @@ def clear_gpu_cache():
     gc.collect()
     return
 
-def retrieve_all_args():
-    """
-    Collect and consolidate all command line arguments from various components.
-    
-    This function creates an ArgumentParser and populates it with arguments 
-    from multiple sources including general parameters, model-specific settings,
-    architecture-specific parameters, and file path configurations. It then
-    parses the command line input and returns the complete argument object.
-    
-    This serves as the central point for collecting all configuration parameters
-    needed across the entire application.
-    
-    Args:
-        None
-        
-    Returns:
-        argparse.Namespace: A namespace object containing all parsed arguments
-    """
-    parser = argparse.ArgumentParser(description='Stage 3: ProteoScribe')
-    get_args(parser=parser)
-    get_model_args(parser=parser)
-    mod.add_model_args(parser=parser)
-    get_path_args(parser=parser)
-    args = parser.parse_args()
-    return args
 
-def load_data(args):
+def load_data(
+        args, *,
+        swissprot_data_root,
+        pfam_data_root,
+        facilitator,
+):
     """
     Initialize and prepare a data module for protein sequence datasets.
     
@@ -544,16 +370,22 @@ def load_data(args):
         A configured PyTorch Lightning data module ready for use in training
     """
     data_module = PL_mod.HDF5_PFamDataModule(
-                            args=args,
-                            swissprot_path=args.swissprot_data_root,
-                            pfam_path=args.pfam_data_root,
-                            group_name=args.facilitator + '_data'  # Uses facilitator type as prefix
+                            batch_size=args.batch_size,
+                            num_workers=args.num_workers,
+                            valid_size=args.valid_size,
+                            seed=args.seed,
+                            diffusion_steps=args.diffusion_steps,
+                            image_size=args.image_size,
+                            swissprot_path=swissprot_data_root,
+                            pfam_path=pfam_data_root,
+                            group_name=facilitator + '_data'  # Uses facilitator type as prefix
     )
     data_module.setup()
     return data_module
 
+
 def load_model(
-    args,
+    args, *,
     data_module
     ):
     """
@@ -580,7 +412,7 @@ def load_model(
     acc_grad_batches = args.acc_grad_batches
     diffusion_steps = args.diffusion_steps
     image_size = args.image_size
-    num_classes = args.num_classes
+    num_classes = args.dataset.num_classes
     num_nodes = args.num_nodes
     batch_size = args.batch_size
 
@@ -605,10 +437,11 @@ def load_model(
     print('Model size:', sum(p.numel() for p in PL_model.model.parameters()))
     return PL_model
 
+
 def train_model(
         args,
         PL_model,
-        data_module
+        data_module,
     ):
     """
     Train a PyTorch Lightning model with DeepSpeed distributed optimization.
@@ -632,12 +465,12 @@ def train_model(
     Returns:
         None - results are saved to the paths specified in args
     """
-
+    # Note: Nested args must be accessed via dictionaries, not attributes.
     tb_logger_path = args.tb_logger_path
     tb_logger_folder = args.tb_logger_folder
     version_name = args.version_name
     log_every_n_steps = args.log_every_n_steps
-    pfam_data_root = args.pfam_data_root
+    pfam_data_root = args.dataset["pfam_data_root"]
     gpu_devices = args.gpu_devices
     num_nodes = args.num_nodes
     acc_grad_batches = args.acc_grad_batches
@@ -646,39 +479,24 @@ def train_model(
     max_steps = args.max_steps
     val_check_interval = args.val_check_interval
     limit_val_batches = args.limit_val_batches
-    lr = args.lr
+    lr = args.optimizer["lr"]
     resume_from_checkpoint = args.resume_from_checkpoint
+    precision = args.precision
     
-
     # Configure DeepSpeed optimization settings
-    ds_config = {
-        "zero_optimization": {
-            "stage": 1,
-            "allgather_bucket_size": 5e8,
-            "reduce_bucket_size": 5e8,
-            "offload_optimizer": {
-                "device": "cpu",
-                "pin_memory": False
-            },
-            "offload_param": {
-                "device": "cpu",
-                "pin_memory": False
-            },
-            "overlap_comm": True,
-            "contiguous_gradients": True
-        },
-        "stage3_max_live_parameters": 1e9,
-        "stage3_max_reuse_distance": 1e8,
-        "stage3_prefetch_bucket_size": 5e8,
-        "stage3_param_persistence_threshold": 1e6,
-    }
-
+    ds_config = args.deepspeed
     strategy = DeepSpeedStrategy(
-                config=ds_config
+        config=ds_config
     )
 
     # Set up TensorBoard logging
-    logger = TensorBoardLogger(tb_logger_path + tb_logger_folder, version=version_name)
+    tb_logger = TensorBoardLogger(
+        os.path.join(tb_logger_path, tb_logger_folder), 
+        version=version_name
+    )
+
+    # Set up Weights&Biases logging
+    wandb_logger = WandbLogger(log_model="all")  # TODO: investigate "all"
 
     # Monitor learning rate changes
     lr_monitor = pl.callbacks.LearningRateMonitor(logging_interval='step')
@@ -686,7 +504,7 @@ def train_model(
     # Configure checkpoint strategy based on dataset type
     if pfam_data_root != 'None':
         checkpoint_callback = ModelCheckpoint(
-            dirpath=tb_logger_path + tb_logger_folder + '/checkpoints/' + version_name,
+            dirpath=os.path.join(tb_logger_path, tb_logger_folder, 'checkpoints', version_name),
             save_top_k=2,
             verbose=True,
             monitor='val_loss',
@@ -696,7 +514,7 @@ def train_model(
         )
     else:
         checkpoint_callback = ModelCheckpoint(
-            dirpath=tb_logger_path + tb_logger_folder + '/checkpoints/' + version_name,
+            dirpath=os.path.join(tb_logger_path, tb_logger_folder, 'checkpoints', version_name),
             save_top_k=2,
             verbose=True,
             monitor='val_loss',
@@ -714,7 +532,7 @@ def train_model(
         'accelerator': 'cuda',
         'strategy': 'deepspeed_stage_2',
         'accumulate_grad_batches': acc_grad_batches,
-        'logger': logger,
+        'logger': [tb_logger, wandb_logger],
         'log_every_n_steps': log_every_n_steps,
         'callbacks': [checkpoint_callback, lr_monitor],
     }
@@ -737,7 +555,7 @@ def train_model(
         trainer_params['accelerator'] = 'auto'
         trainer_params['devices'] = gpu_devices
         # trainer_params['num_nodes'] = num_nodes
-        trainer_params['precision'] = 16
+        trainer_params['precision'] = precision
 
     # Initialize trainer with configured parameters
     trainer = Trainer(**trainer_params)
@@ -780,48 +598,61 @@ def print_config(cfg):
             print(f"{k}: {cfg[k]}")
 
 
-@hydra.main(config_path="../configs", config_name="flat_config", version_base=None)
+@hydra.main(config_path="../configs", config_name="default", version_base=None)
 def main(cfg: DictConfig):
-    print("Starting")
-    print_config(cfg)
-        
-
-    #######################
-    # Clear the GPU cache #
-    #######################
-    clear_gpu_cache()
     
-    ########################
-    # Get input argumenmts #
-    ########################
-    # args = retrieve_all_args()
+    # ----- Process config parameters ----- #
+    print_config(cfg)
+    seed = cfg.seed
+    swissprot_data_root = cfg.dataset.swissprot_data_root
+    pfam_data_root = cfg.dataset.pfam_data_root
+    facilitator = cfg.facilitator
 
-    ######################
-    # For reproducbility #
-    ######################
-    set_seed(args=cfg)
+    
+    # ----- Clear the GPU cache ----- #
+    clear_gpu_cache()
+
+    # ----- For reproducibility ----- #
+    set_seed(seed)
      
-    #############
-    # Load Data #
-    #############
-    data_module = load_data(args=cfg)
+    # ----- Load Data ----- #
+    data_module = load_data(
+        args=cfg,
+        swissprot_data_root=swissprot_data_root,
+        pfam_data_root=pfam_data_root,
+        facilitator=facilitator,
+    )
 
-    ##############
-    # Load Model #
-    ##############
+    # ----- Load Model ----- #
     PL_model = load_model(
-            args=cfg,
-            data_module=data_module
+        args=cfg,
+        data_module=data_module
     )
     
-    ###############
-    # Train Model #
-    ###############
-    train_model(
-            args=cfg,
+    # ----- Prepare Weights&Biases coverage ----- #
+    # See: https://docs.wandb.ai/models/integrations/hydra and
+    # issue solution at: https://github.com/wandb/docs/issues/1964
+    cfg_dict = OmegaConf.to_container(
+        cfg, resolve=True, throw_on_missing=True
+    )
+    entity = cfg["wandb"]["entity"]
+    project = cfg["wandb"]["project"]
+    wandb_dir = cfg["wandb"]["wandb_logging_dir"]
+    # del cfg_dict["wandb"]  # don't need to log these
+    
+    # ----- Train Model ----- #
+    with wandb.init(entity, project, config=cfg_dict, dir=wandb_dir) as run:
+        train_model(
+            args=run.config,
             PL_model=PL_model,
             data_module=data_module
-    )
+        )
+    
+    # train_model(
+    #     args=cfg,
+    #     PL_model=PL_model,
+    #     data_module=data_module,
+    # )
 
 
 if __name__ == '__main__':

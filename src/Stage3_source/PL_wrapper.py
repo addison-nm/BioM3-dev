@@ -148,30 +148,37 @@ class PL_ProtARDM(pl.LightningModule):
                               scheduler settings, or just the optimizer if no
                               scheduler is specified
         """
-        if self.script_args.choose_optim == 'AdamW':
+        choose_optim = self.script_args.optimizer.name
+        lr = self.script_args.optimizer.lr
+        weight_decay = self.script_args.optimizer.weight_decay
+        scheduler_gamma = self.script_args.optimizer.scheduler_gamma
+        traindata_len = self.script_args.traindata_len
+        epochs = self.script_args.epochs
+
+        if choose_optim == 'AdamW':
 
             if isinstance(self, FSDP):
                 print("Enter FSDP")
-                optimizer = torch.optim.AdamW(self.parameters(), lr=self.script_args.lr, weight_decay=self.script_args.weight_decay)
+                optimizer = torch.optim.AdamW(self.parameters(), lr=lr, weight_decay=weight_decay)
 
             else:
-                optimizer = torch.optim.AdamW(self.parameters(), lr=self.script_args.lr, weight_decay=self.script_args.weight_decay)
+                optimizer = torch.optim.AdamW(self.parameters(), lr=lr, weight_decay=weight_decay)
 
-        elif self.script_args.choose_optim == 'AdaFactor':
-            optimizer = Adafactor(self.parameters(), lr=self.script_args.lr, weight_decay=self.script_args.weight_decay, relative_step=False)
+        elif choose_optim == 'AdaFactor':
+            optimizer = Adafactor(self.parameters(), lr=lr, weight_decay=weight_decay, relative_step=False)
 
-        elif self.script_args.choose_optim == 'Adam':
-            optimizer = torch.optim.Adam(self.parameters(), lr=self.script_args.lr)
+        elif choose_optim == 'Adam':
+            optimizer = torch.optim.Adam(self.parameters(), lr=lr)
 
-        elif self.script_args.choose_optim == 'DeepSpeedCPUAdam':
-            optimizer = DeepSpeedCPUAdam(self.parameters(), lr=self.script_args.lr, weight_decay=self.script_args.weight_decay)
+        elif choose_optim == 'DeepSpeedCPUAdam':
+            optimizer = DeepSpeedCPUAdam(self.parameters(), lr=lr, weight_decay=weight_decay)
 
-        if self.script_args.scheduler_gamma is not None:
-            if isinstance(self.script_args.scheduler_gamma, str):
-                if 'coswarmup' == self.script_args.scheduler_gamma.lower():
+        if scheduler_gamma is not None:
+            if isinstance(scheduler_gamma, str):
+                if 'coswarmup' == scheduler_gamma.lower():
                     print(f'Using cossine warmup scheduler with decay')
-                    num_warmup_steps=self.script_args.traindata_len
-                    num_training_steps=self.script_args.traindata_len*self.script_args.epochs
+                    num_warmup_steps=traindata_len
+                    num_training_steps=traindata_len * epochs
                     print(f'Num_warmup_steps={num_warmup_steps}')
                     print(f'Num_training_steps={num_training_steps}')
 
@@ -205,11 +212,11 @@ class PL_ProtARDM(pl.LightningModule):
                     #    },
                     #}
             else:
-                print(f'Using Exponential learning rate decay / epoch with factor: {self.script_args.scheduler_gamma}')
+                print(f'Using Exponential learning rate decay / epoch with factor: {scheduler_gamma}')
                 return {
                     "optimizer": optimizer,
                     "lr_scheduler": {
-                        "scheduler": optim.lr_scheduler.ExponentialLR(optimizer, gamma=self.script_args.scheduler_gamma, verbose=True),
+                        "scheduler": optim.lr_scheduler.ExponentialLR(optimizer, gamma=scheduler_gamma, verbose=True),
                         "interval": "epoch",
                     },
                 }
@@ -373,12 +380,14 @@ class PL_ProtARDM(pl.LightningModule):
         Returns:
             tuple: (loss, metrics) where metrics is a tuple of performance measurements
         """
+        device = self.script_args.device
+
         bs, channel, seq_length = realization.size()
 
         # get a batch of random sampling paths
-        sampled_random_path = trainer_tools.sample_random_path(bs, seq_length, device=self.script_args.device)
+        sampled_random_path = trainer_tools.sample_random_path(bs, seq_length, device=device)
         # sample a set of random smapling steps for each individual training sequences in the current batch
-        idx = trainer_tools.sample_random_index_for_sampling(bs, seq_length, device=self.script_args.device, option='random')
+        idx = trainer_tools.sample_random_index_for_sampling(bs, seq_length, device=device, option='random')
         # we create a mask that masks the location were we've already sampled
         random_path_mask = trainer_tools.create_mask_at_random_path_index(sampled_random_path, idx, bs, seq_length)
         # create a mask that masks the location where we are currently sampling
@@ -401,7 +410,7 @@ class PL_ProtARDM(pl.LightningModule):
         log_prob = trainer_tools.log_prob_of_realization(self.script_args, conditional_prob, real_tokens)
 
         # compute an average over all the unsampled
-        #log_prob_unsampled = trainer_tools.log_prob_of_unsampled_locations(log_prob.to(self.script_args.device), real_token_masked.to(self.script_args.device))
+        #log_prob_unsampled = trainer_tools.log_prob_of_unsampled_locations(log_prob.to(device), real_token_masked.to(device))
         log_prob_unsampled = trainer_tools.log_prob_of_unsampled_locations(log_prob, real_token_masked)
         #log_prob_unsampled = trainer_tools.log_prob_of_unsampled_locations(log_prob, real_token_masked, real_tokens)
 
@@ -769,8 +778,13 @@ class HDF5_PFamDataModule(pl.LightningDataModule):
     - Proper resource management with HDF5 file closing
     """
     def __init__(
-        self,
-        args,
+        self, *,
+        batch_size,
+        num_workers,
+        valid_size,
+        seed,
+        diffusion_steps,
+        image_size,
         swissprot_path=None,
         pfam_path=None,
         group_name='data'
@@ -791,15 +805,22 @@ class HDF5_PFamDataModule(pl.LightningDataModule):
                        (e.g., 'MMD_data', 'MSE_data', 'data')
         """
         super().__init__()
-        self.args = args
+        self.args = {
+            "batch_size": batch_size,
+            "num_workers": num_workers,
+            "valid_size": valid_size,
+            "seed": seed,
+            "diffusion_steps": diffusion_steps,
+            "image_size": image_size,
+        }
         self.swissprot_path = swissprot_path
         self.pfam_path = pfam_path
         self.group_name = group_name
-        self.batch_size = args.batch_size
-        self.num_workers = args.num_workers
-        self.valid_size = args.valid_size
-        self.seed = args.seed
-        self.min_seq_length = args.diffusion_steps - 2  # Minimum sequence length threshold
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.valid_size = valid_size
+        self.seed = seed
+        self.min_seq_length = diffusion_steps - 2  # Minimum sequence length threshold
 
     def setup(self, stage=None):
         """

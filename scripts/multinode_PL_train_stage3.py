@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+
+"""Multinode training script for BioM3 Stage 3
+
+Support for PyTorch Lightning and Weights&Biases
+
+"""
+
 import os
 import numpy as np
 import random
@@ -16,6 +23,7 @@ import pytorch_lightning as pl
 from pytorch_lightning import Trainer
 from pytorch_lightning.strategies import DeepSpeedStrategy
 from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.plugins.environments import ClusterEnvironment
@@ -24,15 +32,14 @@ from pytorch_lightning.strategies import DeepSpeedStrategy
 # DeepSpeed is needed for the DeepSpeedStrategy
 import deepspeed
 
+# WandB
+import wandb
+
 # Custom modules
 import Stage3_source.preprocess as prep
 import Stage3_source.cond_diff_transformer_layer as mod
 import Stage3_source.helper_funcs as help_tools
 import Stage3_source.PL_wrapper as PL_mod
-
-
-
-
 
 
 class MyClusterEnvironment(ClusterEnvironment):
@@ -92,6 +99,7 @@ def set_distribution():
 
     return
 
+
 def get_args(parser):
     """
     Configure argument parser with all training, model, and data parameters.
@@ -108,7 +116,7 @@ def get_args(parser):
         The parser with the complete set of arguments added
     """
     parser.add_argument('--data-root', default="./data/ARDM_temp_homolog_family_dataset.csv", type=Path,
-                        help='path to dataset root director')
+                        help='path to dataset root directory')
 
     parser.add_argument('--tb_logger_path', default=None, type=str,
                         help='checkpoint path to pretrained weights')
@@ -264,6 +272,20 @@ def get_path_args(parser):
                         help='Path to the deepspeed pytorch ckpt saved as state dict...')
     return parser
 
+
+def get_wrapper_args(parser):
+    """
+
+    """
+    parser.add_argument('--hydra', action="store_true", 
+                        help='Whether to run with Hydra.')
+    parser.add_argument('--wandb_entity', type=str, default=None, 
+                        help='Weights&Biases entity.')
+    parser.add_argument('--wandb_project', type=str, default=None, 
+                        help='Weights&Biases project.')
+    return parser
+
+
 def set_seed(args: any):
     """
     Set random seeds for reproducibility across different libraries.
@@ -309,12 +331,14 @@ def compile_model(
             data_shape=data_shape,
             num_classes=num_classes
     ).cpu()
+
     PL_model = PL_mod.PL_ProtARDM(
         args=args,
         model=model,
         #ema_model=ema_model,
     )
     return PL_model
+
 
 def save_history_log(
         args: any,
@@ -337,6 +361,7 @@ def save_history_log(
     hist_df = pd.DataFrame(hist_log)
     hist_df.to_csv(args.save_hist_path, index=False)
     return
+
 
 def get_model_params(
         model_param_df_path,
@@ -401,6 +426,7 @@ def get_protein_dataloader(args=any) -> DataLoader:
     )
     return protein_dataloader
 
+
 def get_deepspeed_model(args: any, PL_model) -> pl.LightningModule:
     """
     Load a model from a DeepSpeed checkpoint.
@@ -429,6 +455,7 @@ def get_deepspeed_model(args: any, PL_model) -> pl.LightningModule:
             model=PL_model.model
     )
     return loaded_model
+
 
 def save_model(
         args: any,
@@ -484,6 +511,7 @@ def save_model(
                     model=loaded_model.model
             )
     return
+
 
 def str_to_bool(s):
     """

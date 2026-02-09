@@ -1,17 +1,6 @@
-# BioM3 development
+# Setup Notes
 
-## About
-
-## Setup
-
-### Polaris
-
-Clone the repository:
-
-```bash 
-git clone https://github.com/addison-nm/BioM3-dev.git
-cd BioM3-dev
-```
+## Polaris 
 
 Create the environment, copying packages from custom base environment on Polaris.
 
@@ -33,12 +22,10 @@ Install source code with dependencies (specified in pyproject.toml).
 python -m pip install -e .
 
 # The following are included in the pyproject.toml file
-# pytorch-lightning==2.5.1.post0
-# axial-positional-embedding==0.3.12
-# linear-attention-transformer==0.19.1
-# biopython==1.85
-# hydra-core==1.3
-# wandb==0.24.1
+#python -m pip install pytorch-lightning==2.5.1.post0
+#python -m pip install axial-positional-embedding==0.3.12
+#python -m pip install linear-attention-transformer==0.19.1
+#python -m pip install biopython==1.85
 ```
 
 To activate (on compute node, with access to GPU):
@@ -56,7 +43,6 @@ Basic verification. **Note: might only succeed on compute node.**
 python -c 'import torch; import pytorch_lightning as pl; import deepspeed; import Stage3_source.preprocess as prep'
 ```
 
-## Usage
+## Aurora
 
-## References
-
+TODO...

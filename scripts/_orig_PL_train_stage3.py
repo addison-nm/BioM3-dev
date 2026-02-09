@@ -1,11 +1,4 @@
 #!/usr/bin/env python3
-
-"""Training script for BioM3 Stage 3
-
-Support for PyTorch Lightning and Weights&Biases
-
-"""
-
 import os
 import numpy as np
 import random
@@ -18,78 +11,33 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-# PyTorch Lightning imports
-import pytorch_lightning as pl
-from pytorch_lightning import Trainer
-from pytorch_lightning.strategies import DeepSpeedStrategy
-from pytorch_lightning.loggers import TensorBoardLogger
-from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
-from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.plugins.environments import ClusterEnvironment
+# # PyTorch Lightning imports
+# import pytorch_lightning as pl
+# from pytorch_lightning import Trainer
+# from pytorch_lightning.strategies import DeepSpeedStrategy
+# from pytorch_lightning.loggers import TensorBoardLogger
+# from pytorch_lightning.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
+# from pytorch_lightning.callbacks import ModelCheckpoint
 
-# # lightning imports (from local installation)
-# import lightning as pl
-# from lightning import Trainer
-# from lightning.fabric.strategies import DeepSpeedStrategy
-# from lightning.fabric.loggers import TensorBoardLogger
-# from lightning.pytorch.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
-# from lightning.pytorch.callbacks import ModelCheckpoint
+# lightning imports (from local installation)
+import lightning as pl
+from lightning import Trainer
+from lightning.fabric.strategies import DeepSpeedStrategy
+from lightning.fabric.loggers import TensorBoardLogger
+from lightning.pytorch.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
+from lightning.pytorch.callbacks import ModelCheckpoint
 
 # to make the model and pytorch lightning compatible with Intel hardware i) import the ipex module and ii) set the device to 'xpu' for the model
-# import intel_extension_for_pytorch as ipex
+import intel_extension_for_pytorch as ipex
 
 # DeepSpeed is needed for the DeepSpeedStrategy
 import deepspeed
-
-# WandB
-import wandb
 
 # Custom modules
 import Stage3_source.preprocess as prep
 import Stage3_source.cond_diff_transformer_layer as mod
 import Stage3_source.helper_funcs as help_tools
 import Stage3_source.PL_wrapper as PL_mod
-
-from mpi4py import MPI
-
-
-class MyClusterEnvironment(ClusterEnvironment):
-    @property
-    def creates_processes_externally(self) -> bool:
-        """Return True if the cluster is managed (you don't launch processes yourself)"""
-        return True
-
-    def world_size(self) -> int:
-        return int(os.environ["WORLD_SIZE"])
-
-    def global_rank(self) -> int:
-        return int(os.environ["RANK"])
-
-    def local_rank(self) -> int:
-        return int(os.environ["LOCAL_RANK"])
-
-    def node_rank(self) -> int:
-        return int(os.environ["NODE_RANK"])
-
-    @property
-    def main_address(self) -> str:
-        return os.environ["MASTER_ADDR"]
-
-    @property
-    def main_port(self) -> int:
-        return int(os.environ["MASTER_PORT"])
-
-    def set_world_size(self, size:int) -> None:
-        pass
-
-    def set_global_rank(self, rank:int) -> None:
-        pass
-
-    @staticmethod
-    def detect() -> bool:
-        """Detects the environment settings corresponding to this cluster and returns ``True`` if they match."""
-        return True
 
 
 def get_args(parser):
@@ -108,13 +56,13 @@ def get_args(parser):
         The parser with the complete set of arguments added
     """
     parser.add_argument('--data-root', default="./data/ARDM_temp_homolog_family_dataset.csv", type=Path,
-                        help='path to dataset root directory')
+                        help='path to dataset root director')
 
     parser.add_argument('--tb_logger_path', default=None, type=str,
                         help='checkpoint path to pretrained weights')
     parser.add_argument('--tb_logger_folder', default=None, type=str,
                         help='tensorboard path containing checkpoints')
-    parser.add_argument('--resume_from_checkpoint', default='None', type=str,
+    parser.add_argument('--resume_from_checkpoint', default=None, type=str,
                         help='checkpoint path to last model iteration (usually last.ckpt)')
 
 
@@ -152,11 +100,11 @@ def get_args(parser):
     parser.add_argument('--model_option', default='transformer', type=str,
                         choices=['Unet', 'transformer'],
                         help='Choose model architecture')
-    parser.add_argument('--download', default='True', type=str,
+    parser.add_argument('--download', default=True, type=bool,
                         help='Download dataset')
-    parser.add_argument('--swissprot_data_root', default='None', type=str,
+    parser.add_argument('--swissprot_data_root', default=None, type=str,
                         help='path to SwissProt data')
-    parser.add_argument('--pfam_data_root', default='None', type=str,
+    parser.add_argument('--pfam_data_root', default=None, type=str,
                         help='path to Pfam data')
 
 
@@ -224,8 +172,8 @@ def get_model_args(parser):
             help='Choose optimizer for training')
     parser.add_argument('--acc_grad_batches', default=4, type=int,
             help='Choose how many gradient steps to accumulate')
-    parser.add_argument('--gpu_devices', default=1, type=int,
-            help='Number of gpus to used for training')
+    parser.add_argument('--xpu_devices', default=1, type=int,
+            help='Number of xpus to used for training')
     parser.add_argument('--num_nodes', default=1, type=int,
             help='Number of nodes to used for training')
     def float_or_str(value):
@@ -265,26 +213,7 @@ def get_path_args(parser):
     return parser
 
 
-def get_wrapper_args(parser):
-    """
-
-    """
-    parser.add_argument('--hydra', action="store_true", 
-                        help='Whether to run with Hydra.')
-    parser.add_argument('--wandb_entity', type=str, default=None, 
-                        help='Weights&Biases entity.')
-    parser.add_argument('--wandb_project', type=str, default=None, 
-                        help='Weights&Biases project.')
-    parser.add_argument('--wandb_logging_dir', type=str, default="./logs", 
-                        help='Weights&Biases logging directory.')
-    parser.add_argument('--wandb_tags', type=str, nargs="*", default=[], 
-                        help='Weights&Biases tags.')
-    
-
-    return parser
-
-
-def set_seed(seed):
+def set_seed(args: any):
     """
     Set random seeds for reproducibility across different libraries.
     
@@ -293,14 +222,14 @@ def set_seed(seed):
     the seed value specified in the arguments.
     
     Args:
-        seed: Random seed
+        args: Configuration object containing a 'seed' attribute
         
     Returns:
         None
     """
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    random.seed(args.seed)
     return
 
 
@@ -334,7 +263,7 @@ def compile_model(
             args=args,
             data_shape=data_shape,
             num_classes=num_classes
-    ).to("cuda")
+    ).to("xpu")
 
     PL_model = PL_mod.PL_ProtARDM(
         args=args,
@@ -342,7 +271,6 @@ def compile_model(
         #ema_model=ema_model,
     )
     return PL_model
-
 
 def save_history_log(
         args: any,
@@ -365,7 +293,6 @@ def save_history_log(
     hist_df = pd.DataFrame(hist_log)
     hist_df.to_csv(args.save_hist_path, index=False)
     return
-
 
 def get_model_params(
         model_param_df_path,
@@ -430,7 +357,6 @@ def get_protein_dataloader(args=any) -> DataLoader:
     )
     return protein_dataloader
 
-
 def get_deepspeed_model(args: any, PL_model) -> pl.LightningModule:
     """
     Load a model from a DeepSpeed checkpoint.
@@ -460,12 +386,10 @@ def get_deepspeed_model(args: any, PL_model) -> pl.LightningModule:
     )
     return loaded_model
 
-
 def save_model(
         args: any,
         checkpoint_path: str,
-        PL_model: pl.LightningModule,
-        trainer: Trainer
+        PL_model: pl.LightningModule
     ) -> None:
     """
     Save a PyTorch Lightning model trained with DeepSpeed.
@@ -487,9 +411,6 @@ def save_model(
     Returns:
         None
     """
-    image_size = args.image_size
-    num_classes = args.num_classes
-
     # once saved via the model checkpoint callback...
     # we have a saved folder containing the deepspeed checkpoint rather than a single file
     checkpoint_folder_path = checkpoint_path + '/last.ckpt'
@@ -500,15 +421,13 @@ def save_model(
         print('Save model')
         new_temp_model = mod.get_model(
             args=args,
-            data_shape=(image_size, image_size),
-            num_classes=num_classes
+            data_shape=(args.image_size, args.image_size),
+            num_classes=args.num_classes
         ).cpu()
         loaded_model = PL_mod.PL_ProtARDM.load_from_checkpoint(single_ckpt_path, args=args, model=new_temp_model)
         # make sure that datatypes or the same ...
         if PL_model.dtype != loaded_model.dtype:
-            msg = "Data types are not matching."
-            msg += f" Expected {PL_model.dtype}. Got: {loaded_model.dtype} (from loaded)"
-            assert False, msg
+            assert False, "Data types are not matching"
         else:
             # save model state dict without pytorch lightning wrapper
             torch.save(loaded_model.model.state_dict(), checkpoint_path + '/state_dict.pth')
@@ -521,7 +440,6 @@ def save_model(
                     model=loaded_model.model
             )
     return
-
 
 def str_to_bool(s):
     """
@@ -540,26 +458,12 @@ def str_to_bool(s):
     Raises:
         ValueError: If the input is anything other than 'true' or 'false'
     """
-    if isinstance(s, bool):
-        return s
     if s.lower() == 'true':
         return True
     elif s.lower() == 'false':
         return False
     else:
         raise ValueError("Input must be 'True' or 'False'")
-
-
-def nonestr_to_none(s):
-    if isinstance(s, str):
-        if s.lower() == 'none':
-            return None
-        else:
-            return s
-    elif s is None:
-        return None
-    else:
-        raise ValueError("Input must be string or 'None'")
 
 
 # === main functions ===
@@ -584,11 +488,10 @@ def clear_gpu_cache():
         None
     """
     torch.set_float32_matmul_precision('medium')
-    torch.cuda.empty_cache()
-    # torch.xpu.empty_cache()
+    # torch.cuda.empty_cache()
+    torch.xpu.empty_cache()
     gc.collect()
     return
-
 
 def retrieve_all_args():
     """
@@ -613,25 +516,10 @@ def retrieve_all_args():
     get_model_args(parser=parser)
     mod.add_model_args(parser=parser)
     get_path_args(parser=parser)
-    get_wrapper_args(parser=parser)
     args = parser.parse_args()
-
-    # Type conversions
-    args.resume_from_checkpoint = nonestr_to_none(args.resume_from_checkpoint)
-    args.download = str_to_bool(args.download)
-    args.swissprot_data_root = nonestr_to_none(args.swissprot_data_root)
-    args.pfam_data_root = nonestr_to_none(args.pfam_data_root)
-    args.start_pfam_trainer = str_to_bool(args.start_pfam_trainer)
-    
     return args
 
-
-def load_data(
-        args, *,
-        swissprot_data_root,
-        pfam_data_root,
-        facilitator,
-):
+def load_data(args):
     """
     Initialize and prepare a data module for protein sequence datasets.
     
@@ -648,22 +536,16 @@ def load_data(
         A configured PyTorch Lightning data module ready for use in training
     """
     data_module = PL_mod.HDF5_PFamDataModule(
-                            batch_size=args.batch_size,
-                            num_workers=args.num_workers,
-                            valid_size=args.valid_size,
-                            seed=args.seed,
-                            diffusion_steps=args.diffusion_steps,
-                            image_size=args.image_size,
-                            swissprot_path=swissprot_data_root,
-                            pfam_path=pfam_data_root,
-                            group_name=facilitator + '_data'  # Uses facilitator type as prefix
+                            args=args,
+                            swissprot_path=args.swissprot_data_root,
+                            pfam_path=args.pfam_data_root,
+                            group_name=args.facilitator + '_data'  # Uses facilitator type as prefix
     )
     data_module.setup()
     return data_module
 
-
 def load_model(
-    args, *,
+    args,
     data_module
     ):
     """
@@ -686,46 +568,31 @@ def load_model(
     Returns:
         A configured PyTorch Lightning model ready for training
     """
-    gpu_devices = args.gpu_devices
-    acc_grad_batches = args.acc_grad_batches
-    diffusion_steps = args.diffusion_steps
-    image_size = args.image_size
-    num_classes = args.num_classes
-    num_nodes = args.num_nodes
-    batch_size = args.batch_size
-
-    args.traindata_len = len(data_module.train_dataloader()) // gpu_devices // acc_grad_batches
+    args.traindata_len = len(data_module.train_dataloader()) // args.xpu_devices // args.acc_grad_batches
     print('Length of dataloader:', len(data_module.train_dataloader()))
-    print('Numer of devices:', gpu_devices)
-    print('Number of nodes:', num_nodes)
-    print('Batch size:', batch_size)
-    print('Length of dataloader per device:', len(data_module.train_dataloader()) // gpu_devices)
+    print('Numer of devices:', args.xpu_devices)
+    print('Number of nodes:', args.num_nodes)
+    print('Batch size:', args.batch_size)
+    print('Length of dataloader per device:', len(data_module.train_dataloader()) // args.xpu_devices)
     print(f'Length of a training epoch in batch gradient updates: {args.traindata_len}')
-    w, h = image_size, image_size
+    w, h = args.image_size, args.image_size
     # Ensure diffusion steps are sufficient for data dimensions
-    if diffusion_steps < int(w*h):
+    if args.diffusion_steps < int(w*h):
         print('Make sure that the number of diffusion steps is equal to or greather than the data cardinality')
     help_tools.print_gpu_initialization()
     # Compile model architecture
     PL_model = compile_model(
             args=args,
-            data_shape=(image_size, image_size),
-            num_classes=num_classes,
+            data_shape=(args.image_size,args.image_size),
+            num_classes=args.num_classes
     )
     print('Model size:', sum(p.numel() for p in PL_model.model.parameters()))
     return PL_model
 
-
-###########################
-##  Training Entrypoint  ##
-###########################
-
-
 def train_model(
         args,
         PL_model,
-        data_module,
-        ds_config=None,
+        data_module
     ):
     """
     Train a PyTorch Lightning model with DeepSpeed distributed optimization.
@@ -745,101 +612,63 @@ def train_model(
         args: Configuration object containing training parameters and paths
         PL_model: PyTorch Lightning model to be trained
         data_module: Data module providing training and validation data
-        ds_config: DeepSpeed configurations. If None, uses defaults.
         
     Returns:
         None - results are saved to the paths specified in args
     """
-    # Note: Nested args must be accessed via dictionaries, not attributes.
-    tb_logger_path = args.tb_logger_path
-    tb_logger_folder = args.tb_logger_folder
-    version_name = args.version_name
-    log_every_n_steps = args.log_every_n_steps
-    pfam_data_root = args.pfam_data_root
-    gpu_devices = args.gpu_devices
-    num_nodes = args.num_nodes
-    acc_grad_batches = args.acc_grad_batches
-    epochs = args.epochs
-    start_pfam_trainer = args.start_pfam_trainer  # Expect bool
-    assert isinstance(start_pfam_trainer, bool), "start_fpam_trainer not bool"
-    max_steps = args.max_steps
-    val_check_interval = args.val_check_interval
-    limit_val_batches = args.limit_val_batches
-    lr = args.lr
-    resume_from_checkpoint = args.resume_from_checkpoint  # Expect str or None
-    assert resume_from_checkpoint is None or (
-            isinstance(resume_from_checkpoint, str) and 
-            resume_from_checkpoint != "None"
-        ), f"resume_from_checkpoint should be str or None (not str `None`). Got {resume_from_checkpoint} (type {type(resume_from_checkpoint)})"
-    precision = args.precision
-    
+
     # Configure DeepSpeed optimization settings
-    if ds_config is None:
-        ds_config = {
-            "zero_optimization": {
-                "stage": 1,
-                "allgather_bucket_size": 5e8,
-                "reduce_bucket_size": 5e8,
-                "offload_optimizer": {
-                    "device": "cpu",
-                    "pin_memory": False
-                },
-                "offload_param": {
-                    "device": "cpu",
-                    "pin_memory": False
-                },
-                "overlap_comm": True,
-                "contiguous_gradients": True
+    ds_config = {
+    "zero_optimization": {
+    "stage": 1,
+    "allgather_bucket_size": 5e8,
+    "reduce_bucket_size": 5e8,
+    "offload_optimizer": {
+            "device": "cpu",
+            "pin_memory": False
             },
-            "stage3_max_live_parameters": 1e9,
-            "stage3_max_reuse_distance": 1e8,
-            "stage3_prefetch_bucket_size": 5e8,
-            "stage3_param_persistence_threshold": 1e6,
-        }
-    
+    "offload_param": {
+            "device": "cpu",
+            "pin_memory": False
+        },
+    "overlap_comm": True,
+    "contiguous_gradients": True
+    },
+    "stage3_max_live_parameters": 1e9,
+    "stage3_max_reuse_distance": 1e8,
+    "stage3_prefetch_bucket_size": 5e8,
+    "stage3_param_persistence_threshold": 1e6,
+    }
+
     strategy = DeepSpeedStrategy(
-        config=ds_config
+                config=ds_config
     )
 
     # Set up TensorBoard logging
-    tb_logger = TensorBoardLogger(
-        os.path.join(tb_logger_path, tb_logger_folder), 
-        version=version_name
-    )
-
-    # Set up Weights&Biases logging
-    wandb_logger = WandbLogger(
-        save_dir=args.wandb_logging_dir,
-        project=args.wandb_project, 
-        entity=args.wandb_entity, 
-        config=args, 
-        tags=args.wandb_tags,
-        group=args.version_name,
-        log_model="all",
-    )  # TODO: investigate "all"
+    logger = TensorBoardLogger(args.tb_logger_path + args.tb_logger_folder, version=args.version_name)
 
     # Monitor learning rate changes
-    lr_monitor = pl.callbacks.LearningRateMonitor(logging_interval='step')
+    lr_monitor = pl.pytorch.callbacks.LearningRateMonitor(logging_interval='step')
 
     # Configure checkpoint strategy based on dataset type
-    if pfam_data_root is None:
+    if args.pfam_data_root != 'None':
         checkpoint_callback = ModelCheckpoint(
-            dirpath=os.path.join(tb_logger_path, tb_logger_folder, 'checkpoints', version_name),
-            save_top_k=2,
-            verbose=True,
-            monitor='val_loss',
-            mode="min",
-            save_last=True
-        )
-    else:
-        checkpoint_callback = ModelCheckpoint(
-            dirpath=os.path.join(tb_logger_path, tb_logger_folder, 'checkpoints', version_name),
+            dirpath=args.tb_logger_path + args.tb_logger_folder + '/checkpoints/' + args.version_name,
             save_top_k=2,
             verbose=True,
             monitor='val_loss',
             mode="min",
             save_last=True,
-            every_n_train_steps=log_every_n_steps  # Save checkpoints periodically by steps
+            every_n_train_steps=args.log_every_n_steps  # Save checkpoints periodically by steps
+        )
+    else:
+        checkpoint_callback = ModelCheckpoint(
+            dirpath=args.tb_logger_path + args.tb_logger_folder + '/checkpoints/' + args.version_name,
+            save_top_k=2,
+            verbose=True,
+            monitor='val_loss',
+            mode="min",
+            save_last=True
         )
 
     # Define common trainer parameters 
@@ -847,54 +676,52 @@ def train_model(
         'enable_progress_bar': True,
         'enable_model_summary': True,
         'enable_checkpointing': True,
-        'devices': gpu_devices,
-        'num_nodes': num_nodes,
-        'accelerator': 'cuda',
-        'strategy': 'deepspeed_stage_2',  # TODO: use strategy defined above?
-        'accumulate_grad_batches': acc_grad_batches,
-        'logger': [tb_logger, wandb_logger],
-        'log_every_n_steps': log_every_n_steps,
+        'devices': args.xpu_devices,
+        'num_nodes': args.num_nodes,
+        'accelerator': 'xpu',
+        'strategy': 'deepspeed_stage_2',
+        'accumulate_grad_batches': args.acc_grad_batches,
+        'logger': logger,
+        'log_every_n_steps': args.log_every_n_steps,
         'callbacks': [checkpoint_callback, lr_monitor],
-        # 'plugins': [MyClusterEnvironment()]  # added a la multinode_PL_train_stage3
     }
 
     # Configure training mode: epoch-based or step-based
-    if pfam_data_root is None:
-        trainer_params['max_epochs'] = epochs
+    if args.pfam_data_root == 'None':
+        trainer_params['max_epochs'] = args.epochs
     else:
-        if start_pfam_trainer:
+        if args.start_pfam_trainer.lower() == 'true':
             print('load weights from swissprot phase...')
             PL_model = get_deepspeed_model(
                     args=args,
                     PL_model=PL_model
             )
 
-        trainer_params['max_steps'] = max_steps
-        trainer_params['val_check_interval'] = val_check_interval
-        trainer_params['limit_val_batches'] = limit_val_batches
+        trainer_params['max_steps'] = args.max_steps
+        trainer_params['val_check_interval'] = args.val_check_interval
+        trainer_params['limit_val_batches'] = args.limit_val_batches
 
         trainer_params['accelerator'] = 'auto'
-        trainer_params['devices'] = gpu_devices
-        # trainer_params['num_nodes'] = num_nodes
-        trainer_params['precision'] = precision
+        trainer_params['devices'] = args.xpu_devices
+        trainer_params['precision'] = 16
 
     # Initialize trainer with configured parameters
     trainer = Trainer(**trainer_params)
 
     # wrap optimizer and model with intel extension for pytorch 
-    optimizer = torch.optim.AdamW(PL_model.parameters(), lr=lr)
-    # PL_model, optimizer = ipex.optimize(PL_model, optimizer=optimizer, dtype=torch.float32)
+    optimizer = torch.optim.AdamW(PL_model.parameters(), lr=args.lr)
+    PL_model, optimizer = ipex.optimize(PL_model, optimizer=optimizer, dtype=torch.float32)
 
     # Handle different training scenarios
-    if resume_from_checkpoint is None:
+    if args.resume_from_checkpoint == "None":
         print("Train from scratch")
         trainer.fit(PL_model, data_module)
-    elif start_pfam_trainer:
+    elif args.resume_from_checkpoint != 'None' and args.start_pfam_trainer.lower() =='true':
         print('Start training Proteoscribe in phase 2 ...')
         trainer.fit(PL_model, data_module)
     else:
         print('Continue training Proteoscribe in phase 2 ...')
-        trainer.fit(PL_model, data_module, ckpt_path=resume_from_checkpoint)
+        trainer.fit(PL_model, data_module, ckpt_path=args.resume_from_checkpoint)
 
     help_tools.print_gpu_initialization()
 
@@ -904,106 +731,45 @@ def train_model(
     save_model(
             args=args,
             checkpoint_path=checkpoint_callback.dirpath,
-            PL_model=PL_model,
-            trainer=trainer,
+            PL_model=PL_model
     )
-
-
-# @hydra.main(config_path="../configs", config_name="default", version_base=None)
-def main(args, use_hydra=False, ds_config=None,):
-
-    SIZE = MPI.COMM_WORLD.Get_size() # Total number of processes
-    RANK = MPI.COMM_WORLD.Get_rank() # Global rank of the process
-    LOCAL_RANK = os.environ.get('PALS_LOCAL_RANKID', '0') # Local rank of the process on the node
-    NODE_RANK = os.environ.get('PALS_NODE_RANKID', '0') # Node rank of the process
-    print("SIZE:", SIZE)
-    print("RANK:", RANK)
-    print("LOCAL_RANK:", LOCAL_RANK)
-    print("NODE_RANK:", NODE_RANK)
-    
-    # ----- Process passed parameters ----- #
-    seed = args.seed
-    swissprot_data_root = args.swissprot_data_root
-    pfam_data_root = args.pfam_data_root
-    facilitator = args.facilitator
-    
-    use_wandb = True
-    wandb_entity = args.wandb_entity
-    wandb_project = args.wandb_project
-    wandb_dir = args.wandb_logging_dir
-    wandb_tags = args.wandb_tags
-
-    # ----- Clear the GPU cache ----- #
-    clear_gpu_cache()
-
-    # ----- For reproducibility ----- #
-    set_seed(seed)
-     
-    # ----- Load Data ----- #
-    data_module = load_data(
-        args=args,
-        swissprot_data_root=swissprot_data_root,
-        pfam_data_root=pfam_data_root,
-        facilitator=facilitator,
-    )
-
-    # ----- Load Model ----- #
-    PL_model = load_model(
-        args=args,
-        data_module=data_module
-    )
-    
-    # ----- Prepare Weights&Biases coverage ----- #
-    # See: https://docs.wandb.ai/models/integrations/hydra and
-    # issue solution at: https://github.com/wandb/docs/issues/1964
-
-    # if use_hydra:
-    #     cfg_dict = OmegaConf.to_container(
-    #         args, resolve=True, throw_on_missing=True
-    #     )
-    #     # entity = args["wandb"]["entity"]
-    #     # project = args["wandb"]["project"]
-    #     # wandb_dir = args["wandb"]["wandb_logging_dir"]
-    #     # del cfg_dict["wandb"]  # don't need to log these
-    # else:
-    #     cfg_dict = args
-    
-    # ----- Train Model ----- #
-
-    # def wandb_init():
-    #     return wandb.init(
-    #         wandb_entity, 
-    #         wandb_project, 
-    #         config=args, 
-    #         dir=wandb_dir,
-    #         tags=wandb_tags,
-    #         group=args.version_name,
-    #     )
-
-    # with wandb_init() as run:
-        # train_model(
-        #     args=run.config,
-        #     PL_model=PL_model,
-        #     data_module=data_module,
-        #     ds_config=ds_config,
-        # )
-    train_model(
-        args=args,
-        PL_model=PL_model,
-        data_module=data_module,
-        ds_config=ds_config,
-    )
-    
-    # train_model(
-    #     args=cfg,
-    #     PL_model=PL_model,
-    #     data_module=data_module,
-    # )
 
 
 if __name__ == '__main__':
-    args = retrieve_all_args()
-    main(args)
+
+    #######################
+    # Clear the GPU cache #
+    #######################
+    clear_gpu_cache()
     
+    ########################
+    # Get input argumenmts #
+    ########################
+    args = retrieve_all_args()
 
+    ######################
+    # For reproducbility #
+    ######################
+    set_seed(args=args)
+     
+    #############
+    # Load Data #
+    #############
+    data_module = load_data(args=args)
 
+    ##############
+    # Load Model #
+    ##############
+    PL_model = load_model(
+            args=args,
+            data_module=data_module
+    )
+    
+    ###############
+    # Train Model #
+    ###############
+    train_model(
+            args=args,
+            PL_model=PL_model,
+            data_module=data_module
+    )

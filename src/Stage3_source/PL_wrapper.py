@@ -148,10 +148,10 @@ class PL_ProtARDM(pl.LightningModule):
                               scheduler settings, or just the optimizer if no
                               scheduler is specified
         """
-        choose_optim = self.script_args.optimizer.name
-        lr = self.script_args.optimizer.lr
-        weight_decay = self.script_args.optimizer.weight_decay
-        scheduler_gamma = self.script_args.optimizer.scheduler_gamma
+        choose_optim = self.script_args.choose_optim
+        lr = self.script_args.lr
+        weight_decay = self.script_args.weight_decay
+        scheduler_gamma = self.script_args.scheduler_gamma
         traindata_len = self.script_args.traindata_len
         epochs = self.script_args.epochs
 

@@ -1,0 +1,46 @@
+#!/bin/bash -l
+#PBS -A NLDesignProtein
+#PBS -N job_test_2gpus
+#PBS -l walltime=00:20:00
+#PBS -l select=2
+#PBS -l filesystems=home:grand
+#PBS -q debug
+#PBS -o /grand/NLDesignProtein/ahowe/BioM3-dev/logs/run_logs/job_test_2gpus.o
+#PBS -e /grand/NLDesignProtein/ahowe/BioM3-dev/logs/run_logs/job_test_2gpus.e
+
+projdir=${PBS_O_WORKDIR}  # Should submit job from the BioM3-dev directory
+
+cd ${projdir}  # TODO: verify that directory ends in BioM3-dev
+pwd
+
+module use /soft/modulefiles
+module load conda
+source venvs/biom3-env/bin/activate
+
+NGPUS=2
+NNODES=2
+
+datetime=$(date +%Y%m%d_%H%M%S)
+# NRANKS=8 # Number of MPI ranks to spawn per node
+
+export version_name="V${datetime}_${NNODES}_nodes"
+export resume_from_checkpoint='null'
+
+export epoch=10 # number of epochs
+export max_steps=3500000 # number of steps
+export val_check_interval=100 # checkpoint interval
+export limit_val_batches=0.00005 #0.0001 #0.25 # validation size # TN: kept to a small value in scaling study 
+export log_every_n_steps=1000
+export start_pfam_trainer='false' # starting checkpoint: 'true'; continue checkpoint: 'false'
+
+export gpu_devices=$NGPUS
+export num_nodes=$NNODES
+
+sh ./scripts/PL_train_transformer.sh \
+    $version_name \
+    $epoch \
+    $resume_from_checkpoint \
+    $max_steps \
+    $val_check_interval \
+    $limit_val_batches \
+    $start_pfam_trainer

@@ -1,0 +1,28 @@
+#!/bin/bash
+
+#PBS -N f_P2_S3
+#PBS -l select=1:ngpus=4
+#PBS -l filesystems=home:eagle
+#PBS -l walltime=72:00:00
+#PBS -q preemptable
+#PBS -A mm_protein
+#PBS -o /lus/grand/projects/mm_protein/Project_TextDiffEDP/outputs/run_logs/final_Phase2_Stage3_pretraining_outputs.txt
+#PBS -e /lus/grand/projects/mm_protein/Project_TextDiffEDP/outputs/run_logs/final_Phase2_Stage3_pretraining_error.txt
+#PBS -r y 
+
+# NOTE:
+# preemptable --> 72:00:00 max
+# debug --> 1:00:00 max
+
+
+module use /soft/modulefiles
+module load conda; conda activate base
+conda activate ProtARDM_env
+
+
+#Run the python script
+sh /home/niksapraljak1/Project_ProtARDM/scripts/scripts/final_stage3_phase2_scripts/run_Stage3_phase2_pretraining.sh \
+	$version_name \
+	$epoch \
+	$resume_from_checkpoint \
+

@@ -1,20 +1,25 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
 WANDB_API_KEY=$1
 config_dir=$2
 config_name=$3
 
+# Export args from config file
 source ${config_dir}/${config_name}.sh
-echo "num_nodes: ${num_nodes} gpu_devices: ${gpu_devices}"
 
+# Override config file with given args
 version_name=$4
-epochs=$5
-resume=$6
+num_nodes=$5
+gpu_devices=$6
+epochs=$7
+resume_from_checkpoint=$8
 
+# echo "num_nodes: ${num_nodes} gpu_devices: ${gpu_devices}"
+
+# Login to W&B
 export WANDB_API_KEY=$WANDB_API_KEY
-wandb login
 
-
+# Run training script
 export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=true
 python ./scripts/PL_train_stage3.py \
 	--output_hist_folder ${output_hist_folder} \
@@ -54,7 +59,7 @@ python ./scripts/PL_train_stage3.py \
 	--facilitator ${facilitator} \
 	--tb_logger_path ${tb_logger_path} \
 	--tb_logger_folder ${tb_logger_folder} \
-	--resume_from_checkpoint ${resume} \
+	--resume_from_checkpoint ${resume_from_checkpoint} \
 	--valid_size ${valid_size} \
 	--max_steps ${max_steps} \
 	--log_every_n_steps ${log_every_n_steps} \
@@ -62,7 +67,9 @@ python ./scripts/PL_train_stage3.py \
 	--limit_val_batches ${limit_val_batches} \
 	--start_pfam_trainer ${start_pfam_trainer} \
 	--num_workers ${num_workers} \
-	--wandb_entity thenaturalmachine --wandb_project "BioM3-dev"
+	--wandb_entity thenaturalmachine \
+	--wandb_project "BioM3-dev" \
+	--wandb_name ${version_name} \
 
 	# --resume_from_checkpoint_state_dict_path ${resume_from_checkpoint_state_dict_path} \
 	#--total-steps ${total_steps} \

@@ -36,7 +36,9 @@ from pytorch_lightning.plugins.environments import ClusterEnvironment
 # from lightning.pytorch.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
 # from lightning.pytorch.callbacks import ModelCheckpoint
 
-# to make the model and pytorch lightning compatible with Intel hardware i) import the ipex module and ii) set the device to 'xpu' for the model
+# to make the model and pytorch lightning compatible with Intel hardware 
+#   i) import the ipex module and 
+#   ii) set the device to 'xpu' for the model
 # import intel_extension_for_pytorch as ipex
 
 # DeepSpeed is needed for the DeepSpeedStrategy
@@ -179,7 +181,7 @@ def get_args(parser):
                 help='Option whether facilitator was used')
     parser.add_argument('--valid_size', default=0.1, type=float,
                         help='Validation dataset size...')
-    parser.add_argument('--num_workers', default=4, type=int,
+    parser.add_argument('--num_workers', default=0, type=int,  #  NOTE: CHANGED TO 0 TO PREVENT CUDA OOM ERROR
                         help='Number of dataloader workers...')
 
     # training on pfam database...
@@ -271,6 +273,8 @@ def get_wrapper_args(parser):
     """
     parser.add_argument('--hydra', action="store_true", 
                         help='Whether to run with Hydra.')
+    parser.add_argument('--wandb_name', type=str, default=None, 
+                        help='Weights&Biases run name.')
     parser.add_argument('--wandb_entity', type=str, default=None, 
                         help='Weights&Biases entity.')
     parser.add_argument('--wandb_project', type=str, default=None, 
@@ -631,7 +635,7 @@ def load_data(
         swissprot_data_root,
         pfam_data_root,
         facilitator,
-):
+    ):
     """
     Initialize and prepare a data module for protein sequence datasets.
     
@@ -809,6 +813,7 @@ def train_model(
 
     # Set up Weights&Biases logging
     wandb_logger = WandbLogger(
+        name=args.wandb_name,
         save_dir=args.wandb_logging_dir,
         project=args.wandb_project, 
         entity=args.wandb_entity, 
@@ -820,6 +825,9 @@ def train_model(
 
     # Monitor learning rate changes
     lr_monitor = pl.callbacks.LearningRateMonitor(logging_interval='step')
+
+    # Monitor GPU usage
+    gpu_logger = pl.callbacks.DeviceStatsMonitor()
 
     # Configure checkpoint strategy based on dataset type
     if pfam_data_root is None:
@@ -854,7 +862,7 @@ def train_model(
         'accumulate_grad_batches': acc_grad_batches,
         'logger': [tb_logger, wandb_logger],
         'log_every_n_steps': log_every_n_steps,
-        'callbacks': [checkpoint_callback, lr_monitor],
+        'callbacks': [checkpoint_callback, lr_monitor, gpu_logger],
         # 'plugins': [MyClusterEnvironment()]  # added a la multinode_PL_train_stage3
     }
 
@@ -873,7 +881,7 @@ def train_model(
         trainer_params['val_check_interval'] = val_check_interval
         trainer_params['limit_val_batches'] = limit_val_batches
 
-        trainer_params['accelerator'] = 'auto'
+        trainer_params['accelerator'] = 'gpu'
         trainer_params['devices'] = gpu_devices
         # trainer_params['num_nodes'] = num_nodes
         trainer_params['precision'] = precision
@@ -898,8 +906,6 @@ def train_model(
 
     help_tools.print_gpu_initialization()
 
-
-
     # Save trained model in multiple formats
     save_model(
             args=args,
@@ -909,19 +915,14 @@ def train_model(
     )
 
 
-# @hydra.main(config_path="../configs", config_name="default", version_base=None)
 def main(args, use_hydra=False, ds_config=None,):
 
     SIZE = MPI.COMM_WORLD.Get_size() # Total number of processes
     RANK = MPI.COMM_WORLD.Get_rank() # Global rank of the process
     LOCAL_RANK = os.environ.get('PALS_LOCAL_RANKID', '0') # Local rank of the process on the node
     NODE_RANK = os.environ.get('PALS_NODE_RANKID', '0') # Node rank of the process
-    print("SIZE:", SIZE)
-    print("RANK:", RANK)
-    print("LOCAL_RANK:", LOCAL_RANK)
-    print("NODE_RANK:", NODE_RANK)
     
-    # ----- Process passed parameters ----- #
+    # ----- Process passed parameters -----
     seed = args.seed
     swissprot_data_root = args.swissprot_data_root
     pfam_data_root = args.pfam_data_root
@@ -933,13 +934,13 @@ def main(args, use_hydra=False, ds_config=None,):
     wandb_dir = args.wandb_logging_dir
     wandb_tags = args.wandb_tags
 
-    # ----- Clear the GPU cache ----- #
+    # ----- Clear the GPU cache -----
     clear_gpu_cache()
 
-    # ----- For reproducibility ----- #
+    # ----- For reproducibility -----
     set_seed(seed)
      
-    # ----- Load Data ----- #
+    # ----- Load Data -----
     data_module = load_data(
         args=args,
         swissprot_data_root=swissprot_data_root,
@@ -947,63 +948,24 @@ def main(args, use_hydra=False, ds_config=None,):
         facilitator=facilitator,
     )
 
-    # ----- Load Model ----- #
+    # ----- Load Model -----
     PL_model = load_model(
         args=args,
         data_module=data_module
     )
-    
-    # ----- Prepare Weights&Biases coverage ----- #
-    # See: https://docs.wandb.ai/models/integrations/hydra and
-    # issue solution at: https://github.com/wandb/docs/issues/1964
 
-    # if use_hydra:
-    #     cfg_dict = OmegaConf.to_container(
-    #         args, resolve=True, throw_on_missing=True
-    #     )
-    #     # entity = args["wandb"]["entity"]
-    #     # project = args["wandb"]["project"]
-    #     # wandb_dir = args["wandb"]["wandb_logging_dir"]
-    #     # del cfg_dict["wandb"]  # don't need to log these
-    # else:
-    #     cfg_dict = args
-    
-    # ----- Train Model ----- #
-
-    # def wandb_init():
-    #     return wandb.init(
-    #         wandb_entity, 
-    #         wandb_project, 
-    #         config=args, 
-    #         dir=wandb_dir,
-    #         tags=wandb_tags,
-    #         group=args.version_name,
-    #     )
-
-    # with wandb_init() as run:
-        # train_model(
-        #     args=run.config,
-        #     PL_model=PL_model,
-        #     data_module=data_module,
-        #     ds_config=ds_config,
-        # )
+    # ----- Train Model -----
     train_model(
         args=args,
         PL_model=PL_model,
         data_module=data_module,
         ds_config=ds_config,
     )
-    
-    # train_model(
-    #     args=cfg,
-    #     PL_model=PL_model,
-    #     data_module=data_module,
-    # )
+
+    # ----- Clean up -----
+    torch.distributed.destroy_process_group()
 
 
 if __name__ == '__main__':
     args = retrieve_all_args()
     main(args)
-    
-
-

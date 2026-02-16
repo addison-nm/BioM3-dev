@@ -1,6 +1,0 @@
-defaults:
-  - base_transformer
-
-name: transformer_v1
-transformer_dim: 1024
-transformer_depth: 32

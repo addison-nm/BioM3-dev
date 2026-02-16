@@ -1,6 +1,9 @@
 # Project specific items
 data/*
 out/*
+logs/
+weights/*/*
+_my*/
 
 # Misc
 **/.DS_Store

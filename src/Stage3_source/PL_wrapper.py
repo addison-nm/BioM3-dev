@@ -844,7 +844,7 @@ class HDF5_PFamDataModule(pl.LightningDataModule):
         train_datasets = []
         val_datasets = []
 
-        if self.swissprot_path != 'None':
+        if self.swissprot_path is not None:
             swissprot_dataset = HDF5Dataset(
                 args=self.args,
                 file_path=self.swissprot_path,
@@ -856,7 +856,7 @@ class HDF5_PFamDataModule(pl.LightningDataModule):
             train_datasets.append(Subset(swissprot_dataset, train_idx))
             val_datasets.append(Subset(swissprot_dataset, val_idx))
 
-        if self.pfam_path != 'None':
+        if self.pfam_path is not None:
             pfam_dataset = HDF5Dataset(
                 args=self.args,
                 file_path=self.pfam_path,

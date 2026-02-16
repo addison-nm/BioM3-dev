@@ -12,7 +12,7 @@ def print_gpu_initialization():
     nvmlInit()
     handle = nvmlDeviceGetHandleByIndex(0)
     info = nvmlDeviceGetMemoryInfo(handle)
-    print(f"GPU memory occupied: {info.used//1024**2} MB.")
+    # print(f"GPU memory occupied: {info.used//1024**2} MB.")
     return info.used // 1024**2
 
 

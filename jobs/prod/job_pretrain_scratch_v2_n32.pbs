@@ -1,0 +1,48 @@
+#!/bin/bash -l
+#PBS -A NLDesignProtein
+#PBS -N pretrain_scratch_v2_n32
+#PBS -l walltime=02:00:00
+#PBS -l select=32
+#PBS -l place=scatter
+#PBS -l filesystems=home:grand
+#PBS -q prod
+#PBS -j oe
+#PBS -M addi.howe+pbs-polaris@gmail.com
+#PBS -m be
+
+projdir=${PBS_O_WORKDIR}  # Should submit job from the BioM3-dev directory
+cd ${projdir}  # TODO: verify that directory ends in BioM3-dev
+
+module use /soft/modulefiles
+module load conda
+conda activate base
+source ./venvs/biom3-env/bin/activate
+
+# Configurations to edit
+config_dir=./arglists
+config_name=config_pretrain_scratch_v2
+num_nodes=32
+epochs=5
+resume_from_checkpoint=None
+
+# Constant configurations
+num_devices=4
+wandb_api_key=$WANDB_API_KEY
+
+# Construct the version name
+datetime=$(date +%Y%m%d_%H%M%S)
+version_name=${config_name/config_/}_n${num_nodes}_d${num_devices}_e${epochs}_V${datetime}
+
+# Direct output to log file
+log_fpath=logs/prod_logs/${version_name}.${PBS_JOBID}.o
+
+sh scripts/production_runs/prodrun_multinode.sh \
+    ${config_dir} \
+    ${config_name} \
+    ${num_nodes} \
+    ${num_devices} \
+    ${wandb_api_key} \
+    ${version_name} \
+    ${epochs} \
+    ${resume_from_checkpoint} \
+> ${log_fpath} 2>&1

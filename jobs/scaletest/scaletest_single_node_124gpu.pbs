@@ -1,0 +1,26 @@
+#!/bin/bash -l
+#PBS -A NLDesignProtein
+#PBS -N scaletest_single_node_124gpu
+#PBS -l walltime=01:00:00
+#PBS -l select=1
+#PBS -l filesystems=home:grand
+#PBS -q debug
+#PBS -j oe
+#PBS -M addi.howe+pbs-polaris@gmail.com
+#PBS -m be
+
+projdir=${PBS_O_WORKDIR}  # Should submit job from the BioM3-dev directory
+log_fpath=logs/run_logs/${PBS_JOBNAME}.${PBS_JOBID}.o
+
+cd ${projdir}  # TODO: verify that directory ends in BioM3-dev
+
+module use /soft/modulefiles
+module load conda
+conda activate base
+source ./venvs/biom3-env/bin/activate
+
+# sh scripts/scaling_runs/runscript_singlenode.sh 1 1  > logs/scaling_runs/runscript_singlenode_1_1 2>&1
+
+# sh scripts/scaling_runs/runscript_singlenode.sh 1 2  > logs/scaling_runs/runscript_singlenode_1_2 2>&1
+
+sh scripts/scaling_runs/runscript_singlenode.sh 1 4  > logs/scaling_runs/runscript_singlenode_1_4 2>&1

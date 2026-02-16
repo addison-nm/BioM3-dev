@@ -19,6 +19,6 @@ source ./venvs/biom3-env/bin/activate
 
 echo "Running tests..."
 
-pytest tests
+python -m pytest tests
 
 echo "Done!"

@@ -1,0 +1,24 @@
+#!/bin/bash -l
+#PBS -A NLDesignProtein
+#PBS -N run_tests_polaris
+#PBS -l walltime=00:30:00
+#PBS -l select=1
+#PBS -l filesystems=home:grand
+#PBS -q debug
+#PBS -j oe
+# PBS -M <email@email.com>
+# PBS -m be
+
+projdir=${PBS_O_WORKDIR}  # Should submit job from the BioM3-dev directory
+cd ${projdir}
+
+module use /soft/modulefiles
+module load conda
+conda activate base
+source ./venvs/biom3-env/bin/activate
+
+echo "Running tests..."
+
+pytest tests
+
+echo "Done!"

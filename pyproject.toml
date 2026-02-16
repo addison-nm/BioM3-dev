@@ -9,10 +9,8 @@ requires-python = ">= 3.8"
 readme = "README.md"
 description = "BioM3 development and investigation."
 authors = [
-  {
-    name = "Addison Howe", 
-    name = "Tarak Nandi",
-  }
+  {name = "Addison Howe"},
+  {name = "Tarak Nandi"},
 ]
 
 [project.scripts]

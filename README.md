@@ -26,19 +26,17 @@ python -m venv "${VENV_DIR}" --system-site-packages
 source "${VENV_DIR}/bin/activate"
 ```
 
-Install source code with dependencies (specified in pyproject.toml).
+Install dependencies specified in `requirements_polaris.txt`, and project source code. Note that presently an error message may be raised due to package conflicts, but the installation should still work. 
 
 ```bash
-# Install source code (with dependencies)
-python -m pip install -e .
+# Install dependencies
+python -m pip install -r requirements_polaris.txt --ignore-installed
+```
 
-# The following are included in the pyproject.toml file
-# pytorch-lightning==2.5.1.post0
-# axial-positional-embedding==0.3.12
-# linear-attention-transformer==0.19.1
-# biopython==1.85
-# hydra-core==1.3
-# wandb==0.24.1
+Install source code:
+
+```bash
+python -m pip install -e .
 ```
 
 To activate (on compute node, with access to GPU):
@@ -54,6 +52,12 @@ Basic verification. **Note: might only succeed on compute node.**
 
 ```bash
 python -c 'import torch; import pytorch_lightning as pl; import deepspeed; import Stage3_source.preprocess as prep'
+```
+
+Run tests with
+
+```bash
+python -m pytest tests
 ```
 
 ## Usage

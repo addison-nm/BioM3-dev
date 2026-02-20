@@ -14,5 +14,5 @@ authors = [
 ]
 
 [project.scripts]
-biom3 = "Stage3_source.__main__:main"
-biom3-test = "Stage3_source.__main__:run_test"
+biom3_run_PenCL_inference = "Stage1_source.__main__:run_PenCL_inference"
+biom3_run_Facilitator_sample = "Stage2_source.__main__:run_Facilitator_sample"

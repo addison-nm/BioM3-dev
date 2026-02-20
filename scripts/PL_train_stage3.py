@@ -161,6 +161,14 @@ def get_args(parser):
     parser.add_argument('--pfam_data_root', default='None', type=str,
                         help='path to Pfam data')
 
+    # Finetuning
+    parser.add_argument('--finetune', default='False', type=str,
+                        help='flag to run finetuning')
+    parser.add_argument('--pretrained_checkpoint', default='None', type=str,
+                        help='path to .bin checkpoint file containing model weights')
+    parser.add_argument('--finetune_last_n_blocks', default=-1, type=int,
+                        help='Number of last transformer blocks to finetune (0: finetune all layers, -1: no layers)')
+
 
     # diffusion param
     parser.add_argument('--diffusion_steps', default=256, type=int,
@@ -626,6 +634,8 @@ def retrieve_all_args():
     args.swissprot_data_root = nonestr_to_none(args.swissprot_data_root)
     args.pfam_data_root = nonestr_to_none(args.pfam_data_root)
     args.start_pfam_trainer = str_to_bool(args.start_pfam_trainer)
+    args.finetune = str_to_bool(args.finetune)
+    args.pretrained_checkpoint = nonestr_to_none(args.pretrained_checkpoint)
     
     return args
 
@@ -720,10 +730,120 @@ def load_model(
     return PL_model
 
 
+def load_pretrained_weights(
+    PL_model,
+    checkpoint_path: str
+    ):
+    """
+    Load pretrained model weights from a .bin checkpoint file.
+    
+    This function loads model weights saved as a PyTorch state dictionary
+    from a .bin file and applies them to the provided PyTorch Lightning model.
+    It handles missing keys and extra keys gracefully, reporting any issues
+    while still loading compatible weights.
+    
+    Args:
+        PL_model: PyTorch Lightning model to load weights into
+        checkpoint_path: Path to the .bin checkpoint file containing model weights
+        
+    Returns:
+        The model with loaded pretrained weights
+    """
+    print(f"Loading pretrained weights from: {checkpoint_path}")
+    
+    if not os.path.exists(checkpoint_path):
+        raise FileNotFoundError(f"Checkpoint file not found: {checkpoint_path}")
+    
+    # Load the state dictionary from the .bin file
+    state_dict = torch.load(checkpoint_path, map_location='cpu')
+    
+    # Load weights into the model, handling potential key mismatches
+    missing_keys, unexpected_keys = PL_model.model.load_state_dict(state_dict, strict=False)
+    
+    if missing_keys:
+        print(f"Warning: Missing keys in checkpoint: {missing_keys}")
+    if unexpected_keys:
+        print(f"Warning: Unexpected keys in checkpoint: {unexpected_keys}")
+    
+    print("Pretrained weights loaded successfully")
+    return PL_model
+
+
+def freeze_except_last_n_blocks(PL_model, n_blocks):
+    """
+    Freeze all model parameters except those in the last n transformer blocks.
+    
+    This enables efficient finetuning by only updating parameters in the last
+    n transformer blocks while keeping all other layers frozen. This approach
+    reduces computational cost and can help prevent catastrophic forgetting.
+    
+    Args:
+        PL_model: PyTorch Lightning model with loaded pretrained weights
+        n_blocks: Number of last transformer blocks to keep trainable (default: 1)
+                  If n_blocks=0, all layers will be trainable (no freezing)
+                  If n_blocks >= total blocks, all blocks will be trainable
+        
+    Returns:
+        The model with frozen parameters (except last n blocks)
+    """
+    if n_blocks == 0:
+        print("n_blocks=0: All parameters will remain trainable (no freezing)")
+        return PL_model
+    
+    print(f"Freezing all parameters except the last {n_blocks} transformer block(s)...")
+    
+    # First, freeze all parameters
+    for param in PL_model.model.parameters():
+        param.requires_grad = False
+    
+    # Then unfreeze only the last n transformer blocks
+    # The model structure is: PL_model.model.transformer.transformer_blocks
+    if hasattr(PL_model.model, 'transformer'):
+        transformer = PL_model.model.transformer
+        if hasattr(transformer, 'transformer_blocks') and len(transformer.transformer_blocks) > 0:
+            total_blocks = len(transformer.transformer_blocks)
+            blocks_to_unfreeze = min(n_blocks, total_blocks)
+            
+            # Unfreeze the last n blocks
+            for i in range(total_blocks - blocks_to_unfreeze, total_blocks):
+                block = transformer.transformer_blocks[i]
+                for param in block.parameters():
+                    param.requires_grad = True
+            
+            print(f"Unfroze last {blocks_to_unfreeze} transformer block(s) out of {total_blocks} total blocks")
+            if blocks_to_unfreeze < n_blocks:
+                print(f"Note: Requested {n_blocks} blocks but only {total_blocks} exist in model")
+        else:
+            print("Warning: Could not find transformer_blocks in model")
+    else:
+        print("Warning: Could not find transformer attribute in model")
+    
+    # Also unfreeze the final output layers (norm and out) for better finetuning
+    if hasattr(PL_model.model, 'transformer'):
+        transformer = PL_model.model.transformer
+        if hasattr(transformer, 'norm'):
+            for param in transformer.norm.parameters():
+                param.requires_grad = True
+            print("Unfroze final LayerNorm")
+        if hasattr(transformer, 'out'):
+            for param in transformer.out.parameters():
+                param.requires_grad = True
+            print("Unfroze final output layer")
+    
+    # Count trainable vs frozen parameters
+    trainable_params = sum(p.numel() for p in PL_model.model.parameters() if p.requires_grad)
+    total_params = sum(p.numel() for p in PL_model.model.parameters())
+    frozen_params = total_params - trainable_params
+    
+    print(f"Trainable parameters: {trainable_params:,} ({100 * trainable_params / total_params:.2f}%)")
+    print(f"Frozen parameters: {frozen_params:,} ({100 * frozen_params / total_params:.2f}%)")
+    
+    return PL_model
+
+
 ###########################
 ##  Training Entrypoint  ##
 ###########################
-
 
 def train_model(
         args,
@@ -774,7 +894,8 @@ def train_model(
     assert resume_from_checkpoint is None or (
             isinstance(resume_from_checkpoint, str) and 
             resume_from_checkpoint != "None"
-        ), f"resume_from_checkpoint should be str or None (not str `None`). Got {resume_from_checkpoint} (type {type(resume_from_checkpoint)})"
+        ), f"resume_from_checkpoint should be str or None (not str `None`)." + \
+           f" Got {resume_from_checkpoint} (type {type(resume_from_checkpoint)})"
     precision = args.precision
     
     # Configure DeepSpeed optimization settings
@@ -894,15 +1015,21 @@ def train_model(
     # PL_model, optimizer = ipex.optimize(PL_model, optimizer=optimizer, dtype=torch.float32)
 
     # Handle different training scenarios
-    if resume_from_checkpoint is None:
-        print("Train from scratch")
-        trainer.fit(PL_model, data_module)
-    elif start_pfam_trainer:
-        print('Start training Proteoscribe in phase 2 ...')
+    if args.finetune:
+        # Finetuning
+        print("Start finetuning")
         trainer.fit(PL_model, data_module)
     else:
-        print('Continue training Proteoscribe in phase 2 ...')
-        trainer.fit(PL_model, data_module, ckpt_path=resume_from_checkpoint)
+        # Pretraining
+        if resume_from_checkpoint is None:
+            print("Train from scratch")
+            trainer.fit(PL_model, data_module)
+        elif start_pfam_trainer:
+            print('Start training Proteoscribe in phase 2 ...')
+            trainer.fit(PL_model, data_module)
+        else:
+            print('Continue training Proteoscribe in phase 2 ...')
+            trainer.fit(PL_model, data_module, ckpt_path=resume_from_checkpoint)
 
     help_tools.print_gpu_initialization()
 
@@ -934,6 +1061,8 @@ def main(args, use_hydra=False, ds_config=None,):
     wandb_dir = args.wandb_logging_dir
     wandb_tags = args.wandb_tags
 
+    
+
     # ----- Clear the GPU cache -----
     clear_gpu_cache()
 
@@ -953,6 +1082,37 @@ def main(args, use_hydra=False, ds_config=None,):
         args=args,
         data_module=data_module
     )
+
+    # ----- Load pretrained weights and freeze if finetuning -----
+    # TODO: handle case where resume_from_checkpoint is specified
+    finetuning = args.finetune
+    if finetuning:
+        finetune_last_n_blocks = args.finetune_last_n_blocks
+        pretrained_checkpoint = args.pretrained_checkpoint
+        if finetune_last_n_blocks < 0:
+            # If flag is set to finetune and blocks not specified (default -1)
+            # set to default actionable value 1
+            finetune_last_n_blocks = 1
+        if pretrained_checkpoint is None:
+            msg = "Finetuning flag --finetune set to True but " \
+                    "pretrained_checkpoint path not specified."
+            print(msg)
+            print("Proceeding with randomly initialized weights")
+        elif os.path.exists(pretrained_checkpoint):
+            PL_model = load_pretrained_weights(
+                PL_model=PL_model,
+                checkpoint_path=pretrained_checkpoint
+            )
+            # Freeze parameters based on user configuration
+            PL_model = freeze_except_last_n_blocks(
+                PL_model=PL_model,
+                n_blocks=finetune_last_n_blocks
+            )
+        else:
+            print(f"Warning: Pretrained checkpoint not found at {pretrained_checkpoint}")
+            print("Proceeding with randomly initialized weights")
+    else:
+        pass
 
     # ----- Train Model -----
     train_model(

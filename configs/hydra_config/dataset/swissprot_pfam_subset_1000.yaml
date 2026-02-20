@@ -1,5 +1,0 @@
-defaults:
-  - base
-
-swissprot_data_root: ./data/Stage2_MMD_swissprot_embedding_subset_1000.hdf5
-pfam_data_root: ./data/Stage2_MMD_pfam_embedding_subset_1000.hdf5

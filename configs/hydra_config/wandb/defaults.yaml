@@ -1,5 +1,0 @@
-wandb_entity: thenaturalmachine
-wandb_project: BioM3
-wandb_logging_dir: ./logs
-wandb_tags:
-  - debug

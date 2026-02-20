@@ -1,7 +1,0 @@
-defaults:
-  - base
-
-choose_optim: AdamW
-lr: 1e-4
-weight_decay: 1e-6
-scheduler_gamma: coswarmup

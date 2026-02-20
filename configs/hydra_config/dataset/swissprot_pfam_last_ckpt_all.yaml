@@ -1,5 +1,0 @@
-defaults:
-  - base
-
-swissprot_data_root: ./data/Stage2_MMD_swissprot_embedding_last_ckpt_all.hdf5
-pfam_data_root: ./data/Stage2_MMD_pfam_embedding_last_ckpt_all.hdf5

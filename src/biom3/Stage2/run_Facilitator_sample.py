@@ -28,7 +28,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import Stage1_source.model as mod
+import biom3.Stage1.model as mod
 import warnings
 
 

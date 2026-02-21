@@ -20,9 +20,9 @@ import time
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 
 # our packages
-import Stage1_source.helper_funcs as helper_tools
-import Stage1_source.preprocess as prep
-import Stage1_source.model as mod
+import biom3.Stage1.helper_funcs as helper_tools
+import biom3.Stage1.preprocess as prep
+import biom3.Stage1.model as mod
 
 
 ######################

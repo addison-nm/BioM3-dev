@@ -1,10 +1,10 @@
 import sys
 
 def main():
-    print("Hello world from Stage2_source.__main__")
+    print("Hello world from biom3.Stage2.__main__")
 
 def run_Facilitator_sample():
-    from Stage2_source.run_Facilitator_sample import parse_arguments, main
+    from biom3.Stage2.run_Facilitator_sample import parse_arguments, main
     args = parse_arguments(sys.argv[1:])
     main(args)
 

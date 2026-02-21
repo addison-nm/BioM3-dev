@@ -11,10 +11,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
-import Stage3_source.preprocess as prep
+import biom3.Stage3.preprocess as prep
 #mport source.sampling as sample_tools
-import Stage3_source.cond_diff_transformer_layer as mod
-import Stage3_source.transformer_training_helper as train_helper
+import biom3.Stage3.cond_diff_transformer_layer as mod
+import biom3.Stage3.transformer_training_helper as train_helper
 
 
 

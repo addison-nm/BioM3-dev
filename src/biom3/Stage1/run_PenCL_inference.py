@@ -34,9 +34,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import Stage1_source.preprocess as prep
-import Stage1_source.model as mod
-import Stage1_source.PL_wrapper as PL_wrap
+import biom3.Stage1.preprocess as prep
+import biom3.Stage1.model as mod
+import biom3.Stage1.PL_wrapper as PL_wrap
 
 
 # Step 0: Argument Parser Function

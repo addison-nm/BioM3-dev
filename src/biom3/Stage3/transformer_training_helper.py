@@ -18,7 +18,7 @@ from torch.distributions import OneHotCategorical
 from torch.distributions import Categorical
 
 # ----- Custom Modules -----
-import Stage3_source.eval_metrics as eval_funcs
+import biom3.Stage3.eval_metrics as eval_funcs
 
 
 def sample_random_path(

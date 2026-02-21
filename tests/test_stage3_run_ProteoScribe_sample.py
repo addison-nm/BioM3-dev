@@ -1,6 +1,6 @@
 """Tests for entrypoint biom3_run_ProteoScribe_sample
 
-Tests script: src/Stage2_source/run_ProteoScribe_sample.py
+Tests script: src/biom3/Stage2/run_ProteoScribe_sample.py
 
 """
 
@@ -10,7 +10,7 @@ from contextlib import nullcontext as does_not_raise
 
 from tests.conftest import DATDIR, TMPDIR, remove_dir
 
-from Stage3_source.run_ProteoScribe_sample import parse_arguments, main
+from biom3.Stage3.run_ProteoScribe_sample import parse_arguments, main
 
 #####################
 ##  Configuration  ##

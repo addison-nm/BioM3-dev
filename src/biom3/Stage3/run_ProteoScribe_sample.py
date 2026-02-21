@@ -27,10 +27,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
-import Stage3_source.PL_wrapper as Stage3_PL_mod
-import Stage3_source.cond_diff_transformer_layer as Stage3_mod
-import Stage3_source.sampling_analysis as Stage3_sample_tools
-import Stage3_source.animation_tools as Stage3_ani_tools
+import biom3.Stage3.PL_wrapper as Stage3_PL_mod
+import biom3.Stage3.cond_diff_transformer_layer as Stage3_mod
+import biom3.Stage3.sampling_analysis as Stage3_sample_tools
+import biom3.Stage3.animation_tools as Stage3_ani_tools
 
 
 # Step 0: Argument Parser Function

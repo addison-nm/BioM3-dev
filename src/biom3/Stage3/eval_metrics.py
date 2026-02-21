@@ -20,7 +20,7 @@ import torch
 import re  # For regular expressions in sequence processing
 
 # ----- Custom Modules -----
-import Stage3_source.animation_tools as ani_tools  # For visualization of generation process
+import biom3.Stage3.animation_tools as ani_tools  # For visualization of generation process
 
 
 

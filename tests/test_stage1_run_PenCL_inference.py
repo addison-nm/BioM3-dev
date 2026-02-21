@@ -1,6 +1,6 @@
 """Tests for entrypoint biom3_run_PenCL_inference
 
-Tests script: src/Stage1_source/run_PenCL_inference.py
+Tests script: src/biom3/Stage1/run_PenCL_inference.py
 
 """
 
@@ -10,7 +10,7 @@ from contextlib import nullcontext as does_not_raise
 
 from tests.conftest import DATDIR, TMPDIR, remove_dir
 
-from Stage1_source.run_PenCL_inference import parse_arguments, main
+from biom3.Stage1.run_PenCL_inference import parse_arguments, main
 
 #####################
 ##  Configuration  ##

@@ -41,11 +41,11 @@ import math
 import copy
 
 # ----- Custom Modules & Project-Specific Imports -----
-from Stage3_source.DSEma import moving_average, clone_zero_model  # EMA implementation
-import Stage3_source.transformer_training_helper as trainer_tools
-import Stage3_source.helper_funcs as helper_tools
-import Stage3_source.eval_metrics as eval_funcs
-import Stage3_source.preprocess as prep
+from biom3.Stage3.DSEma import moving_average, clone_zero_model  # EMA implementation
+import biom3.Stage3.transformer_training_helper as trainer_tools
+import biom3.Stage3.helper_funcs as helper_tools
+import biom3.Stage3.eval_metrics as eval_funcs
+import biom3.Stage3.preprocess as prep
 
 
 

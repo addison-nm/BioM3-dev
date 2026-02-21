@@ -48,10 +48,10 @@ import deepspeed
 import wandb
 
 # Custom modules
-import Stage3_source.preprocess as prep
-import Stage3_source.cond_diff_transformer_layer as mod
-import Stage3_source.helper_funcs as help_tools
-import Stage3_source.PL_wrapper as PL_mod
+import biom3.Stage3.preprocess as prep
+import biom3.Stage3.cond_diff_transformer_layer as mod
+import biom3.Stage3.helper_funcs as help_tools
+import biom3.Stage3.PL_wrapper as PL_mod
 
 from mpi4py import MPI
 

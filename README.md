@@ -53,7 +53,7 @@ source venvs/biom3-env/bin/activate
 Basic verification.
 
 ```bash
-python -c 'import torch; import pytorch_lightning as pl; import deepspeed; import Stage3_source.preprocess'
+python -c 'import torch; import pytorch_lightning as pl; import deepspeed; import biom3; import biom3.Stage1'
 ```
 
 Run tests with

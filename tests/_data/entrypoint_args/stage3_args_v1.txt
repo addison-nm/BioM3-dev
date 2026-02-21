@@ -1,0 +1,1 @@
+-i tests/_data/embeddings/test_Facilitator_embeddings.pt -c tests/_data/configs/test_stage3_config_v1.json -m weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin -o tests/_tmp/outputs/test_ProteoScribe_samples.pt

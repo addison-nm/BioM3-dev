@@ -4,6 +4,7 @@ out/*
 logs/
 weights/*/*
 _my*/
+tests/_tmp/
 
 # Misc
 **/.DS_Store

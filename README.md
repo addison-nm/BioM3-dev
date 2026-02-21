@@ -59,8 +59,10 @@ python -c 'import torch; import pytorch_lightning as pl; import deepspeed; impor
 Run tests with
 
 ```bash
-python -m pytest tests
+python -m pytest -rs tests
 ```
+
+Note that some tests will be skipped if the necessary weights have not been downloaded. Running with flags `-rs` should report these issues.
 
 #### Aurora
 
@@ -74,11 +76,31 @@ Check the `weights` directory, and follow instructions in the READMEs there to d
 
 ### Stage 1
 
-TODO...
+Run PenCL inference from the entrypoint `biom3_run_PenCL_inference`.
+
+```bash
+source venvs/biom3-env/bin/activate
+
+biom3_run_PenCL_inference \
+    -i None \
+    -c configs/stage1_config_PenCL_inference.json \
+    -m ./weights/PenCL/BioM3_PenCL_epoch20.bin \
+    -o outputs/test_PenCL_embeddings.pt
+```
 
 ### Stage 2
 
-TODO... 
+Run Facilitator sampling from the entrypoint `biom3_run_Facilitator_sample`.
+
+```bash
+source venvs/biom3-env/bin/activate
+
+biom3_run_Facilitator_sample \
+    -i None \
+    -c configs/stage2_config_Facilitator_sample.json \
+    -m ./weights/Facilitator/BioM3_Facilitator_epoch20.bin \
+    -o outputs/test_Facilitator_embeddings.pt
+```
 
 ### Stage 3
 
@@ -111,7 +133,15 @@ Currently, we can achieve finetuning by passing the dataset of interest in as th
 
 #### Generation
 
-TODO...
+```bash
+source venvs/biom3-env/bin/activate
+
+biom3_run_ProteoScribe_sample \
+    -i outputs/test_Facilitator_embeddings.pt \
+    -c configs/stage3_config_ProteoScribe_sample.json \
+    -m ./weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin \
+    -o outputs/test_ProteoScribe_samples.pt
+```
 
 ## References
 

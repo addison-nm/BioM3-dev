@@ -1,8 +1,14 @@
 """BioM3 Stage 2: Facilitator sampling
 
+Mimics the workflow described at
+    https://huggingface.co/niksapraljak1/BioM3#stage-2-facilitator-sampling
+
 Preparation:
 
-    Follows execution of the run_PenCL_inference.py script
+    Follows execution of Stage 1: run_PenCL_inference
+
+    Corresponding config file:
+        configs/stage2_config_Facilitator_sample.json
 
 Example usage:
 
@@ -23,32 +29,35 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import Stage1_source.model as mod
+import warnings
 
 
 # Step 0: Argument Parser Function
 def parse_arguments(args):
     parser = argparse.ArgumentParser(description="BioM3 Facilitator Model (Stage 2)")
-    parser.add_argument('-d', '--input_data_path', type=str, required=True,
+    parser.add_argument('-i', '--input_data_path', type=str, required=True,
                         help="Path to the input embeddings (e.g., PenCL_test_outputs.pt)")
     parser.add_argument('-c', '--json_path', type=str, required=True,
-                        help="Path to the JSON configuration file (stage2_config.json)")
+                        help="Path to the JSON configuration file (stage2_config_Facilitator_sample.json)")
     parser.add_argument('-m', '--model_path', type=str, required=True,
                         help="Path to the Facilitator model weights (e.g., BioM3_Facilitator_epoch20.bin)")
     parser.add_argument('-o', '--output_data_path', type=str, required=True,
                         help="Path to save the output embeddings (e.g., Facilitator_test_outputs.pt)")
-    
     return parser.parse_args(args)
 
 
 # Step 1: Load JSON Configuration
 def load_json_config(json_path):
+    """Load JSON configuration file."""
     with open(json_path, "r") as f:
         config = json.load(f)
+    warnings.warn("jajaja")
     return config
 
 
 # Step 2: Convert JSON dictionary to Namespace
 def convert_to_namespace(config_dict):
+    """Recursively convert a dictionary to an argparse Namespace."""
     for key, value in config_dict.items():
         if isinstance(value, dict):
             config_dict[key] = convert_to_namespace(value)
@@ -90,7 +99,10 @@ def main(args):
     config_args = convert_to_namespace(config_dict)
 
     # Load model
-    model = prepare_model(config_args=config_args, model_path=args.model_path)
+    model = prepare_model(
+        config_args=config_args, 
+        model_path=args.model_path
+    )
 
     # Load input embeddings
     embedding_dataset = torch.load(args.input_data_path)

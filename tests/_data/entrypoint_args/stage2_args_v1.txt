@@ -1,0 +1,1 @@
+-i tests/_data/embeddings/test_PenCL_embeddings.pt -c tests/_data/configs/test_stage2_config_v1.json -m weights/Facilitator/BioM3_Facilitator_epoch20.bin -o tests/_tmp/outputs/test_Facilitator_embeddings.pt

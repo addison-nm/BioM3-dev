@@ -9,10 +9,10 @@ requires-python = ">= 3.8"
 readme = "README.md"
 description = "BioM3 development and investigation."
 authors = [
-  {name = "Addison Howe"},
-  {name = "Tarak Nandi"},
+  {name = "The BioM3 team"},
 ]
 
 [project.scripts]
 biom3_run_PenCL_inference = "Stage1_source.__main__:run_PenCL_inference"
 biom3_run_Facilitator_sample = "Stage2_source.__main__:run_Facilitator_sample"
+biom3_run_ProteoScribe_sample = "Stage3_source.__main__:run_ProteoScribe_sample"

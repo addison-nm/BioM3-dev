@@ -1,5 +1,5 @@
 {
-  "device": "cuda",
+  "device": "cpu",
   "output_hist_folder": "None",
   "version_name": "None",
   "output_folder": "./",
@@ -12,7 +12,7 @@
   "stage2_data_path": "None",
   "stage3_output_data_path": "None",
   "data_root": "None",
-  "num_replicas": 5,
+  "num_replicas": 2,
   "batch_size_sample": 32,
   "diffusion_steps": 1024,
   "seed": 42,

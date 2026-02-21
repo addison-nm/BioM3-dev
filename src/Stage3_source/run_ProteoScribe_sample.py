@@ -1,3 +1,23 @@
+"""BioM3 Stage 3: ProteoScribe sampling
+
+Mimics the workflow described at
+    https://huggingface.co/niksapraljak1/BioM3#stage-3-proteoscribe
+
+Preparation:
+
+    Corresponding config file:
+        configs/stage3_config_ProteoScribe_sample.json
+
+Example usage:
+
+biom3_run_ProteoScribe_sample \
+    --input_data_path None \
+    --json_path "configs/stage1_config_ProteoScribe_sample.json" \
+    --model_path "./weights/PenCL/BioM3_PenCL_epoch20.bin" \
+    --output_path "outputs/test_PenCL_embeddings.pt"
+
+"""
+
 from argparse import Namespace
 import json
 import pandas as pd
@@ -13,21 +33,31 @@ import Stage3_source.sampling_analysis as Stage3_sample_tools
 import Stage3_source.animation_tools as Stage3_ani_tools
 
 
+# Step 0: Argument Parser Function
+def parse_arguments(args):
+    parser = argparse.ArgumentParser(description="BioM3 Inference Script (Stage 1)")
+    parser.add_argument('-i', '--input_path', type=str, required=True,
+                        help="Path to input embeddings")
+    parser.add_argument('-c', '--json_path', type=str, required=True,
+                        help="Path to the JSON configuration file (stage3_config_ProteoScribe_sample.json)")
+    parser.add_argument('-m', '--model_path', type=str, required=True,
+                        help="Path to the pre-trained model weights (pytorch_model.bin)")
+    parser.add_argument('-o', '--output_path', type=str, required=True,
+                        help="Path to save output embeddings")
+    return parser.parse_args(args)
+
+
 # Step 1: Load JSON configuration
 def load_json_config(json_path):
-    """
-    Load JSON configuration file.
-    """
+    """Load JSON configuration file."""
     with open(json_path, "r") as f:
         config = json.load(f)
-    # print("Loaded JSON config:", config)
     return config
+
 
 # Step 2: Convert JSON dictionary to Namespace
 def convert_to_namespace(config_dict):
-    """
-    Recursively convert a dictionary to an argparse Namespace.
-    """
+    """Recursively convert a dictionary to an argparse Namespace."""
     for key, value in config_dict.items():
         if isinstance(value, dict):  # Recursively handle nested dictionaries
             config_dict[key] = convert_to_namespace(value)
@@ -47,13 +77,34 @@ def prepare_model(args, config_args) ->nn.Module:
         num_classes=config_args.num_classes
     )
     
-    # Load state_dict into the model with map_location="cpu"
-    model.load_state_dict(torch.load(args.model_path, map_location=config_args.device))
+    # Load state_dict into the model. Verbose handling of parameter mismatches.
+    state_dict = torch.load(args.model_path, map_location=config_args.device)
+    try:
+        model.load_state_dict(state_dict)
+    except RuntimeError as e:
+        print("Encountered error loading state_dict:")
+        print(e)
+        missing_keys, unexpected_keys = model.load_state_dict(
+            state_dict, strict=False
+        )
+        if missing_keys:
+            print(f"Warning: Missing keys in checkpoint: {missing_keys}")
+        if unexpected_keys:
+            print(f"Warning: Unexpected keys in checkpoint: {unexpected_keys}")
+        for k in unexpected_keys:
+            new_k = k.replace("weights_", "weights.")
+            if new_k in missing_keys:
+                state_dict[new_k] = state_dict.pop(k)
+                print(f"Replaced state_dict key `{k}` with `{new_k}`")
+        # Reload model with updated parameter names
+        model.load_state_dict(
+            state_dict, strict=True
+        )
+    
     model.eval()
     
     print(f"Stage 3 model loaded from: {args.model_path} (loaded on {config_args.device})")
     return model
-
 
 
 # Step 4: Sample sequences from the model
@@ -126,26 +177,9 @@ def batch_stage3_generate_sequences(
     return design_sequence_dict
 
 
-
-# Step 5: Argument Parser Function
-def parse_arguments():
-    
-    parser = argparse.ArgumentParser(description="BioM3 Inference Script (Stage 1)")
-    parser.add_argument('--json_path', type=str, required=True,
-                                    help="Path to the JSON configuration file (stage1_config.json)")
-    parser.add_argument('--model_path', type=str, required=True,
-                                    help="Path to the pre-trained model weights (pytorch_model.bin)")
-    parser.add_argument('--input_path', type=str, required=True,
-                                    help="Path to save input embeddings")
-    parser.add_argument('--output_path', type=str, required=True,
-                                    help="Path to save output embeddings")
-    return parser.parse_args()
-
-
-if __name__ == '__main__':
-   
+def main(args):
     # Parse arguments
-    config_args_parser = parse_arguments()
+    config_args_parser = args
 
     # Load and convert JSON config
     config_dict = load_json_config(config_args_parser.json_path)
@@ -168,3 +202,8 @@ if __name__ == '__main__':
     )
     
     print(f'{design_sequence_dict=}')
+
+
+if __name__ == '__main__':
+    args = parse_arguments(sys.argv[1:])
+    main(args)    

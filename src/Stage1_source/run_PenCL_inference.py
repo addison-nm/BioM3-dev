@@ -1,5 +1,8 @@
 """BioM3 Stage 1: PenCL inference
 
+Mimics the workflow described at
+    https://huggingface.co/niksapraljak1/BioM3#stage-1-pencl-inference
+
 Preparation:
 
     Edit the corresponding config file:
@@ -35,23 +38,24 @@ import Stage1_source.preprocess as prep
 import Stage1_source.model as mod
 import Stage1_source.PL_wrapper as PL_wrap
 
+
 # Step 0: Argument Parser Function
 def parse_arguments(args):
     parser = argparse.ArgumentParser(description="BioM3 Inference Script (Stage 1)")
-    parser.add_argument('-d', '--input_data_path', type=str, required=True,
+    parser.add_argument('-i', '--input_data_path', type=str, required=True,
                         help="Path to input data in csv format. Use None for test case.")
     parser.add_argument('-c', '--json_path', type=str, required=True,
-                        help="Path to the JSON configuration file (stage1_config.json)")
+                        help="Path to the JSON configuration file (stage1_config_PenCL_inference.json)")
     parser.add_argument('-m', '--model_path', type=str, required=True,
                         help="Path to the pre-trained model weights (pytorch_model.bin)")
     parser.add_argument('-o', '--output_path', type=str, required=True,
                         help="Path to save output embeddings")
-    
     return parser.parse_args(args)
 
 
 # Step 1: Load JSON Configuration
 def load_json_config(json_path):
+    """Load JSON configuration file."""
     with open(json_path, "r") as f:
         config = json.load(f)
     return config
@@ -59,6 +63,7 @@ def load_json_config(json_path):
 
 # Step 2: Convert JSON dictionary to Namespace
 def convert_to_namespace(config_dict):
+    """Recursively convert a dictionary to an argparse Namespace."""
     for key, value in config_dict.items():
         if isinstance(value, dict):
             config_dict[key] = convert_to_namespace(value)
@@ -68,6 +73,8 @@ def convert_to_namespace(config_dict):
 # Step 3: Load Pre-trained Model
 def prepare_model(config_args, model_path) -> nn.Module:
     model = mod.pfam_PEN_CL(args=config_args)
+    # TODO: Need to test loading using strict=False. Possible that weights 
+    # are not being properly loaded.
     model.load_state_dict(
         torch.load(model_path, map_location="cpu"), strict=False
     )
@@ -76,7 +83,7 @@ def prepare_model(config_args, model_path) -> nn.Module:
     return model
 
 
-# Step 4: Prepare Test Dataset or load dataset
+# Step 4: Prepare Test Dataset
 def load_test_dataset(config_args):
     
     test_dict = {
@@ -112,6 +119,7 @@ def load_test_dataset(config_args):
 
 
 def load_dataset(input_data_path, config_args, **kwargs):
+    """Processes a csv file and constructs a dataset from this data."""
     df = pd.read_csv(
         input_data_path, **kwargs
     )
@@ -142,14 +150,20 @@ def main(args):
 
     with torch.serialization.safe_globals([Namespace]):
         # Load model
-        model = prepare_model(config_args=config_args, model_path=config_args_parser.model_path)
+        model = prepare_model(
+            config_args=config_args, 
+            model_path=config_args_parser.model_path
+        )
 
         # Load dataset
         if args.input_data_path.lower() == "none":
-            test_dataset = load_test_dataset(config_args)
+            dataset = load_test_dataset(config_args)
         else:
-            dataset = load_dataset(args.input_data_path, config_args, sep=",")
-
+            dataset = load_dataset(
+                args.input_data_path, config_args, 
+                sep=",",
+                quotechar='"',
+            )
 
     # Run inference and store z_t, z_p
     z_t_list = []
@@ -158,8 +172,8 @@ def main(args):
     protein_list = []
     
     with torch.no_grad():
-        for idx in range(len(test_dataset)):
-            batch = test_dataset[idx]
+        for idx in range(len(dataset)):
+            batch = dataset[idx]
             x_t, x_p = batch
             outputs = model(x_t, x_p, compute_masked_logits=False) # Infer Joint-Embeddings 
             z_t = outputs['text_joint_latent']  # Text latent
@@ -167,8 +181,8 @@ def main(args):
             z_t_list.append(z_t)
             z_p_list.append(z_p)
             
-            protein_sequence = test_dataset.protein_sequence_list[idx]
-            text_prompt = test_dataset.text_captions_list[idx]
+            protein_sequence = dataset.protein_sequence_list[idx]
+            text_prompt = dataset.text_captions_list[idx]
             text_list.append(text_prompt)
             protein_list.append(protein_sequence)
 
@@ -219,6 +233,7 @@ def main(args):
     print("\n=== Homology Matrix (Dot Product of Normalized z_p) ===")
     print(homology_matrix)
     
+    # Save output
     torch.save(embedding_dict, config_args_parser.output_path)
 
 

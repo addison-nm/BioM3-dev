@@ -23,13 +23,6 @@ from transformers import AutoTokenizer, AutoModel
 # Added by A Howe
 #########################################################
 
-import torch
-from torch.utils.data import Dataset, DataLoader
-from transformers import AutoTokenizer
-import pandas as pd
-import esm
-
-
 class BatchedTextSeqPairingDataset(Dataset):
     """
     Returns raw (text_caption, protein_sequence, accession_id).
@@ -47,11 +40,13 @@ class BatchedTextSeqPairingDataset(Dataset):
         self.seq_max_length = 1024
 
         # tokenizers (shared by collate_fn)
-        self.text_tokenizer = AutoTokenizer.from_pretrained(args.text_model_path)
-        self.seq_model, self.sequence_alphabet = esm.pretrained.load_model_and_alphabet(
+        self.text_tokenizer = AutoTokenizer.from_pretrained(
+            args.text_model_path
+        )
+        _, self.sequence_tokenizer = pretrained.load_model_and_alphabet(
             args.seq_model_path
         )
-        self.batch_converter = self.sequence_alphabet.get_batch_converter()
+        self.batch_converter = self.sequence_tokenizer.get_batch_converter()
 
     def __len__(self):
         return len(self.df)
@@ -63,7 +58,11 @@ class BatchedTextSeqPairingDataset(Dataset):
             self.accession_ids[idx],
         )
 
-def collate_fn(batch, dataset: BatchedTextSeqPairingDataset):
+def collate_fn(
+        batch, 
+        dataset: BatchedTextSeqPairingDataset, 
+        include_raw=False
+):
     texts, sequences, accessions = zip(*batch)
 
     # -------- TEXT TOKENIZATION --------
@@ -91,7 +90,16 @@ def collate_fn(batch, dataset: BatchedTextSeqPairingDataset):
     else:
         batch_tokens = batch_tokens[:, : dataset.seq_max_length]
 
-    return text_inputs["input_ids"], batch_tokens
+    if include_raw:
+        return (
+            text_inputs["input_ids"], 
+            batch_tokens,
+            list(texts),        # raw text captions
+            list(sequences),    # raw protein sequences
+            list(accessions),   # accession IDs
+        )
+    else:
+        return text_inputs["input_ids"], batch_tokens
 
 ########################################
 # Dataset iterator with masking tokens #

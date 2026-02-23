@@ -65,14 +65,14 @@ def convert_to_namespace(config_dict):
 
 
 # Step 3: Load Pre-trained Model
-def prepare_model(config_args, model_path) -> nn.Module:
+def prepare_model(config_args, model_path, device) -> nn.Module:
     model = mod.Facilitator(
         in_dim=config_args.emb_dim,
         hid_dim=config_args.hid_dim,
         out_dim=config_args.emb_dim,
         dropout=config_args.dropout
     )
-    model.load_state_dict(torch.load(model_path, map_location="cpu"))
+    model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
     print("Model loaded successfully with weights!")
     return model
@@ -98,19 +98,23 @@ def main(args):
     config_dict = load_json_config(args.json_path)
     config_args = convert_to_namespace(config_dict)
 
+    device = torch.device("cpu")  # TODO: cuda results in OOM
+
     # Load model
     model = prepare_model(
         config_args=config_args, 
-        model_path=args.model_path
+        model_path=args.model_path,
+        device=device,
     )
+    model.to(device)
 
     # Load input embeddings
     embedding_dataset = torch.load(args.input_data_path)
 
     # Run inference to get facilitated embeddings
     with torch.no_grad():
-        z_t = embedding_dataset['z_t']
-        z_p = embedding_dataset['z_p']
+        z_t = embedding_dataset['z_t'].to(device)
+        z_p = embedding_dataset['z_p'].to(device)
         z_c = model(z_t)
         embedding_dataset['z_c'] = z_c
 

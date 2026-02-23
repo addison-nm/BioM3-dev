@@ -1,24 +1,34 @@
 #!/bin/bash
 #=============================================================================
 #
-# FILE: prepare_sequence_data.sh
+# FILE: embedding_pipeline.sh
 #
-# USAGE: prepare_sequence_data.sh infpath outdir
+# USAGE: embedding_pipeline.sh infpath outdir config1 config2 prefix
 #
 # DESCRIPTION: Runs a data processing pipeline to embed sequence-text pairs and
-#   save these in hdf5 format for Stage 3 ProteoScribe training.
+#   save these in hdf5 format for Stage 3 ProteoScribe pretraining/finetuning.
 #
-# EXAMPLE: sh prepare_sequence_data.sh <infpath> <outdir>
+# EXAMPLE: sh embedding_pipeline.sh \
+#   data/dataset_with_prompts.csv \
+#   outputs/embeddings \
+#   configs/stage1_config_PenCL_inference.json \
+#   configs/stage1_config_Facilitator_sample.json \
+#   <dataset_name>
 #=============================================================================
+
+set -euo pipefail
 
 infpath=$1
 outdir=$2
 config1=$3  # configs/stage1_config_PenCL_inference.json
-config2=$4  # configs/stage1_config_PenCL_inference.json
+config2=$4  # configs/stage1_config_Facilitator_sample.json
 prefix=$5
 
-# Check args
+# TODO: Check args
+# TODO: Generalize args below
+# TODO: Consider randomness implications and seeding
 
+dataset_key=MMD_data
 PENCL_WEIGHTS=weights/PenCL/BioM3_PenCL_epoch20.bin
 FACILITATOR_WEIGHTS=weights/Facilitator/BioM3_Facilitator_epoch20.bin
 
@@ -38,3 +48,9 @@ biom3_run_Facilitator_sample \
     -c ${config2} \
     -m ${FACILITATOR_WEIGHTS} \
     -o ${outdir}/${prefix}.Facilitator_emb.pt
+
+# Compile Stage 1 and 2 data into an hdf5 dataset ready for finetuning
+python scripts/data_prep/compile_stage2_data_to_hdf5.py \
+    -o ${outdir}/${prefix}.compiled_emb.hdf5 \
+    --dataset_key ${dataset_key} \
+    --facilitator_embeddings ${outdir}/${prefix}.Facilitator_emb.pt

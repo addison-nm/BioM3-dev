@@ -29,6 +29,7 @@ import argparse
 import yaml
 from argparse import Namespace
 import json
+import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
@@ -170,35 +171,45 @@ def main(args):
                 args.input_data_path, config_args, 
                 sep=",",
                 quotechar='"',
+                keep_default_na=False,  # empty string instead of nan
             )
 
     loader = DataLoader(
         dataset,
-        batch_size=32,  # TODO: hardcoded
+        batch_size=64,  # TODO: hardcoded
         shuffle=False,
-        num_workers=1, # TODO: hardcoded
+        num_workers=0, # TODO: hardcoded
         pin_memory=True,
-        collate_fn=partial(prep.collate_fn, dataset=dataset),
+        collate_fn=partial(prep.collate_fn, dataset=dataset, include_raw=True),
     )
 
-    # Run inference and store z_t, z_p
+    # Run inference and store accession, text, protein sequence, z_t, and z_p
     z_t_list = []
     z_p_list = []
     text_list = []
     protein_list = []
+    acc_id_list = []
 
+    # counter = 0
     with torch.no_grad():
-        for x_t, x_p in tqdm.tqdm(loader):
+        for item in tqdm.tqdm(loader):
+            x_t, x_p, texts, sequences, accessions = item
             x_t = x_t.to(device, non_blocking=True)
             x_p = x_p.to(device, non_blocking=True)
 
             outputs = model(x_t, x_p, compute_masked_logits=False)
 
-            z_t_list.append(outputs["text_joint_latent"].cpu())
-            z_p_list.append(outputs["seq_joint_latent"].cpu())
+            z_t_list.append(outputs["text_joint_latent"])
+            z_p_list.append(outputs["seq_joint_latent"])
+            text_list += texts
+            protein_list += sequences
+            acc_id_list += accessions
+            # counter += 1
+            # if counter > 3:
+            #     break
 
-    z_t = torch.cat(z_t_list)
-    z_p = torch.cat(z_p_list)
+    z_t = torch.cat(z_t_list).cpu()
+    z_p = torch.cat(z_p_list).cpu()
     
     # ORIGINAL CODE FROM HUGGING FACE SEEMS TO PREVENT PARALLELIZATION
     # with torch.no_grad():
@@ -220,15 +231,25 @@ def main(args):
     # Stack all latent vectors
     z_t_tensor = torch.vstack(z_t_list)  # Shape: (num_samples, latent_dim)
     z_p_tensor = torch.vstack(z_p_list)  # Shape: (num_samples, latent_dim)
+    text_prompt_array = np.array(
+        [s.encode("utf-8") for s in text_list], dtype=object
+    )
+    protein_array = np.array(
+        [s.encode("utf-8") for s in protein_list], dtype=object
+    )
+    acc_id_array = np.array(
+        [s.encode("utf-8") for s in acc_id_list], dtype=object
+    )
     
     # Prepare embedding dict.
     embedding_dict = {
-            'sequence': protein_list,
-            'text_prompts': text_list,
             'z_t': z_t_tensor,
-            'z_p': z_p_tensor
+            'z_p': z_p_tensor,
+            'text_prompts': text_prompt_array,
+            'sequence': protein_array,
+            'acc_id': acc_id_array,
     }
-
+    
     # Compute Dot Product scores
     dot_product_scores = torch.matmul(z_p_tensor, z_t_tensor.T)  # Dot product
 
@@ -262,6 +283,11 @@ def main(args):
 
     print("\n=== Homology Matrix (Dot Product of Normalized z_p) ===")
     print(homology_matrix)
+
+    print("\n=== Example raw data elements ===")
+    for k in range(3):
+        print(f"  acc_id[{k}]:", acc_id_array[k])
+        print(f"sequence[{k}]:", protein_array[k])
     
     # Save output
     torch.save(embedding_dict, config_args_parser.output_path)

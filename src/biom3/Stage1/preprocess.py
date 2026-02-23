@@ -18,6 +18,81 @@ from esm import pretrained
 from transformers import AutoTokenizer, AutoModel
 
 
+#########################################################
+# BATCHED VERSION: Dataset iterator with masking tokens #
+# Added by A Howe
+#########################################################
+
+import torch
+from torch.utils.data import Dataset, DataLoader
+from transformers import AutoTokenizer
+import pandas as pd
+import esm
+
+
+class BatchedTextSeqPairingDataset(Dataset):
+    """
+    Returns raw (text_caption, protein_sequence, accession_id).
+    Tokenization is handled in collate_fn for batching.
+    """
+
+    def __init__(self, args, df: pd.DataFrame):
+        self.df = df.reset_index(drop=True)
+
+        self.text_captions = df["[final]text_caption"].tolist()
+        self.protein_sequences = df[args.sequence_keyword].tolist()
+        self.accession_ids = df[args.id_keyword].tolist()
+
+        self.text_max_length = args.text_max_length
+        self.seq_max_length = 1024
+
+        # tokenizers (shared by collate_fn)
+        self.text_tokenizer = AutoTokenizer.from_pretrained(args.text_model_path)
+        self.seq_model, self.sequence_alphabet = esm.pretrained.load_model_and_alphabet(
+            args.seq_model_path
+        )
+        self.batch_converter = self.sequence_alphabet.get_batch_converter()
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, idx):
+        return (
+            self.text_captions[idx],
+            self.protein_sequences[idx],
+            self.accession_ids[idx],
+        )
+
+def collate_fn(batch, dataset: BatchedTextSeqPairingDataset):
+    texts, sequences, accessions = zip(*batch)
+
+    # -------- TEXT TOKENIZATION --------
+    text_inputs = dataset.text_tokenizer.batch_encode_plus(
+        list(texts),
+        truncation=True,
+        max_length=dataset.text_max_length,
+        padding=True,
+        return_tensors="pt",
+        return_attention_mask=True,
+        return_token_type_ids=False,
+    )
+
+    # -------- PROTEIN TOKENIZATION --------
+    batch_sequences = list(zip(accessions, sequences))
+    batch_labels, batch_strs, batch_tokens = dataset.batch_converter(batch_sequences)
+
+    # pad protein sequences to fixed length (1024)
+    if batch_tokens.shape[1] < dataset.seq_max_length:
+        pad_len = dataset.seq_max_length - batch_tokens.shape[1]
+        pad = torch.ones(
+            batch_tokens.shape[0], pad_len, dtype=batch_tokens.dtype
+        )
+        batch_tokens = torch.cat([batch_tokens, pad], dim=1)
+    else:
+        batch_tokens = batch_tokens[:, : dataset.seq_max_length]
+
+    return text_inputs["input_ids"], batch_tokens
+
 ########################################
 # Dataset iterator with masking tokens #
 ########################################

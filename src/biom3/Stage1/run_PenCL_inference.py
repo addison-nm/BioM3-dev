@@ -33,6 +33,9 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.data import DataLoader
+import tqdm as tqdm
+from functools import partial
 
 import biom3.Stage1.preprocess as prep
 import biom3.Stage1.model as mod
@@ -71,13 +74,14 @@ def convert_to_namespace(config_dict):
 
 
 # Step 3: Load Pre-trained Model
-def prepare_model(config_args, model_path) -> nn.Module:
+def prepare_model(config_args, model_path, device) -> nn.Module:
     model = mod.pfam_PEN_CL(args=config_args)
     # TODO: Need to test loading using strict=False. Possible that weights 
     # are not being properly loaded.
     model.load_state_dict(
-        torch.load(model_path, map_location="cpu"), strict=False
+        torch.load(model_path, map_location="cuda"), strict=False
     )
+    model.to(device)
     model.eval()
     print("Model loaded successfully with weights!")
     return model
@@ -114,7 +118,7 @@ def load_test_dataset(config_args):
     }
     
     test_df = pd.DataFrame(test_dict)
-    test_dataset = prep.TextSeqPairing_Dataset(args=config_args, df=test_df)
+    test_dataset = prep.BatchedTextSeqPairingDataset(args=config_args, df=test_df)
     return test_dataset
 
 
@@ -124,7 +128,7 @@ def load_dataset(input_data_path, config_args, **kwargs):
         input_data_path, **kwargs
     )
     df = df.reset_index(drop=True)
-    return prep.TextSeqPairing_Dataset(args=config_args, df=df)
+    return prep.BatchedTextSeqPairingDataset(args=config_args, df=df)
 
 
 # Step 5: Compute Homology Probabilities
@@ -143,6 +147,8 @@ def compute_homology_matrix(z_p_tensor):
 
 def main(args):
     config_args_parser = args
+    
+    device = torch.device("cuda")  # TODO: hardcoded
 
     # Load configuration
     config_dict = load_json_config(config_args_parser.json_path)
@@ -152,7 +158,8 @@ def main(args):
         # Load model
         model = prepare_model(
             config_args=config_args, 
-            model_path=config_args_parser.model_path
+            model_path=config_args_parser.model_path,
+            device=device,
         )
 
         # Load dataset
@@ -165,27 +172,50 @@ def main(args):
                 quotechar='"',
             )
 
+    loader = DataLoader(
+        dataset,
+        batch_size=32,  # TODO: hardcoded
+        shuffle=False,
+        num_workers=1, # TODO: hardcoded
+        pin_memory=True,
+        collate_fn=partial(prep.collate_fn, dataset=dataset),
+    )
+
     # Run inference and store z_t, z_p
     z_t_list = []
     z_p_list = []
     text_list = []
     protein_list = []
-    
-    with torch.no_grad():
-        for idx in range(len(dataset)):
-            batch = dataset[idx]
-            x_t, x_p = batch
-            outputs = model(x_t, x_p, compute_masked_logits=False) # Infer Joint-Embeddings 
-            z_t = outputs['text_joint_latent']  # Text latent
-            z_p = outputs['seq_joint_latent']   # Protein latent
-            z_t_list.append(z_t)
-            z_p_list.append(z_p)
-            
-            protein_sequence = dataset.protein_sequence_list[idx]
-            text_prompt = dataset.text_captions_list[idx]
-            text_list.append(text_prompt)
-            protein_list.append(protein_sequence)
 
+    with torch.no_grad():
+        for x_t, x_p in tqdm.tqdm(loader):
+            x_t = x_t.to(device, non_blocking=True)
+            x_p = x_p.to(device, non_blocking=True)
+
+            outputs = model(x_t, x_p, compute_masked_logits=False)
+
+            z_t_list.append(outputs["text_joint_latent"].cpu())
+            z_p_list.append(outputs["seq_joint_latent"].cpu())
+
+    z_t = torch.cat(z_t_list)
+    z_p = torch.cat(z_p_list)
+    
+    # ORIGINAL CODE FROM HUGGING FACE SEEMS TO PREVENT PARALLELIZATION
+    # with torch.no_grad():
+    #     for idx in tqdm.trange(len(dataset)):
+    #         # print(f"{idx}/{len(dataset)}")
+    #         batch = dataset[idx]
+    #         x_t, x_p = batch
+    #         outputs = model(x_t, x_p, compute_masked_logits=False) # Infer Joint-Embeddings 
+    #         z_t = outputs['text_joint_latent']  # Text latent
+    #         z_p = outputs['seq_joint_latent']   # Protein latent
+    #         z_t_list.append(z_t)
+    #         z_p_list.append(z_p)
+            
+    #         protein_sequence = dataset.protein_sequence_list[idx]
+    #         text_prompt = dataset.text_captions_list[idx]
+    #         text_list.append(text_prompt)
+    #         protein_list.append(protein_sequence)
 
     # Stack all latent vectors
     z_t_tensor = torch.vstack(z_t_list)  # Shape: (num_samples, latent_dim)

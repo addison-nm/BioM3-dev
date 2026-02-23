@@ -1,6 +1,6 @@
 # Project specific items
 data/*
-out/*
+outputs/*
 logs/
 weights/*/*
 _my*/

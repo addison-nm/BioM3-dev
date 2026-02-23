@@ -10,7 +10,7 @@ Preparation:
 
 Example usage:
 
-biom3_run_ProteoScribe_sample \
+biom3_ProteoScribe_sample \
     --input_data_path None \
     --json_path "configs/stage1_config_ProteoScribe_sample.json" \
     --model_path "./weights/PenCL/BioM3_PenCL_epoch20.bin" \

@@ -13,6 +13,6 @@ authors = [
 ]
 
 [project.scripts]
-biom3_run_PenCL_inference = "biom3.Stage1.__main__:run_PenCL_inference"
-biom3_run_Facilitator_sample = "biom3.Stage2.__main__:run_Facilitator_sample"
-biom3_run_ProteoScribe_sample = "biom3.Stage3.__main__:run_ProteoScribe_sample"
+biom3_PenCL_inference = "biom3.Stage1.__main__:run_PenCL_inference"
+biom3_Facilitator_sample = "biom3.Stage2.__main__:run_Facilitator_sample"
+biom3_ProteoScribe_sample = "biom3.Stage3.__main__:run_ProteoScribe_sample"

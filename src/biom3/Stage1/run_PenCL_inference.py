@@ -17,7 +17,7 @@ Preparation:
 
 Example usage:
 
-biom3_run_PenCL_inference \
+biom3_PenCL_inference \
     --input_data_path None \
     --json_path "configs/stage1_config_PenCL_inference.json" \
     --model_path "./weights/PenCL/BioM3_PenCL_epoch20.bin" \

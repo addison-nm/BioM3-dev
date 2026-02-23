@@ -1,7 +1,7 @@
 """
 Helper script to compile Stage 2 outputs into a format ready for finetuning.
 
-This script uses the output of the biom3_run_Facilitator_sample entrypoint, 
+This script uses the output of the biom3_Facilitator_sample entrypoint, 
 which saves as part of its output a .pt file <prefix>.Facilitator_emb.pt.
 This file should contain the following key-accessed data:
     acc_id: Accession IDs

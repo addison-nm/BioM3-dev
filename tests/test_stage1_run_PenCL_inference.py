@@ -1,4 +1,4 @@
-"""Tests for entrypoint biom3_run_PenCL_inference
+"""Tests for entrypoint biom3_PenCL_inference
 
 Tests script: src/biom3/Stage1/run_PenCL_inference.py
 

@@ -12,7 +12,7 @@ Preparation:
 
 Example usage:
 
-biom3_run_Facilitator_sample.py \
+biom3_Facilitator_sample.py \
     --input_data_path "outputs/test_PenCL_embeddings.pt" \
     --json_path "configs/stage2_config_Facilitator_sample.json" \
     --model_path "./weights/Facilitator/BioM3_Facilitator_epoch20.bin" \

@@ -1,4 +1,4 @@
-"""Tests for entrypoint biom3_run_ProteoScribe_sample
+"""Tests for entrypoint biom3_ProteoScribe_sample
 
 Tests script: src/biom3/Stage2/run_ProteoScribe_sample.py
 

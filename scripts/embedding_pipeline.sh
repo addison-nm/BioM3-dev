@@ -36,14 +36,14 @@ FACILITATOR_WEIGHTS=weights/Facilitator/BioM3_Facilitator_epoch20.bin
 mkdir -p ${outdir}
 
 # Run PenCL for Stage 1 embeddings
-biom3_run_PenCL_inference \
+biom3_PenCL_inference \
     -i ${infpath} \
     -c ${config1} \
     -m ${PENCL_WEIGHTS} \
     -o ${outdir}/${prefix}.PenCL_emb.pt
 
 # Run Facilitator for Stage 2 embeddings
-biom3_run_Facilitator_sample \
+biom3_Facilitator_sample \
     -i ${outdir}/${prefix}.PenCL_emb.pt \
     -c ${config2} \
     -m ${FACILITATOR_WEIGHTS} \

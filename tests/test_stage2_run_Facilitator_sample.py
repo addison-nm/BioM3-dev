@@ -1,4 +1,4 @@
-"""Tests for entrypoint biom3_run_Facilitator_sample
+"""Tests for entrypoint biom3_Facilitator_sample
 
 Tests script: src/biom3/Stage2/run_Facilitator_sample.py
 

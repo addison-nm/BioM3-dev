@@ -6,7 +6,7 @@ config1="configs/stage1_config_PenCL_inference.json"
 config2="configs/stage2_config_Facilitator_sample.json"
 prefix="CM"
 
-./scripts/data_prep/prepare_sequence_data.sh \
+./scripts/embedding_pipeline.sh \
     ${infpath} \
     ${outdir} \
     ${config1} \

@@ -7,8 +7,9 @@ Tests script: src/biom3/Stage1/run_PenCL_inference.py
 import pytest
 import os
 from contextlib import nullcontext as does_not_raise
-
 from tests.conftest import DATDIR, TMPDIR, remove_dir
+
+import torch
 
 from biom3.Stage1.run_PenCL_inference import parse_arguments, main
 
@@ -55,18 +56,23 @@ def check_downloads(paths_to_check):
     [f"{ARGS_DIR}/stage1_args_v1.txt", does_not_raise()],
     [f"{ARGS_DIR}/stage1_args_v2.txt", does_not_raise()],
 ])
+@pytest.mark.parametrize("device", ["cpu", "cuda"])
 def test_entrypoint(
-        argstring_fpath, expect_error_context
+        argstring_fpath, expect_error_context, device
     ):
     # This test relies on the following downloaded weights. Check existence.
     issues, skip_reason = check_downloads(REQUIRED_DOWNLOADS)
     if issues:
         pytest.skip(reason=skip_reason)
+    # Skip device=cuda if not available on machine
+    if device == "cuda" and not torch.cuda.is_available():
+        pytest.skip(reason="device=cuda and cuda not available")
     # Parse the command line string
     argstring = get_args(argstring_fpath)
     os.makedirs(OUTPUTS_DIR, exist_ok=True)
-    # Run entrypoint
+    # Run entrypoint, manually adding device to the argstring.
     with expect_error_context:
         args = parse_arguments(argstring)
+        args.device = device
         main(args)
     remove_dir(OUTPUTS_DIR)

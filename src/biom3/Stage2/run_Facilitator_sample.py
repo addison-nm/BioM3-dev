@@ -20,6 +20,7 @@ biom3_Facilitator_sample.py \
 
 """
 
+import sys
 import argparse
 import yaml
 from argparse import Namespace
@@ -43,6 +44,11 @@ def parse_arguments(args):
                         help="Path to the Facilitator model weights (e.g., BioM3_Facilitator_epoch20.bin)")
     parser.add_argument('-o', '--output_data_path', type=str, required=True,
                         help="Path to save the output embeddings (e.g., Facilitator_test_outputs.pt)")
+    
+    parser.add_argument('--device', type=str, default="cpu", 
+                        choices=["cpu", "cuda"], help="available device")
+    parser.add_argument("--mmd_sample_limit", type=int, default=-1,
+                        help="limit on the number of samples used to compute MMD. If -1, use all")
     return parser.parse_args(args)
 
 
@@ -51,7 +57,6 @@ def load_json_config(json_path):
     """Load JSON configuration file."""
     with open(json_path, "r") as f:
         config = json.load(f)
-    warnings.warn("jajaja")
     return config
 
 
@@ -98,7 +103,8 @@ def main(args):
     config_dict = load_json_config(args.json_path)
     config_args = convert_to_namespace(config_dict)
 
-    device = torch.device("cpu")  # TODO: cuda results in OOM
+    mmd_sample_limit = args.mmd_sample_limit
+    device = torch.device(args.device)  # TODO: cuda results in OOM
 
     # Load model
     model = prepare_model(
@@ -130,8 +136,9 @@ def main(args):
     norm_z_c = torch.norm(z_c[batch_idx], p=2).item()
 
     # 3. Compute MMD between embeddings
-    mmd_zc_zp = model.compute_mmd(z_c, z_p)
-    mmd_zp_zt = model.compute_mmd(z_p, z_t)
+    k = min(mmd_sample_limit, len(z_t))
+    mmd_zc_zp = model.compute_mmd(z_c[0:k], z_p[0:k])
+    mmd_zp_zt = model.compute_mmd(z_p[0:k], z_t[0:k])
 
     # Print results
     print("\n=== Facilitator Model Output ===")

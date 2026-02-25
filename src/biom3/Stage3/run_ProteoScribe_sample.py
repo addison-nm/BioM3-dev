@@ -18,6 +18,7 @@ biom3_ProteoScribe_sample \
 
 """
 
+import sys
 from argparse import Namespace
 import json
 import pandas as pd

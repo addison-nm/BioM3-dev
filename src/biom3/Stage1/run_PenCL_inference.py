@@ -25,6 +25,7 @@ biom3_PenCL_inference \
 
 """
 
+import sys
 import argparse
 import yaml
 from argparse import Namespace
@@ -54,6 +55,14 @@ def parse_arguments(args):
                         help="Path to the pre-trained model weights (pytorch_model.bin)")
     parser.add_argument('-o', '--output_path', type=str, required=True,
                         help="Path to save output embeddings")
+    
+    parser.add_argument('--device', type=str, default="cuda", 
+                        choices=["cpu", "cuda"], help="available device")
+    parser.add_argument('--batch_size', type=int, default=32, 
+                        help="batch size")
+    parser.add_argument('--num_workers', type=int, default=0, 
+                        help="number of dataloading workers")
+    
     return parser.parse_args(args)
 
 
@@ -80,7 +89,7 @@ def prepare_model(config_args, model_path, device) -> nn.Module:
     # TODO: Need to test loading using strict=False. Possible that weights 
     # are not being properly loaded.
     model.load_state_dict(
-        torch.load(model_path, map_location="cuda"), strict=False
+        torch.load(model_path, map_location=device), strict=False
     )
     model.to(device)
     model.eval()
@@ -148,8 +157,13 @@ def compute_homology_matrix(z_p_tensor):
 
 def main(args):
     config_args_parser = args
+    batch_size = config_args_parser.batch_size
+    num_workers = config_args_parser.num_workers
+
+    device = torch.device(config_args_parser.device)
     
-    device = torch.device("cuda")  # TODO: hardcoded
+    if device in ["xpu"]:
+        raise NotImplementedError(f"Not implemented on device {device}")
 
     # Load configuration
     config_dict = load_json_config(config_args_parser.json_path)
@@ -176,9 +190,9 @@ def main(args):
 
     loader = DataLoader(
         dataset,
-        batch_size=64,  # TODO: hardcoded
+        batch_size=batch_size,
         shuffle=False,
-        num_workers=0, # TODO: hardcoded
+        num_workers=num_workers,
         pin_memory=True,
         collate_fn=partial(prep.collate_fn, dataset=dataset, include_raw=True),
     )

@@ -1,3 +1,8 @@
+#=============================================================================
+# Configuration file for finetuning Stage3 ProteoScribe model. Specifies the 
+# transformer architecture corresponding to the original model defined in the 
+# BioM3 paper.
+#=============================================================================
 
 export swissprot_data_root="./data/Stage2_MMD_swissprot_embedding_last_ckpt_all.hdf5"
 export pfam_data_root="None"
@@ -19,7 +24,7 @@ export seed=123
 export epochs=100
 export valid_size=0.2
 export enter_eval=1000
-export resume_from_checkpoint=null  # overridden
+export resume_from_checkpoint=None  # overridden
 export batch_size=32
 export output_folder=None
 export model_option=transformer
@@ -42,7 +47,7 @@ export val_check_interval=20
 export limit_val_batches=0.05
 
 export log_every_n_steps=100
-export start_pfam_trainer=True
+export start_pfam_trainer=False
 export num_workers=1
 
 # Flow params
@@ -57,7 +62,7 @@ export input_dp_rate=0.0
 export transformer_dim=512
 export transformer_heads=16
 export transformer_depth=16
-export transformer_blocks=16
+export transformer_blocks=1
 export transformer_dropout=0.1
 export transformer_reversible=False
 export transformer_local_heads=8
@@ -66,7 +71,7 @@ export transformer_local_size=128
 export text_emb_dim=512
 export facilitator=MMD
 
-export version_name=config_1node_1gpu
+export version_name=None
 export output_hist_folder=./logs/history/test_stage3
 export tb_logger_path=./logs/history
 export tb_logger_folder=Stage3_history

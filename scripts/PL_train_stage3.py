@@ -56,42 +56,42 @@ import biom3.Stage3.PL_wrapper as PL_mod
 from mpi4py import MPI
 
 
-class MyClusterEnvironment(ClusterEnvironment):
-    @property
-    def creates_processes_externally(self) -> bool:
-        """Return True if the cluster is managed (you don't launch processes yourself)"""
-        return True
+# class MyClusterEnvironment(ClusterEnvironment):
+#     @property
+#     def creates_processes_externally(self) -> bool:
+#         """Return True if the cluster is managed (you don't launch processes yourself)"""
+#         return True
 
-    def world_size(self) -> int:
-        return int(os.environ["WORLD_SIZE"])
+#     def world_size(self) -> int:
+#         return int(os.environ["WORLD_SIZE"])
 
-    def global_rank(self) -> int:
-        return int(os.environ["RANK"])
+#     def global_rank(self) -> int:
+#         return int(os.environ["RANK"])
 
-    def local_rank(self) -> int:
-        return int(os.environ["LOCAL_RANK"])
+#     def local_rank(self) -> int:
+#         return int(os.environ["LOCAL_RANK"])
 
-    def node_rank(self) -> int:
-        return int(os.environ["NODE_RANK"])
+#     def node_rank(self) -> int:
+#         return int(os.environ["NODE_RANK"])
 
-    @property
-    def main_address(self) -> str:
-        return os.environ["MASTER_ADDR"]
+#     @property
+#     def main_address(self) -> str:
+#         return os.environ["MASTER_ADDR"]
 
-    @property
-    def main_port(self) -> int:
-        return int(os.environ["MASTER_PORT"])
+#     @property
+#     def main_port(self) -> int:
+#         return int(os.environ["MASTER_PORT"])
 
-    def set_world_size(self, size:int) -> None:
-        pass
+#     def set_world_size(self, size:int) -> None:
+#         pass
 
-    def set_global_rank(self, rank:int) -> None:
-        pass
+#     def set_global_rank(self, rank:int) -> None:
+#         pass
 
-    @staticmethod
-    def detect() -> bool:
-        """Detects the environment settings corresponding to this cluster and returns ``True`` if they match."""
-        return True
+#     @staticmethod
+#     def detect() -> bool:
+#         """Detects the environment settings corresponding to this cluster and returns ``True`` if they match."""
+#         return True
 
 
 def get_args(parser):
@@ -1067,6 +1067,10 @@ def main(args, use_hydra=False, ds_config=None,):
     clear_gpu_cache()
 
     # ----- For reproducibility -----
+    if seed <= 0:
+        # If the seed is not specified, generate a random seed and use this.
+        seed = np.random.randint(2**32)
+        args.seed = seed
     set_seed(seed)
      
     # ----- Load Data -----

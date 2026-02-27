@@ -6,6 +6,7 @@ Common helper functions
 import json
 from argparse import Namespace
 import numpy as np
+import torch
 import torch.nn as nn
 
 
@@ -59,3 +60,38 @@ def load_state_dict_with_correction_attempt(
         model.load_state_dict(
             state_dict, strict=True
         )
+
+
+def compare_model_params(
+        model1: nn.Module,
+        model2: nn.Module,
+        verbosity=1,
+) -> dict:
+    num_weights1 = get_num_named_weights(model1)
+    num_weights2 = get_num_named_weights(model2)
+    params1 = dict(model1.named_parameters())
+    params2 = dict(model2.named_parameters())
+    set1 = set(params1.keys())
+    set2 = set(params2.keys())
+    intersection = set1.intersection(set2)
+    set1_not_set2 = set1 - set2
+    set2_not_set1 = set2 - set1
+    max_differences = {}
+    with torch.no_grad():
+        for name in sorted(list(intersection)):
+            vals1 = params1[name]
+            vals2 = params2[name]
+            print(type(vals1), type(vals2))
+            if vals1.shape == vals2.shape:
+                max_differences[name] = torch.max(torch.abs(vals1 - vals2))
+            else:                
+                max_differences[name] = np.inf # indicate mismatch in shape
+    return {
+        "num_weights1": num_weights1,
+        "num_weights2": num_weights2,
+        "model1_only": sorted(list(set1_not_set2)),
+        "model2_only": sorted(list(set2_not_set1)),
+        "common_names": sorted(list(intersection)),
+        "differences": max_differences,
+        "diff_shape_key": np.inf,
+    }

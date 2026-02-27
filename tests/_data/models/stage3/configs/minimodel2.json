@@ -1,0 +1,16 @@
+{
+    "num_classes" : 29,
+    "image_size": 32,
+    "input_dp_rate" : 0.0,
+    "transformer_dim" : 16,
+    "transformer_heads" : 4,
+    "transformer_depth" : 2,
+    "transformer_blocks" : 1,
+    "transformer_dropout" : 0.1,
+    "transformer_reversible" : false,
+    "transformer_local_heads" : 2,
+    "transformer_local_size" : 16,
+    "text_emb_dim" : 512,
+    "facilitator" : "MMD",
+    "diffusion_steps" : 1024
+}

@@ -6,6 +6,12 @@
 
 ### Installation
 
+#### DGX Spark
+
+```bash
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130
+```
+
 #### Polaris
 
 Clone the repository:
@@ -13,6 +19,16 @@ Clone the repository:
 ```bash 
 git clone https://github.com/addison-nm/BioM3-dev.git
 cd BioM3-dev
+```
+
+Create an environment with the same packages as the original BioM3 project:
+
+```
+conda create -p venvs/env-orig python=3.10
+conda activate venvs/env-orig
+python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+python -m pip install -r requirements_orig.txt
+python -m pip install -e .
 ```
 
 Create the environment, copying packages from custom base environment on Polaris.

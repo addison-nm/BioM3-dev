@@ -38,3 +38,7 @@ pynvml==11.5.0
 
 # Additions (added by A Howe)
 h5py
+pytest
+wandb
+tensorboard
+mpi4py

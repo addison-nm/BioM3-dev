@@ -1130,6 +1130,7 @@ def main(args, use_hydra=False, ds_config=None,):
         seed = np.random.randint(2**32)
         args.seed = seed
     set_seed(seed)
+    print(f"Using seed: {seed}")
      
     # ----- Load Data -----
     data_module = load_data(

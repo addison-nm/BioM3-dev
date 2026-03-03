@@ -19,7 +19,7 @@ export lr=1e-4
 export weight_decay=1e-6
 export scheduler_gamma="coswarmup"
 
-export seed=42
+export seed=0
 export epochs=100
 export valid_size=0.2
 export enter_eval=1000

@@ -22,7 +22,7 @@ config_name=config_finetune_v1
 num_nodes=2
 epochs=2
 resume_from_checkpoint=None
-pretrained_checkpoint="./weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin"
+pretrained_weights="./weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin"
 finetune_last_n_blocks=1
 
 # Constant configurations
@@ -45,6 +45,6 @@ sh scripts/finetuning/finetune_multinode.sh \
     ${version_name} \
     ${epochs} \
     ${resume_from_checkpoint} \
-    ${pretrained_checkpoint} \
+    ${pretrained_weights} \
     ${finetune_last_n_blocks} \
 > ${log_fpath} 2>&1

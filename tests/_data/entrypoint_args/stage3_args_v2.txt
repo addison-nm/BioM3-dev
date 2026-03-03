@@ -1,0 +1,1 @@
+-i tests/_data/embeddings/test_Facilitator_embeddings.pt -c tests/_data/configs/test_stage3_config_v2.json -m tests/_data/models/stage3/weights/minimodel1_weights1.pth -o tests/_tmp/outputs/test_ProteoScribe_samples.pt

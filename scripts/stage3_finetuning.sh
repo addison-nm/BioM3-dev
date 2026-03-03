@@ -6,7 +6,7 @@
 # USAGE: stage3_finetuning.sh \
 #		WANDB_API_KEY config_dir config_name \
 #		version_name num_nodes gpu_devices epochs resume_from_checkpoint \
-#		pretrained_checkpoint finetune_last_n_block
+#		pretrained_weights finetune_last_n_block
 #
 # DESCRIPTION: Wraps the Stage 3 training python script PL_train_stage3.py, and 
 #	specifies arguments intended for model finetuning. 
@@ -31,7 +31,7 @@ num_nodes=$5
 gpu_devices=$6
 epochs=$7
 resume_from_checkpoint=$8
-pretrained_checkpoint=$9
+pretrained_weights=$9
 finetune_last_n_block=$10
 
 # Weights&Biases API key
@@ -89,5 +89,5 @@ python ./scripts/PL_train_stage3.py \
 	--wandb_project "BioM3-dev" \
 	--wandb_name ${version_name} \
     --finetune True \
-    --pretrained_checkpoint ${pretrained_checkpoint} \
+    --pretrained_weights ${pretrained_weights} \
     --finetune_last_n_blocks ${finetune_last_n_blocks} \

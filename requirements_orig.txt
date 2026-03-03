@@ -34,7 +34,7 @@ biopython==1.79
 
 # General Utilities
 tqdm==4.65.0
-pynvml==11.5.0
+# pynvml==11.5.0
 
 # Additions (added by A Howe)
 h5py
@@ -42,3 +42,4 @@ pytest
 wandb
 tensorboard
 mpi4py
+nvidia-ml-py

@@ -80,5 +80,5 @@ export save_hist_path=None
 export traindata_len=None
 
 export finetune=True
-export pretrained_checkpoint="./weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin"
+export pretrained_weights="./weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin"
 export finetune_last_n_blocks=1

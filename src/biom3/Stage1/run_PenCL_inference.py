@@ -42,6 +42,7 @@ from functools import partial
 import biom3.Stage1.preprocess as prep
 import biom3.Stage1.model as mod
 import biom3.Stage1.PL_wrapper as PL_wrap
+from biom3.core.io import load_and_prepare_model
 
 
 # Step 0: Argument Parser Function
@@ -86,13 +87,13 @@ def convert_to_namespace(config_dict):
 # Step 3: Load Pre-trained Model
 def prepare_model(config_args, model_path, device) -> nn.Module:
     model = mod.pfam_PEN_CL(args=config_args)
-    # TODO: Need to test loading using strict=False. Possible that weights 
-    # are not being properly loaded.
-    model.load_state_dict(
-        torch.load(model_path, map_location=device), strict=False
+    model = load_and_prepare_model(
+        model, model_path, 
+        device=device, 
+        strict=True, 
+        eval_mode=True,
+        attempt_correction=True,
     )
-    model.to(device)
-    model.eval()
     print("Model loaded successfully with weights!")
     return model
 

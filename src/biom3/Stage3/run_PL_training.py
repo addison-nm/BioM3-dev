@@ -163,14 +163,18 @@ def get_args(parser):
     parser.add_argument('--pfam_data_root', default='None', type=str,
                         help='path to Pfam data')
 
+    parser.add_argument('--pretrained_weights', default='None', type=str,
+                        help='path to .bin weight or checkpoint file containing model weights')
+    
     # Finetuning
     parser.add_argument('--finetune', default='False', type=str,
                         help='flag to run finetuning')
-    parser.add_argument('--pretrained_checkpoint', default='None', type=str,
-                        help='path to .bin checkpoint file containing model weights')
-    parser.add_argument('--finetune_last_n_blocks', default=-1, type=int,
-                        help='Number of last transformer blocks to finetune (0: finetune all layers, -1: no layers)')
-
+    parser.add_argument('--finetune_last_n_blocks', default=-2, type=int,
+                        help='Number of last transformer blocks to finetune (-1: finetune all blocks, 0: no blocks)')
+    parser.add_argument('--finetune_last_n_layers', default=-2, type=int,
+                        help='Number of last transformer layers to finetune (-1: finetune all layers, 0: no layers)')
+    parser.add_argument('--finetune_output_layers', default="True", type=str,
+                        help='Whether to finetune the transformer output layers (norm and out)')
 
     # diffusion param
     parser.add_argument('--diffusion_steps', default=256, type=int,
@@ -283,6 +287,8 @@ def get_wrapper_args(parser):
     """
     parser.add_argument('--hydra', action="store_true", 
                         help='Whether to run with Hydra.')
+    parser.add_argument('--wandb', type=str, default="True", 
+                        help='Flag to use Weights&Biases.')
     parser.add_argument('--wandb_name', type=str, default=None, 
                         help='Weights&Biases run name.')
     parser.add_argument('--wandb_entity', type=str, default=None, 
@@ -352,7 +358,7 @@ def compile_model(
 
     model = prepare_model_ProteoScribe(
         config_args=args,
-        weights_fpath=args.pretrained_checkpoint,
+        weights_fpath=args.pretrained_weights,
         device="cuda",
         strict=True,
         eval=False,
@@ -647,7 +653,8 @@ def retrieve_all_args(args):
     args.pfam_data_root = nonestr_to_none(args.pfam_data_root)
     args.start_pfam_trainer = str_to_bool(args.start_pfam_trainer)
     args.finetune = str_to_bool(args.finetune)
-    args.pretrained_checkpoint = nonestr_to_none(args.pretrained_checkpoint)
+    args.pretrained_weights = nonestr_to_none(args.pretrained_weights)
+    args.wandb = str_to_bool(args.wandb)
     
     return args
 
@@ -781,9 +788,15 @@ def load_pretrained_weights(
     return PL_model
 
 
-def freeze_except_last_n_blocks(PL_model, n_blocks):
+def freeze_except_last_n_blocks_and_layers(
+        PL_model,
+        n_blocks,
+        n_layers,
+        finetune_output_layers=True
+    ):
     """
-    Freeze all model parameters except those in the last n transformer blocks.
+    Freeze all model parameters except those in the last n transformer blocks and
+    layers.
     
     This enables efficient finetuning by only updating parameters in the last
     n transformer blocks while keeping all other layers frozen. This approach
@@ -792,35 +805,59 @@ def freeze_except_last_n_blocks(PL_model, n_blocks):
     Args:
         PL_model: PyTorch Lightning model with loaded pretrained weights
         n_blocks: Number of last transformer blocks to keep trainable (default: 1)
-                  If n_blocks=0, all layers will be trainable (no freezing)
+                  If n_blocks=0, no blocks will be trainable (complete freezing)
+                  If n_blocks=-1, all blocks will be trainable (no freezing)
                   If n_blocks >= total blocks, all blocks will be trainable
+        n_layers: Number of last transformer layers to keep trainable (default: 1)
+                  If n_layers=0, no layers will be trainable (complete freezing)
+                  If n_layers=-1, all layers will be trainable (no freezing)
+                  If n_layers >= total layers, all layers will be trainable
         
     Returns:
         The model with frozen parameters (except last n blocks)
     """
-    if n_blocks == 0:
-        print("n_blocks=0: All parameters will remain trainable (no freezing)")
-        return PL_model
+    if n_blocks == -1 and n_layers == -1:
+        print("n_blocks=n_layers=-1: All parameters will remain trainable (no freezing)")
+        # return PL_model
     
-    print(f"Freezing all parameters except the last {n_blocks} transformer block(s)...")
+    if n_blocks == 0 and n_layers == 0:
+        print("n_blocks=n_layers=0: All parameters will be frozen (no training)")
+    else:
+        msg = f"Freezing all parameters except the last {n_layers} layer(s) "
+        msg += f"of each of the last {n_blocks} transformer block(s)..."
+        print(msg)
     
     # First, freeze all parameters
     for param in PL_model.model.parameters():
         param.requires_grad = False
     
-    # Then unfreeze only the last n transformer blocks
-    # The model structure is: PL_model.model.transformer.transformer_blocks
+    # Then unfreeze only the last k layers of the last n transformer blocks
+    # The model structure is: PL_model.model.transformer.transformer_blocks[bidx][depth]
     if hasattr(PL_model.model, 'transformer'):
         transformer = PL_model.model.transformer
         if hasattr(transformer, 'transformer_blocks') and len(transformer.transformer_blocks) > 0:
             total_blocks = len(transformer.transformer_blocks)
+            if n_blocks == -1:
+                n_blocks = total_blocks
             blocks_to_unfreeze = min(n_blocks, total_blocks)
-            
-            # Unfreeze the last n blocks
+            # Unfreeze the last k layers of the last n blocks
+            print(f"Attemtping to unfreeze last {blocks_to_unfreeze} blocks...")
             for i in range(total_blocks - blocks_to_unfreeze, total_blocks):
+                print(f"***** Freezing block {i}...")
                 block = transformer.transformer_blocks[i]
-                for param in block.parameters():
-                    param.requires_grad = True
+                if len(block) > 0:
+                    total_layers = len(block)
+                    if n_layers == -1:
+                        n_layers = total_layers
+                    layers_to_unfreeze = min(n_layers, total_layers)
+                    for j in range(total_layers - layers_to_unfreeze, total_layers):
+                        layer = block[j]
+                        print(f"*** Freezing block {i} layer {j}")
+                        for param in layer.parameters():
+                            param.requires_grad = True
+                else:
+                    for param in block.parameters():
+                        param.requires_grad = True
             
             print(f"Unfroze last {blocks_to_unfreeze} transformer block(s) out of {total_blocks} total blocks")
             if blocks_to_unfreeze < n_blocks:
@@ -831,16 +868,17 @@ def freeze_except_last_n_blocks(PL_model, n_blocks):
         print("Warning: Could not find transformer attribute in model")
     
     # Also unfreeze the final output layers (norm and out) for better finetuning
-    if hasattr(PL_model.model, 'transformer'):
-        transformer = PL_model.model.transformer
-        if hasattr(transformer, 'norm'):
-            for param in transformer.norm.parameters():
-                param.requires_grad = True
-            print("Unfroze final LayerNorm")
-        if hasattr(transformer, 'out'):
-            for param in transformer.out.parameters():
-                param.requires_grad = True
-            print("Unfroze final output layer")
+    if finetune_output_layers:
+        if hasattr(PL_model.model, 'transformer'):
+            transformer = PL_model.model.transformer
+            if hasattr(transformer, 'norm'):
+                for param in transformer.norm.parameters():
+                    param.requires_grad = True
+                print("Unfroze final LayerNorm")
+            if hasattr(transformer, 'out'):
+                for param in transformer.out.parameters():
+                    param.requires_grad = True
+                print("Unfroze final output layer")
     
     # Count trainable vs frozen parameters
     trainable_params = sum(p.numel() for p in PL_model.model.parameters() if p.requires_grad)
@@ -909,6 +947,7 @@ def train_model(
         ), f"resume_from_checkpoint should be str or None (not str `None`)." + \
            f" Got {resume_from_checkpoint} (type {type(resume_from_checkpoint)})"
     precision = args.precision
+    use_wandb = args.wandb
     
     # Configure DeepSpeed optimization settings
     if ds_config is None:
@@ -938,23 +977,30 @@ def train_model(
         config=ds_config
     )
 
+    loggers = []
+
     # Set up TensorBoard logging
     tb_logger = TensorBoardLogger(
         os.path.join(tb_logger_path, tb_logger_folder), 
         version=version_name
     )
+    loggers.append(tb_logger)
 
     # Set up Weights&Biases logging
-    wandb_logger = WandbLogger(
-        name=args.wandb_name,
-        save_dir=args.wandb_logging_dir,
-        project=args.wandb_project, 
-        entity=args.wandb_entity, 
-        config=args, 
-        tags=args.wandb_tags,
-        group=args.version_name,
-        log_model="all",
-    )  # TODO: investigate "all"
+    wandb_logger = None
+    if use_wandb:
+        wandb_logger = WandbLogger(
+            name=args.wandb_name,
+            save_dir=args.wandb_logging_dir,
+            project=args.wandb_project, 
+            entity=args.wandb_entity, 
+            config=args, 
+            tags=args.wandb_tags,
+            group=args.version_name,
+            log_model="all",
+        )  # TODO: investigate "all"
+        loggers.append(wandb_logger)
+        
 
     # Monitor learning rate changes
     lr_monitor = pl.callbacks.LearningRateMonitor(logging_interval='step')
@@ -993,7 +1039,7 @@ def train_model(
         'accelerator': 'cuda',
         'strategy': 'deepspeed_stage_2',  # TODO: use strategy defined above?
         'accumulate_grad_batches': acc_grad_batches,
-        'logger': [tb_logger, wandb_logger],
+        'logger': loggers,
         'log_every_n_steps': log_every_n_steps,
         'callbacks': [checkpoint_callback, lr_monitor, gpu_logger],
         # 'plugins': [MyClusterEnvironment()]  # added a la multinode_PL_train_stage3
@@ -1067,7 +1113,7 @@ def main(args, use_hydra=False, ds_config=None,):
     pfam_data_root = args.pfam_data_root
     facilitator = args.facilitator
     
-    use_wandb = True
+    use_wandb = args.wandb
     wandb_entity = args.wandb_entity
     wandb_project = args.wandb_project
     wandb_dir = args.wandb_logging_dir
@@ -1104,28 +1150,36 @@ def main(args, use_hydra=False, ds_config=None,):
     finetuning = args.finetune
     if finetuning:
         finetune_last_n_blocks = args.finetune_last_n_blocks
-        pretrained_checkpoint = args.pretrained_checkpoint
-        if finetune_last_n_blocks < 0:
-            # If flag is set to finetune and blocks not specified (default -1)
+        finetune_last_n_layers = args.finetune_last_n_layers
+        finetune_output_layers = args.finetune_output_layers
+        pretrained_weights = args.pretrained_weights
+        if finetune_last_n_layers == -2:
+            # If flag is set to finetune and layers not specified (default -2)
+            # set to default actionable value 1
+            finetune_last_n_layers = 1
+        if finetune_last_n_blocks == -2:
+            # If flag is set to finetune and blocks not specified (default -2)
             # set to default actionable value 1
             finetune_last_n_blocks = 1
-        if pretrained_checkpoint is None:
+        if pretrained_weights is None:
             msg = "Finetuning flag --finetune set to True but " \
-                    "pretrained_checkpoint path not specified."
+                    "pretrained_weights path not specified."
             print(msg)
             print("Proceeding with randomly initialized weights")
-        elif os.path.exists(pretrained_checkpoint):
+        elif os.path.exists(pretrained_weights):
             PL_model = load_pretrained_weights(
                 PL_model=PL_model,
-                checkpoint_path=pretrained_checkpoint
+                checkpoint_path=pretrained_weights
             )
             # Freeze parameters based on user configuration
-            PL_model = freeze_except_last_n_blocks(
+            PL_model = freeze_except_last_n_blocks_and_layers(
                 PL_model=PL_model,
-                n_blocks=finetune_last_n_blocks
+                n_blocks=finetune_last_n_blocks,
+                n_layers=finetune_last_n_layers,
+                finetune_output_layers=finetune_output_layers
             )
         else:
-            print(f"Warning: Pretrained checkpoint not found at {pretrained_checkpoint}")
+            print(f"Warning: Pretrained checkpoint not found at {pretrained_weights}")
             print("Proceeding with randomly initialized weights")
     else:
         pass
@@ -1139,11 +1193,12 @@ def main(args, use_hydra=False, ds_config=None,):
     )
 
     # ----- Clean up -----
-    torch.distributed.destroy_process_group()
+    # torch.distributed.destroy_process_group()
 
 
 def parse_arguments(args):
     return retrieve_all_args(args)
+
 
 if __name__ == '__main__':
     args = parse_arguments(sys.argv[1:])

@@ -164,7 +164,7 @@ def get_args(parser):
     # Finetuning
     parser.add_argument('--finetune', default='False', type=str,
                         help='flag to run finetuning')
-    parser.add_argument('--pretrained_checkpoint', default='None', type=str,
+    parser.add_argument('--pretrained_weights', default='None', type=str,
                         help='path to .bin checkpoint file containing model weights')
     parser.add_argument('--finetune_last_n_blocks', default=-1, type=int,
                         help='Number of last transformer blocks to finetune (0: finetune all layers, -1: no layers)')
@@ -635,7 +635,7 @@ def retrieve_all_args():
     args.pfam_data_root = nonestr_to_none(args.pfam_data_root)
     args.start_pfam_trainer = str_to_bool(args.start_pfam_trainer)
     args.finetune = str_to_bool(args.finetune)
-    args.pretrained_checkpoint = nonestr_to_none(args.pretrained_checkpoint)
+    args.pretrained_weights = nonestr_to_none(args.pretrained_weights)
     
     return args
 
@@ -1092,20 +1092,20 @@ def main(args, use_hydra=False, ds_config=None,):
     finetuning = args.finetune
     if finetuning:
         finetune_last_n_blocks = args.finetune_last_n_blocks
-        pretrained_checkpoint = args.pretrained_checkpoint
+        pretrained_weights = args.pretrained_weights
         if finetune_last_n_blocks < 0:
             # If flag is set to finetune and blocks not specified (default -1)
             # set to default actionable value 1
             finetune_last_n_blocks = 1
-        if pretrained_checkpoint is None:
+        if pretrained_weights is None:
             msg = "Finetuning flag --finetune set to True but " \
-                    "pretrained_checkpoint path not specified."
+                    "pretrained_weights path not specified."
             print(msg)
             print("Proceeding with randomly initialized weights")
-        elif os.path.exists(pretrained_checkpoint):
+        elif os.path.exists(pretrained_weights):
             PL_model = load_pretrained_weights(
                 PL_model=PL_model,
-                checkpoint_path=pretrained_checkpoint
+                checkpoint_path=pretrained_weights
             )
             # Freeze parameters based on user configuration
             PL_model = freeze_except_last_n_blocks(
@@ -1113,7 +1113,7 @@ def main(args, use_hydra=False, ds_config=None,):
                 n_blocks=finetune_last_n_blocks
             )
         else:
-            print(f"Warning: Pretrained checkpoint not found at {pretrained_checkpoint}")
+            print(f"Warning: Pretrained checkpoint not found at {pretrained_weights}")
             print("Proceeding with randomly initialized weights")
     else:
         pass

@@ -51,10 +51,9 @@ def check_downloads(paths_to_check):
 ###############################   BEGIN TESTS   ###############################
 ###############################################################################
 
-@pytest.mark.skip()
 @pytest.mark.parametrize(
     "argstring_fpath, expect_error_context", [
-    [f"{ARGS_DIR}/stage3_args_v1.txt", does_not_raise()],
+    [f"{ARGS_DIR}/stage3_args_v2.txt", does_not_raise()],
 ])
 def test_entrypoint(
         argstring_fpath, expect_error_context

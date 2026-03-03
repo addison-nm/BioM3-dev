@@ -29,9 +29,10 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import biom3.Stage1.model as mod
 import warnings
 
+import biom3.Stage1.model as mod
+from biom3.core.io import load_and_prepare_model
 
 # Step 0: Argument Parser Function
 def parse_arguments(args):
@@ -71,14 +72,21 @@ def convert_to_namespace(config_dict):
 
 # Step 3: Load Pre-trained Model
 def prepare_model(config_args, model_path, device) -> nn.Module:
+    # Initialize the model graph
     model = mod.Facilitator(
         in_dim=config_args.emb_dim,
         hid_dim=config_args.hid_dim,
         out_dim=config_args.emb_dim,
         dropout=config_args.dropout
     )
-    model.load_state_dict(torch.load(model_path, map_location=device))
-    model.eval()
+    # Load model weights
+    model = load_and_prepare_model(
+        model, model_path, 
+        device=device, 
+        strict=True, 
+        eval_mode=True,
+        attempt_correction=True,
+    )
     print("Model loaded successfully with weights!")
     return model
 

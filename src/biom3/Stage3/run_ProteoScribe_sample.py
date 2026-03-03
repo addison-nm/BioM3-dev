@@ -28,10 +28,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
+
 import biom3.Stage3.PL_wrapper as Stage3_PL_mod
 import biom3.Stage3.cond_diff_transformer_layer as Stage3_mod
 import biom3.Stage3.sampling_analysis as Stage3_sample_tools
 import biom3.Stage3.animation_tools as Stage3_ani_tools
+from biom3.core.io import load_and_prepare_model
 
 
 # Step 0: Argument Parser Function
@@ -70,41 +72,23 @@ def prepare_model(args, config_args) ->nn.Module:
     """
     Prepare the model and PyTorch Lightning Trainer using a flat args object.
     """
-
+    model_path = args.model_path
+    device = config_args.device
     # Initialize the model graph
     model = Stage3_mod.get_model(
         args=config_args,
         data_shape=(config_args.image_size, config_args.image_size),
         num_classes=config_args.num_classes
     )
-    
-    # Load state_dict into the model. Verbose handling of parameter mismatches.
-    state_dict = torch.load(args.model_path, map_location=config_args.device)
-    try:
-        model.load_state_dict(state_dict)
-    except RuntimeError as e:
-        print("Encountered error loading state_dict:")
-        print(e)
-        missing_keys, unexpected_keys = model.load_state_dict(
-            state_dict, strict=False
-        )
-        if missing_keys:
-            print(f"Warning: Missing keys in checkpoint: {missing_keys}")
-        if unexpected_keys:
-            print(f"Warning: Unexpected keys in checkpoint: {unexpected_keys}")
-        for k in unexpected_keys:
-            new_k = k.replace("weights_", "weights.")
-            if new_k in missing_keys:
-                state_dict[new_k] = state_dict.pop(k)
-                print(f"Replaced state_dict key `{k}` with `{new_k}`")
-        # Reload model with updated parameter names
-        model.load_state_dict(
-            state_dict, strict=True
-        )
-    
-    model.eval()
-    
-    print(f"Stage 3 model loaded from: {args.model_path} (loaded on {config_args.device})")
+    # Load model weights
+    model = load_and_prepare_model(
+        model, model_path, 
+        device=device, 
+        strict=True, 
+        eval_mode=True,
+        attempt_correction=True,
+    )    
+    print(f"Stage 3 model loaded from: {model_path} (loaded on {device})")
     return model
 
 

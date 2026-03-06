@@ -55,7 +55,7 @@ import biom3.Stage3.helper_funcs as help_tools
 import biom3.Stage3.PL_wrapper as PL_mod
 from biom3.Stage3.io import prepare_model_ProteoScribe
 
-from mpi4py import MPI
+# from mpi4py import MPI
 
 
 # class MyClusterEnvironment(ClusterEnvironment):
@@ -1102,10 +1102,10 @@ def train_model(
 
 def main(args, use_hydra=False, ds_config=None,):
 
-    SIZE = MPI.COMM_WORLD.Get_size() # Total number of processes
-    RANK = MPI.COMM_WORLD.Get_rank() # Global rank of the process
-    LOCAL_RANK = os.environ.get('PALS_LOCAL_RANKID', '0') # Local rank of the process on the node
-    NODE_RANK = os.environ.get('PALS_NODE_RANKID', '0') # Node rank of the process
+    # SIZE = MPI.COMM_WORLD.Get_size() # Total number of processes
+    # RANK = MPI.COMM_WORLD.Get_rank() # Global rank of the process
+    # LOCAL_RANK = os.environ.get('PALS_LOCAL_RANKID', '0') # Local rank of the process on the node
+    # NODE_RANK = os.environ.get('PALS_NODE_RANKID', '0') # Node rank of the process
     
     # ----- Process passed parameters -----
     seed = args.seed

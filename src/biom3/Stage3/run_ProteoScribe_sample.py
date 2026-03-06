@@ -188,6 +188,8 @@ def main(args):
     
     print(f'{design_sequence_dict=}')
 
+    torch.save(design_sequence_dict, f"{config_args_parser.output_path}")
+
 
 if __name__ == '__main__':
     args = parse_arguments(sys.argv[1:])

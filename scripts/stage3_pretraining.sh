@@ -34,7 +34,7 @@ export WANDB_API_KEY=$WANDB_API_KEY
 
 # Run training script
 export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=true
-python ./scripts/PL_train_stage3.py \
+biom3_pretrain_stage3 \
 	--output_hist_folder ${output_hist_folder} \
 	--output_folder ${output_folder} \
 	--save_hist_path ${save_hist_path} \

@@ -28,9 +28,10 @@ def prepare_model_ProteoScribe(
     strict=True,
     eval=False,
     attempt_correction=False,
+    substitutions={"weights_": "weights."},
     verbosity=2,
 ) -> nn.Module:
-    
+
     model = build_model_ProteoScribe(config_args)
 
     model = load_and_prepare_model(
@@ -40,6 +41,7 @@ def prepare_model_ProteoScribe(
         strict=strict,
         eval_mode=eval,
         attempt_correction=attempt_correction,
+        substitutions=substitutions,
         verbosity=verbosity,
     )
 

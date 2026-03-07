@@ -59,19 +59,42 @@ def test_model_load_scratch(
 
 @pytest.mark.parametrize(
         "config_fpath, weights_fpath, tot_weights_exp, " \
-        "names_mismatched, expect_error_context", [
+        "names_mismatched, attempt_correction, expect_error_context", [
     [
         f"{CONFIGS_DIR}/orig_model.json", 
         "weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin", 
         None, 
         True, 
-        # pytest.raises(RuntimeError, match=r"Unexpected key\(s\) in state_dict"),
+        True,
+        does_not_raise(),
+    ],
+    [
+        f"{CONFIGS_DIR}/orig_model.json", 
+        "weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin", 
+        None, 
+        True, 
+        False,
+        pytest.raises(RuntimeError, match=r"Unexpected key\(s\) in state_dict"),
+    ],
+    [
+        f"{CONFIGS_DIR}/orig_model.json", 
+        "weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.renamed.bin", 
+        None, 
+        False, 
+        True,
+        does_not_raise(),
+    ],
+    [
+        f"{CONFIGS_DIR}/orig_model.json", 
+        "weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.renamed.bin", 
+        None, 
+        False, 
+        False,
         does_not_raise(),
     ],
 ])
-@pytest.mark.parametrize("attempt_correction", [True, False])
 @pytest.mark.parametrize("strict", [True, False])
-@pytest.mark.parametrize("device", ["cpu"])
+@pytest.mark.parametrize("device", ["cpu", "cuda"])
 @pytest.mark.parametrize("eval_flag", [True, False])
 def test_model_load_from_bin(
         config_fpath, weights_fpath, tot_weights_exp, 

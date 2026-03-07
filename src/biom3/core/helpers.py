@@ -34,9 +34,11 @@ def get_num_named_weights(model: nn.Module) -> int:
 def load_state_dict_with_correction_attempt(
         model,
         state_dict, 
+        substitutions={},
         verbosity=2,
 ):
     """Load a state_dict and attempt to infer missing keys."""
+        
     try:
         model.load_state_dict(state_dict)
     except RuntimeError as e:
@@ -51,7 +53,10 @@ def load_state_dict_with_correction_attempt(
         if verbosity > 1 and unexpected_keys:
             print(f"Warning: Unexpected keys in checkpoint: {unexpected_keys}")
         for k in unexpected_keys:
-            new_k = k.replace("weights_", "weights.")
+            new_k = k
+            for s0, s1 in substitutions.items():
+                if s0 in k:
+                    new_k = new_k.replace(s0, s1)
             if new_k in missing_keys:
                 state_dict[new_k] = state_dict.pop(k)
                 if verbosity > 1:

@@ -1,0 +1,46 @@
+# Foundational Libraries (core dependencies)
+setuptools==79.0.1
+numpy==2.2.6            # Pin numpy to ensure compatibility
+scipy==1.16.2             # Install scipy after numpy
+pandas==2.3.3            # Pin pandas to avoid dask incompatibilities
+
+# Libraries dependent on numpy, pandas, or scipy
+numba==0.61.2
+dask==2026.1.2
+scikit-learn==1.7.2
+imageio==2.37.0
+matplotlib==3.10.6
+seaborn==0.13.2
+wordcloud==1.9.3  # unspecified on polaris
+
+# Machine Learning and Deep Learning
+torchmetrics
+pytorch-lightning
+transformers==4.48.1
+deepspeed==0.17             # Leaving ambiguous
+accelerate==1.10.1
+diffusers==0.16.1  # unspecified on polaris
+optuna==3.1.1  # unspecified on polaris
+fair-esm==2.0.0
+
+# Specialized Libraries
+# lightning-flash  # unspecified on polaris
+axial-positional-embedding==0.3.12
+linear-attention-transformer==0.19.1
+linformer==0.2.3
+
+# Bioinformatics
+biopython==1.85
+
+# General Utilities
+tqdm==4.67
+# pynvml==11.5.0
+
+# Additions (added by A Howe)
+h5py==3.14
+pytest==8.4
+wandb
+tensorboard==2.20
+mpi4py==4.1
+nvidia-ml-py==13.580.82
+pyarrow

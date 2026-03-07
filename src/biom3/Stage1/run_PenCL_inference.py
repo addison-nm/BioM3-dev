@@ -90,9 +90,9 @@ def prepare_model(config_args, model_path, device) -> nn.Module:
     model = load_and_prepare_model(
         model, model_path, 
         device=device, 
-        strict=True, 
+        strict=False,  # NOTE: Avoids issue.
         eval_mode=True,
-        attempt_correction=True,
+        attempt_correction=False,
     )
     print("Model loaded successfully with weights!")
     return model

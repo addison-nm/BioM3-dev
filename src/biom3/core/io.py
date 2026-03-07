@@ -19,6 +19,7 @@ def load_and_prepare_model(
     strict: bool = True,
     eval_mode: bool = False,
     attempt_correction: bool = False,
+    substitutions: dict = {},
     verbosity: int = 1,
 ) -> nn.Module:
     """Wrapper to load and attach weights, and specify model device/mode."""
@@ -34,6 +35,7 @@ def load_and_prepare_model(
         strict=strict,
         eval_mode=eval_mode,
         attempt_correction=attempt_correction,
+        substitutions=substitutions,
         verbosity=verbosity,
     )
 
@@ -54,6 +56,7 @@ def prepare_model(
     strict: bool = True,
     eval_mode: bool = False,
     attempt_correction: bool = False,
+    substitutions: dict = {},
     verbosity: int = 1,
 ) -> nn.Module:
     """Attach weights, move to device, and set mode."""
@@ -64,6 +67,7 @@ def prepare_model(
                 model,
                 state_dict,
                 verbosity=verbosity,
+                substitutions=substitutions,
             )
         else:
             model.load_state_dict(state_dict, strict=strict)

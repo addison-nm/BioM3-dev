@@ -9,7 +9,18 @@
 #### DGX Spark
 
 ```bash
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130
+# Original environment
+conda create -p venvs/env-orig python=3.10
+conda activate venvs/env-orig
+python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+python -m pip install -r requirements_orig.txt
+
+# Updated environment
+conda create -p venvs/biom3-env-py312 python=3.12
+conda activate venvs/biom3-env-py312
+python -m pip install torch==2.8 torchvision --index-url https://download.pytorch.org/whl/cu129
+python -m pip install -r requirements_spark_py312.txt
+python -m pip install -e .
 ```
 
 #### Polaris

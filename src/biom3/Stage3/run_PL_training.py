@@ -166,6 +166,9 @@ def get_args(parser):
     parser.add_argument('--pretrained_weights', default='None', type=str,
                         help='path to .bin weight or checkpoint file containing model weights')
     
+    parser.add_argument('--scale_learning_rate', default='True', type=str,
+                        help='scale the specified learning rate by the number of devices')
+    
     # Finetuning
     parser.add_argument('--finetune', default='False', type=str,
                         help='flag to run finetuning')
@@ -655,6 +658,7 @@ def retrieve_all_args(args):
     args.finetune = str_to_bool(args.finetune)
     args.pretrained_weights = nonestr_to_none(args.pretrained_weights)
     args.wandb = str_to_bool(args.wandb)
+    args.scale_learning_rate = str_to_bool(args.scale_learning_rate)
     
     return args
 
@@ -939,7 +943,6 @@ def train_model(
     max_steps = args.max_steps
     val_check_interval = args.val_check_interval
     limit_val_batches = args.limit_val_batches
-    lr = args.lr
     resume_from_checkpoint = args.resume_from_checkpoint  # Expect str or None
     assert resume_from_checkpoint is None or (
             isinstance(resume_from_checkpoint, str) and 
@@ -948,6 +951,14 @@ def train_model(
            f" Got {resume_from_checkpoint} (type {type(resume_from_checkpoint)})"
     precision = args.precision
     use_wandb = args.wandb
+
+    # Scale the learning rate with number of total devices
+    if args.scale_learning_rate:
+        n = num_nodes * gpu_devices
+        print(f"Scaling learning rate with effective batch size: " + 
+              f"num_nodes x gpu_devices = {num_nodes} x {gpu_devices} = {n}")
+        args.lr = args.lr * n
+        print(f"Effective learning rate: {args.lr}")
     
     # Configure DeepSpeed optimization settings
     if ds_config is None:
@@ -973,9 +984,9 @@ def train_model(
             "stage3_param_persistence_threshold": 1e6,
         }
     
-    strategy = DeepSpeedStrategy(
-        config=ds_config
-    )
+    # strategy = DeepSpeedStrategy(
+    #     config=ds_config
+    # )
 
     loggers = []
 
@@ -1069,7 +1080,7 @@ def train_model(
     trainer = Trainer(**trainer_params)
 
     # wrap optimizer and model with intel extension for pytorch 
-    optimizer = torch.optim.AdamW(PL_model.parameters(), lr=lr)
+    # optimizer = torch.optim.AdamW(PL_model.parameters(), lr=lr)
     # PL_model, optimizer = ipex.optimize(PL_model, optimizer=optimizer, dtype=torch.float32)
 
     # Handle different training scenarios

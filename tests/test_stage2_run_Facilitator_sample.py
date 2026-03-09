@@ -10,6 +10,7 @@ from contextlib import nullcontext as does_not_raise
 
 from tests.conftest import DATDIR, TMPDIR, remove_dir
 
+import torch
 from biom3.Stage2.run_Facilitator_sample import parse_arguments, main
 
 #####################
@@ -69,4 +70,17 @@ def test_entrypoint(
     with expect_error_context:
         args = parse_arguments(argstring)
         main(args)
-    remove_dir(OUTPUTS_DIR)
+        # Verify results can be loaded
+        res = torch.load(
+            os.path.join(OUTPUTS_DIR, "test_Facilitator_embeddings.pt")
+        )
+        errors = []
+        expected_keys = [
+            "z_t", "z_p", "z_c"
+        ]
+        for k in expected_keys:
+            if k not in res:
+                msg = f"key {k} not found in results"
+                errors.append(msg)
+        remove_dir(OUTPUTS_DIR)
+        assert not errors, "Errors occurred:\n{}".format("\n".join(errors))

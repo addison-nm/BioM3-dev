@@ -75,4 +75,17 @@ def test_entrypoint(
         args = parse_arguments(argstring)
         args.device = device
         main(args)
-    remove_dir(OUTPUTS_DIR)
+        # Verify results can be loaded
+        res = torch.load(
+            os.path.join(OUTPUTS_DIR, "test_PenCL_embeddings.pt")
+        )
+        errors = []
+        expected_keys = [
+            "z_t", "z_p", "text_prompts", "sequence", "acc_id"
+        ]
+        for k in expected_keys:
+            if k not in res:
+                msg = f"key {k} not found in results"
+                errors.append(msg)
+        remove_dir(OUTPUTS_DIR)
+        assert not errors, "Errors occurred:\n{}".format("\n".join(errors))

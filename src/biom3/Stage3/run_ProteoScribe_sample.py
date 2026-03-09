@@ -20,7 +20,9 @@ biom3_ProteoScribe_sample \
 
 import sys
 from argparse import Namespace
+import random
 import json
+import numpy as np
 import pandas as pd
 import argparse
 
@@ -47,6 +49,8 @@ def parse_arguments(args):
                         help="Path to the pre-trained model weights (pytorch_model.bin)")
     parser.add_argument('-o', '--output_path', type=str, required=True,
                         help="Path to save output embeddings")
+    parser.add_argument('--seed', type=int, default=0, 
+                        help="seed for random number generation")
     return parser.parse_args(args)
 
 
@@ -162,9 +166,37 @@ def batch_stage3_generate_sequences(
     return design_sequence_dict
 
 
+def set_seed(seed):
+    """
+    Set random seeds for reproducibility across different libraries.
+    
+    This function ensures deterministic behavior by setting identical random
+    seeds for PyTorch, NumPy, and Python's built-in random module based on
+    the seed value specified in the arguments.
+    
+    Args:
+        seed: Random seed
+        
+    Returns:
+        None
+    """
+    torch.manual_seed(seed)
+    np.random.seed(seed + 1)
+    random.seed(seed + 2)
+    return
+
+
 def main(args):
     # Parse arguments
     config_args_parser = args
+
+    seed = config_args_parser.seed
+    
+    if seed <= 0:
+        seed = np.random.randint(2**32)
+        
+    set_seed(seed)
+    print(f"Seed: {seed}")
 
     # Load and convert JSON config
     config_dict = load_json_config(config_args_parser.json_path)

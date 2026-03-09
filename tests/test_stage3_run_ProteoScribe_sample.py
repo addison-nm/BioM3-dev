@@ -10,6 +10,8 @@ from contextlib import nullcontext as does_not_raise
 
 from tests.conftest import DATDIR, TMPDIR, remove_dir
 
+import torch
+import numpy as np
 from biom3.Stage3.run_ProteoScribe_sample import parse_arguments, main
 
 #####################
@@ -70,3 +72,69 @@ def test_entrypoint(
         args = parse_arguments(argstring)
         main(args)
     remove_dir(OUTPUTS_DIR)
+
+
+@pytest.mark.parametrize(
+    "argstring_fpath", [
+    f"{ARGS_DIR}/stage3_args_v2.txt",
+])
+@pytest.mark.parametrize(
+    "seed1, seed2", [
+        [1, 2],
+        [1, 1]
+    ]
+)
+def test_reproducibility(
+        argstring_fpath, seed1, seed2
+    ):
+    # This test relies on the following downloaded weights. Check existence.
+    issues, skip_reason = check_downloads(REQUIRED_DOWNLOADS)
+    if issues:
+        pytest.skip(reason=skip_reason)
+    # Parse the command line string
+    argstring = get_args(argstring_fpath)
+    # Run 1
+    os.makedirs(OUTPUTS_DIR, exist_ok=True)
+    args = parse_arguments(argstring)
+    args.seed = seed1
+    main(args)
+    res_dict1 = torch.load(
+        os.path.join(OUTPUTS_DIR, "test_ProteoScribe_samples.pt")
+    )
+    remove_dir(OUTPUTS_DIR)
+    # Run 2
+    os.makedirs(OUTPUTS_DIR, exist_ok=True)
+    args = parse_arguments(argstring)
+    args.seed = seed2
+    main(args)
+    res_dict2 = torch.load(
+        os.path.join(OUTPUTS_DIR, "test_ProteoScribe_samples.pt")
+    )
+    remove_dir(OUTPUTS_DIR)
+    # Compare results
+    expect_same = seed1 == seed2
+    errors = []
+    assert len(res_dict1) == len(res_dict2)
+    for i in range(len(res_dict1)):
+        replicates1 = res_dict1[f"replica_{i}"]
+        replicates2 = res_dict2[f"replica_{i}"]
+        observed_same = np.all(
+            [s1 == s2 for s1, s2 in zip(replicates1, replicates2)]
+        )
+        if expect_same and not observed_same:
+            msg = "Expected same results but results differed."
+            msg += f"\n  Replicates 1: {replicates1}"
+            msg += f"\n  Replicates 2: {replicates2}"
+            errors.append(msg)
+        elif not expect_same and observed_same:
+            msg = "Expected different results but results matched."
+            msg += f"\n  Replicates 1 == Replicates 2: {replicates1}"
+            errors.append(msg)
+    # observed_same_z_p = torch.allclose(res1["z_p"], res2["z_p"])
+    # if expect_same and not observed_same_z_p:
+    #     msg = "Expected same results but results differed for z_p."
+    #     errors.append(msg)
+    # elif not expect_same and observed_same_z_p:
+    #     msg = "Expected different results but results matched for z_p."
+    #     errors.append(msg)
+    assert not errors, "Errors occurred:\n{}".format("\n".join(errors))

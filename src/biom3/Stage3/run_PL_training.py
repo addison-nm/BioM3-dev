@@ -832,7 +832,11 @@ def freeze_except_last_n_blocks_and_layers(
         print(msg)
     
     # First, freeze all parameters
-    for param in PL_model.model.parameters():
+    for name, param in PL_model.model.named_parameters():
+        print(f"Parameter: {name}")
+        print(f"  Shape: {param.shape}")
+        print(f"  Trainable: {param.requires_grad}")
+        print(f"  Device: {param.device}")
         param.requires_grad = False
     
     # Then unfreeze only the last k layers of the last n transformer blocks
@@ -888,7 +892,12 @@ def freeze_except_last_n_blocks_and_layers(
     trainable_params = sum(p.numel() for p in PL_model.model.parameters() if p.requires_grad)
     total_params = sum(p.numel() for p in PL_model.model.parameters())
     frozen_params = total_params - trainable_params
-    
+    print("After freezing blocks/layers for finetuning .. ")
+    for name, param in PL_model.model.named_parameters():
+        print(f"Parameter: {name}")
+        print(f"  Shape: {param.shape}")
+        print(f"  Trainable: {param.requires_grad}")
+        print(f"  Device: {param.device}")
     print(f"Trainable parameters: {trainable_params:,} ({100 * trainable_params / total_params:.2f}%)")
     print(f"Frozen parameters: {frozen_params:,} ({100 * frozen_params / total_params:.2f}%)")
     

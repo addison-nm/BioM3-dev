@@ -9,7 +9,7 @@ export sequence_keyname="sequence"
 export num_classes=29
 export num_y_class_labels=6
 
-export wandb_entity="thenaturalmachine"
+export wandb_entity="tnnandi"
 export wandb_project="BioM3"
 export wandb_logging_dir="./logs"
 export wandb_tags="pretrain_from_scratch"
@@ -20,7 +20,6 @@ export weight_decay=1e-6
 export scheduler_gamma="coswarmup"
 
 export seed=0
-export epochs=100
 export valid_size=0.2
 export enter_eval=1000
 export resume_from_checkpoint=None
@@ -39,7 +38,6 @@ export max_steps=3000000
 export device=cuda
 export precision=bf16
 export gpu_devices=4
-export num_nodes=1
 export acc_grad_batches=1
 
 export val_check_interval=20

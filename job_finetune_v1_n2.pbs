@@ -5,7 +5,7 @@
 #PBS -l select=2
 #PBS -l place=scatter
 #PBS -l filesystems=home:grand
-#PBS -q debug-scaling
+#PBS -q preemptable 
 #PBS -j oe
 
 projdir=${PBS_O_WORKDIR}  # Should submit job from the BioM3-dev directory

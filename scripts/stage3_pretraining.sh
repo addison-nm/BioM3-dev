@@ -80,6 +80,6 @@ biom3_pretrain_stage3 \
 	--limit_val_batches ${limit_val_batches} \
 	--start_pfam_trainer ${start_pfam_trainer} \
 	--num_workers ${num_workers} \
-	--wandb_entity thenaturalmachine \
+	--wandb_entity tnnandi \
 	--wandb_project "BioM3-dev" \
 	--wandb_name ${version_name} \

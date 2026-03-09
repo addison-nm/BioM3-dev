@@ -7,8 +7,7 @@
 #PBS -l filesystems=home:grand
 #PBS -q debug
 #PBS -j oe
-# PBS -M <emailaddress>
-# PBS -m be
+
 
 projdir=${PBS_O_WORKDIR}  # Should submit job from the BioM3-dev directory
 cd ${projdir}  # TODO: verify that directory ends in BioM3-dev

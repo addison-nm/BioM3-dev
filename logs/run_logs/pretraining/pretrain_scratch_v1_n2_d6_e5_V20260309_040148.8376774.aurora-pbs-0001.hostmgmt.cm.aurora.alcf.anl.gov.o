@@ -1,0 +1,814 @@
+NRANKS: 2, NGPU_PER_RANK: 6, NGPUS: 12
+Disabling local launch: multi-node application
+Connected to tcp://x4311c5s2b0n0.hsn.cm.aurora.alcf.anl.gov:7919
+Launching application bb66ae46-3c75-4864-827a-7414ef29e089
+Application bb66ae46-3c75-4864-827a-7414ef29e089 started execution
+Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)[W309 04:02:13.048293496 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 04:02:13.048293599 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 04:02:13.048293481 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 04:02:13.048293500 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 04:02:13.048293342 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 04:02:13.048293494 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[2026-03-09 04:02:15,576] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 04:02:15,578] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 04:02:15,578] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 04:02:15,582] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 04:02:15,583] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 04:02:15,584] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 04:02:18,766] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 04:02:18,905] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 04:02:19,094] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 04:02:19,105] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 04:02:19,124] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 04:02:19,133] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[W309 04:02:21.796202076 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 04:02:21.796201970 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 04:02:21.796202054 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 04:02:22.838241965 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 04:02:22.875821887 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[2026-03-09 04:02:27,226] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 04:02:27,226] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 04:02:27,227] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 04:02:27,227] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 04:02:27,227] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 04:02:37,899] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 04:02:37,968] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 04:02:38,043] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 04:02:38,054] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 04:02:38,072] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[W309 04:04:46.794840643 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[2026-03-09 04:04:48,615] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 04:04:51,428] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+DDP: Hi from rank 0 of 12 (total number of nodes: 2.0) with local rank 0. x4311c5s2b0n0
+Using seed: 2296268637
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of datalaoder: 13789
+Numer of devices: 6
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 2298
+Length of a training epoch in batch gradient updates: 2298
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 65520 MB
+Data shape index 0: 1024
+Model prepared successfully.
+Model size: 86186013
+Detailed Model Summary:
+    | Name                                                                              | Type                                | Params | Mode 
+----------------------------------------------------------------------------------------------------------------------------------------------------
+0   | model                                                                             | DiffTransformer                     | 86.2 M | train
+1   | model.transformer                                                                 | LinearAttentionTransformerEmbedding | 86.2 M | train
+2   | model.transformer.x_emb_NN                                                        | Embedding                           | 14.8 K | train
+3   | model.transformer.y_mlp                                                           | Sequential                          | 17.8 M | train
+4   | model.transformer.y_mlp.0                                                         | Linear                              | 1.1 M  | train
+5   | model.transformer.y_mlp.1                                                         | Softplus                            | 0      | train
+6   | model.transformer.y_mlp.2                                                         | Linear                              | 16.8 M | train
+7   | model.transformer.time_pos_emb                                                    | SinusoidalPosEmb                    | 0      | train
+8   | model.transformer.mlp                                                             | Sequential                          | 17.8 M | train
+9   | model.transformer.mlp.0                                                           | Linear                              | 1.1 M  | train
+10  | model.transformer.mlp.1                                                           | Softplus                            | 0      | train
+11  | model.transformer.mlp.2                                                           | Linear                              | 16.8 M | train
+12  | model.transformer.axial_pos_emb                                                   | AxialPositionalEmbedding            | 69.6 K | train
+13  | model.transformer.axial_pos_emb.weights                                           | ParameterList                       | 69.6 K | train
+14  | model.transformer.transformer_blocks                                              | ModuleList                          | 50.4 M | train
+15  | model.transformer.transformer_blocks.0                                            | ModuleList                          | 50.4 M | train
+16  | model.transformer.transformer_blocks.0.0                                          | LinearAttentionTransformer          | 3.2 M  | train
+17  | model.transformer.transformer_blocks.0.0.layers                                   | SequentialSequence                  | 3.2 M  | train
+18  | model.transformer.transformer_blocks.0.0.layers.layers                            | ModuleList                          | 3.2 M  | train
+19  | model.transformer.transformer_blocks.0.0.layers.layers.0                          | ModuleList                          | 3.2 M  | train
+20  | model.transformer.transformer_blocks.0.0.layers.layers.0.0                        | PreNorm                             | 1.1 M  | train
+21  | model.transformer.transformer_blocks.0.0.layers.layers.0.0.fn                     | SelfAttention                       | 1.0 M  | train
+22  | model.transformer.transformer_blocks.0.0.layers.layers.0.0.fn.local_attn          | LocalAttention                      | 0      | train
+23  | model.transformer.transformer_blocks.0.0.layers.layers.0.0.fn.local_attn.dropout  | Dropout                             | 0      | train
+24  | model.transformer.transformer_blocks.0.0.layers.layers.0.0.fn.to_q                | Linear                              | 262 K  | train
+25  | model.transformer.transformer_blocks.0.0.layers.layers.0.0.fn.to_k                | Linear                              | 262 K  | train
+26  | model.transformer.transformer_blocks.0.0.layers.layers.0.0.fn.to_v                | Linear                              | 262 K  | train
+27  | model.transformer.transformer_blocks.0.0.layers.layers.0.0.fn.to_out              | Linear                              | 262 K  | train
+28  | model.transformer.transformer_blocks.0.0.layers.layers.0.0.fn.dropout             | Dropout                             | 0      | train
+29  | model.transformer.transformer_blocks.0.0.layers.layers.0.0.norm                   | LayerNorm                           | 1.0 K  | train
+30  | model.transformer.transformer_blocks.0.0.layers.layers.0.1                        | PreNorm                             | 2.1 M  | train
+31  | model.transformer.transformer_blocks.0.0.layers.layers.0.1.fn                     | Chunk                               | 2.1 M  | train
+32  | model.transformer.transformer_blocks.0.0.layers.layers.0.1.fn.fn                  | FeedForward                         | 2.1 M  | train
+33  | model.transformer.transformer_blocks.0.0.layers.layers.0.1.fn.fn.w1               | Linear                              | 1.1 M  | train
+34  | model.transformer.transformer_blocks.0.0.layers.layers.0.1.fn.fn.act              | GELU                                | 0      | train
+35  | model.transformer.transformer_blocks.0.0.layers.layers.0.1.fn.fn.dropout          | Dropout                             | 0      | train
+36  | model.transformer.transformer_blocks.0.0.layers.layers.0.1.fn.fn.w2               | Linear                              | 1.0 M  | train
+37  | model.transformer.transformer_blocks.0.0.layers.layers.0.1.norm                   | LayerNorm                           | 1.0 K  | train
+38  | model.transformer.transformer_blocks.0.1                                          | LinearAttentionTransformer          | 3.2 M  | train
+39  | model.transformer.transformer_blocks.0.1.layers                                   | SequentialSequence                  | 3.2 M  | train
+40  | model.transformer.transformer_blocks.0.1.layers.layers                            | ModuleList                          | 3.2 M  | train
+41  | model.transformer.transformer_blocks.0.1.layers.layers.0                          | ModuleList                          | 3.2 M  | train
+42  | model.transformer.transformer_blocks.0.1.layers.layers.0.0                        | PreNorm                             | 1.1 M  | train
+43  | model.transformer.transformer_blocks.0.1.layers.layers.0.0.fn                     | SelfAttention                       | 1.0 M  | train
+44  | model.transformer.transformer_blocks.0.1.layers.layers.0.0.fn.local_attn          | LocalAttention                      | 0      | train
+45  | model.transformer.transformer_blocks.0.1.layers.layers.0.0.fn.local_attn.dropout  | Dropout                             | 0      | train
+46  | model.transformer.transformer_blocks.0.1.layers.layers.0.0.fn.to_q                | Linear                              | 262 K  | train
+47  | model.transformer.transformer_blocks.0.1.layers.layers.0.0.fn.to_k                | Linear                              | 262 K  | train
+48  | model.transformer.transformer_blocks.0.1.layers.layers.0.0.fn.to_v                | Linear                              | 262 K  | train
+49  | model.transformer.transformer_blocks.0.1.layers.layers.0.0.fn.to_out              | Linear                              | 262 K  | train
+50  | model.transformer.transformer_blocks.0.1.layers.layers.0.0.fn.dropout             | Dropout                             | 0      | train
+51  | model.transformer.transformer_blocks.0.1.layers.layers.0.0.norm                   | LayerNorm                           | 1.0 K  | train
+52  | model.transformer.transformer_blocks.0.1.layers.layers.0.1                        | PreNorm                             | 2.1 M  | train
+53  | model.transformer.transformer_blocks.0.1.layers.layers.0.1.fn                     | Chunk                               | 2.1 M  | train
+54  | model.transformer.transformer_blocks.0.1.layers.layers.0.1.fn.fn                  | FeedForward                         | 2.1 M  | train
+55  | model.transformer.transformer_blocks.0.1.layers.layers.0.1.fn.fn.w1               | Linear                              | 1.1 M  | train
+56  | model.transformer.transformer_blocks.0.1.layers.layers.0.1.fn.fn.act              | GELU                                | 0      | train
+57  | model.transformer.transformer_blocks.0.1.layers.layers.0.1.fn.fn.dropout          | Dropout                             | 0      | train
+58  | model.transformer.transformer_blocks.0.1.layers.layers.0.1.fn.fn.w2               | Linear                              | 1.0 M  | train
+59  | model.transformer.transformer_blocks.0.1.layers.layers.0.1.norm                   | LayerNorm                           | 1.0 K  | train
+60  | model.transformer.transformer_blocks.0.2                                          | LinearAttentionTransformer          | 3.2 M  | train
+61  | model.transformer.transformer_blocks.0.2.layers                                   | SequentialSequence                  | 3.2 M  | train
+62  | model.transformer.transformer_blocks.0.2.layers.layers                            | ModuleList                          | 3.2 M  | train
+63  | model.transformer.transformer_blocks.0.2.layers.layers.0                          | ModuleList                          | 3.2 M  | train
+64  | model.transformer.transformer_blocks.0.2.layers.layers.0.0                        | PreNorm                             | 1.1 M  | train
+65  | model.transformer.transformer_blocks.0.2.layers.layers.0.0.fn                     | SelfAttention                       | 1.0 M  | train
+66  | model.transformer.transformer_blocks.0.2.layers.layers.0.0.fn.local_attn          | LocalAttention                      | 0      | train
+67  | model.transformer.transformer_blocks.0.2.layers.layers.0.0.fn.local_attn.dropout  | Dropout                             | 0      | train
+68  | model.transformer.transformer_blocks.0.2.layers.layers.0.0.fn.to_q                | Linear                              | 262 K  | train
+69  | model.transformer.transformer_blocks.0.2.layers.layers.0.0.fn.to_k                | Linear                              | 262 K  | train
+70  | model.transformer.transformer_blocks.0.2.layers.layers.0.0.fn.to_v                | Linear                              | 262 K  | train
+71  | model.transformer.transformer_blocks.0.2.layers.layers.0.0.fn.to_out              | Linear                              | 262 K  | train
+72  | model.transformer.transformer_blocks.0.2.layers.layers.0.0.fn.dropout             | Dropout                             | 0      | train
+73  | model.transformer.transformer_blocks.0.2.layers.layers.0.0.norm                   | LayerNorm                           | 1.0 K  | train
+74  | model.transformer.transformer_blocks.0.2.layers.layers.0.1                        | PreNorm                             | 2.1 M  | train
+75  | model.transformer.transformer_blocks.0.2.layers.layers.0.1.fn                     | Chunk                               | 2.1 M  | train
+76  | model.transformer.transformer_blocks.0.2.layers.layers.0.1.fn.fn                  | FeedForward                         | 2.1 M  | train
+77  | model.transformer.transformer_blocks.0.2.layers.layers.0.1.fn.fn.w1               | Linear                              | 1.1 M  | train
+78  | model.transformer.transformer_blocks.0.2.layers.layers.0.1.fn.fn.act              | GELU                                | 0      | train
+79  | model.transformer.transformer_blocks.0.2.layers.layers.0.1.fn.fn.dropout          | Dropout                             | 0      | train
+80  | model.transformer.transformer_blocks.0.2.layers.layers.0.1.fn.fn.w2               | Linear                              | 1.0 M  | train
+81  | model.transformer.transformer_blocks.0.2.layers.layers.0.1.norm                   | LayerNorm                           | 1.0 K  | train
+82  | model.transformer.transformer_blocks.0.3                                          | LinearAttentionTransformer          | 3.2 M  | train
+83  | model.transformer.transformer_blocks.0.3.layers                                   | SequentialSequence                  | 3.2 M  | train
+84  | model.transformer.transformer_blocks.0.3.layers.layers                            | ModuleList                          | 3.2 M  | train
+85  | model.transformer.transformer_blocks.0.3.layers.layers.0                          | ModuleList                          | 3.2 M  | train
+86  | model.transformer.transformer_blocks.0.3.layers.layers.0.0                        | PreNorm                             | 1.1 M  | train
+87  | model.transformer.transformer_blocks.0.3.layers.layers.0.0.fn                     | SelfAttention                       | 1.0 M  | train
+88  | model.transformer.transformer_blocks.0.3.layers.layers.0.0.fn.local_attn          | LocalAttention                      | 0      | train
+89  | model.transformer.transformer_blocks.0.3.layers.layers.0.0.fn.local_attn.dropout  | Dropout                             | 0      | train
+90  | model.transformer.transformer_blocks.0.3.layers.layers.0.0.fn.to_q                | Linear                              | 262 K  | train
+91  | model.transformer.transformer_blocks.0.3.layers.layers.0.0.fn.to_k                | Linear                              | 262 K  | train
+92  | model.transformer.transformer_blocks.0.3.layers.layers.0.0.fn.to_v                | Linear                              | 262 K  | train
+93  | model.transformer.transformer_blocks.0.3.layers.layers.0.0.fn.to_out              | Linear                              | 262 K  | train
+94  | model.transformer.transformer_blocks.0.3.layers.layers.0.0.fn.dropout             | Dropout                             | 0      | train
+95  | model.transformer.transformer_blocks.0.3.layers.layers.0.0.norm                   | LayerNorm                           | 1.0 K  | train
+96  | model.transformer.transformer_blocks.0.3.layers.layers.0.1                        | PreNorm                             | 2.1 M  | train
+97  | model.transformer.transformer_blocks.0.3.layers.layers.0.1.fn                     | Chunk                               | 2.1 M  | train
+98  | model.transformer.transformer_blocks.0.3.layers.layers.0.1.fn.fn                  | FeedForward                         | 2.1 M  | train
+99  | model.transformer.transformer_blocks.0.3.layers.layers.0.1.fn.fn.w1               | Linear                              | 1.1 M  | train
+100 | model.transformer.transformer_blocks.0.3.layers.layers.0.1.fn.fn.act              | GELU                                | 0      | train
+101 | model.transformer.transformer_blocks.0.3.layers.layers.0.1.fn.fn.dropout          | Dropout                             | 0      | train
+102 | model.transformer.transformer_blocks.0.3.layers.layers.0.1.fn.fn.w2               | Linear                              | 1.0 M  | train
+103 | model.transformer.transformer_blocks.0.3.layers.layers.0.1.norm                   | LayerNorm                           | 1.0 K  | train
+104 | model.transformer.transformer_blocks.0.4                                          | LinearAttentionTransformer          | 3.2 M  | train
+105 | model.transformer.transformer_blocks.0.4.layers                                   | SequentialSequence                  | 3.2 M  | train
+106 | model.transformer.transformer_blocks.0.4.layers.layers                            | ModuleList                          | 3.2 M  | train
+107 | model.transformer.transformer_blocks.0.4.layers.layers.0                          | ModuleList                          | 3.2 M  | train
+108 | model.transformer.transformer_blocks.0.4.layers.layers.0.0                        | PreNorm                             | 1.1 M  | train
+109 | model.transformer.transformer_blocks.0.4.layers.layers.0.0.fn                     | SelfAttention                       | 1.0 M  | train
+110 | model.transformer.transformer_blocks.0.4.layers.layers.0.0.fn.local_attn          | LocalAttention                      | 0      | train
+111 | model.transformer.transformer_blocks.0.4.layers.layers.0.0.fn.local_attn.dropout  | Dropout                             | 0      | train
+112 | model.transformer.transformer_blocks.0.4.layers.layers.0.0.fn.to_q                | Linear                              | 262 K  | train
+113 | model.transformer.transformer_blocks.0.4.layers.layers.0.0.fn.to_k                | Linear                              | 262 K  | train
+114 | model.transformer.transformer_blocks.0.4.layers.layers.0.0.fn.to_v                | Linear                              | 262 K  | train
+115 | model.transformer.transformer_blocks.0.4.layers.layers.0.0.fn.to_out              | Linear                              | 262 K  | train
+116 | model.transformer.transformer_blocks.0.4.layers.layers.0.0.fn.dropout             | Dropout                             | 0      | train
+117 | model.transformer.transformer_blocks.0.4.layers.layers.0.0.norm                   | LayerNorm                           | 1.0 K  | train
+118 | model.transformer.transformer_blocks.0.4.layers.layers.0.1                        | PreNorm                             | 2.1 M  | train
+119 | model.transformer.transformer_blocks.0.4.layers.layers.0.1.fn                     | Chunk                               | 2.1 M  | train
+120 | model.transformer.transformer_blocks.0.4.layers.layers.0.1.fn.fn                  | FeedForward                         | 2.1 M  | train
+121 | model.transformer.transformer_blocks.0.4.layers.layers.0.1.fn.fn.w1               | Linear                              | 1.1 M  | train
+122 | model.transformer.transformer_blocks.0.4.layers.layers.0.1.fn.fn.act              | GELU                                | 0      | train
+123 | model.transformer.transformer_blocks.0.4.layers.layers.0.1.fn.fn.dropout          | Dropout                             | 0      | train
+124 | model.transformer.transformer_blocks.0.4.layers.layers.0.1.fn.fn.w2               | Linear                              | 1.0 M  | train
+125 | model.transformer.transformer_blocks.0.4.layers.layers.0.1.norm                   | LayerNorm                           | 1.0 K  | train
+126 | model.transformer.transformer_blocks.0.5                                          | LinearAttentionTransformer          | 3.2 M  | train
+127 | model.transformer.transformer_blocks.0.5.layers                                   | SequentialSequence                  | 3.2 M  | train
+128 | model.transformer.transformer_blocks.0.5.layers.layers                            | ModuleList                          | 3.2 M  | train
+129 | model.transformer.transformer_blocks.0.5.layers.layers.0                          | ModuleList                          | 3.2 M  | train
+130 | model.transformer.transformer_blocks.0.5.layers.layers.0.0                        | PreNorm                             | 1.1 M  | train
+131 | model.transformer.transformer_blocks.0.5.layers.layers.0.0.fn                     | SelfAttention                       | 1.0 M  | train
+132 | model.transformer.transformer_blocks.0.5.layers.layers.0.0.fn.local_attn          | LocalAttention                      | 0      | train
+133 | model.transformer.transformer_blocks.0.5.layers.layers.0.0.fn.local_attn.dropout  | Dropout                             | 0      | train
+134 | model.transformer.transformer_blocks.0.5.layers.layers.0.0.fn.to_q                | Linear                              | 262 K  | train
+135 | model.transformer.transformer_blocks.0.5.layers.layers.0.0.fn.to_k                | Linear                              | 262 K  | train
+136 | model.transformer.transformer_blocks.0.5.layers.layers.0.0.fn.to_v                | Linear                              | 262 K  | train
+137 | model.transformer.transformer_blocks.0.5.layers.layers.0.0.fn.to_out              | Linear                              | 262 K  | train
+138 | model.transformer.transformer_blocks.0.5.layers.layers.0.0.fn.dropout             | Dropout                             | 0      | train
+139 | model.transformer.transformer_blocks.0.5.layers.layers.0.0.norm                   | LayerNorm                           | 1.0 K  | train
+140 | model.transformer.transformer_blocks.0.5.layers.layers.0.1                        | PreNorm                             | 2.1 M  | train
+141 | model.transformer.transformer_blocks.0.5.layers.layers.0.1.fn                     | Chunk                               | 2.1 M  | train
+142 | model.transformer.transformer_blocks.0.5.layers.layers.0.1.fn.fn                  | FeedForward                         | 2.1 M  | train
+143 | model.transformer.transformer_blocks.0.5.layers.layers.0.1.fn.fn.w1               | Linear                              | 1.1 M  | train
+144 | model.transformer.transformer_blocks.0.5.layers.layers.0.1.fn.fn.act              | GELU                                | 0      | train
+145 | model.transformer.transformer_blocks.0.5.layers.layers.0.1.fn.fn.dropout          | Dropout                             | 0      | train
+146 | model.transformer.transformer_blocks.0.5.layers.layers.0.1.fn.fn.w2               | Linear                              | 1.0 M  | train
+147 | model.transformer.transformer_blocks.0.5.layers.layers.0.1.norm                   | LayerNorm                           | 1.0 K  | train
+148 | model.transformer.transformer_blocks.0.6                                          | LinearAttentionTransformer          | 3.2 M  | train
+149 | model.transformer.transformer_blocks.0.6.layers                                   | SequentialSequence                  | 3.2 M  | train
+150 | model.transformer.transformer_blocks.0.6.layers.layers                            | ModuleList                          | 3.2 M  | train
+151 | model.transformer.transformer_blocks.0.6.layers.layers.0                          | ModuleList                          | 3.2 M  | train
+152 | model.transformer.transformer_blocks.0.6.layers.layers.0.0                        | PreNorm                             | 1.1 M  | train
+153 | model.transformer.transformer_blocks.0.6.layers.layers.0.0.fn                     | SelfAttention                       | 1.0 M  | train
+154 | model.transformer.transformer_blocks.0.6.layers.layers.0.0.fn.local_attn          | LocalAttention                      | 0      | train
+155 | model.transformer.transformer_blocks.0.6.layers.layers.0.0.fn.local_attn.dropout  | Dropout                             | 0      | train
+156 | model.transformer.transformer_blocks.0.6.layers.layers.0.0.fn.to_q                | Linear                              | 262 K  | train
+157 | model.transformer.transformer_blocks.0.6.layers.layers.0.0.fn.to_k                | Linear                              | 262 K  | train
+158 | model.transformer.transformer_blocks.0.6.layers.layers.0.0.fn.to_v                | Linear                              | 262 K  | train
+159 | model.transformer.transformer_blocks.0.6.layers.layers.0.0.fn.to_out              | Linear                              | 262 K  | train
+160 | model.transformer.transformer_blocks.0.6.layers.layers.0.0.fn.dropout             | Dropout                             | 0      | train
+161 | model.transformer.transformer_blocks.0.6.layers.layers.0.0.norm                   | LayerNorm                           | 1.0 K  | train
+162 | model.transformer.transformer_blocks.0.6.layers.layers.0.1                        | PreNorm                             | 2.1 M  | train
+163 | model.transformer.transformer_blocks.0.6.layers.layers.0.1.fn                     | Chunk                               | 2.1 M  | train
+164 | model.transformer.transformer_blocks.0.6.layers.layers.0.1.fn.fn                  | FeedForward                         | 2.1 M  | train
+165 | model.transformer.transformer_blocks.0.6.layers.layers.0.1.fn.fn.w1               | Linear                              | 1.1 M  | train
+166 | model.transformer.transformer_blocks.0.6.layers.layers.0.1.fn.fn.act              | GELU                                | 0      | train
+167 | model.transformer.transformer_blocks.0.6.layers.layers.0.1.fn.fn.dropout          | Dropout                             | 0      | train
+168 | model.transformer.transformer_blocks.0.6.layers.layers.0.1.fn.fn.w2               | Linear                              | 1.0 M  | train
+169 | model.transformer.transformer_blocks.0.6.layers.layers.0.1.norm                   | LayerNorm                           | 1.0 K  | train
+170 | model.transformer.transformer_blocks.0.7                                          | LinearAttentionTransformer          | 3.2 M  | train
+171 | model.transformer.transformer_blocks.0.7.layers                                   | SequentialSequence                  | 3.2 M  | train
+172 | model.transformer.transformer_blocks.0.7.layers.layers                            | ModuleList                          | 3.2 M  | train
+173 | model.transformer.transformer_blocks.0.7.layers.layers.0                          | ModuleList                          | 3.2 M  | train
+174 | model.transformer.transformer_blocks.0.7.layers.layers.0.0                        | PreNorm                             | 1.1 M  | train
+175 | model.transformer.transformer_blocks.0.7.layers.layers.0.0.fn                     | SelfAttention                       | 1.0 M  | train
+176 | model.transformer.transformer_blocks.0.7.layers.layers.0.0.fn.local_attn          | LocalAttention                      | 0      | train
+177 | model.transformer.transformer_blocks.0.7.layers.layers.0.0.fn.local_attn.dropout  | Dropout                             | 0      | train
+178 | model.transformer.transformer_blocks.0.7.layers.layers.0.0.fn.to_q                | Linear                              | 262 K  | train
+179 | model.transformer.transformer_blocks.0.7.layers.layers.0.0.fn.to_k                | Linear                              | 262 K  | train
+180 | model.transformer.transformer_blocks.0.7.layers.layers.0.0.fn.to_v                | Linear                              | 262 K  | train
+181 | model.transformer.transformer_blocks.0.7.layers.layers.0.0.fn.to_out              | Linear                              | 262 K  | train
+182 | model.transformer.transformer_blocks.0.7.layers.layers.0.0.fn.dropout             | Dropout                             | 0      | train
+183 | model.transformer.transformer_blocks.0.7.layers.layers.0.0.norm                   | LayerNorm                           | 1.0 K  | train
+184 | model.transformer.transformer_blocks.0.7.layers.layers.0.1                        | PreNorm                             | 2.1 M  | train
+185 | model.transformer.transformer_blocks.0.7.layers.layers.0.1.fn                     | Chunk                               | 2.1 M  | train
+186 | model.transformer.transformer_blocks.0.7.layers.layers.0.1.fn.fn                  | FeedForward                         | 2.1 M  | train
+187 | model.transformer.transformer_blocks.0.7.layers.layers.0.1.fn.fn.w1               | Linear                              | 1.1 M  | train
+188 | model.transformer.transformer_blocks.0.7.layers.layers.0.1.fn.fn.act              | GELU                                | 0      | train
+189 | model.transformer.transformer_blocks.0.7.layers.layers.0.1.fn.fn.dropout          | Dropout                             | 0      | train
+190 | model.transformer.transformer_blocks.0.7.layers.layers.0.1.fn.fn.w2               | Linear                              | 1.0 M  | train
+191 | model.transformer.transformer_blocks.0.7.layers.layers.0.1.norm                   | LayerNorm                           | 1.0 K  | train
+192 | model.transformer.transformer_blocks.0.8                                          | LinearAttentionTransformer          | 3.2 M  | train
+193 | model.transformer.transformer_blocks.0.8.layers                                   | SequentialSequence                  | 3.2 M  | train
+194 | model.transformer.transformer_blocks.0.8.layers.layers                            | ModuleList                          | 3.2 M  | train
+195 | model.transformer.transformer_blocks.0.8.layers.layers.0                          | ModuleList                          | 3.2 M  | train
+196 | model.transformer.transformer_blocks.0.8.layers.layers.0.0                        | PreNorm                             | 1.1 M  | train
+197 | model.transformer.transformer_blocks.0.8.layers.layers.0.0.fn                     | SelfAttention                       | 1.0 M  | train
+198 | model.transformer.transformer_blocks.0.8.layers.layers.0.0.fn.local_attn          | LocalAttention                      | 0      | train
+199 | model.transformer.transformer_blocks.0.8.layers.layers.0.0.fn.local_attn.dropout  | Dropout                             | 0      | train
+200 | model.transformer.transformer_blocks.0.8.layers.layers.0.0.fn.to_q                | Linear                              | 262 K  | train
+201 | model.transformer.transformer_blocks.0.8.layers.layers.0.0.fn.to_k                | Linear                              | 262 K  | train
+202 | model.transformer.transformer_blocks.0.8.layers.layers.0.0.fn.to_v                | Linear                              | 262 K  | train
+203 | model.transformer.transformer_blocks.0.8.layers.layers.0.0.fn.to_out              | Linear                              | 262 K  | train
+204 | model.transformer.transformer_blocks.0.8.layers.layers.0.0.fn.dropout             | Dropout                             | 0      | train
+205 | model.transformer.transformer_blocks.0.8.layers.layers.0.0.norm                   | LayerNorm                           | 1.0 K  | train
+206 | model.transformer.transformer_blocks.0.8.layers.layers.0.1                        | PreNorm                             | 2.1 M  | train
+207 | model.transformer.transformer_blocks.0.8.layers.layers.0.1.fn                     | Chunk                               | 2.1 M  | train
+208 | model.transformer.transformer_blocks.0.8.layers.layers.0.1.fn.fn                  | FeedForward                         | 2.1 M  | train
+209 | model.transformer.transformer_blocks.0.8.layers.layers.0.1.fn.fn.w1               | Linear                              | 1.1 M  | train
+210 | model.transformer.transformer_blocks.0.8.layers.layers.0.1.fn.fn.act              | GELU                                | 0      | train
+211 | model.transformer.transformer_blocks.0.8.layers.layers.0.1.fn.fn.dropout          | Dropout                             | 0      | train
+212 | model.transformer.transformer_blocks.0.8.layers.layers.0.1.fn.fn.w2               | Linear                              | 1.0 M  | train
+213 | model.transformer.transformer_blocks.0.8.layers.layers.0.1.norm                   | LayerNorm                           | 1.0 K  | train
+214 | model.transformer.transformer_blocks.0.9                                          | LinearAttentionTransformer          | 3.2 M  | train
+215 | model.transformer.transformer_blocks.0.9.layers                                   | SequentialSequence                  | 3.2 M  | train
+216 | model.transformer.transformer_blocks.0.9.layers.layers                            | ModuleList                          | 3.2 M  | train
+217 | model.transformer.transformer_blocks.0.9.layers.layers.0                          | ModuleList                          | 3.2 M  | train
+218 | model.transformer.transformer_blocks.0.9.layers.layers.0.0                        | PreNorm                             | 1.1 M  | train
+219 | model.transformer.transformer_blocks.0.9.layers.layers.0.0.fn                     | SelfAttention                       | 1.0 M  | train
+220 | model.transformer.transformer_blocks.0.9.layers.layers.0.0.fn.local_attn          | LocalAttention                      | 0      | train
+221 | model.transformer.transformer_blocks.0.9.layers.layers.0.0.fn.local_attn.dropout  | Dropout                             | 0      | train
+222 | model.transformer.transformer_blocks.0.9.layers.layers.0.0.fn.to_q                | Linear                              | 262 K  | train
+223 | model.transformer.transformer_blocks.0.9.layers.layers.0.0.fn.to_k                | Linear                              | 262 K  | train
+224 | model.transformer.transformer_blocks.0.9.layers.layers.0.0.fn.to_v                | Linear                              | 262 K  | train
+225 | model.transformer.transformer_blocks.0.9.layers.layers.0.0.fn.to_out              | Linear                              | 262 K  | train
+226 | model.transformer.transformer_blocks.0.9.layers.layers.0.0.fn.dropout             | Dropout                             | 0      | train
+227 | model.transformer.transformer_blocks.0.9.layers.layers.0.0.norm                   | LayerNorm                           | 1.0 K  | train
+228 | model.transformer.transformer_blocks.0.9.layers.layers.0.1                        | PreNorm                             | 2.1 M  | train
+229 | model.transformer.transformer_blocks.0.9.layers.layers.0.1.fn                     | Chunk                               | 2.1 M  | train
+230 | model.transformer.transformer_blocks.0.9.layers.layers.0.1.fn.fn                  | FeedForward                         | 2.1 M  | train
+231 | model.transformer.transformer_blocks.0.9.layers.layers.0.1.fn.fn.w1               | Linear                              | 1.1 M  | train
+232 | model.transformer.transformer_blocks.0.9.layers.layers.0.1.fn.fn.act              | GELU                                | 0      | train
+233 | model.transformer.transformer_blocks.0.9.layers.layers.0.1.fn.fn.dropout          | Dropout                             | 0      | train
+234 | model.transformer.transformer_blocks.0.9.layers.layers.0.1.fn.fn.w2               | Linear                              | 1.0 M  | train
+235 | model.transformer.transformer_blocks.0.9.layers.layers.0.1.norm                   | LayerNorm                           | 1.0 K  | train
+236 | model.transformer.transformer_blocks.0.10                                         | LinearAttentionTransformer          | 3.2 M  | train
+237 | model.transformer.transformer_blocks.0.10.layers                                  | SequentialSequence                  | 3.2 M  | train
+238 | model.transformer.transformer_blocks.0.10.layers.layers                           | ModuleList                          | 3.2 M  | train
+239 | model.transformer.transformer_blocks.0.10.layers.layers.0                         | ModuleList                          | 3.2 M  | train
+240 | model.transformer.transformer_blocks.0.10.layers.layers.0.0                       | PreNorm                             | 1.1 M  | train
+241 | model.transformer.transformer_blocks.0.10.layers.layers.0.0.fn                    | SelfAttention                       | 1.0 M  | train
+242 | model.transformer.transformer_blocks.0.10.layers.layers.0.0.fn.local_attn         | LocalAttention                      | 0      | train
+243 | model.transformer.transformer_blocks.0.10.layers.layers.0.0.fn.local_attn.dropout | Dropout                             | 0      | train
+244 | model.transformer.transformer_blocks.0.10.layers.layers.0.0.fn.to_q               | Linear                              | 262 K  | train
+245 | model.transformer.transformer_blocks.0.10.layers.layers.0.0.fn.to_k               | Linear                              | 262 K  | train
+246 | model.transformer.transformer_blocks.0.10.layers.layers.0.0.fn.to_v               | Linear                              | 262 K  | train
+247 | model.transformer.transformer_blocks.0.10.layers.layers.0.0.fn.to_out             | Linear                              | 262 K  | train
+248 | model.transformer.transformer_blocks.0.10.layers.layers.0.0.fn.dropout            | Dropout                             | 0      | train
+249 | model.transformer.transformer_blocks.0.10.layers.layers.0.0.norm                  | LayerNorm                           | 1.0 K  | train
+250 | model.transformer.transformer_blocks.0.10.layers.layers.0.1                       | PreNorm                             | 2.1 M  | train
+251 | model.transformer.transformer_blocks.0.10.layers.layers.0.1.fn                    | Chunk                               | 2.1 M  | train
+252 | model.transformer.transformer_blocks.0.10.layers.layers.0.1.fn.fn                 | FeedForward                         | 2.1 M  | train
+253 | model.transformer.transformer_blocks.0.10.layers.layers.0.1.fn.fn.w1              | Linear                              | 1.1 M  | train
+254 | model.transformer.transformer_blocks.0.10.layers.layers.0.1.fn.fn.act             | GELU                                | 0      | train
+255 | model.transformer.transformer_blocks.0.10.layers.layers.0.1.fn.fn.dropout         | Dropout                             | 0      | train
+256 | model.transformer.transformer_blocks.0.10.layers.layers.0.1.fn.fn.w2              | Linear                              | 1.0 M  | train
+257 | model.transformer.transformer_blocks.0.10.layers.layers.0.1.norm                  | LayerNorm                           | 1.0 K  | train
+258 | model.transformer.transformer_blocks.0.11                                         | LinearAttentionTransformer          | 3.2 M  | train
+259 | model.transformer.transformer_blocks.0.11.layers                                  | SequentialSequence                  | 3.2 M  | train
+260 | model.transformer.transformer_blocks.0.11.layers.layers                           | ModuleList                          | 3.2 M  | train
+261 | model.transformer.transformer_blocks.0.11.layers.layers.0                         | ModuleList                          | 3.2 M  | train
+262 | model.transformer.transformer_blocks.0.11.layers.layers.0.0                       | PreNorm                             | 1.1 M  | train
+263 | model.transformer.transformer_blocks.0.11.layers.layers.0.0.fn                    | SelfAttention                       | 1.0 M  | train
+264 | model.transformer.transformer_blocks.0.11.layers.layers.0.0.fn.local_attn         | LocalAttention                      | 0      | train
+265 | model.transformer.transformer_blocks.0.11.layers.layers.0.0.fn.local_attn.dropout | Dropout                             | 0      | train
+266 | model.transformer.transformer_blocks.0.11.layers.layers.0.0.fn.to_q               | Linear                              | 262 K  | train
+267 | model.transformer.transformer_blocks.0.11.layers.layers.0.0.fn.to_k               | Linear                              | 262 K  | train
+268 | model.transformer.transformer_blocks.0.11.layers.layers.0.0.fn.to_v               | Linear                              | 262 K  | train
+269 | model.transformer.transformer_blocks.0.11.layers.layers.0.0.fn.to_out             | Linear                              | 262 K  | train
+270 | model.transformer.transformer_blocks.0.11.layers.layers.0.0.fn.dropout            | Dropout                             | 0      | train
+271 | model.transformer.transformer_blocks.0.11.layers.layers.0.0.norm                  | LayerNorm                           | 1.0 K  | train
+272 | model.transformer.transformer_blocks.0.11.layers.layers.0.1                       | PreNorm                             | 2.1 M  | train
+273 | model.transformer.transformer_blocks.0.11.layers.layers.0.1.fn                    | Chunk                               | 2.1 M  | train
+274 | model.transformer.transformer_blocks.0.11.layers.layers.0.1.fn.fn                 | FeedForward                         | 2.1 M  | train
+275 | model.transformer.transformer_blocks.0.11.layers.layers.0.1.fn.fn.w1              | Linear                              | 1.1 M  | train
+276 | model.transformer.transformer_blocks.0.11.layers.layers.0.1.fn.fn.act             | GELU                                | 0      | train
+277 | model.transformer.transformer_blocks.0.11.layers.layers.0.1.fn.fn.dropout         | Dropout                             | 0      | train
+278 | model.transformer.transformer_blocks.0.11.layers.layers.0.1.fn.fn.w2              | Linear                              | 1.0 M  | train
+279 | model.transformer.transformer_blocks.0.11.layers.layers.0.1.norm                  | LayerNorm                           | 1.0 K  | train
+280 | model.transformer.transformer_blocks.0.12                                         | LinearAttentionTransformer          | 3.2 M  | train
+281 | model.transformer.transformer_blocks.0.12.layers                                  | SequentialSequence                  | 3.2 M  | train
+282 | model.transformer.transformer_blocks.0.12.layers.layers                           | ModuleList                          | 3.2 M  | train
+283 | model.transformer.transformer_blocks.0.12.layers.layers.0                         | ModuleList                          | 3.2 M  | train
+284 | model.transformer.transformer_blocks.0.12.layers.layers.0.0                       | PreNorm                             | 1.1 M  | train
+285 | model.transformer.transformer_blocks.0.12.layers.layers.0.0.fn                    | SelfAttention                       | 1.0 M  | train
+286 | model.transformer.transformer_blocks.0.12.layers.layers.0.0.fn.local_attn         | LocalAttention                      | 0      | train
+287 | model.transformer.transformer_blocks.0.12.layers.layers.0.0.fn.local_attn.dropout | Dropout                             | 0      | train
+288 | model.transformer.transformer_blocks.0.12.layers.layers.0.0.fn.to_q               | Linear                              | 262 K  | train
+289 | model.transformer.transformer_blocks.0.12.layers.layers.0.0.fn.to_k               | Linear                              | 262 K  | train
+290 | model.transformer.transformer_blocks.0.12.layers.layers.0.0.fn.to_v               | Linear                              | 262 K  | train
+291 | model.transformer.transformer_blocks.0.12.layers.layers.0.0.fn.to_out             | Linear                              | 262 K  | train
+292 | model.transformer.transformer_blocks.0.12.layers.layers.0.0.fn.dropout            | Dropout                             | 0      | train
+293 | model.transformer.transformer_blocks.0.12.layers.layers.0.0.norm                  | LayerNorm                           | 1.0 K  | train
+294 | model.transformer.transformer_blocks.0.12.layers.layers.0.1                       | PreNorm                             | 2.1 M  | train
+295 | model.transformer.transformer_blocks.0.12.layers.layers.0.1.fn                    | Chunk                               | 2.1 M  | train
+296 | model.transformer.transformer_blocks.0.12.layers.layers.0.1.fn.fn                 | FeedForward                         | 2.1 M  | train
+297 | model.transformer.transformer_blocks.0.12.layers.layers.0.1.fn.fn.w1              | Linear                              | 1.1 M  | train
+298 | model.transformer.transformer_blocks.0.12.layers.layers.0.1.fn.fn.act             | GELU                                | 0      | train
+299 | model.transformer.transformer_blocks.0.12.layers.layers.0.1.fn.fn.dropout         | Dropout                             | 0      | train
+300 | model.transformer.transformer_blocks.0.12.layers.layers.0.1.fn.fn.w2              | Linear                              | 1.0 M  | train
+301 | model.transformer.transformer_blocks.0.12.layers.layers.0.1.norm                  | LayerNorm                           | 1.0 K  | train
+302 | model.transformer.transformer_blocks.0.13                                         | LinearAttentionTransformer          | 3.2 M  | train
+303 | model.transformer.transformer_blocks.0.13.layers                                  | SequentialSequence                  | 3.2 M  | train
+304 | model.transformer.transformer_blocks.0.13.layers.layers                           | ModuleList                          | 3.2 M  | train
+305 | model.transformer.transformer_blocks.0.13.layers.layers.0                         | ModuleList                          | 3.2 M  | train
+306 | model.transformer.transformer_blocks.0.13.layers.layers.0.0                       | PreNorm                             | 1.1 M  | train
+307 | model.transformer.transformer_blocks.0.13.layers.layers.0.0.fn                    | SelfAttention                       | 1.0 M  | train
+308 | model.transformer.transformer_blocks.0.13.layers.layers.0.0.fn.local_attn         | LocalAttention                      | 0      | train
+309 | model.transformer.transformer_blocks.0.13.layers.layers.0.0.fn.local_attn.dropout | Dropout                             | 0      | train
+310 | model.transformer.transformer_blocks.0.13.layers.layers.0.0.fn.to_q               | Linear                              | 262 K  | train
+311 | model.transformer.transformer_blocks.0.13.layers.layers.0.0.fn.to_k               | Linear                              | 262 K  | train
+312 | model.transformer.transformer_blocks.0.13.layers.layers.0.0.fn.to_v               | Linear                              | 262 K  | train
+313 | model.transformer.transformer_blocks.0.13.layers.layers.0.0.fn.to_out             | Linear                              | 262 K  | train
+314 | model.transformer.transformer_blocks.0.13.layers.layers.0.0.fn.dropout            | Dropout                             | 0      | train
+315 | model.transformer.transformer_blocks.0.13.layers.layers.0.0.norm                  | LayerNorm                           | 1.0 K  | train
+316 | model.transformer.transformer_blocks.0.13.layers.layers.0.1                       | PreNorm                             | 2.1 M  | train
+317 | model.transformer.transformer_blocks.0.13.layers.layers.0.1.fn                    | Chunk                               | 2.1 M  | train
+318 | model.transformer.transformer_blocks.0.13.layers.layers.0.1.fn.fn                 | FeedForward                         | 2.1 M  | train
+319 | model.transformer.transformer_blocks.0.13.layers.layers.0.1.fn.fn.w1              | Linear                              | 1.1 M  | train
+320 | model.transformer.transformer_blocks.0.13.layers.layers.0.1.fn.fn.act             | GELU                                | 0      | train
+321 | model.transformer.transformer_blocks.0.13.layers.layers.0.1.fn.fn.dropout         | Dropout                             | 0      | train
+322 | model.transformer.transformer_blocks.0.13.layers.layers.0.1.fn.fn.w2              | Linear                              | 1.0 M  | train
+323 | model.transformer.transformer_blocks.0.13.layers.layers.0.1.norm                  | LayerNorm                           | 1.0 K  | train
+324 | model.transformer.transformer_blocks.0.14                                         | LinearAttentionTransformer          | 3.2 M  | train
+325 | model.transformer.transformer_blocks.0.14.layers                                  | SequentialSequence                  | 3.2 M  | train
+326 | model.transformer.transformer_blocks.0.14.layers.layers                           | ModuleList                          | 3.2 M  | train
+327 | model.transformer.transformer_blocks.0.14.layers.layers.0                         | ModuleList                          | 3.2 M  | train
+328 | model.transformer.transformer_blocks.0.14.layers.layers.0.0                       | PreNorm                             | 1.1 M  | train
+329 | model.transformer.transformer_blocks.0.14.layers.layers.0.0.fn                    | SelfAttention                       | 1.0 M  | train
+330 | model.transformer.transformer_blocks.0.14.layers.layers.0.0.fn.local_attn         | LocalAttention                      | 0      | train
+331 | model.transformer.transformer_blocks.0.14.layers.layers.0.0.fn.local_attn.dropout | Dropout                             | 0      | train
+332 | model.transformer.transformer_blocks.0.14.layers.layers.0.0.fn.to_q               | Linear                              | 262 K  | train
+333 | model.transformer.transformer_blocks.0.14.layers.layers.0.0.fn.to_k               | Linear                              | 262 K  | train
+334 | model.transformer.transformer_blocks.0.14.layers.layers.0.0.fn.to_v               | Linear                              | 262 K  | train
+335 | model.transformer.transformer_blocks.0.14.layers.layers.0.0.fn.to_out             | Linear                              | 262 K  | train
+336 | model.transformer.transformer_blocks.0.14.layers.layers.0.0.fn.dropout            | Dropout                             | 0      | train
+337 | model.transformer.transformer_blocks.0.14.layers.layers.0.0.norm                  | LayerNorm                           | 1.0 K  | train
+338 | model.transformer.transformer_blocks.0.14.layers.layers.0.1                       | PreNorm                             | 2.1 M  | train
+339 | model.transformer.transformer_blocks.0.14.layers.layers.0.1.fn                    | Chunk                               | 2.1 M  | train
+340 | model.transformer.transformer_blocks.0.14.layers.layers.0.1.fn.fn                 | FeedForward                         | 2.1 M  | train
+341 | model.transformer.transformer_blocks.0.14.layers.layers.0.1.fn.fn.w1              | Linear                              | 1.1 M  | train
+342 | model.transformer.transformer_blocks.0.14.layers.layers.0.1.fn.fn.act             | GELU                                | 0      | train
+343 | model.transformer.transformer_blocks.0.14.layers.layers.0.1.fn.fn.dropout         | Dropout                             | 0      | train
+344 | model.transformer.transformer_blocks.0.14.layers.layers.0.1.fn.fn.w2              | Linear                              | 1.0 M  | train
+345 | model.transformer.transformer_blocks.0.14.layers.layers.0.1.norm                  | LayerNorm                           | 1.0 K  | train
+346 | model.transformer.transformer_blocks.0.15                                         | LinearAttentionTransformer          | 3.2 M  | train
+347 | model.transformer.transformer_blocks.0.15.layers                                  | SequentialSequence                  | 3.2 M  | train
+348 | model.transformer.transformer_blocks.0.15.layers.layers                           | ModuleList                          | 3.2 M  | train
+349 | model.transformer.transformer_blocks.0.15.layers.layers.0                         | ModuleList                          | 3.2 M  | train
+350 | model.transformer.transformer_blocks.0.15.layers.layers.0.0                       | PreNorm                             | 1.1 M  | train
+351 | model.transformer.transformer_blocks.0.15.layers.layers.0.0.fn                    | SelfAttention                       | 1.0 M  | train
+352 | model.transformer.transformer_blocks.0.15.layers.layers.0.0.fn.local_attn         | LocalAttention                      | 0      | train
+353 | model.transformer.transformer_blocks.0.15.layers.layers.0.0.fn.local_attn.dropout | Dropout                             | 0      | train
+354 | model.transformer.transformer_blocks.0.15.layers.layers.0.0.fn.to_q               | Linear                              | 262 K  | train
+355 | model.transformer.transformer_blocks.0.15.layers.layers.0.0.fn.to_k               | Linear                              | 262 K  | train
+356 | model.transformer.transformer_blocks.0.15.layers.layers.0.0.fn.to_v               | Linear                              | 262 K  | train
+357 | model.transformer.transformer_blocks.0.15.layers.layers.0.0.fn.to_out             | Linear                              | 262 K  | train
+358 | model.transformer.transformer_blocks.0.15.layers.layers.0.0.fn.dropout            | Dropout                             | 0      | train
+359 | model.transformer.transformer_blocks.0.15.layers.layers.0.0.norm                  | LayerNorm                           | 1.0 K  | train
+360 | model.transformer.transformer_blocks.0.15.layers.layers.0.1                       | PreNorm                             | 2.1 M  | train
+361 | model.transformer.transformer_blocks.0.15.layers.layers.0.1.fn                    | Chunk                               | 2.1 M  | train
+362 | model.transformer.transformer_blocks.0.15.layers.layers.0.1.fn.fn                 | FeedForward                         | 2.1 M  | train
+363 | model.transformer.transformer_blocks.0.15.layers.layers.0.1.fn.fn.w1              | Linear                              | 1.1 M  | train
+364 | model.transformer.transformer_blocks.0.15.layers.layers.0.1.fn.fn.act             | GELU                                | 0      | train
+365 | model.transformer.transformer_blocks.0.15.layers.layers.0.1.fn.fn.dropout         | Dropout                             | 0      | train
+366 | model.transformer.transformer_blocks.0.15.layers.layers.0.1.fn.fn.w2              | Linear                              | 1.0 M  | train
+367 | model.transformer.transformer_blocks.0.15.layers.layers.0.1.norm                  | LayerNorm                           | 1.0 K  | train
+368 | model.transformer.norm                                                            | LayerNorm                           | 1.0 K  | train
+369 | model.transformer.out                                                             | Linear                              | 14.9 K | train
+----------------------------------------------------------------------------------------------------------------------------------------------------
+86.2 M    Trainable params
+0         Non-trainable params
+86.2 M    Total params
+344.744   Total estimated model params size (MB)
+
+Full Model Parameter List:
+Name: model.transformer.x_emb_NN.weight | Shape: torch.Size([29, 512]) | Trainable: True
+Name: model.transformer.y_mlp.0.weight | Shape: torch.Size([2048, 512]) | Trainable: True
+Name: model.transformer.y_mlp.0.bias | Shape: torch.Size([2048]) | Trainable: True
+Name: model.transformer.y_mlp.2.weight | Shape: torch.Size([8192, 2048]) | Trainable: True
+Name: model.transformer.y_mlp.2.bias | Shape: torch.Size([8192]) | Trainable: True
+Name: model.transformer.mlp.0.weight | Shape: torch.Size([2048, 512]) | Trainable: True
+Name: model.transformer.mlp.0.bias | Shape: torch.Size([2048]) | Trainable: True
+Name: model.transformer.mlp.2.weight | Shape: torch.Size([8192, 2048]) | Trainable: True
+Name: model.transformer.mlp.2.bias | Shape: torch.Size([8192]) | Trainable: True
+Name: model.transformer.axial_pos_emb.weights.0 | Shape: torch.Size([1, 8, 1, 512]) | Trainable: True
+Name: model.transformer.axial_pos_emb.weights.1 | Shape: torch.Size([1, 1, 128, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.0.layers.layers.0.0.fn.to_q.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.0.layers.layers.0.0.fn.to_k.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.0.layers.layers.0.0.fn.to_v.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.0.layers.layers.0.0.fn.to_out.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.0.layers.layers.0.0.fn.to_out.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.0.layers.layers.0.0.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.0.layers.layers.0.0.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.0.layers.layers.0.1.fn.fn.w1.weight | Shape: torch.Size([2048, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.0.layers.layers.0.1.fn.fn.w1.bias | Shape: torch.Size([2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.0.layers.layers.0.1.fn.fn.w2.weight | Shape: torch.Size([512, 2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.0.layers.layers.0.1.fn.fn.w2.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.0.layers.layers.0.1.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.0.layers.layers.0.1.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.1.layers.layers.0.0.fn.to_q.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.1.layers.layers.0.0.fn.to_k.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.1.layers.layers.0.0.fn.to_v.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.1.layers.layers.0.0.fn.to_out.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.1.layers.layers.0.0.fn.to_out.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.1.layers.layers.0.0.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.1.layers.layers.0.0.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.1.layers.layers.0.1.fn.fn.w1.weight | Shape: torch.Size([2048, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.1.layers.layers.0.1.fn.fn.w1.bias | Shape: torch.Size([2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.1.layers.layers.0.1.fn.fn.w2.weight | Shape: torch.Size([512, 2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.1.layers.layers.0.1.fn.fn.w2.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.1.layers.layers.0.1.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.1.layers.layers.0.1.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.2.layers.layers.0.0.fn.to_q.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.2.layers.layers.0.0.fn.to_k.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.2.layers.layers.0.0.fn.to_v.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.2.layers.layers.0.0.fn.to_out.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.2.layers.layers.0.0.fn.to_out.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.2.layers.layers.0.0.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.2.layers.layers.0.0.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.2.layers.layers.0.1.fn.fn.w1.weight | Shape: torch.Size([2048, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.2.layers.layers.0.1.fn.fn.w1.bias | Shape: torch.Size([2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.2.layers.layers.0.1.fn.fn.w2.weight | Shape: torch.Size([512, 2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.2.layers.layers.0.1.fn.fn.w2.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.2.layers.layers.0.1.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.2.layers.layers.0.1.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.3.layers.layers.0.0.fn.to_q.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.3.layers.layers.0.0.fn.to_k.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.3.layers.layers.0.0.fn.to_v.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.3.layers.layers.0.0.fn.to_out.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.3.layers.layers.0.0.fn.to_out.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.3.layers.layers.0.0.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.3.layers.layers.0.0.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.3.layers.layers.0.1.fn.fn.w1.weight | Shape: torch.Size([2048, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.3.layers.layers.0.1.fn.fn.w1.bias | Shape: torch.Size([2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.3.layers.layers.0.1.fn.fn.w2.weight | Shape: torch.Size([512, 2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.3.layers.layers.0.1.fn.fn.w2.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.3.layers.layers.0.1.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.3.layers.layers.0.1.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.4.layers.layers.0.0.fn.to_q.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.4.layers.layers.0.0.fn.to_k.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.4.layers.layers.0.0.fn.to_v.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.4.layers.layers.0.0.fn.to_out.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.4.layers.layers.0.0.fn.to_out.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.4.layers.layers.0.0.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.4.layers.layers.0.0.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.4.layers.layers.0.1.fn.fn.w1.weight | Shape: torch.Size([2048, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.4.layers.layers.0.1.fn.fn.w1.bias | Shape: torch.Size([2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.4.layers.layers.0.1.fn.fn.w2.weight | Shape: torch.Size([512, 2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.4.layers.layers.0.1.fn.fn.w2.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.4.layers.layers.0.1.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.4.layers.layers.0.1.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.5.layers.layers.0.0.fn.to_q.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.5.layers.layers.0.0.fn.to_k.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.5.layers.layers.0.0.fn.to_v.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.5.layers.layers.0.0.fn.to_out.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.5.layers.layers.0.0.fn.to_out.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.5.layers.layers.0.0.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.5.layers.layers.0.0.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.5.layers.layers.0.1.fn.fn.w1.weight | Shape: torch.Size([2048, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.5.layers.layers.0.1.fn.fn.w1.bias | Shape: torch.Size([2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.5.layers.layers.0.1.fn.fn.w2.weight | Shape: torch.Size([512, 2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.5.layers.layers.0.1.fn.fn.w2.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.5.layers.layers.0.1.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.5.layers.layers.0.1.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.6.layers.layers.0.0.fn.to_q.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.6.layers.layers.0.0.fn.to_k.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.6.layers.layers.0.0.fn.to_v.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.6.layers.layers.0.0.fn.to_out.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.6.layers.layers.0.0.fn.to_out.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.6.layers.layers.0.0.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.6.layers.layers.0.0.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.6.layers.layers.0.1.fn.fn.w1.weight | Shape: torch.Size([2048, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.6.layers.layers.0.1.fn.fn.w1.bias | Shape: torch.Size([2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.6.layers.layers.0.1.fn.fn.w2.weight | Shape: torch.Size([512, 2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.6.layers.layers.0.1.fn.fn.w2.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.6.layers.layers.0.1.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.6.layers.layers.0.1.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.7.layers.layers.0.0.fn.to_q.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.7.layers.layers.0.0.fn.to_k.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.7.layers.layers.0.0.fn.to_v.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.7.layers.layers.0.0.fn.to_out.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.7.layers.layers.0.0.fn.to_out.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.7.layers.layers.0.0.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.7.layers.layers.0.0.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.7.layers.layers.0.1.fn.fn.w1.weight | Shape: torch.Size([2048, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.7.layers.layers.0.1.fn.fn.w1.bias | Shape: torch.Size([2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.7.layers.layers.0.1.fn.fn.w2.weight | Shape: torch.Size([512, 2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.7.layers.layers.0.1.fn.fn.w2.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.7.layers.layers.0.1.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.7.layers.layers.0.1.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.8.layers.layers.0.0.fn.to_q.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.8.layers.layers.0.0.fn.to_k.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.8.layers.layers.0.0.fn.to_v.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.8.layers.layers.0.0.fn.to_out.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.8.layers.layers.0.0.fn.to_out.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.8.layers.layers.0.0.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.8.layers.layers.0.0.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.8.layers.layers.0.1.fn.fn.w1.weight | Shape: torch.Size([2048, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.8.layers.layers.0.1.fn.fn.w1.bias | Shape: torch.Size([2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.8.layers.layers.0.1.fn.fn.w2.weight | Shape: torch.Size([512, 2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.8.layers.layers.0.1.fn.fn.w2.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.8.layers.layers.0.1.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.8.layers.layers.0.1.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.9.layers.layers.0.0.fn.to_q.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.9.layers.layers.0.0.fn.to_k.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.9.layers.layers.0.0.fn.to_v.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.9.layers.layers.0.0.fn.to_out.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.9.layers.layers.0.0.fn.to_out.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.9.layers.layers.0.0.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.9.layers.layers.0.0.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.9.layers.layers.0.1.fn.fn.w1.weight | Shape: torch.Size([2048, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.9.layers.layers.0.1.fn.fn.w1.bias | Shape: torch.Size([2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.9.layers.layers.0.1.fn.fn.w2.weight | Shape: torch.Size([512, 2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.9.layers.layers.0.1.fn.fn.w2.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.9.layers.layers.0.1.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.9.layers.layers.0.1.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.10.layers.layers.0.0.fn.to_q.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.10.layers.layers.0.0.fn.to_k.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.10.layers.layers.0.0.fn.to_v.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.10.layers.layers.0.0.fn.to_out.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.10.layers.layers.0.0.fn.to_out.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.10.layers.layers.0.0.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.10.layers.layers.0.0.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.10.layers.layers.0.1.fn.fn.w1.weight | Shape: torch.Size([2048, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.10.layers.layers.0.1.fn.fn.w1.bias | Shape: torch.Size([2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.10.layers.layers.0.1.fn.fn.w2.weight | Shape: torch.Size([512, 2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.10.layers.layers.0.1.fn.fn.w2.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.10.layers.layers.0.1.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.10.layers.layers.0.1.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.11.layers.layers.0.0.fn.to_q.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.11.layers.layers.0.0.fn.to_k.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.11.layers.layers.0.0.fn.to_v.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.11.layers.layers.0.0.fn.to_out.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.11.layers.layers.0.0.fn.to_out.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.11.layers.layers.0.0.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.11.layers.layers.0.0.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.11.layers.layers.0.1.fn.fn.w1.weight | Shape: torch.Size([2048, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.11.layers.layers.0.1.fn.fn.w1.bias | Shape: torch.Size([2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.11.layers.layers.0.1.fn.fn.w2.weight | Shape: torch.Size([512, 2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.11.layers.layers.0.1.fn.fn.w2.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.11.layers.layers.0.1.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.11.layers.layers.0.1.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.12.layers.layers.0.0.fn.to_q.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.12.layers.layers.0.0.fn.to_k.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.12.layers.layers.0.0.fn.to_v.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.12.layers.layers.0.0.fn.to_out.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.12.layers.layers.0.0.fn.to_out.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.12.layers.layers.0.0.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.12.layers.layers.0.0.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.12.layers.layers.0.1.fn.fn.w1.weight | Shape: torch.Size([2048, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.12.layers.layers.0.1.fn.fn.w1.bias | Shape: torch.Size([2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.12.layers.layers.0.1.fn.fn.w2.weight | Shape: torch.Size([512, 2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.12.layers.layers.0.1.fn.fn.w2.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.12.layers.layers.0.1.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.12.layers.layers.0.1.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.13.layers.layers.0.0.fn.to_q.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.13.layers.layers.0.0.fn.to_k.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.13.layers.layers.0.0.fn.to_v.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.13.layers.layers.0.0.fn.to_out.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.13.layers.layers.0.0.fn.to_out.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.13.layers.layers.0.0.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.13.layers.layers.0.0.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.13.layers.layers.0.1.fn.fn.w1.weight | Shape: torch.Size([2048, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.13.layers.layers.0.1.fn.fn.w1.bias | Shape: torch.Size([2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.13.layers.layers.0.1.fn.fn.w2.weight | Shape: torch.Size([512, 2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.13.layers.layers.0.1.fn.fn.w2.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.13.layers.layers.0.1.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.13.layers.layers.0.1.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.14.layers.layers.0.0.fn.to_q.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.14.layers.layers.0.0.fn.to_k.weight | Shape: torch.Size([512, 512]) | Trainable: True
+initializing deepspeed distributed: GLOBAL_RANK: 1, MEMBER: 2/12
+initializing deepspeed distributed: GLOBAL_RANK: 3, MEMBER: 4/12
+initializing deepspeed distributed: GLOBAL_RANK: 4, MEMBER: 5/12
+initializing deepspeed distributed: GLOBAL_RANK: 5, MEMBER: 6/12
+initializing deepspeed distributed: GLOBAL_RANK: 2, MEMBER: 3/12
+/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:4807: UserWarning: No device id is provided via `init_process_group` or `barrier `. Using the current device set by the user. 
+  warnings.warn(  # warn only once
+/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:4807: UserWarning: No device id is provided via `init_process_group` or `barrier `. Using the current device set by the user. 
+  warnings.warn(  # warn only once
+/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:4807: UserWarning: No device id is provided via `init_process_group` or `barrier `. Using the current device set by the user. 
+  warnings.warn(  # warn only once
+/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:4807: UserWarning: No device id is provided via `init_process_group` or `barrier `. Using the current device set by the user. 
+  warnings.warn(  # warn only once
+/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:4807: UserWarning: No device id is provided via `init_process_group` or `barrier `. Using the current device set by the user. 
+  warnings.warn(  # warn only once
+initializing deepspeed distributed: GLOBAL_RANK: 6, MEMBER: 7/12
+initializing deepspeed distributed: GLOBAL_RANK: 7, MEMBER: 8/12
+initializing deepspeed distributed: GLOBAL_RANK: 8, MEMBER: 9/12
+initializing deepspeed distributed: GLOBAL_RANK: 9, MEMBER: 10/12
+initializing deepspeed distributed: GLOBAL_RANK: 10, MEMBER: 11/12
+initializing deepspeed distributed: GLOBAL_RANK: 11, MEMBER: 12/12
+/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:4807: UserWarning: No device id is provided via `init_process_group` or `barrier `. Using the current device set by the user. 
+  warnings.warn(  # warn only once
+/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:4807: UserWarning: No device id is provided via `init_process_group` or `barrier `. Using the current device set by the user. 
+  warnings.warn(  # warn only once
+/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:4807: UserWarning: No device id is provided via `init_process_group` or `barrier `. Using the current device set by the user. 
+  warnings.warn(  # warn only once
+/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:4807: UserWarning: No device id is provided via `init_process_group` or `barrier `. Using the current device set by the user. 
+  warnings.warn(  # warn only once
+/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:4807: UserWarning: No device id is provided via `init_process_group` or `barrier `. Using the current device set by the user. 
+  warnings.warn(  # warn only once
+/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:4807: UserWarning: No device id is provided via `init_process_group` or `barrier `. Using the current device set by the user. 
+  warnings.warn(  # warn only once
+GPU available: True (xpu), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+initializing deepspeed distributed: GLOBAL_RANK: 0, MEMBER: 1/12
+wandb: Currently logged in as: tnnandi to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: creating run
+wandb: Tracking run with wandb version 0.21.3
+wandb: Run data is saved locally in ./logs/wandb/run-20260309_040454-vyynq8ne
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run pretrain_scratch_v1_n2_d6_e5_V20260309_040148
+wandb: ⭐️ View project at https://wandb.ai/tnnandi/BioM3-dev
+wandb: 🚀 View run at https://wandb.ai/tnnandi/BioM3-dev/runs/vyynq8ne
+/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:4807: UserWarning: No device id is provided via `init_process_group` or `barrier `. Using the current device set by the user. 
+  warnings.warn(  # warn only once
+2026:03:09-04:05:00:(106228) |CCL_WARN| value of CCL_OP_SYNC changed to be 1 (default:0)
+2026:03:09-04:05:00:(106228) |CCL_WARN| value of CCL_PROCESS_LAUNCHER changed to be pmix (default:hydra)
+
+  | Name  | Type            | Params | Mode 
+--------------------------------------------------
+0 | model | DiffTransformer | 86.2 M | train
+--------------------------------------------------
+86.2 M    Trainable params
+0         Non-trainable params
+86.2 M    Total params
+344.744   Total estimated model params size (MB)
+/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/fabric/loggers/tensorboard.py:270: Could not log computational graph to TensorBoard: The `model.example_input_array` attribute is not set or `input_array` was not given.
+Name: model.transformer.transformer_blocks.0.14.layers.layers.0.0.fn.to_v.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.14.layers.layers.0.0.fn.to_out.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.14.layers.layers.0.0.fn.to_out.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.14.layers.layers.0.0.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.14.layers.layers.0.0.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.14.layers.layers.0.1.fn.fn.w1.weight | Shape: torch.Size([2048, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.14.layers.layers.0.1.fn.fn.w1.bias | Shape: torch.Size([2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.14.layers.layers.0.1.fn.fn.w2.weight | Shape: torch.Size([512, 2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.14.layers.layers.0.1.fn.fn.w2.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.14.layers.layers.0.1.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.14.layers.layers.0.1.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.15.layers.layers.0.0.fn.to_q.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.15.layers.layers.0.0.fn.to_k.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.15.layers.layers.0.0.fn.to_v.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.15.layers.layers.0.0.fn.to_out.weight | Shape: torch.Size([512, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.15.layers.layers.0.0.fn.to_out.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.15.layers.layers.0.0.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.15.layers.layers.0.0.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.15.layers.layers.0.1.fn.fn.w1.weight | Shape: torch.Size([2048, 512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.15.layers.layers.0.1.fn.fn.w1.bias | Shape: torch.Size([2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.15.layers.layers.0.1.fn.fn.w2.weight | Shape: torch.Size([512, 2048]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.15.layers.layers.0.1.fn.fn.w2.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.15.layers.layers.0.1.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.transformer_blocks.0.15.layers.layers.0.1.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.norm.weight | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.norm.bias | Shape: torch.Size([512]) | Trainable: True
+Name: model.transformer.out.weight | Shape: torch.Size([29, 512]) | Trainable: True
+Name: model.transformer.out.bias | Shape: torch.Size([29]) | Trainable: True
+Scaling learning rate with effective batch size: num_nodes x gpu_devices = 2 x 6 = 12
+Effective learning rate: 0.0012000000000000001
+Train from scratch
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Using cossine warmup scheduler with decay
+Num_warmup_steps=2298
+Num_training_steps=11490
+Sanity Checking: |          | 0/? [00:00<?, ?it/s]read_signalfd: got signal 15 (Terminated)
+Forwarding signal 15
+x4311c5s2b0n0.hsn.cm.aurora.alcf.anl.gov: rank 3 died from signal 15
+x4311c5s2b0n0.hsn.cm.aurora.alcf.anl.gov: rank 0 died from signal 15
+x4311c5s2b0n0.hsn.cm.aurora.alcf.anl.gov: rank 1 died from signal 15
+x4311c5s2b0n0.hsn.cm.aurora.alcf.anl.gov: rank 2 died from signal 15
+x4311c5s2b0n0.hsn.cm.aurora.alcf.anl.gov: rank 4 died from signal 15
+x4311c5s2b0n0.hsn.cm.aurora.alcf.anl.gov: rank 5 died from signal 15
+x4311c5s3b0n0.hsn.cm.aurora.alcf.anl.gov: rank 6 died from signal 15
+x4311c5s3b0n0.hsn.cm.aurora.alcf.anl.gov: rank 7 died from signal 15
+x4311c5s3b0n0.hsn.cm.aurora.alcf.anl.gov: rank 8 died from signal 15
+x4311c5s3b0n0.hsn.cm.aurora.alcf.anl.gov: rank 9 died from signal 15
+x4311c5s3b0n0.hsn.cm.aurora.alcf.anl.gov: rank 10 died from signal 15
+x4311c5s3b0n0.hsn.cm.aurora.alcf.anl.gov: rank 11 died from signal 15
+Application bb66ae46 resources: utime=0s stime=0s maxrss=115572KB inblock=140 oublock=0 minflt=28151 majflt=17 nvcsw=675 nivcsw=23

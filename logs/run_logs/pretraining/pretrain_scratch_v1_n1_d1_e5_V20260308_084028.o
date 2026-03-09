@@ -1,0 +1,2 @@
+NRANKS: 1, NGPU_PER_RANK: 1, NGPUS: 1
+Couldn't open : No such file or directory

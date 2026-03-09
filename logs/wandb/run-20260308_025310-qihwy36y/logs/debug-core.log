@@ -1,0 +1,14 @@
+{"time":"2026-03-08T02:53:11.421992114Z","level":"INFO","msg":"main: starting server","port-filename":"/var/tmp/pbs.6956401.polaris-pbs-01.hsn.cm.polaris.alcf.anl.gov/tmpv8pcoxay/port-2974991.txt","pid":2974991,"log-level":0,"disable-analytics":false,"shutdown-on-parent-exit":false,"enable-dcgm-profiling":false}
+{"time":"2026-03-08T02:53:11.422632968Z","level":"INFO","msg":"server: accepting connections","addr":{"Name":"/var/tmp/pbs.6956401.polaris-pbs-01.hsn.cm.polaris.alcf.anl.gov/wandb-2974991-2976334-695904105/socket","Net":"unix"}}
+{"time":"2026-03-08T02:53:11.422828766Z","level":"INFO","msg":"server: will exit if parent process dies","ppid":2974991}
+{"time":"2026-03-08T02:53:11.490082152Z","level":"INFO","msg":"connection: ManageConnectionData: new connection created","id":"1(@)"}
+{"time":"2026-03-08T02:53:11.543948785Z","level":"INFO","msg":"handleInformInit: received","streamId":"qihwy36y","id":"1(@)"}
+{"time":"2026-03-08T02:53:16.66802404Z","level":"INFO","msg":"handleInformInit: stream started","streamId":"qihwy36y","id":"1(@)"}
+{"time":"2026-03-08T02:53:17.033214076Z","level":"INFO","msg":"handleInformTeardown: server teardown initiated","id":"1(@)"}
+{"time":"2026-03-08T02:53:17.033540209Z","level":"INFO","msg":"connection: closing","id":"1(@)"}
+{"time":"2026-03-08T02:53:17.033585304Z","level":"INFO","msg":"connection: closed successfully","id":"1(@)"}
+{"time":"2026-03-08T02:53:17.033608688Z","level":"INFO","msg":"server is shutting down"}
+{"time":"2026-03-08T02:53:17.033661086Z","level":"INFO","msg":"server: listener closed","addr":{"Name":"/var/tmp/pbs.6956401.polaris-pbs-01.hsn.cm.polaris.alcf.anl.gov/wandb-2974991-2976334-695904105/socket","Net":"unix"}}
+{"time":"2026-03-08T02:53:17.121417016Z","level":"INFO","msg":"handleInformTeardown: server shutdown complete","id":"1(@)"}
+{"time":"2026-03-08T02:53:17.121448665Z","level":"INFO","msg":"connection: ManageConnectionData: connection closed","id":"1(@)"}
+{"time":"2026-03-08T02:53:17.121465937Z","level":"INFO","msg":"server is closed"}

@@ -1,0 +1,279 @@
+NRANKS: 2, NGPU_PER_RANK: 4, NGPUS: 8
+Disabling local launch: multi-node application
+Connected to tcp://x3010c0s37b0n0.hsn.cm.polaris.alcf.anl.gov:7919
+Launching application 2497ddce-3b05-4fc2-8205-6a5af7602050
+Using PMI ports 40484,40485
+Application 2497ddce-3b05-4fc2-8205-6a5af7602050 started execution
+/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/transformers/utils/hub.py:111: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/transformers/utils/hub.py:111: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/transformers/utils/hub.py:111: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/transformers/utils/hub.py:111: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/transformers/utils/hub.py:111: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/transformers/utils/hub.py:111: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/transformers/utils/hub.py:111: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/transformers/utils/hub.py:111: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1772938127.359314 3766997 cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: SSE3 SSE4.1 SSE4.2 AVX AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1772938127.359317 3766996 cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: SSE3 SSE4.1 SSE4.2 AVX AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1772938127.359314 3766995 cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: SSE3 SSE4.1 SSE4.2 AVX AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1772938127.359310 3766994 cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: SSE3 SSE4.1 SSE4.2 AVX AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1772938131.434154 2970043 cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: SSE3 SSE4.1 SSE4.2 AVX AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1772938131.434153 2970042 cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: SSE3 SSE4.1 SSE4.2 AVX AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1772938131.434154 2970044 cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: SSE3 SSE4.1 SSE4.2 AVX AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1772938131.434154 2970041 cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: SSE3 SSE4.1 SSE4.2 AVX AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+Using seed: 199633710
+Using seed: 74274750
+Using seed: 1258661085
+Traceback (most recent call last):
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+Using seed: 2889518593
+Traceback (most recent call last):
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+Traceback (most recent call last):
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+Traceback (most recent call last):
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+    main(args)
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1147, in main
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1147, in main
+    main(args)
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1147, in main
+    main(args)
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1147, in main
+    data_module = load_data(
+    data_module = load_data(
+    data_module = load_data(
+                  ^^^^^^^^^^
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 698, in load_data
+                  ^^^^^^^^^^
+                  ^^^^^^^^^^
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 698, in load_data
+    data_module = load_data(
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 698, in load_data
+                  ^^^^^^^^^^
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 698, in load_data
+    data_module.setup()
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/PL_wrapper.py", line 848, in setup
+    data_module.setup()
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/PL_wrapper.py", line 848, in setup
+    swissprot_dataset = HDF5Dataset(
+    data_module.setup()
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/PL_wrapper.py", line 848, in setup
+    data_module.setup()
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/PL_wrapper.py", line 848, in setup
+    swissprot_dataset = HDF5Dataset(
+                        ^^^^^^^^^^^^
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/PL_wrapper.py", line 696, in __init__
+                        ^^^^^^^^^^^^
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/PL_wrapper.py", line 696, in __init__
+    swissprot_dataset = HDF5Dataset(
+    self.f = h5py.File(file_path, 'r')
+    swissprot_dataset = HDF5Dataset(
+    self.f = h5py.File(file_path, 'r')
+                        ^^^^^^^^^^^^
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/PL_wrapper.py", line 696, in __init__
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/h5py/_hl/files.py", line 566, in __init__
+                        ^^^^^^^^^^^^
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/PL_wrapper.py", line 696, in __init__
+    self.f = h5py.File(file_path, 'r')
+    self.f = h5py.File(file_path, 'r')
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/h5py/_hl/files.py", line 566, in __init__
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/h5py/_hl/files.py", line 566, in __init__
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/h5py/_hl/files.py", line 566, in __init__
+    fid = make_fid(name, mode, userblock_size, fapl, fcpl, swmr=swmr)
+    fid = make_fid(name, mode, userblock_size, fapl, fcpl, swmr=swmr)
+    fid = make_fid(name, mode, userblock_size, fapl, fcpl, swmr=swmr)
+    fid = make_fid(name, mode, userblock_size, fapl, fcpl, swmr=swmr)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/h5py/_hl/files.py", line 241, in make_fid
+  File "/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/h5py/_hl/files.py", line 241, in make_fid
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/h5py/_hl/files.py", line 241, in make_fid
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/h5py/_hl/files.py", line 241, in make_fid
+    fid = h5f.open(name, flags, fapl=fapl)
+    fid = h5f.open(name, flags, fapl=fapl)
+    fid = h5f.open(name, flags, fapl=fapl)
+    fid = h5f.open(name, flags, fapl=fapl)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 54, in h5py._objects.with_phil.wrapper
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 54, in h5py._objects.with_phil.wrapper
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 54, in h5py._objects.with_phil.wrapper
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 54, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 55, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 55, in h5py._objects.with_phil.wrapper
+  File "h5py/h5f.pyx", line 102, in h5py.h5f.open
+  File "h5py/_objects.pyx", line 55, in h5py._objects.with_phil.wrapper
+  File "h5py/h5f.pyx", line 102, in h5py.h5f.open
+  File "h5py/_objects.pyx", line 55, in h5py._objects.with_phil.wrapper
+  File "h5py/h5f.pyx", line 102, in h5py.h5f.open
+  File "h5py/h5f.pyx", line 102, in h5py.h5f.open
+FileNotFoundError: [Errno 2] Unable to open file (unable to open file: name = './data/Stage2_MMD_swissprot_embedding_last_ckpt_all.hdf5', errno = 2, error message = 'No such file or directory', flags = 0, o_flags = 0)
+FileNotFoundError: [Errno 2] Unable to open file (unable to open file: name = './data/Stage2_MMD_swissprot_embedding_last_ckpt_all.hdf5', errno = 2, error message = 'No such file or directory', flags = 0, o_flags = 0)
+FileNotFoundError: [Errno 2] Unable to open file (unable to open file: name = './data/Stage2_MMD_swissprot_embedding_last_ckpt_all.hdf5', errno = 2, error message = 'No such file or directory', flags = 0, o_flags = 0)
+FileNotFoundError: [Errno 2] Unable to open file (unable to open file: name = './data/Stage2_MMD_swissprot_embedding_last_ckpt_all.hdf5', errno = 2, error message = 'No such file or directory', flags = 0, o_flags = 0)
+Using seed: 4257369400
+Using seed: 2415051488
+Using seed: 3635272289
+Using seed: 3742553901
+Traceback (most recent call last):
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+Traceback (most recent call last):
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+Traceback (most recent call last):
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+Traceback (most recent call last):
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1147, in main
+    main(args)
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1147, in main
+    main(args)
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1147, in main
+    data_module = load_data(
+    main(args)
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1147, in main
+    data_module = load_data(
+                  ^^^^^^^^^^
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 698, in load_data
+    data_module = load_data(
+                  ^^^^^^^^^^
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 698, in load_data
+                  ^^^^^^^^^^
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 698, in load_data
+    data_module.setup()
+    data_module = load_data(
+                  ^^^^^^^^^^
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 698, in load_data
+    data_module.setup()
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/PL_wrapper.py", line 848, in setup
+    data_module.setup()
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/PL_wrapper.py", line 848, in setup
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/PL_wrapper.py", line 848, in setup
+    data_module.setup()
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/PL_wrapper.py", line 848, in setup
+    swissprot_dataset = HDF5Dataset(
+    swissprot_dataset = HDF5Dataset(
+    swissprot_dataset = HDF5Dataset(
+                        ^^^^^^^^^^^^
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/PL_wrapper.py", line 696, in __init__
+                        ^^^^^^^^^^^^
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/PL_wrapper.py", line 696, in __init__
+                        ^^^^^^^^^^^^
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/PL_wrapper.py", line 696, in __init__
+    swissprot_dataset = HDF5Dataset(
+                        ^^^^^^^^^^^^
+  File "/lus/grand/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/PL_wrapper.py", line 696, in __init__
+    self.f = h5py.File(file_path, 'r')
+    self.f = h5py.File(file_path, 'r')
+    self.f = h5py.File(file_path, 'r')
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/h5py/_hl/files.py", line 566, in __init__
+    self.f = h5py.File(file_path, 'r')
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/h5py/_hl/files.py", line 566, in __init__
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/h5py/_hl/files.py", line 566, in __init__
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/h5py/_hl/files.py", line 566, in __init__
+    fid = make_fid(name, mode, userblock_size, fapl, fcpl, swmr=swmr)
+    fid = make_fid(name, mode, userblock_size, fapl, fcpl, swmr=swmr)
+    fid = make_fid(name, mode, userblock_size, fapl, fcpl, swmr=swmr)
+    fid = make_fid(name, mode, userblock_size, fapl, fcpl, swmr=swmr)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/h5py/_hl/files.py", line 241, in make_fid
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/h5py/_hl/files.py", line 241, in make_fid
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/h5py/_hl/files.py", line 241, in make_fid
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/soft/applications/conda/2025-09-25/mconda3/lib/python3.12/site-packages/h5py/_hl/files.py", line 241, in make_fid
+    fid = h5f.open(name, flags, fapl=fapl)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 54, in h5py._objects.with_phil.wrapper
+    fid = h5f.open(name, flags, fapl=fapl)
+    fid = h5f.open(name, flags, fapl=fapl)
+    fid = h5f.open(name, flags, fapl=fapl)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 54, in h5py._objects.with_phil.wrapper
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 54, in h5py._objects.with_phil.wrapper
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 54, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 55, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 55, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 55, in h5py._objects.with_phil.wrapper
+  File "h5py/h5f.pyx", line 102, in h5py.h5f.open
+  File "h5py/h5f.pyx", line 102, in h5py.h5f.open
+  File "h5py/_objects.pyx", line 55, in h5py._objects.with_phil.wrapper
+  File "h5py/h5f.pyx", line 102, in h5py.h5f.open
+  File "h5py/h5f.pyx", line 102, in h5py.h5f.open
+FileNotFoundError: [Errno 2] Unable to open file (unable to open file: name = './data/Stage2_MMD_swissprot_embedding_last_ckpt_all.hdf5', errno = 2, error message = 'No such file or directory', flags = 0, o_flags = 0)
+FileNotFoundError: [Errno 2] Unable to open file (unable to open file: name = './data/Stage2_MMD_swissprot_embedding_last_ckpt_all.hdf5', errno = 2, error message = 'No such file or directory', flags = 0, o_flags = 0)
+FileNotFoundError: [Errno 2] Unable to open file (unable to open file: name = './data/Stage2_MMD_swissprot_embedding_last_ckpt_all.hdf5', errno = 2, error message = 'No such file or directory', flags = 0, o_flags = 0)
+FileNotFoundError: [Errno 2] Unable to open file (unable to open file: name = './data/Stage2_MMD_swissprot_embedding_last_ckpt_all.hdf5', errno = 2, error message = 'No such file or directory', flags = 0, o_flags = 0)
+x3005c0s19b0n0.hsn.cm.polaris.alcf.anl.gov: rank 4 exited with code 1
+x3005c0s19b0n0.hsn.cm.polaris.alcf.anl.gov: rank 5 died from signal 15
+x3005c0s19b0n0.hsn.cm.polaris.alcf.anl.gov: rank 6 died from signal 15
+x3010c0s37b0n0.hsn.cm.polaris.alcf.anl.gov: rank 1 died from signal 15
+x3010c0s37b0n0.hsn.cm.polaris.alcf.anl.gov: rank 0 died from signal 15
+x3010c0s37b0n0.hsn.cm.polaris.alcf.anl.gov: rank 2 died from signal 15
+x3010c0s37b0n0.hsn.cm.polaris.alcf.anl.gov: rank 3 died from signal 15
+x3005c0s19b0n0.hsn.cm.polaris.alcf.anl.gov: rank 7 died from signal 15
+Application 2497ddce resources: utime=11s stime=5s maxrss=1569600KB inblock=222112 oublock=352 minflt=299311 majflt=17949 nvcsw=89888 nivcsw=319

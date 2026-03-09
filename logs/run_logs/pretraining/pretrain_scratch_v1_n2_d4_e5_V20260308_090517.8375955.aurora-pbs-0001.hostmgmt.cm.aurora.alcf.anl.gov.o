@@ -1,0 +1,94 @@
+NRANKS: 2, NGPU_PER_RANK: 4, NGPUS: 8
+Disabling local launch: multi-node application
+Connected to tcp://x4311c6s0b0n0.hsn.cm.aurora.alcf.anl.gov:7919
+Launching application 2c654501-c825-403b-968b-b127862666b0
+Application 2c654501-c825-403b-968b-b127862666b0 started execution
+Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 12, in run_stage3_pretraining
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 12, in run_stage3_pretraining
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 12, in run_stage3_pretraining
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 12, in run_stage3_pretraining
+    from biom3.Stage3.run_PL_training import parse_arguments, main
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 17, in <module>
+    from biom3.Stage3.run_PL_training import parse_arguments, main
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 17, in <module>
+    from biom3.Stage3.run_PL_training import parse_arguments, main
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 17, in <module>
+    from biom3.Stage3.run_PL_training import parse_arguments, main
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 17, in <module>
+    import h5py
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/h5py/__init__.py", line 25, in <module>
+    from . import _errors
+ImportError: libhdf5.so.310: cannot open shared object file: No such file or directory
+    import h5py
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/h5py/__init__.py", line 25, in <module>
+    from . import _errors
+ImportError: libhdf5.so.310: cannot open shared object file: No such file or directory
+    import h5py
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/h5py/__init__.py", line 25, in <module>
+    from . import _errors
+ImportError: libhdf5.so.310: cannot open shared object file: No such file or directory
+    import h5py
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/h5py/__init__.py", line 25, in <module>
+    from . import _errors
+ImportError: libhdf5.so.310: cannot open shared object file: No such file or directory
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 12, in run_stage3_pretraining
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 12, in run_stage3_pretraining
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 12, in run_stage3_pretraining
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 12, in run_stage3_pretraining
+    from biom3.Stage3.run_PL_training import parse_arguments, main
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 17, in <module>
+    from biom3.Stage3.run_PL_training import parse_arguments, main
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 17, in <module>
+    from biom3.Stage3.run_PL_training import parse_arguments, main
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 17, in <module>
+    from biom3.Stage3.run_PL_training import parse_arguments, main
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 17, in <module>
+    import h5py
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/h5py/__init__.py", line 25, in <module>
+    import h5py
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/h5py/__init__.py", line 25, in <module>
+    from . import _errors
+ImportError: libhdf5.so.310: cannot open shared object file: No such file or directory
+    import h5py
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/h5py/__init__.py", line 25, in <module>
+    from . import _errors
+ImportError: libhdf5.so.310: cannot open shared object file: No such file or directory
+    from . import _errors
+ImportError: libhdf5.so.310: cannot open shared object file: No such file or directory
+    import h5py
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/h5py/__init__.py", line 25, in <module>
+    from . import _errors
+ImportError: libhdf5.so.310: cannot open shared object file: No such file or directory
+x4311c6s2b0n0.hsn.cm.aurora.alcf.anl.gov: rank 7 exited with code 1
+x4311c6s2b0n0.hsn.cm.aurora.alcf.anl.gov: rank 5 died from signal 15
+x4311c6s2b0n0.hsn.cm.aurora.alcf.anl.gov: rank 4 died from signal 15
+x4311c6s2b0n0.hsn.cm.aurora.alcf.anl.gov: rank 6 died from signal 15
+x4311c6s0b0n0.hsn.cm.aurora.alcf.anl.gov: rank 1 died from signal 15
+x4311c6s0b0n0.hsn.cm.aurora.alcf.anl.gov: rank 0 died from signal 15
+x4311c6s0b0n0.hsn.cm.aurora.alcf.anl.gov: rank 2 died from signal 15
+x4311c6s0b0n0.hsn.cm.aurora.alcf.anl.gov: rank 3 died from signal 15
+Application 2c654501 resources: utime=1s stime=0s maxrss=114660KB inblock=19032 oublock=0 minflt=114506 majflt=1591 nvcsw=7807 nivcsw=18

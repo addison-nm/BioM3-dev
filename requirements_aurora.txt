@@ -1,0 +1,4 @@
+axial-positional-embedding==0.3.12
+linear-attention-transformer==0.19.1
+biopython==1.85
+tables==3.11

@@ -1,0 +1,302 @@
+NRANKS: 2, NGPU_PER_RANK: 4, NGPUS: 8
+Disabling local launch: multi-node application
+Connected to tcp://x4502c7s1b0n0.hsn.cm.aurora.alcf.anl.gov:7919
+Launching application f52f7960-c711-43d4-bf0b-105220a68741
+Application f52f7960-c711-43d4-bf0b-105220a68741 started execution
+Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)[W309 01:25:01.257007734 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 01:25:01.257008058 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 01:25:01.257007571 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 01:25:01.258767448 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 01:25:01.415026423 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 01:25:01.415464688 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 01:25:01.415407964 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 01:25:01.415410580 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[2026-03-09 01:25:03,498] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 01:25:03,498] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 01:25:03,498] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 01:25:03,499] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 01:25:03,941] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 01:25:03,954] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 01:25:03,955] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 01:25:03,957] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 01:25:06,529] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 01:25:06,754] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 01:25:06,778] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 01:25:06,783] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 01:25:07,180] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 01:25:07,233] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 01:25:07,242] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 01:25:07,244] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+Using seed: 76791390
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of dataloader: 13789
+Numer of devices: 4
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 3447
+Length of a training epoch in batch gradient updates: 3447
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 65520 MB
+Data shape index 0: 1024
+Model prepared successfully.
+Model size: 86186013
+Scaling learning rate with effective batch size: num_nodes x gpu_devices = 2 x 4 = 8
+Effective learning rate: 0.0008
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1200, in main
+    train_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1003, in train_model
+    wandb_logger = WandbLogger(
+NameError: name 'WandbLogger' is not defined. Did you mean: 'wandb_logger'?
+Using seed: 4155995736
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of dataloader: 13789
+Numer of devices: 4
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 3447
+Length of a training epoch in batch gradient updates: 3447
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 65520 MB
+Data shape index 0: 1024
+Model prepared successfully.
+Model size: 86186013
+Scaling learning rate with effective batch size: num_nodes x gpu_devices = 2 x 4 = 8
+Effective learning rate: 0.0008
+Using seed: 3034649656
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of dataloader: 13789
+Numer of devices: 4
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 3447
+Length of a training epoch in batch gradient updates: 3447
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 65520 MB
+Data shape index 0: 1024
+Model prepared successfully.
+Model size: 86186013
+Scaling learning rate with effective batch size: num_nodes x gpu_devices = 2 x 4 = 8
+Effective learning rate: 0.0008
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1200, in main
+    train_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1003, in train_model
+    wandb_logger = WandbLogger(
+NameError: name 'WandbLogger' is not defined. Did you mean: 'wandb_logger'?
+Using seed: 2768369444
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of dataloader: 13789
+Numer of devices: 4
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 3447
+Length of a training epoch in batch gradient updates: 3447
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 65520 MB
+Data shape index 0: 1024
+Model prepared successfully.
+Model size: 86186013
+Scaling learning rate with effective batch size: num_nodes x gpu_devices = 2 x 4 = 8
+Effective learning rate: 0.0008
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1200, in main
+    train_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1003, in train_model
+    wandb_logger = WandbLogger(
+NameError: name 'WandbLogger' is not defined. Did you mean: 'wandb_logger'?
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1200, in main
+    train_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1003, in train_model
+    wandb_logger = WandbLogger(
+NameError: name 'WandbLogger' is not defined. Did you mean: 'wandb_logger'?
+Using seed: 1239028510
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of dataloader: 13789
+Numer of devices: 4
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 3447
+Length of a training epoch in batch gradient updates: 3447
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 65520 MB
+Data shape index 0: 1024
+Model prepared successfully.
+Model size: 86186013
+Scaling learning rate with effective batch size: num_nodes x gpu_devices = 2 x 4 = 8
+Effective learning rate: 0.0008
+Using seed: 621103012
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of dataloader: 13789
+Numer of devices: 4
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 3447
+Length of a training epoch in batch gradient updates: 3447
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 65520 MB
+Data shape index 0: 1024
+Model prepared successfully.
+Model size: 86186013
+Scaling learning rate with effective batch size: num_nodes x gpu_devices = 2 x 4 = 8
+Effective learning rate: 0.0008
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1200, in main
+    train_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1003, in train_model
+    wandb_logger = WandbLogger(
+NameError: name 'WandbLogger' is not defined. Did you mean: 'wandb_logger'?
+Using seed: 3585046290
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of dataloader: 13789
+Numer of devices: 4
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 3447
+Length of a training epoch in batch gradient updates: 3447
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 65520 MB
+Data shape index 0: 1024
+Model prepared successfully.
+Model size: 86186013
+Scaling learning rate with effective batch size: num_nodes x gpu_devices = 2 x 4 = 8
+Effective learning rate: 0.0008
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1200, in main
+    train_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1003, in train_model
+    wandb_logger = WandbLogger(
+NameError: name 'WandbLogger' is not defined. Did you mean: 'wandb_logger'?
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1200, in main
+    train_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1003, in train_model
+    wandb_logger = WandbLogger(
+NameError: name 'WandbLogger' is not defined. Did you mean: 'wandb_logger'?
+Using seed: 2854063346
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of dataloader: 13789
+Numer of devices: 4
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 3447
+Length of a training epoch in batch gradient updates: 3447
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 65520 MB
+Data shape index 0: 1024
+Model prepared successfully.
+Model size: 86186013
+Scaling learning rate with effective batch size: num_nodes x gpu_devices = 2 x 4 = 8
+Effective learning rate: 0.0008
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1200, in main
+    train_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1003, in train_model
+    wandb_logger = WandbLogger(
+NameError: name 'WandbLogger' is not defined. Did you mean: 'wandb_logger'?
+x4502c7s1b0n0.hsn.cm.aurora.alcf.anl.gov: rank 0 exited with code 1
+x4502c7s1b0n0.hsn.cm.aurora.alcf.anl.gov: rank 1 died from signal 15
+x4502c7s1b0n0.hsn.cm.aurora.alcf.anl.gov: rank 2 died from signal 15
+x4502c7s1b0n0.hsn.cm.aurora.alcf.anl.gov: rank 3 died from signal 15
+x4502c7s7b0n0.hsn.cm.aurora.alcf.anl.gov: rank 4 died from signal 15
+x4502c7s7b0n0.hsn.cm.aurora.alcf.anl.gov: rank 5 died from signal 15
+x4502c7s7b0n0.hsn.cm.aurora.alcf.anl.gov: rank 6 died from signal 15
+x4502c7s7b0n0.hsn.cm.aurora.alcf.anl.gov: rank 7 died from signal 15
+Application f52f7960 resources: utime=10s stime=3s maxrss=2320608KB inblock=50024 oublock=4608 minflt=291587 majflt=872 nvcsw=21314 nivcsw=1935

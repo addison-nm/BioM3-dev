@@ -1,0 +1,11 @@
+{"time":"2026-03-08T02:59:12.113571782Z","level":"INFO","msg":"stream: starting","core version":"0.24.1"}
+{"time":"2026-03-08T02:59:17.148916868Z","level":"ERROR","msg":"monitor: failed to initialize GPU resource: monitor: could not get GPU binary port: timeout reading portfile /var/tmp/pbs.6956405.polaris-pbs-01.hsn.cm.polaris.alcf.anl.gov/wandb-system-monitor-portfile-532314954"}
+{"time":"2026-03-08T02:59:17.216112077Z","level":"INFO","msg":"stream: created new stream","id":"yeoa2pmz"}
+{"time":"2026-03-08T02:59:17.216371154Z","level":"INFO","msg":"handler: started","stream_id":"yeoa2pmz"}
+{"time":"2026-03-08T02:59:17.217429213Z","level":"INFO","msg":"stream: started","id":"yeoa2pmz"}
+{"time":"2026-03-08T02:59:17.217790031Z","level":"INFO","msg":"writer: started","stream_id":"yeoa2pmz"}
+{"time":"2026-03-08T02:59:17.217865263Z","level":"INFO","msg":"sender: started","stream_id":"yeoa2pmz"}
+{"time":"2026-03-08T03:02:00.309241029Z","level":"INFO","msg":"flowcontrol: backed up, offloading to disk","recordNumber":279}
+{"time":"2026-03-08T03:02:00.310541954Z","level":"INFO","msg":"flowcontrol: unblocked","totalOffloaded":92}
+{"time":"2026-03-08T03:02:01.666372965Z","level":"INFO","msg":"flowcontrol: backed up, offloading to disk","recordNumber":404}
+{"time":"2026-03-08T03:02:01.667533386Z","level":"INFO","msg":"flowcontrol: unblocked","totalOffloaded":92}

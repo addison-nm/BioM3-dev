@@ -1,0 +1,19 @@
+NRANKS: 2, NGPU_PER_RANK: 4, NGPUS: 8
+Disabling local launch: multi-node application
+Connected to tcp://x3004c0s37b0n0.hsn.cm.polaris.alcf.anl.gov:7919
+Launching application 58bd8e39-4515-4ad7-be83-2f637c15c391
+Using PMI ports 49112,49113
+Application 58bd8e39-4515-4ad7-be83-2f637c15c391 started execution
+./scripts/stage3_pretraining.sh: line 38: biom3_pretrain_stage3: command not found
+./scripts/stage3_pretraining.sh: line 38: biom3_pretrain_stage3: command not found
+./scripts/stage3_pretraining.sh: line 38: biom3_pretrain_stage3: command not found
+./scripts/stage3_pretraining.sh: line 38: biom3_pretrain_stage3: command not found
+x3004c0s37b0n0.hsn.cm.polaris.alcf.anl.gov: rank 1 exited with code 127
+x3004c0s37b0n0.hsn.cm.polaris.alcf.anl.gov: rank 0 exited with code 127
+x3004c0s37b0n0.hsn.cm.polaris.alcf.anl.gov: rank 2 exited with code 127
+x3004c0s37b0n0.hsn.cm.polaris.alcf.anl.gov: rank 3 exited with code 127
+x3004c0s37b1n0.hsn.cm.polaris.alcf.anl.gov: rank 5 died from signal 15
+x3004c0s37b1n0.hsn.cm.polaris.alcf.anl.gov: rank 4 died from signal 15
+x3004c0s37b1n0.hsn.cm.polaris.alcf.anl.gov: rank 6 died from signal 15
+x3004c0s37b1n0.hsn.cm.polaris.alcf.anl.gov: rank 7 died from signal 15
+Application 58bd8e39 resources: utime=0s stime=0s maxrss=14664KB inblock=326 oublock=0 minflt=10816 majflt=10 nvcsw=1021 nivcsw=7

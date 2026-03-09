@@ -1,0 +1,593 @@
+NRANKS: 2, NGPU_PER_RANK: 4, NGPUS: 8
+Disabling local launch: multi-node application
+Connected to tcp://x4502c7s0b0n0.hsn.cm.aurora.alcf.anl.gov:7919
+Launching application a7fc2b0e-7e99-4f48-876a-432f61d85803
+Application a7fc2b0e-7e99-4f48-876a-432f61d85803 started execution
+Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)[W309 02:22:52.457213802 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 02:22:52.457345606 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 02:22:52.457352063 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 02:22:52.457385854 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[2026-03-09 02:22:54,186] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 02:22:54,227] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 02:22:54,242] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 02:22:54,244] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 02:22:56,949] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 02:22:57,200] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 02:22:57,281] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 02:22:57,282] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[W309 02:23:04.312256126 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 02:23:04.313168684 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 02:23:04.313169714 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 02:23:04.313180754 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[2026-03-09 02:23:06,485] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 02:23:06,486] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 02:23:06,486] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 02:23:06,487] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 02:23:11,080] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 02:23:11,080] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 02:23:11,081] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 02:23:11,118] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+GPU available: True (xpu), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+initializing deepspeed distributed: GLOBAL_RANK: 0, MEMBER: 1/8
+initializing deepspeed distributed: GLOBAL_RANK: 1, MEMBER: 2/8
+initializing deepspeed distributed: GLOBAL_RANK: 2, MEMBER: 3/8
+initializing deepspeed distributed: GLOBAL_RANK: 4, MEMBER: 5/8
+initializing deepspeed distributed: GLOBAL_RANK: 5, MEMBER: 6/8
+initializing deepspeed distributed: GLOBAL_RANK: 6, MEMBER: 7/8
+initializing deepspeed distributed: GLOBAL_RANK: 7, MEMBER: 8/8
+initializing deepspeed distributed: GLOBAL_RANK: 3, MEMBER: 4/8
+/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:421: UserWarning: Device capability of ccl unknown, assuming `cpu` and `cuda`. You can specify it in `device:backend` format in `init_process_group` call.
+  warnings.warn(
+/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:421: UserWarning: Device capability of ccl unknown, assuming `cpu` and `cuda`. You can specify it in `device:backend` format in `init_process_group` call.
+  warnings.warn(
+/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:421: UserWarning: Device capability of ccl unknown, assuming `cpu` and `cuda`. You can specify it in `device:backend` format in `init_process_group` call.
+  warnings.warn(
+/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:421: UserWarning: Device capability of ccl unknown, assuming `cpu` and `cuda`. You can specify it in `device:backend` format in `init_process_group` call.
+  warnings.warn(
+/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:421: UserWarning: Device capability of ccl unknown, assuming `cpu` and `cuda`. You can specify it in `device:backend` format in `init_process_group` call.
+  warnings.warn(
+/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:421: UserWarning: Device capability of ccl unknown, assuming `cpu` and `cuda`. You can specify it in `device:backend` format in `init_process_group` call.
+  warnings.warn(
+/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:421: UserWarning: Device capability of ccl unknown, assuming `cpu` and `cuda`. You can specify it in `device:backend` format in `init_process_group` call.
+  warnings.warn(
+/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:421: UserWarning: Device capability of ccl unknown, assuming `cpu` and `cuda`. You can specify it in `device:backend` format in `init_process_group` call.
+  warnings.warn(
+Using seed: 4136315036
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of dataloader: 13789
+Numer of devices: 4
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 3447
+Length of a training epoch in batch gradient updates: 3447
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 65520 MB
+Data shape index 0: 1024
+Model prepared successfully.
+Model size: 86186013
+Scaling learning rate with effective batch size: num_nodes x gpu_devices = 2 x 4 = 8
+Effective learning rate: 0.0008
+Train from scratch
+Using seed: 2267428251
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of dataloader: 13789
+Numer of devices: 4
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 3447
+Length of a training epoch in batch gradient updates: 3447
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 65520 MB
+Data shape index 0: 1024
+Model prepared successfully.
+Model size: 86186013
+Scaling learning rate with effective batch size: num_nodes x gpu_devices = 2 x 4 = 8
+Effective learning rate: 0.0008
+Train from scratch
+Using seed: 3892700365
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of dataloader: 13789
+Numer of devices: 4
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 3447
+Length of a training epoch in batch gradient updates: 3447
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 65520 MB
+Data shape index 0: 1024
+Model prepared successfully.
+Model size: 86186013
+Scaling learning rate with effective batch size: num_nodes x gpu_devices = 2 x 4 = 8
+Effective learning rate: 0.0008
+Train from scratch
+Using seed: 3628970451
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of dataloader: 13789
+Numer of devices: 4
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 3447
+Length of a training epoch in batch gradient updates: 3447
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 65520 MB
+Data shape index 0: 1024
+Model prepared successfully.
+Model size: 86186013
+Scaling learning rate with effective batch size: num_nodes x gpu_devices = 2 x 4 = 8
+Effective learning rate: 0.0008
+Train from scratch
+Using seed: 2228067185
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of dataloader: 13789
+Numer of devices: 4
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 3447
+Length of a training epoch in batch gradient updates: 3447
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 65520 MB
+Data shape index 0: 1024
+Model prepared successfully.
+Model size: 86186013
+Scaling learning rate with effective batch size: num_nodes x gpu_devices = 2 x 4 = 8
+Effective learning rate: 0.0008
+Train from scratch
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1203, in main
+    train_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1098, in train_model
+    trainer.fit(PL_model, data_module)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 544, in fit
+    call._call_and_handle_interrupt(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/call.py", line 43, in _call_and_handle_interrupt
+    return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/launchers/subprocess_script.py", line 105, in launch
+    return function(*args, **kwargs)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 580, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 943, in _run
+    self.strategy.setup_environment()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 325, in setup_environment
+    super().setup_environment()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/ddp.py", line 154, in setup_environment
+    self.setup_distributed()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 333, in setup_distributed
+    self._init_deepspeed_distributed()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 367, in _init_deepspeed_distributed
+    deepspeed.init_distributed(self._process_group_backend, distributed_port=self.cluster_environment.main_port)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/comm.py", line 854, in init_distributed
+    cdb = TorchBackend(dist_backend, timeout, init_method, rank, world_size)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/torch.py", line 120, in __init__
+    self.init_process_group(backend, timeout, init_method, rank, world_size)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/torch.py", line 163, in init_process_group
+    torch.distributed.init_process_group(backend, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/c10d_logger.py", line 81, in wrapper
+    return func(*args, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/c10d_logger.py", line 95, in wrapper
+    func_return = func(*args, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 1764, in init_process_group
+    default_pg, _ = _new_process_group_helper(
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 1935, in _new_process_group_helper
+    assert backend in Backend.backend_type_map, f"Unknown backend type {backend}"
+AssertionError: Unknown backend type ccl
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1203, in main
+    train_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1098, in train_model
+    trainer.fit(PL_model, data_module)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 544, in fit
+    call._call_and_handle_interrupt(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/call.py", line 43, in _call_and_handle_interrupt
+    return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/launchers/subprocess_script.py", line 105, in launch
+    return function(*args, **kwargs)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 580, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 943, in _run
+    self.strategy.setup_environment()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 325, in setup_environment
+    super().setup_environment()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/ddp.py", line 154, in setup_environment
+    self.setup_distributed()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 333, in setup_distributed
+    self._init_deepspeed_distributed()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 367, in _init_deepspeed_distributed
+    deepspeed.init_distributed(self._process_group_backend, distributed_port=self.cluster_environment.main_port)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/comm.py", line 854, in init_distributed
+    cdb = TorchBackend(dist_backend, timeout, init_method, rank, world_size)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/torch.py", line 120, in __init__
+    self.init_process_group(backend, timeout, init_method, rank, world_size)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/torch.py", line 163, in init_process_group
+    torch.distributed.init_process_group(backend, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/c10d_logger.py", line 81, in wrapper
+    return func(*args, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/c10d_logger.py", line 95, in wrapper
+    func_return = func(*args, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 1764, in init_process_group
+    default_pg, _ = _new_process_group_helper(
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 1935, in _new_process_group_helper
+    assert backend in Backend.backend_type_map, f"Unknown backend type {backend}"
+AssertionError: Unknown backend type ccl
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1203, in main
+    train_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1098, in train_model
+    trainer.fit(PL_model, data_module)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 544, in fit
+    call._call_and_handle_interrupt(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/call.py", line 43, in _call_and_handle_interrupt
+    return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/launchers/subprocess_script.py", line 105, in launch
+    return function(*args, **kwargs)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 580, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 943, in _run
+    self.strategy.setup_environment()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 325, in setup_environment
+    super().setup_environment()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/ddp.py", line 154, in setup_environment
+    self.setup_distributed()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 333, in setup_distributed
+    self._init_deepspeed_distributed()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 367, in _init_deepspeed_distributed
+    deepspeed.init_distributed(self._process_group_backend, distributed_port=self.cluster_environment.main_port)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/comm.py", line 854, in init_distributed
+    cdb = TorchBackend(dist_backend, timeout, init_method, rank, world_size)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/torch.py", line 120, in __init__
+    self.init_process_group(backend, timeout, init_method, rank, world_size)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/torch.py", line 163, in init_process_group
+    torch.distributed.init_process_group(backend, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/c10d_logger.py", line 81, in wrapper
+    return func(*args, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/c10d_logger.py", line 95, in wrapper
+    func_return = func(*args, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 1764, in init_process_group
+    default_pg, _ = _new_process_group_helper(
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 1935, in _new_process_group_helper
+    assert backend in Backend.backend_type_map, f"Unknown backend type {backend}"
+AssertionError: Unknown backend type ccl
+Using seed: 3974479135
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of dataloader: 13789
+Numer of devices: 4
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 3447
+Length of a training epoch in batch gradient updates: 3447
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 65520 MB
+Data shape index 0: 1024
+Model prepared successfully.
+Model size: 86186013
+Scaling learning rate with effective batch size: num_nodes x gpu_devices = 2 x 4 = 8
+Effective learning rate: 0.0008
+Train from scratch
+Using seed: 1277852485
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of dataloader: 13789
+Numer of devices: 4
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 3447
+Length of a training epoch in batch gradient updates: 3447
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 65520 MB
+Data shape index 0: 1024
+Model prepared successfully.
+Model size: 86186013
+Scaling learning rate with effective batch size: num_nodes x gpu_devices = 2 x 4 = 8
+Effective learning rate: 0.0008
+Train from scratch
+Using seed: 2986766077
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of dataloader: 13789
+Numer of devices: 4
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 3447
+Length of a training epoch in batch gradient updates: 3447
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 65520 MB
+Data shape index 0: 1024
+Model prepared successfully.
+Model size: 86186013
+Scaling learning rate with effective batch size: num_nodes x gpu_devices = 2 x 4 = 8
+Effective learning rate: 0.0008
+Train from scratch
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1203, in main
+    train_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1098, in train_model
+    trainer.fit(PL_model, data_module)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 544, in fit
+    call._call_and_handle_interrupt(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/call.py", line 43, in _call_and_handle_interrupt
+    return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/launchers/subprocess_script.py", line 105, in launch
+    return function(*args, **kwargs)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 580, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 943, in _run
+    self.strategy.setup_environment()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 325, in setup_environment
+    super().setup_environment()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/ddp.py", line 154, in setup_environment
+    self.setup_distributed()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 333, in setup_distributed
+    self._init_deepspeed_distributed()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 367, in _init_deepspeed_distributed
+    deepspeed.init_distributed(self._process_group_backend, distributed_port=self.cluster_environment.main_port)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/comm.py", line 854, in init_distributed
+    cdb = TorchBackend(dist_backend, timeout, init_method, rank, world_size)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/torch.py", line 120, in __init__
+    self.init_process_group(backend, timeout, init_method, rank, world_size)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/torch.py", line 163, in init_process_group
+    torch.distributed.init_process_group(backend, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/c10d_logger.py", line 81, in wrapper
+    return func(*args, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/c10d_logger.py", line 95, in wrapper
+    func_return = func(*args, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 1764, in init_process_group
+    default_pg, _ = _new_process_group_helper(
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 1935, in _new_process_group_helper
+    assert backend in Backend.backend_type_map, f"Unknown backend type {backend}"
+AssertionError: Unknown backend type ccl
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1203, in main
+    train_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1098, in train_model
+    trainer.fit(PL_model, data_module)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 544, in fit
+    call._call_and_handle_interrupt(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/call.py", line 43, in _call_and_handle_interrupt
+    return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/launchers/subprocess_script.py", line 105, in launch
+    return function(*args, **kwargs)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 580, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 943, in _run
+    self.strategy.setup_environment()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 325, in setup_environment
+    super().setup_environment()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/ddp.py", line 154, in setup_environment
+    self.setup_distributed()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 333, in setup_distributed
+    self._init_deepspeed_distributed()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 367, in _init_deepspeed_distributed
+    deepspeed.init_distributed(self._process_group_backend, distributed_port=self.cluster_environment.main_port)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/comm.py", line 854, in init_distributed
+    cdb = TorchBackend(dist_backend, timeout, init_method, rank, world_size)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/torch.py", line 120, in __init__
+    self.init_process_group(backend, timeout, init_method, rank, world_size)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/torch.py", line 163, in init_process_group
+    torch.distributed.init_process_group(backend, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/c10d_logger.py", line 81, in wrapper
+    return func(*args, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/c10d_logger.py", line 95, in wrapper
+    func_return = func(*args, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 1764, in init_process_group
+    default_pg, _ = _new_process_group_helper(
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 1935, in _new_process_group_helper
+    assert backend in Backend.backend_type_map, f"Unknown backend type {backend}"
+AssertionError: Unknown backend type ccl
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1203, in main
+    train_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1098, in train_model
+    trainer.fit(PL_model, data_module)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 544, in fit
+    call._call_and_handle_interrupt(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/call.py", line 43, in _call_and_handle_interrupt
+    return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/launchers/subprocess_script.py", line 105, in launch
+    return function(*args, **kwargs)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 580, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 943, in _run
+    self.strategy.setup_environment()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 325, in setup_environment
+    super().setup_environment()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/ddp.py", line 154, in setup_environment
+    self.setup_distributed()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 333, in setup_distributed
+    self._init_deepspeed_distributed()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 367, in _init_deepspeed_distributed
+    deepspeed.init_distributed(self._process_group_backend, distributed_port=self.cluster_environment.main_port)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/comm.py", line 854, in init_distributed
+    cdb = TorchBackend(dist_backend, timeout, init_method, rank, world_size)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/torch.py", line 120, in __init__
+    self.init_process_group(backend, timeout, init_method, rank, world_size)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/torch.py", line 163, in init_process_group
+    torch.distributed.init_process_group(backend, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/c10d_logger.py", line 81, in wrapper
+    return func(*args, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/c10d_logger.py", line 95, in wrapper
+    func_return = func(*args, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 1764, in init_process_group
+    default_pg, _ = _new_process_group_helper(
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 1935, in _new_process_group_helper
+    assert backend in Backend.backend_type_map, f"Unknown backend type {backend}"
+AssertionError: Unknown backend type ccl
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1203, in main
+    train_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1098, in train_model
+    trainer.fit(PL_model, data_module)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 544, in fit
+    call._call_and_handle_interrupt(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/call.py", line 43, in _call_and_handle_interrupt
+    return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/launchers/subprocess_script.py", line 105, in launch
+    return function(*args, **kwargs)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 580, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 943, in _run
+    self.strategy.setup_environment()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 325, in setup_environment
+    super().setup_environment()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/ddp.py", line 154, in setup_environment
+    self.setup_distributed()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 333, in setup_distributed
+    self._init_deepspeed_distributed()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 367, in _init_deepspeed_distributed
+    deepspeed.init_distributed(self._process_group_backend, distributed_port=self.cluster_environment.main_port)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/comm.py", line 854, in init_distributed
+    cdb = TorchBackend(dist_backend, timeout, init_method, rank, world_size)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/torch.py", line 120, in __init__
+    self.init_process_group(backend, timeout, init_method, rank, world_size)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/torch.py", line 163, in init_process_group
+    torch.distributed.init_process_group(backend, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/c10d_logger.py", line 81, in wrapper
+    return func(*args, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/c10d_logger.py", line 95, in wrapper
+    func_return = func(*args, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 1764, in init_process_group
+    default_pg, _ = _new_process_group_helper(
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 1935, in _new_process_group_helper
+    assert backend in Backend.backend_type_map, f"Unknown backend type {backend}"
+AssertionError: Unknown backend type ccl
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1203, in main
+    train_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1098, in train_model
+    trainer.fit(PL_model, data_module)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 544, in fit
+    call._call_and_handle_interrupt(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/call.py", line 43, in _call_and_handle_interrupt
+    return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/launchers/subprocess_script.py", line 105, in launch
+    return function(*args, **kwargs)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 580, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 943, in _run
+    self.strategy.setup_environment()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 325, in setup_environment
+    super().setup_environment()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/ddp.py", line 154, in setup_environment
+    self.setup_distributed()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 333, in setup_distributed
+    self._init_deepspeed_distributed()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/strategies/deepspeed.py", line 367, in _init_deepspeed_distributed
+    deepspeed.init_distributed(self._process_group_backend, distributed_port=self.cluster_environment.main_port)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/comm.py", line 854, in init_distributed
+    cdb = TorchBackend(dist_backend, timeout, init_method, rank, world_size)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/torch.py", line 120, in __init__
+    self.init_process_group(backend, timeout, init_method, rank, world_size)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/deepspeed/comm/torch.py", line 163, in init_process_group
+    torch.distributed.init_process_group(backend, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/c10d_logger.py", line 81, in wrapper
+    return func(*args, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/c10d_logger.py", line 95, in wrapper
+    func_return = func(*args, **kwargs)
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 1764, in init_process_group
+    default_pg, _ = _new_process_group_helper(
+  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 1935, in _new_process_group_helper
+    assert backend in Backend.backend_type_map, f"Unknown backend type {backend}"
+AssertionError: Unknown backend type ccl
+x4502c7s1b0n0.hsn.cm.aurora.alcf.anl.gov: rank 5 exited with code 1
+x4502c7s1b0n0.hsn.cm.aurora.alcf.anl.gov: rank 4 died from signal 15
+x4502c7s1b0n0.hsn.cm.aurora.alcf.anl.gov: rank 6 died from signal 15
+x4502c7s1b0n0.hsn.cm.aurora.alcf.anl.gov: rank 7 died from signal 15
+x4502c7s0b0n0.hsn.cm.aurora.alcf.anl.gov: rank 3 died from signal 15
+x4502c7s0b0n0.hsn.cm.aurora.alcf.anl.gov: rank 0 died from signal 15
+x4502c7s0b0n0.hsn.cm.aurora.alcf.anl.gov: rank 1 died from signal 15
+x4502c7s0b0n0.hsn.cm.aurora.alcf.anl.gov: rank 2 died from signal 15
+Application a7fc2b0e resources: utime=10s stime=2s maxrss=2502824KB inblock=11734 oublock=64 minflt=350608 majflt=1204 nvcsw=15015 nivcsw=1939

@@ -1,0 +1,1 @@
+Usage: ./scripts/pretraining/pretrain_multinode.sh config_dir config_name NRANKS NGPU_PER_RANK wandb_api_key version_name epochs resume_from_checkpoint

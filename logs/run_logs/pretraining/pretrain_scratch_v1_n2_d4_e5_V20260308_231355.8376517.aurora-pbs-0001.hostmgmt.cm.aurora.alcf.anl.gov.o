@@ -1,0 +1,102 @@
+NRANKS: 2, NGPU_PER_RANK: 4, NGPUS: 8
+Disabling local launch: multi-node application
+Connected to tcp://x4217c5s1b0n0.hsn.cm.aurora.alcf.anl.gov:7919
+Launching application 5c06fa53-97e8-4086-a8f8-40357da3a634
+Application 5c06fa53-97e8-4086-a8f8-40357da3a634 started execution
+Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)[2026-03-08 23:14:54,682] [WARNING] [real_accelerator.py:209:get_accelerator] Setting accelerator to CPU. If you have GPU or other accelerator, we were unable to detect it.
+[2026-03-08 23:14:54,683] [WARNING] [real_accelerator.py:209:get_accelerator] Setting accelerator to CPU. If you have GPU or other accelerator, we were unable to detect it.
+[2026-03-08 23:14:54,683] [WARNING] [real_accelerator.py:209:get_accelerator] Setting accelerator to CPU. If you have GPU or other accelerator, we were unable to detect it.
+[2026-03-08 23:14:54,683] [WARNING] [real_accelerator.py:209:get_accelerator] Setting accelerator to CPU. If you have GPU or other accelerator, we were unable to detect it.
+[2026-03-08 23:14:54,686] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to cpu (auto detect)
+[2026-03-08 23:14:54,686] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to cpu (auto detect)
+[2026-03-08 23:14:54,686] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to cpu (auto detect)
+[2026-03-08 23:14:54,686] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to cpu (auto detect)
+[2026-03-08 23:14:55,728] [WARNING] [real_accelerator.py:209:get_accelerator] Setting accelerator to CPU. If you have GPU or other accelerator, we were unable to detect it.
+[2026-03-08 23:14:55,728] [WARNING] [real_accelerator.py:209:get_accelerator] Setting accelerator to CPU. If you have GPU or other accelerator, we were unable to detect it.
+[2026-03-08 23:14:55,729] [WARNING] [real_accelerator.py:209:get_accelerator] Setting accelerator to CPU. If you have GPU or other accelerator, we were unable to detect it.
+[2026-03-08 23:14:55,729] [WARNING] [real_accelerator.py:209:get_accelerator] Setting accelerator to CPU. If you have GPU or other accelerator, we were unable to detect it.
+[2026-03-08 23:14:55,731] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to cpu (auto detect)
+[2026-03-08 23:14:55,732] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to cpu (auto detect)
+[2026-03-08 23:14:55,732] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to cpu (auto detect)
+[2026-03-08 23:14:55,732] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to cpu (auto detect)
+[2026-03-08 23:15:01,956] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-08 23:15:01,956] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-08 23:15:01,956] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-08 23:15:01,956] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+WARNING:torchao.kernel.intmm:Warning: Detected no triton, on systems without Triton certain kernels will not work
+WARNING:torchao.kernel.intmm:Warning: Detected no triton, on systems without Triton certain kernels will not work
+WARNING:torchao.kernel.intmm:Warning: Detected no triton, on systems without Triton certain kernels will not work
+WARNING:torchao.kernel.intmm:Warning: Detected no triton, on systems without Triton certain kernels will not work
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 12, in run_stage3_pretraining
+    from biom3.Stage3.run_PL_training import parse_arguments, main
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 55, in <module>
+    import biom3.Stage3.PL_wrapper as PL_mod
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/PL_wrapper.py", line 45, in <module>
+    import biom3.Stage3.transformer_training_helper as trainer_tools
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/transformer_training_helper.py", line 21, in <module>
+    import biom3.Stage3.eval_metrics as eval_funcs
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/eval_metrics.py", line 23, in <module>
+    import biom3.Stage3.animation_tools as ani_tools  # For visualization of generation process
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/animation_tools.py", line 3, in <module>
+    import imageio
+ModuleNotFoundError: No module named 'imageio'
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 12, in run_stage3_pretraining
+    from biom3.Stage3.run_PL_training import parse_arguments, main
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 55, in <module>
+    import biom3.Stage3.PL_wrapper as PL_mod
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/PL_wrapper.py", line 45, in <module>
+    import biom3.Stage3.transformer_training_helper as trainer_tools
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/transformer_training_helper.py", line 21, in <module>
+    import biom3.Stage3.eval_metrics as eval_funcs
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/eval_metrics.py", line 23, in <module>
+    import biom3.Stage3.animation_tools as ani_tools  # For visualization of generation process
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/animation_tools.py", line 3, in <module>
+    import imageio
+ModuleNotFoundError: No module named 'imageio'
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 12, in run_stage3_pretraining
+    from biom3.Stage3.run_PL_training import parse_arguments, main
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 55, in <module>
+    import biom3.Stage3.PL_wrapper as PL_mod
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/PL_wrapper.py", line 45, in <module>
+    import biom3.Stage3.transformer_training_helper as trainer_tools
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/transformer_training_helper.py", line 21, in <module>
+    import biom3.Stage3.eval_metrics as eval_funcs
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/eval_metrics.py", line 23, in <module>
+    import biom3.Stage3.animation_tools as ani_tools  # For visualization of generation process
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/animation_tools.py", line 3, in <module>
+    import imageio
+ModuleNotFoundError: No module named 'imageio'
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 12, in run_stage3_pretraining
+    from biom3.Stage3.run_PL_training import parse_arguments, main
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 55, in <module>
+    import biom3.Stage3.PL_wrapper as PL_mod
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/PL_wrapper.py", line 45, in <module>
+    import biom3.Stage3.transformer_training_helper as trainer_tools
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/transformer_training_helper.py", line 21, in <module>
+    import biom3.Stage3.eval_metrics as eval_funcs
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/eval_metrics.py", line 23, in <module>
+    import biom3.Stage3.animation_tools as ani_tools  # For visualization of generation process
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/animation_tools.py", line 3, in <module>
+    import imageio
+ModuleNotFoundError: No module named 'imageio'
+x4217c5s1b0n0.hsn.cm.aurora.alcf.anl.gov: rank 3 exited with code 1
+x4217c5s1b0n0.hsn.cm.aurora.alcf.anl.gov: rank 1 died from signal 15
+x4217c5s1b0n0.hsn.cm.aurora.alcf.anl.gov: rank 0 died from signal 15
+x4217c5s1b0n0.hsn.cm.aurora.alcf.anl.gov: rank 2 died from signal 15
+x4217c5s4b0n0.hsn.cm.aurora.alcf.anl.gov: rank 5 died from signal 15
+x4217c5s4b0n0.hsn.cm.aurora.alcf.anl.gov: rank 4 died from signal 15
+x4217c5s4b0n0.hsn.cm.aurora.alcf.anl.gov: rank 6 died from signal 15
+x4217c5s4b0n0.hsn.cm.aurora.alcf.anl.gov: rank 7 died from signal 15
+Application 5c06fa53 resources: utime=9s stime=3s maxrss=933600KB inblock=265012 oublock=8 minflt=268658 majflt=23840 nvcsw=72927 nivcsw=205

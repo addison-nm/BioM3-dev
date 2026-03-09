@@ -1,0 +1,7 @@
+{"time":"2026-03-09T04:04:54.89448915Z","level":"INFO","msg":"stream: starting","core version":"0.21.3"}
+{"time":"2026-03-09T04:04:59.941013151Z","level":"ERROR","msg":"monitor: failed to initialize GPU resource: monitor: could not get GPU binary port: timeout reading portfile /var/tmp/pbs.8376774.aurora-pbs-0001.hostmgmt.cm.aurora.alcf.anl.gov/wandb-system-monitor-portfile-3036923095"}
+{"time":"2026-03-09T04:05:00.05329599Z","level":"INFO","msg":"stream: created new stream","id":"vyynq8ne"}
+{"time":"2026-03-09T04:05:00.053329849Z","level":"INFO","msg":"stream: started","id":"vyynq8ne"}
+{"time":"2026-03-09T04:05:00.05356844Z","level":"INFO","msg":"handler: started","stream_id":"vyynq8ne"}
+{"time":"2026-03-09T04:05:00.053589694Z","level":"INFO","msg":"writer: started","stream_id":"vyynq8ne"}
+{"time":"2026-03-09T04:05:00.053715306Z","level":"INFO","msg":"sender: started","stream_id":"vyynq8ne"}

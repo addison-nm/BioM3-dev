@@ -1,0 +1,23 @@
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Using cossine warmup scheduler with decay
+Num_warmup_steps=2298
+Num_training_steps=11490
+
+  | Name  | Type            | Params | Mode
+--------------------------------------------------
+0 | model | DiffTransformer | 86.2 M | train
+--------------------------------------------------
+86.2 M    Trainable params
+0         Non-trainable params
+86.2 M    Total params
+344.744   Total estimated model params size (MB)
+/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/fabric/loggers/tensorboard.py:270: Could not log computational graph to TensorBoard: The `model.example_input_array` attribute is not set or `input_array` was not given.
+Sanity Checking DataLoader 0:   0%|          | 0/2 [00:00<?, ?it/s]Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 65520 MB
+Epoch 0:   0%|          | 0/1150 [00:00<?, ?it/s] Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 65520 MB
+Epoch 0:  16%|█▌        | 185/1150 [04:42<24:33,  0.65it/s, v_num=wuii, train_loss_step=0.743, train_prev_hard_acc_step=0.0518, train_fut_hard_acc_step=0.0468, train_current_hard_acc_step=0.300]   
+[rank: 0] Received SIGTERM: 15

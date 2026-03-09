@@ -1,0 +1,18 @@
+/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:4807: UserWarning: No device id is provided via `init_process_group` or `barrier `. Using the current device set by the user.
+  warnings.warn(  # warn only once
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Using cossine warmup scheduler with decay
+Num_warmup_steps=2298
+Num_training_steps=11490
+
+  | Name  | Type            | Params | Mode
+--------------------------------------------------
+0 | model | DiffTransformer | 86.2 M | train
+--------------------------------------------------
+86.2 M    Trainable params
+0         Non-trainable params
+86.2 M    Total params
+344.744   Total estimated model params size (MB)
+/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/fabric/loggers/tensorboard.py:270: Could not log computational graph to TensorBoard: The `model.example_input_array` attribute is not set or `input_array` was not given.
+Sanity Checking: |          | 0/? [00:00<?, ?it/s]

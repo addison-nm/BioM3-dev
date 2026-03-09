@@ -1,0 +1,8 @@
+{"time":"2026-03-08T02:59:11.913770509Z","level":"INFO","msg":"main: starting server","port-filename":"/var/tmp/pbs.6956405.polaris-pbs-01.hsn.cm.polaris.alcf.anl.gov/tmppc7n3zzt/port-2979465.txt","pid":2979465,"log-level":0,"disable-analytics":false,"shutdown-on-parent-exit":false,"enable-dcgm-profiling":false}
+{"time":"2026-03-08T02:59:11.914440168Z","level":"INFO","msg":"server: accepting connections","addr":{"Name":"/var/tmp/pbs.6956405.polaris-pbs-01.hsn.cm.polaris.alcf.anl.gov/wandb-2979465-2980984-4227535058/socket","Net":"unix"}}
+{"time":"2026-03-08T02:59:11.91461726Z","level":"INFO","msg":"server: will exit if parent process dies","ppid":2979465}
+{"time":"2026-03-08T02:59:12.09798487Z","level":"INFO","msg":"connection: ManageConnectionData: new connection created","id":"1(@)"}
+{"time":"2026-03-08T02:59:12.104219831Z","level":"INFO","msg":"handleInformInit: received","streamId":"yeoa2pmz","id":"1(@)"}
+{"time":"2026-03-08T02:59:17.217452627Z","level":"INFO","msg":"handleInformInit: stream started","streamId":"yeoa2pmz","id":"1(@)"}
+{"time":"2026-03-08T02:59:25.309001235Z","level":"INFO","msg":"connection: cancelling request","id":"1(@)","requestId":"xq37mi3f3lzi"}
+{"time":"2026-03-08T03:29:02.468106994Z","level":"INFO","msg":"server: parent process exited, terminating service process"}

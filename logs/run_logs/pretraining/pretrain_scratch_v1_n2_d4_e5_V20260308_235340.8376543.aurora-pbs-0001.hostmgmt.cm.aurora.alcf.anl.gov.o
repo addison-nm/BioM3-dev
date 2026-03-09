@@ -1,0 +1,167 @@
+NRANKS: 2, NGPU_PER_RANK: 4, NGPUS: 8
+Disabling local launch: multi-node application
+Connected to tcp://x4217c5s2b0n0.hsn.cm.aurora.alcf.anl.gov:7919
+Launching application 29455bcf-1a20-44f6-8c28-eda681981c0d
+Application 29455bcf-1a20-44f6-8c28-eda681981c0d started execution
+Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)[2026-03-08 23:54:43,058] [WARNING] [real_accelerator.py:209:get_accelerator] Setting accelerator to CPU. If you have GPU or other accelerator, we were unable to detect it.
+[2026-03-08 23:54:43,058] [WARNING] [real_accelerator.py:209:get_accelerator] Setting accelerator to CPU. If you have GPU or other accelerator, we were unable to detect it.
+[2026-03-08 23:54:43,059] [WARNING] [real_accelerator.py:209:get_accelerator] Setting accelerator to CPU. If you have GPU or other accelerator, we were unable to detect it.
+[2026-03-08 23:54:43,059] [WARNING] [real_accelerator.py:209:get_accelerator] Setting accelerator to CPU. If you have GPU or other accelerator, we were unable to detect it.
+[2026-03-08 23:54:43,064] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to cpu (auto detect)
+[2026-03-08 23:54:43,065] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to cpu (auto detect)
+[2026-03-08 23:54:43,065] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to cpu (auto detect)
+[2026-03-08 23:54:43,065] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to cpu (auto detect)
+[2026-03-08 23:54:43,900] [WARNING] [real_accelerator.py:209:get_accelerator] Setting accelerator to CPU. If you have GPU or other accelerator, we were unable to detect it.
+[2026-03-08 23:54:43,900] [WARNING] [real_accelerator.py:209:get_accelerator] Setting accelerator to CPU. If you have GPU or other accelerator, we were unable to detect it.
+[2026-03-08 23:54:43,900] [WARNING] [real_accelerator.py:209:get_accelerator] Setting accelerator to CPU. If you have GPU or other accelerator, we were unable to detect it.
+[2026-03-08 23:54:43,900] [WARNING] [real_accelerator.py:209:get_accelerator] Setting accelerator to CPU. If you have GPU or other accelerator, we were unable to detect it.
+[2026-03-08 23:54:43,903] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to cpu (auto detect)
+[2026-03-08 23:54:43,903] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to cpu (auto detect)
+[2026-03-08 23:54:43,904] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to cpu (auto detect)
+[2026-03-08 23:54:43,904] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to cpu (auto detect)
+[2026-03-08 23:54:52,348] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-08 23:54:52,349] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-08 23:54:52,349] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-08 23:54:52,349] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+WARNING:torchao.kernel.intmm:Warning: Detected no triton, on systems without Triton certain kernels will not work
+WARNING:torchao.kernel.intmm:Warning: Detected no triton, on systems without Triton certain kernels will not work
+WARNING:torchao.kernel.intmm:Warning: Detected no triton, on systems without Triton certain kernels will not work
+WARNING:torchao.kernel.intmm:Warning: Detected no triton, on systems without Triton certain kernels will not work
+Using seed: 2604370722
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of dataloader: 13789
+Numer of devices: 4
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 3447
+Length of a training epoch in batch gradient updates: 3447
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 131040 MB
+Data shape index 0: 1024
+Using seed: 2896649027
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of dataloader: 13789
+Numer of devices: 4
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 3447
+Length of a training epoch in batch gradient updates: 3447
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 131040 MB
+Data shape index 0: 1024
+Using seed: 871804910
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of dataloader: 13789
+Numer of devices: 4
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 3447
+Length of a training epoch in batch gradient updates: 3447
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 131040 MB
+Data shape index 0: 1024
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1155, in main
+    PL_model = load_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 747, in load_model
+    PL_model = compile_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 362, in compile_model
+    model = prepare_model_ProteoScribe(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/io.py", line 37, in prepare_model_ProteoScribe
+    model = load_and_prepare_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/core/io.py", line 31, in load_and_prepare_model
+    return prepare_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/core/io.py", line 76, in prepare_model
+    model.to(device)
+  File "/home/tnnandi/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1369, in to
+    return self._apply(convert)
+  File "/home/tnnandi/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 928, in _apply
+    module._apply(fn)
+  File "/home/tnnandi/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 928, in _apply
+    module._apply(fn)
+  File "/home/tnnandi/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 955, in _apply
+    param_applied = fn(param)
+  File "/home/tnnandi/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1355, in convert
+    return t.to(
+  File "/home/tnnandi/.local/lib/python3.10/site-packages/torch/xpu/__init__.py", line 123, in _lazy_init
+    raise AssertionError("Torch not compiled with XPU enabled")
+AssertionError: Torch not compiled with XPU enabled
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1155, in main
+    PL_model = load_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 747, in load_model
+    PL_model = compile_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 362, in compile_model
+    model = prepare_model_ProteoScribe(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/io.py", line 37, in prepare_model_ProteoScribe
+    model = load_and_prepare_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/core/io.py", line 31, in load_and_prepare_model
+    return prepare_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/core/io.py", line 76, in prepare_model
+    model.to(device)
+  File "/home/tnnandi/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1369, in to
+    return self._apply(convert)
+  File "/home/tnnandi/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 928, in _apply
+    module._apply(fn)
+  File "/home/tnnandi/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 928, in _apply
+    module._apply(fn)
+  File "/home/tnnandi/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 955, in _apply
+    param_applied = fn(param)
+  File "/home/tnnandi/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1355, in convert
+    return t.to(
+  File "/home/tnnandi/.local/lib/python3.10/site-packages/torch/xpu/__init__.py", line 123, in _lazy_init
+    raise AssertionError("Torch not compiled with XPU enabled")
+AssertionError: Torch not compiled with XPU enabled
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1155, in main
+    PL_model = load_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 747, in load_model
+    PL_model = compile_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 362, in compile_model
+    model = prepare_model_ProteoScribe(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/io.py", line 37, in prepare_model_ProteoScribe
+    model = load_and_prepare_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/core/io.py", line 31, in load_and_prepare_model
+    return prepare_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/core/io.py", line 76, in prepare_model
+    model.to(device)
+  File "/home/tnnandi/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1369, in to
+    return self._apply(convert)
+  File "/home/tnnandi/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 928, in _apply
+    module._apply(fn)
+  File "/home/tnnandi/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 928, in _apply
+    module._apply(fn)
+  File "/home/tnnandi/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 955, in _apply
+    param_applied = fn(param)
+  File "/home/tnnandi/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1355, in convert
+    return t.to(
+  File "/home/tnnandi/.local/lib/python3.10/site-packages/torch/xpu/__init__.py", line 123, in _lazy_init
+    raise AssertionError("Torch not compiled with XPU enabled")
+AssertionError: Torch not compiled with XPU enabled
+x4217c5s5b0n0.hsn.cm.aurora.alcf.anl.gov: rank 6 exited with code 1
+x4217c5s5b0n0.hsn.cm.aurora.alcf.anl.gov: rank 5 died from signal 15
+x4217c5s5b0n0.hsn.cm.aurora.alcf.anl.gov: rank 4 died from signal 15
+x4217c5s5b0n0.hsn.cm.aurora.alcf.anl.gov: rank 7 died from signal 15
+x4217c5s2b0n0.hsn.cm.aurora.alcf.anl.gov: rank 3 died from signal 15
+x4217c5s2b0n0.hsn.cm.aurora.alcf.anl.gov: rank 0 died from signal 15
+x4217c5s2b0n0.hsn.cm.aurora.alcf.anl.gov: rank 1 died from signal 15
+x4217c5s2b0n0.hsn.cm.aurora.alcf.anl.gov: rank 2 died from signal 15
+Application 29455bcf resources: utime=9s stime=4s maxrss=1400040KB inblock=490094 oublock=64 minflt=310464 majflt=23973 nvcsw=84346 nivcsw=679

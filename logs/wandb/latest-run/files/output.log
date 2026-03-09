@@ -1,0 +1,18 @@
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0,1,2,3]
+Using cossine warmup scheduler with decay
+Num_warmup_steps=3447
+Num_training_steps=17235
+
+  | Name  | Type            | Params | Mode
+--------------------------------------------------
+0 | model | DiffTransformer | 86.2 M | train
+--------------------------------------------------
+86.2 M    Trainable params
+0         Non-trainable params
+86.2 M    Total params
+344.744   Total estimated model params size (MB)
+370       Modules in train mode
+0         Modules in eval mode
+Epoch 0:  72%|███████▏  | 1242/1724 [29:22<11:23,  0.70it/s, v_num=2pmz, train_loss_step=0.794, train_prev_hard_acc_step=0.0764, train_fut_hard_acc_step=0.0792, train_current_hard_acc_step=0.0909]

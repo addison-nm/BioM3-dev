@@ -1,0 +1,46 @@
+NRANKS: 2, NGPU_PER_RANK: 4, NGPUS: 8
+Disabling local launch: multi-node application
+Connected to tcp://x4311c3s5b0n0.hsn.cm.aurora.alcf.anl.gov:7919
+Launching application 17633f5a-8619-4960-8021-ddbe61b62102
+Application 17633f5a-8619-4960-8021-ddbe61b62102 started execution
+Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 12, in run_stage3_pretraining
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 12, in run_stage3_pretraining
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 12, in run_stage3_pretraining
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    from biom3.Stage3.run_PL_training import parse_arguments, main
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 37, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 12, in run_stage3_pretraining
+    from biom3.Stage3.run_PL_training import parse_arguments, main
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 37, in <module>
+    from biom3.Stage3.run_PL_training import parse_arguments, main
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 37, in <module>
+    from lightning.fabric.loggers import WandbLogger
+ImportError: cannot import name 'WandbLogger' from 'lightning.fabric.loggers' (/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/fabric/loggers/__init__.py)
+    from biom3.Stage3.run_PL_training import parse_arguments, main
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 37, in <module>
+    from lightning.fabric.loggers import WandbLogger
+ImportError: cannot import name 'WandbLogger' from 'lightning.fabric.loggers' (/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/fabric/loggers/__init__.py)
+    from lightning.fabric.loggers import WandbLogger
+ImportError: cannot import name 'WandbLogger' from 'lightning.fabric.loggers' (/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/fabric/loggers/__init__.py)
+    from lightning.fabric.loggers import WandbLogger
+ImportError: cannot import name 'WandbLogger' from 'lightning.fabric.loggers' (/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/fabric/loggers/__init__.py)
+x4311c3s4b0n0.hsn.cm.aurora.alcf.anl.gov: rank 7 exited with code 1
+x4311c3s4b0n0.hsn.cm.aurora.alcf.anl.gov: rank 4 died from signal 15
+x4311c3s4b0n0.hsn.cm.aurora.alcf.anl.gov: rank 5 died from signal 15
+x4311c3s4b0n0.hsn.cm.aurora.alcf.anl.gov: rank 6 died from signal 15
+x4311c3s5b0n0.hsn.cm.aurora.alcf.anl.gov: rank 1 died from signal 15
+x4311c3s5b0n0.hsn.cm.aurora.alcf.anl.gov: rank 0 died from signal 15
+x4311c3s5b0n0.hsn.cm.aurora.alcf.anl.gov: rank 2 died from signal 15
+x4311c3s5b0n0.hsn.cm.aurora.alcf.anl.gov: rank 3 died from signal 15
+Application 17633f5a resources: utime=13s stime=3s maxrss=942876KB inblock=37270 oublock=192 minflt=392858 majflt=1296 nvcsw=33088 nivcsw=772

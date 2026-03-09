@@ -1,0 +1,39 @@
+#!/bin/bash -l
+
+
+# Configurations to edit
+config_dir=./arglists
+config_name=config_pretrain_scratch_v1
+num_nodes=1
+epochs=5
+resume_from_checkpoint=None
+
+# Constant configurations
+num_devices=1 # Rename it to num_devices_per_node
+wandb_api_key=${WANDB_API_KEY:-none}
+
+# Ensure PBS_NODEFILE exists for mpiexec in subsequent scripts
+if [ -z "$PBS_NODEFILE" ] || [ ! -f "$PBS_NODEFILE" ]; then
+    export PBS_NODEFILE=$(mktemp /tmp/nodefile.XXXXXX)
+    echo "localhost" > "$PBS_NODEFILE"
+    trap "rm -f $PBS_NODEFILE" EXIT
+fi
+
+# Construct the version name
+datetime=$(date +%Y%m%d_%H%M%S)
+version_name=${config_name/config_/}_n${num_nodes}_d${num_devices}_e${epochs}_V${datetime}
+
+# Direct output to log file
+log_fpath=./logs/run_logs/pretraining/${version_name}.o
+mkdir -p "$(dirname "${log_fpath}")"
+
+./scripts/pretraining/pretrain_multinode.sh \
+    ${config_dir} \
+    ${config_name} \
+    ${num_nodes} \
+    ${num_devices} \
+    ${wandb_api_key} \
+    ${version_name} \
+    ${epochs} \
+    ${resume_from_checkpoint} \
+> ${log_fpath} 2>&1

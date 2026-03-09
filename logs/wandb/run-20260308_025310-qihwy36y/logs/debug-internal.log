@@ -1,0 +1,17 @@
+{"time":"2026-03-08T02:53:11.548080308Z","level":"INFO","msg":"stream: starting","core version":"0.24.1"}
+{"time":"2026-03-08T02:53:16.592857575Z","level":"ERROR","msg":"monitor: failed to initialize GPU resource: monitor: could not get GPU binary port: timeout reading portfile /var/tmp/pbs.6956401.polaris-pbs-01.hsn.cm.polaris.alcf.anl.gov/wandb-system-monitor-portfile-772405743"}
+{"time":"2026-03-08T02:53:16.66643299Z","level":"INFO","msg":"stream: created new stream","id":"qihwy36y"}
+{"time":"2026-03-08T02:53:16.666667992Z","level":"INFO","msg":"handler: started","stream_id":"qihwy36y"}
+{"time":"2026-03-08T02:53:16.667985818Z","level":"INFO","msg":"stream: started","id":"qihwy36y"}
+{"time":"2026-03-08T02:53:16.668548616Z","level":"INFO","msg":"writer: started","stream_id":"qihwy36y"}
+{"time":"2026-03-08T02:53:16.668755685Z","level":"INFO","msg":"sender: started","stream_id":"qihwy36y"}
+{"time":"2026-03-08T02:53:16.769885543Z","level":"ERROR","msg":"api: HTTP error","status":403,"method":"POST","url":"https://api.wandb.ai/graphql"}
+{"time":"2026-03-08T02:53:16.770003836Z","level":"ERROR","msg":"runupserter: failed to init run","error":"returned error 403: {\"data\":{\"upsertBucket\":null},\"errors\":[{\"message\":\"permission denied\",\"path\":[\"upsertBucket\"],\"extensions\":{\"code\":\"PERMISSION_ERROR\"}}]}"}
+{"time":"2026-03-08T02:53:17.033293445Z","level":"INFO","msg":"stream: closing","id":"qihwy36y"}
+{"time":"2026-03-08T02:53:17.034846944Z","level":"ERROR","msg":"sender: uploadConfigFile: runhandle: run not yet initialized"}
+{"time":"2026-03-08T02:53:17.085980201Z","level":"ERROR","msg":"runfiles: runhandle: run not yet initialized"}
+{"time":"2026-03-08T02:53:17.087001731Z","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2026-03-08T02:53:17.087034983Z","level":"INFO","msg":"handler: closed","stream_id":"qihwy36y"}
+{"time":"2026-03-08T02:53:17.087913303Z","level":"INFO","msg":"sender: closed","stream_id":"qihwy36y"}
+{"time":"2026-03-08T02:53:17.087938831Z","level":"INFO","msg":"stream: closed","id":"qihwy36y"}
+{"time":"2026-03-08T02:53:17.120899293Z","level":"ERROR","msg":"stream: runURL: runhandle: run not yet initialized"}

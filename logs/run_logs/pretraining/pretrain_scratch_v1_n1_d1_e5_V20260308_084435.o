@@ -1,0 +1,5 @@
+NRANKS: 1, NGPU_PER_RANK: 1, NGPUS: 1
+Using local launch
+Launching application 91ab8db1-a5f7-4c69-b85f-0d94957809c3
+Executing local shepherd /usr/sbin/palsd -s 6
+Couldn't read RPC length: Connection reset by peer

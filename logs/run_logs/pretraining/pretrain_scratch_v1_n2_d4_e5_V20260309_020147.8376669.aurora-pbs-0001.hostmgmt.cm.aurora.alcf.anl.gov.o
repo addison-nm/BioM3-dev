@@ -1,0 +1,218 @@
+NRANKS: 2, NGPU_PER_RANK: 4, NGPUS: 8
+Disabling local launch: multi-node application
+Connected to tcp://x4220c4s3b0n0.hsn.cm.aurora.alcf.anl.gov:7919
+Launching application 8085abdd-69c9-44e1-9cc6-d1fba951ddbb
+Application 8085abdd-69c9-44e1-9cc6-d1fba951ddbb started execution
+Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)[W309 02:02:13.312161408 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 02:02:13.312419039 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 02:02:13.312418872 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 02:02:13.312418752 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[2026-03-09 02:02:15,965] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 02:02:15,967] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 02:02:15,971] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 02:02:15,973] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to xpu (auto detect)
+[2026-03-09 02:02:19,264] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 02:02:19,318] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 02:02:19,344] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[2026-03-09 02:02:19,349] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+Using seed: 3188646759
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of dataloader: 13789
+Numer of devices: 4
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 3447
+Length of a training epoch in batch gradient updates: 3447
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 65520 MB
+Data shape index 0: 1024
+Model prepared successfully.
+Model size: 86186013
+Scaling learning rate with effective batch size: num_nodes x gpu_devices = 2 x 4 = 8
+Effective learning rate: 0.0008
+Using seed: 3315722035
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of dataloader: 13789
+Numer of devices: 4
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 3447
+Length of a training epoch in batch gradient updates: 3447
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 65520 MB
+Data shape index 0: 1024
+Model prepared successfully.
+Model size: 86186013
+Scaling learning rate with effective batch size: num_nodes x gpu_devices = 2 x 4 = 8
+Effective learning rate: 0.0008
+Using seed: 2713075355
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of dataloader: 13789
+Numer of devices: 4
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 3447
+Length of a training epoch in batch gradient updates: 3447
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 65520 MB
+Data shape index 0: 1024
+Model prepared successfully.
+Model size: 86186013
+Scaling learning rate with effective batch size: num_nodes x gpu_devices = 2 x 4 = 8
+Effective learning rate: 0.0008
+Using seed: 1926894669
+Original indices count: 441228, Filtered indices count: 441228
+Original indices count: 110307, Filtered indices count: 110307
+Length of dataloader: 13789
+Numer of devices: 4
+Number of nodes: 2
+Batch size: 32
+Length of dataloader per device: 3447
+Length of a training epoch in batch gradient updates: 3447
+Running on device: Intel(R) Data Center GPU Max 1550
+Vendor: Intel(R) Corporation
+Global memory: 65520 MB
+Data shape index 0: 1024
+Model prepared successfully.
+Model size: 86186013
+Scaling learning rate with effective batch size: num_nodes x gpu_devices = 2 x 4 = 8
+Effective learning rate: 0.0008
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1203, in main
+    train_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1083, in train_model
+    trainer = Trainer(**trainer_params)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/utilities/argparse.py", line 70, in insert_env_defaults
+    return fn(self, **kwargs)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 401, in __init__
+    self._accelerator_connector = _AcceleratorConnector(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/connectors/accelerator_connector.py", line 147, in __init__
+    self._set_parallel_devices_and_init_accelerator()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/connectors/accelerator_connector.py", line 379, in _set_parallel_devices_and_init_accelerator
+    raise MisconfigurationException(
+lightning.fabric.utilities.exceptions.MisconfigurationException: `CUDAAccelerator` can not run on your system since the accelerator is not available. The following accelerator(s) is available and can be passed into `accelerator` argument of `Trainer`: ['cpu', 'xpu'].
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1203, in main
+    train_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1083, in train_model
+    trainer = Trainer(**trainer_params)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/utilities/argparse.py", line 70, in insert_env_defaults
+    return fn(self, **kwargs)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 401, in __init__
+    self._accelerator_connector = _AcceleratorConnector(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/connectors/accelerator_connector.py", line 147, in __init__
+    self._set_parallel_devices_and_init_accelerator()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/connectors/accelerator_connector.py", line 379, in _set_parallel_devices_and_init_accelerator
+    raise MisconfigurationException(
+lightning.fabric.utilities.exceptions.MisconfigurationException: `CUDAAccelerator` can not run on your system since the accelerator is not available. The following accelerator(s) is available and can be passed into `accelerator` argument of `Trainer`: ['cpu', 'xpu'].
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1203, in main
+    train_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1083, in train_model
+    trainer = Trainer(**trainer_params)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/utilities/argparse.py", line 70, in insert_env_defaults
+    return fn(self, **kwargs)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 401, in __init__
+    self._accelerator_connector = _AcceleratorConnector(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/connectors/accelerator_connector.py", line 147, in __init__
+    self._set_parallel_devices_and_init_accelerator()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/connectors/accelerator_connector.py", line 379, in _set_parallel_devices_and_init_accelerator
+    raise MisconfigurationException(
+lightning.fabric.utilities.exceptions.MisconfigurationException: `CUDAAccelerator` can not run on your system since the accelerator is not available. The following accelerator(s) is available and can be passed into `accelerator` argument of `Trainer`: ['cpu', 'xpu'].
+Traceback (most recent call last):
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/venvs/biom3-env/bin/biom3_pretrain_stage3", line 8, in <module>
+    sys.exit(run_stage3_pretraining())
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/__main__.py", line 14, in run_stage3_pretraining
+    main(args)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1203, in main
+    train_model(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/src/biom3/Stage3/run_PL_training.py", line 1083, in train_model
+    trainer = Trainer(**trainer_params)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/utilities/argparse.py", line 70, in insert_env_defaults
+    return fn(self, **kwargs)
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/trainer.py", line 401, in __init__
+    self._accelerator_connector = _AcceleratorConnector(
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/connectors/accelerator_connector.py", line 147, in __init__
+    self._set_parallel_devices_and_init_accelerator()
+  File "/lus/flare/projects/NLDesignProtein/tnnandi/BioM3-dev/lightning/src/lightning/pytorch/trainer/connectors/accelerator_connector.py", line 379, in _set_parallel_devices_and_init_accelerator
+    raise MisconfigurationException(
+lightning.fabric.utilities.exceptions.MisconfigurationException: `CUDAAccelerator` can not run on your system since the accelerator is not available. The following accelerator(s) is available and can be passed into `accelerator` argument of `Trainer`: ['cpu', 'xpu'].
+[W309 02:02:23.904185471 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 02:02:23.904185428 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 02:02:23.904185472 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+[W309 02:02:23.904334724 OperatorEntry.cpp:218] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/pytorch_2p8_rel_07_18_2025/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /lus/tegu/projects/datasets/software/wheelforge/repositories/ipex_2.8.10_xpu_rel_08_18_2025/intel-extension-for-pytorch/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:172 (function operator())
+x4220c4s4b0n0.hsn.cm.aurora.alcf.anl.gov: rank 6 exited with code 1
+x4220c4s4b0n0.hsn.cm.aurora.alcf.anl.gov: rank 4 died from signal 15
+x4220c4s4b0n0.hsn.cm.aurora.alcf.anl.gov: rank 5 died from signal 15
+x4220c4s4b0n0.hsn.cm.aurora.alcf.anl.gov: rank 7 died from signal 15
+x4220c4s3b0n0.hsn.cm.aurora.alcf.anl.gov: rank 0 died from signal 15
+x4220c4s3b0n0.hsn.cm.aurora.alcf.anl.gov: rank 1 died from signal 15
+x4220c4s3b0n0.hsn.cm.aurora.alcf.anl.gov: rank 2 died from signal 15
+x4220c4s3b0n0.hsn.cm.aurora.alcf.anl.gov: rank 3 died from signal 15
+Application 8085abdd resources: utime=10s stime=3s maxrss=2303252KB inblock=14462 oublock=72 minflt=298714 majflt=1279 nvcsw=19211 nivcsw=1877

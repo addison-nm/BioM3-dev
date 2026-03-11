@@ -1,8 +1,8 @@
 #!/bin/bash -l
 #PBS -A NLDesignProtein
-#PBS -N pretrain_scratch_v1_n64
-#PBS -l walltime=06:00:00
-#PBS -l select=64
+#PBS -N pretrain_scratch_v1_n32
+#PBS -l walltime=03:00:00
+#PBS -l select=32
 #PBS -l place=scatter
 #PBS -l filesystems=home:grand
 #PBS -q prod
@@ -21,7 +21,7 @@ source ./venvs/biom3-env/bin/activate
 # Configurations to edit
 config_dir=./arglists
 config_name=config_pretrain_scratch_v1
-num_nodes=64
+num_nodes=32
 epochs=100
 resume_from_checkpoint=None
 

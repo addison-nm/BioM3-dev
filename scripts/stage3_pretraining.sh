@@ -47,6 +47,7 @@ biom3_pretrain_stage3 \
 	--warmup-steps ${warmup_steps} \
 	--image-size ${image_size} \
 	--lr ${lr} \
+	--scale_learning_rate ${scale_learning_rate} \
 	--weight-decay ${weight_decay} \
 	--ema_inv_gamma ${ema_inv_gamma} \
 	--ema_max_value ${ema_max_value} \

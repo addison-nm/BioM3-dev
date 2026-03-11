@@ -16,6 +16,7 @@ export wandb_tags="pretrain_start_pfam"
 
 export choose_optim="AdamW"
 export lr=1e-4
+export scale_learning_rate=False
 export weight_decay=1e-6
 export scheduler_gamma="coswarmup"
 

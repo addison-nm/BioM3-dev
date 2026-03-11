@@ -525,34 +525,92 @@ def save_model(
 
     # once saved via the model checkpoint callback...
     # we have a saved folder containing the deepspeed checkpoint rather than a single file
-    checkpoint_folder_path = checkpoint_path + '/last.ckpt'
+    last_ckpt_fpath = os.path.join(checkpoint_path, 'last.ckpt')
+    best_ckpt_fpath = trainer.checkpoint_callback.best_model_path
+    last_single_ckpt_fpath = os.path.join(checkpoint_path, 'single_model.last.pth')
+    best_single_ckpt_fpath = os.path.join(checkpoint_path, 'single_model.best.pth')
+    last_state_dict_fpath = os.path.join(checkpoint_path, 'state_dict.last.pth')
+    best_state_dict_fpath = os.path.join(checkpoint_path, 'state_dict.best.pth')
+    last_state_dict_ema_fpath = os.path.join(checkpoint_path, 'state_dict_ema.last.pth')
+    best_state_dict_ema_fpath = os.path.join(checkpoint_path, 'state_dict_ema.best.pth')
+
+    symlink_to = "best"  # symlink from state_dict.pth to either best or last
+    
     if trainer.is_global_zero:
-        single_ckpt_path = checkpoint_path + '/single_model.pth'
-        # magically convert the folder into a single lightning loadable pytorch file (works for ZeRO 1,2,3)
-        convert_zero_checkpoint_to_fp32_state_dict(checkpoint_folder_path, single_ckpt_path)
-        print('Save model')
+        # ---------------- LAST MODEL ----------------
+        # magically convert the folder into a single lightning loadable pytorch 
+        # file (works for ZeRO 1,2,3)
+        convert_zero_checkpoint_to_fp32_state_dict(
+            last_ckpt_fpath, last_single_ckpt_fpath
+        )
+        print('Save model (last)')
         new_temp_model = mod.get_model(
             args=args,
             data_shape=(image_size, image_size),
             num_classes=num_classes
         ).cpu()
-        loaded_model = PL_mod.PL_ProtARDM.load_from_checkpoint(single_ckpt_path, args=args, model=new_temp_model)
-        # make sure that datatypes or the same ...
+        loaded_model = PL_mod.PL_ProtARDM.load_from_checkpoint(
+            last_single_ckpt_fpath, 
+            args=args, model=new_temp_model
+        )
+        # make sure that datatypes are the same ...
         if PL_model.dtype != loaded_model.dtype:
             msg = "Data types are not matching."
-            msg += f" Expected {PL_model.dtype}. Got: {loaded_model.dtype} (from loaded)"
+            msg += f" Expected {PL_model.dtype}. Loaded: {loaded_model.dtype}"
             assert False, msg
         else:
             # save model state dict without pytorch lightning wrapper
-            torch.save(loaded_model.model.state_dict(), checkpoint_path + '/state_dict.pth')
+            torch.save(loaded_model.model.state_dict(), last_state_dict_fpath)
             if hasattr(loaded_model, 'ema_model'):
                 print('Also saving EMA model...')
-                torch.save(loaded_model.ema_model.state_dict(), checkpoint_path + '/state_dict_ema.pth')
+                torch.save(loaded_model.ema_model.state_dict(), last_state_dict_ema_fpath)
             # check model params
             get_model_params(
-                    checkpoint_path + '/params.csv',
+                    os.path.join(checkpoint_path, 'params.csv'),
                     model=loaded_model.model
             )
+
+        # ---------------- BEST MODEL ----------------
+        convert_zero_checkpoint_to_fp32_state_dict(
+            best_ckpt_fpath, best_single_ckpt_fpath
+        )
+        print('Save model (best)')
+        new_temp_model = mod.get_model(
+            args=args,
+            data_shape=(image_size, image_size),
+            num_classes=num_classes
+        ).cpu()
+        loaded_model = PL_mod.PL_ProtARDM.load_from_checkpoint(
+            best_single_ckpt_fpath, 
+            args=args, model=new_temp_model
+        )
+        # make sure that datatypes are the same ...
+        if PL_model.dtype != loaded_model.dtype:
+            msg = "Data types are not matching."
+            msg += f" Expected {PL_model.dtype}. Loaded: {loaded_model.dtype}"
+            assert False, msg
+        else:
+            # save model state dict without pytorch lightning wrapper
+            torch.save(loaded_model.model.state_dict(), best_state_dict_fpath)
+            if hasattr(loaded_model, 'ema_model'):
+                print('Also saving EMA model...')
+                torch.save(loaded_model.ema_model.state_dict(), best_state_dict_ema_fpath)
+            # check model params
+            get_model_params(
+                    os.path.join(checkpoint_path, 'params.csv'),
+                    model=loaded_model.model
+            )
+        
+        symlink_path = os.path.join(checkpoint_path, 'state_dict.pth')
+        symlink_ema_path = os.path.join(checkpoint_path, 'state_dict_ema.pth')
+        if symlink_to == "best":
+            os.symlink(best_state_dict_fpath, symlink_path)
+            if os.path.exists(best_state_dict_ema_fpath):
+                os.symlink(best_state_dict_ema_fpath, symlink_ema_path)
+        elif symlink_to == "last":
+            os.symlink(last_state_dict_fpath, symlink_path)
+            if os.path.exists(last_state_dict_ema_fpath):
+                os.symlink(last_state_dict_ema_fpath, symlink_ema_path)
     return
 
 

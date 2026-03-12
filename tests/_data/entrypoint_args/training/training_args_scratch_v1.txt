@@ -52,13 +52,10 @@
 --transformer_local_size 16 
 --text_emb_dim 512 
 --facilitator MMD 
---version_name finetuning_args_v1 
+--version_name training_args_v1a 
 --output_hist_folder outputs/logs/history 
 --tb_logger_path outputs/logs 
 --tb_logger_folder history 
 --save_hist_path None 
---pretrained_weights models/stage3/weights/minimodel1_weights1.pth 
---wandb False 
---finetune True 
---finetune_last_n_blocks 1 
---finetune_last_n_layers 1
+--pretrained_weights None
+--wandb False

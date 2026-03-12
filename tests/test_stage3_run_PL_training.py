@@ -37,9 +37,13 @@ TRANSFORMER_OUTPUT_LAYER_PARAMS = [
 
 def get_args(fpath):
     with open(fpath, 'r') as f:
-        argstring = f.readline()
-        arglist = argstring.split(" ")
-        return arglist
+        # Strip whitespace and ignore empty lines
+        lines = [line.strip() for line in f if line.strip()]
+    # Join into a single string and split into arguments
+    argstring = " ".join(lines)
+    arglist = argstring.split()
+    
+    return arglist
 
 def check_downloads(paths_to_check):
     """Returns list of missing files and a warning message."""
@@ -55,7 +59,6 @@ def check_downloads(paths_to_check):
         for issue in issues:
             msg += f"\n  {issue}"
     return issues, msg
-
 
 def prefix_paths(args):
     """Prepend data files with path to test directories"""
@@ -97,13 +100,20 @@ def prefix_paths(args):
 ###############################   BEGIN TESTS   ###############################
 ###############################################################################
 
+# @pytest.mark.skip()
 @pytest.mark.parametrize(
     "argstring_fpath, expect_error_context", [
-    [f"{ARGS_DIR}/training_args_v1.txt", does_not_raise()],
+    [f"{ARGS_DIR}/training_args_scratch_v1.txt", does_not_raise()],
 ])
-def test_entrypoint(
+def test_train_from_scratch(
         argstring_fpath, expect_error_context
     ):
+    """
+    Tests that basic training succeeds.
+
+    Uses argfile(s):
+        training_args_scratch_v1.txt
+    """
     # This test relies on the following downloaded weights. Check existence.
     issues, skip_reason = check_downloads(REQUIRED_DOWNLOADS)
     if issues:
@@ -120,18 +130,19 @@ def test_entrypoint(
     remove_dir(OUTPUTS_DIR)
 
 
+# @pytest.mark.skip()
 @pytest.mark.parametrize(
     "argstring_fpath, expect_error, exp_end_weights_fpath, exp_ckpt_fpath", [
     # Test that pretrained ProteoScribe weights can be loaded correctly
     [
-        f"{ARGS_DIR}/training_args_v1.txt", 
+        f"{ARGS_DIR}/training_args_pretrained_weights_v1.txt", 
         False, 
         f"{DATDIR}/models/stage3/weights/minimodel1_weights1.pth",
-        f"{TMPDIR}/outputs/logs/history/checkpoints/training_args_v1a/state_dict.pth"
+        f"{TMPDIR}/outputs/logs/history/checkpoints/training_args_pretrained_weights_v1/state_dict.pth"
     ],
     # Test that an error is raised when incompatible weights are specified.
     [
-        f"{ARGS_DIR}/training_args_v2.txt", 
+        f"{ARGS_DIR}/training_args_pretrained_weights_v2.txt", 
         True, 
         None,
         None
@@ -142,12 +153,19 @@ def test_entrypoint(
     [1e-4, False],
     [0.0, True],
 ])
-def test_run_with_pretrained_weights(
+def test_train_from_pretrained_weights(
         argstring_fpath, expect_error, exp_end_weights_fpath, 
         exp_ckpt_fpath, learning_rate, exp_same_weights
     ):
     """
-    Test that a model can be trained from existing weights.
+    Tests that a model can be trained from an initial state of pretrained 
+    weights. Verifies that when trained with AdamW and learning rate of zero,
+    the resulting weights match those loaded at the start (v1). Also checks 
+    that an error is raised if incompatible weights are loaded (v2).
+
+    Uses argfile(s):
+        training_args_pretrained_weights_v1.txt
+        training_args_pretrained_weights_v2.txt
     """
     num_epochs = 3
     # Parse the command line string
@@ -201,15 +219,16 @@ def test_run_with_pretrained_weights(
     assert not errors, "Errors occurred:\n{}".format("\n".join(errors))
 
 
+# @pytest.mark.skip()
 @pytest.mark.parametrize(
-    "argstring_fpath1, argstring_fpath2, expect_error, exp_ckpt_fpath1, exp_ckpt_fpath2", [
-    # Test that resumption succeeds
+    "argstring_fpath1, argstring_fpath2, expect_error, exp_state_dict_path1, exp_state_dict_path2", [
+    # Test that resuming from a checkpoint succeeds
     [
-        f"{ARGS_DIR}/training_args_v3a.txt", 
-        f"{ARGS_DIR}/training_args_v3b.txt", 
+        f"{ARGS_DIR}/training_args_resume_from_checkpoint_v1a.txt", 
+        f"{ARGS_DIR}/training_args_resume_from_checkpoint_v1b.txt", 
         False, 
-        f"{TMPDIR}/outputs/logs/history/checkpoints/training_args_v3a/state_dict.pth",
-        f"{TMPDIR}/outputs/logs/history/checkpoints/training_args_v3b/state_dict.pth"
+        f"{TMPDIR}/outputs/logs/history/checkpoints/training_args_resume_from_checkpoint_v1a/state_dict.pth",
+        f"{TMPDIR}/outputs/logs/history/checkpoints/training_args_resume_from_checkpoint_v1b/state_dict.pth"
     ],
 ])
 @pytest.mark.parametrize(
@@ -219,11 +238,19 @@ def test_run_with_pretrained_weights(
 ])
 def test_resume_training(
         argstring_fpath1, argstring_fpath2, expect_error, 
-        exp_ckpt_fpath1, exp_ckpt_fpath2, learning_rate1, learning_rate2, 
+        exp_state_dict_path1, exp_state_dict_path2, learning_rate1, learning_rate2, 
         exp_same_weights
     ):
     """
-    Test that a model can be trained from existing weights.
+    Tests that model training can resume from a saved checkpoint. Runs initial
+    training using first argfile, then continues for one or more additional 
+    epochs. Verifies that when learning rate is 0 for both runs, the 
+    the resulting weights of both models match. Both runs must use lr=0 otherwise
+    momentum results in different weights.
+    
+    Uses argfile(s):
+        training_args_resume_from_checkpoint_v1a.txt
+        training_args_resume_from_checkpoint_v1b.txt
     """
     num_epochs1 = 2
     num_epochs2 = 3 # train for additional epoch(s) (n2 - n1)
@@ -248,12 +275,12 @@ def test_resume_training(
     # ---- Initial training ----
     main(args1)
     # Store model weights
-    end_weights1 = torch.load(exp_ckpt_fpath1)
+    end_weights1 = torch.load(exp_state_dict_path1)
 
     # ---- Resume training ----
     main(args2)
     # Store model weights
-    end_weights2 = torch.load(exp_ckpt_fpath2)
+    end_weights2 = torch.load(exp_state_dict_path2)
 
     # ---- ERROR CHECKS ----
     errors = []
@@ -278,6 +305,7 @@ def test_resume_training(
     assert not errors, "Errors occurred:\n{}".format("\n".join(errors))
 
 
+# @pytest.mark.skip()
 @pytest.mark.parametrize(
     "argstring_fpath, expect_error, weights_orig_fpath, exp_ckpt_fpath", [
     # Test that finetuning succeeds and only certain weights change
@@ -307,8 +335,12 @@ def test_finetuning(
         finetune_output_layers, finetune_last_n_blocks, finetune_last_n_layers
     ):
     """
-    Test that a model can be finetuned from existing weights, specifying 
-    different configurations of blocks and layers to finetune.
+    Tests that a model can be finetuned from pretrained weights, specifying 
+    different configurations of blocks and layers to finetune. Verifies that
+    only the specified blocks/layers are updated.
+
+    Uses argfile(s):
+        finetuning_args_v1
     """
     num_epochs = 1
 
@@ -390,3 +422,86 @@ def test_finetuning(
     assert not errors, "Errors occurred:\n{}".format("\n".join(errors))
 
 
+# @pytest.mark.skip()
+@pytest.mark.parametrize(
+    "argstring_fpath1, argstring_fpath2, expect_error, exp_state_dict_path1, exp_state_dict_path2", [
+    # Test that resumption succeeds
+    [
+        f"{ARGS_DIR}/training_args_phase2_training_v1a.txt", 
+        f"{ARGS_DIR}/training_args_phase2_training_v1b.txt", 
+        False, 
+        f"{TMPDIR}/outputs/logs/history/checkpoints/training_args_phase2_training_v1a/state_dict.best.pth",
+        f"{TMPDIR}/outputs/logs/history/checkpoints/training_args_phase2_training_v1b/state_dict.last.pth"
+    ],
+])
+@pytest.mark.parametrize(
+    "learning_rate1, learning_rate2, exp_same_weights", [
+    [1e-4, 1e-4, False],
+    [0., 0., True],
+])
+def test_start_phase2_training(
+        argstring_fpath1, argstring_fpath2, expect_error, 
+        exp_state_dict_path1, exp_state_dict_path2, learning_rate1, learning_rate2, 
+        exp_same_weights
+    ):
+    """
+    Tests phase 2 model training, in which a pretrained model is loaded and 
+    further pretrained on a different data set (e.g. Pfam + SwissProt). Initial
+    phase runs only on Pfam data. The best model state is then loaded in phase 2
+    and trained for additional epochs. We verify that with learning rate of 0,
+    The final model state in phase 2 has the same weights.
+
+    Uses argfile(s):
+        training_args_phase2_training_v1a
+        training_args_phase2_training_v1b
+    """
+    # Parse the command line string
+    argstring1 = get_args(argstring_fpath1)
+    argstring2 = get_args(argstring_fpath2)
+    if os.path.exists(OUTPUTS_DIR):
+        remove_dir(OUTPUTS_DIR)
+    os.makedirs(OUTPUTS_DIR, exist_ok=True)
+
+    # Parse and modify args for initial run
+    args1 = parse_arguments(argstring1)
+    prefix_paths(args1)
+    args1.lr = learning_rate1
+
+    # Parse and modify args for secondary run
+    args2 = parse_arguments(argstring2)
+    orig_pretrained_weights = args2.pretrained_weights
+    prefix_paths(args2)
+    args2.pretrained_weights = os.path.join(TMPDIR, orig_pretrained_weights)
+    args2.lr = learning_rate2
+
+    # ---- Initial training ----
+    main(args1)
+    # Store model weights
+    end_weights1 = torch.load(exp_state_dict_path1)
+
+    # ---- Second phase training ----
+    main(args2)
+    # Store model weights
+    end_weights2 = torch.load(exp_state_dict_path2)
+
+    # ---- ERROR CHECKS ----
+    errors = []
+    if len(end_weights1) != len(end_weights2):
+        errors.append("Mismatch in number of parameters!")
+    for name in end_weights1:
+        w1 = end_weights1[name]
+        if name not in end_weights2:
+            msg = f"Missing parameter in subsequent training phase: {name}"
+            errors.append(msg)
+        else:
+            w2 = end_weights2[name]
+            weights_changed = not torch.allclose(w1, w2)
+            if exp_same_weights and weights_changed:
+                msg = f"Expected same weights but change occurred in: {name}"
+                msg += f"\n\t max diff: {torch.max(torch.abs(w1-w2))}"
+                errors.append(msg)
+            elif not exp_same_weights and not weights_changed:
+                msg = f"Expected updates to weights but no change in: {name}"
+                errors.append(msg)
+    remove_dir(OUTPUTS_DIR)
+    assert not errors, "Errors occurred:\n{}".format("\n".join(errors))

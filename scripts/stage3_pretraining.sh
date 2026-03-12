@@ -5,7 +5,8 @@
 #
 # USAGE: stage3_pretraining.sh \
 #		WANDB_API_KEY config_dir config_name \
-# 		version_name num_nodes gpu_devices epochs resume_from_checkpoint
+# 		version_name num_nodes gpu_devices epochs \
+# 		resume_from_checkpoint pretrained_weights
 #
 # DESCRIPTION: Wraps the Stage 3 training python script PL_train_stage3.py.
 #	Reads command line arguments from a specified config file. Arguments for 
@@ -28,6 +29,12 @@ num_nodes=$5
 gpu_devices=$6
 epochs=$7
 resume_from_checkpoint=$8
+
+# Override `pretrained_weights` argument only if specified in 
+if [[ "$9" != "UNSPECIFIED" ]]; then
+	pretrained_weights=$9
+fi
+
 
 # Weights&Biases API key
 export WANDB_API_KEY=$WANDB_API_KEY

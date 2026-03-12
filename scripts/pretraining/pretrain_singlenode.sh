@@ -5,14 +5,18 @@
 #
 # USAGE: pretrain_singlenode.sh config_dir config_name \
 #       NRANKS NGPU_PER_RANK wandb_api_key version_name epochs \
-#       resume_from_checkpoint
+#       resume_from_checkpoint [pretrained_weights]
 #
 # DESCRIPTION: Wrapper for running the stage3_pretraining.sh script.
 #
 #=============================================================================
 
-if [ "$#" -ne 8 ]; then
-  echo "Usage: $0 config_dir config_name NRANKS NGPU_PER_RANK wandb_api_key version_name epochs resume_from_checkpoint"
+if [ "$#" -eq 8 ]; then
+  pretrained_weights=UNSPECIFIED
+elif [ "$#" -eq 9 ]; then
+  pretrained_weights=$9
+else
+  echo "Usage: $0 config_dir config_name NRANKS NGPU_PER_RANK wandb_api_key version_name epochs resume_from_checkpoint [pretrained_weights]"
   exit 1
 fi
 
@@ -41,4 +45,5 @@ echo "NRANKS: ${NRANKS}, NGPU_PER_RANK: ${NGPU_PER_RANK}, NGPUS: ${NGPUS}"
     $NRANKS \
     $NGPU_PER_RANK \
     $epochs \
-    $resume_from_checkpoint
+    $resume_from_checkpoint \
+    $pretrained_weights

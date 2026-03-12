@@ -1118,21 +1118,21 @@ def train_model(
     if pfam_data_root is None:
         trainer_params['max_epochs'] = epochs
     else:
-        if start_pfam_trainer:
-            print('load weights from swissprot phase...')
-            PL_model = get_deepspeed_model(
-                    args=args,
-                    PL_model=PL_model
-            )
+        # if start_pfam_trainer:
+        #     print('load weights from swissprot phase...')
+        #     PL_model = get_deepspeed_model(
+        #             args=args,
+        #             PL_model=PL_model
+        #     )
 
         trainer_params['max_steps'] = max_steps
         trainer_params['val_check_interval'] = val_check_interval
         trainer_params['limit_val_batches'] = limit_val_batches
 
-        trainer_params['accelerator'] = 'gpu'
-        trainer_params['devices'] = gpu_devices
+        # trainer_params['accelerator'] = 'gpu'
+        # trainer_params['devices'] = gpu_devices
         # trainer_params['num_nodes'] = num_nodes
-        trainer_params['precision'] = precision
+        # trainer_params['precision'] = precision
 
     # Initialize trainer with configured parameters
     trainer = Trainer(**trainer_params)

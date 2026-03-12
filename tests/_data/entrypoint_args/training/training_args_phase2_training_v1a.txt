@@ -11,8 +11,8 @@
 --lr 1e-4 
 --weight-decay 1e-6 
 --scheduler_gamma coswarmup 
---seed 42 
---epochs 3 
+--seed 0 
+--epochs 2 
 --valid_size 0.2 
 --enter_eval 100 
 --resume_from_checkpoint None 
@@ -52,13 +52,10 @@
 --transformer_local_size 16 
 --text_emb_dim 512 
 --facilitator MMD 
---version_name finetuning_args_v1 
+--version_name training_args_phase2_training_v1a 
 --output_hist_folder outputs/logs/history 
 --tb_logger_path outputs/logs 
 --tb_logger_folder history 
 --save_hist_path None 
---pretrained_weights models/stage3/weights/minimodel1_weights1.pth 
---wandb False 
---finetune True 
---finetune_last_n_blocks 1 
---finetune_last_n_layers 1
+--pretrained_weights None 
+--wandb False

@@ -57,19 +57,26 @@ def check_downloads(paths_to_check):
     "argstring_fpath, expect_error_context", [
     [f"{ARGS_DIR}/stage3_args_v2.txt", does_not_raise()],
 ])
+@pytest.mark.parametrize("device", ["cpu", "cuda", "xpu"])
 def test_entrypoint(
-        argstring_fpath, expect_error_context
+        argstring_fpath, expect_error_context, device
     ):
     # This test relies on the following downloaded weights. Check existence.
     issues, skip_reason = check_downloads(REQUIRED_DOWNLOADS)
     if issues:
         pytest.skip(reason=skip_reason)
+    # Skip device if not available on machine
+    if device == "cuda" and not torch.cuda.is_available():
+        pytest.skip(reason="device=cuda and cuda not available")
+    elif device == "xpu" and not torch.xpu.is_available():
+        pytest.skip(reason="device=xpu and xpu not available")
     # Parse the command line string
     argstring = get_args(argstring_fpath)
     os.makedirs(OUTPUTS_DIR, exist_ok=True)
     # Run entrypoint
     with expect_error_context:
         args = parse_arguments(argstring)
+        args.device = device
         main(args)
     remove_dir(OUTPUTS_DIR)
 
@@ -84,18 +91,25 @@ def test_entrypoint(
         [1, 1]
     ]
 )
+@pytest.mark.parametrize("device", ["cpu", "cuda", "xpu"])
 def test_reproducibility(
-        argstring_fpath, seed1, seed2
+        argstring_fpath, seed1, seed2, device
     ):
     # This test relies on the following downloaded weights. Check existence.
     issues, skip_reason = check_downloads(REQUIRED_DOWNLOADS)
     if issues:
         pytest.skip(reason=skip_reason)
+    # Skip device if not available on machine
+    if device == "cuda" and not torch.cuda.is_available():
+        pytest.skip(reason="device=cuda and cuda not available")
+    elif device == "xpu" and not torch.xpu.is_available():
+        pytest.skip(reason="device=xpu and xpu not available")
     # Parse the command line string
     argstring = get_args(argstring_fpath)
     # Run 1
     os.makedirs(OUTPUTS_DIR, exist_ok=True)
     args = parse_arguments(argstring)
+    args.device = device
     args.seed = seed1
     main(args)
     res_dict1 = torch.load(
@@ -105,6 +119,7 @@ def test_reproducibility(
     # Run 2
     os.makedirs(OUTPUTS_DIR, exist_ok=True)
     args = parse_arguments(argstring)
+    args.device = device
     args.seed = seed2
     main(args)
     res_dict2 = torch.load(
@@ -130,11 +145,4 @@ def test_reproducibility(
             msg = "Expected different results but results matched."
             msg += f"\n  Replicates 1 == Replicates 2: {replicates1}"
             errors.append(msg)
-    # observed_same_z_p = torch.allclose(res1["z_p"], res2["z_p"])
-    # if expect_same and not observed_same_z_p:
-    #     msg = "Expected same results but results differed for z_p."
-    #     errors.append(msg)
-    # elif not expect_same and observed_same_z_p:
-    #     msg = "Expected different results but results matched for z_p."
-    #     errors.append(msg)
     assert not errors, "Errors occurred:\n{}".format("\n".join(errors))

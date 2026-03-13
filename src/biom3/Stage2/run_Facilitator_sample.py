@@ -47,7 +47,7 @@ def parse_arguments(args):
                         help="Path to save the output embeddings (e.g., Facilitator_test_outputs.pt)")
     
     parser.add_argument('--device', type=str, default="cpu", 
-                        choices=["cpu", "cuda"], help="available device")
+                        choices=["cpu", "cuda", "xpu"], help="available device")
     parser.add_argument("--mmd_sample_limit", type=int, default=-1,
                         help="limit on the number of samples used to compute MMD. If -1, use all")
     return parser.parse_args(args)

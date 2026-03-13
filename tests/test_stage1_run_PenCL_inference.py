@@ -56,7 +56,7 @@ def check_downloads(paths_to_check):
     [f"{ARGS_DIR}/stage1_args_v1.txt", does_not_raise()],
     [f"{ARGS_DIR}/stage1_args_v2.txt", does_not_raise()],
 ])
-@pytest.mark.parametrize("device", ["cpu", "cuda"])
+@pytest.mark.parametrize("device", ["cpu", "cuda", "xpu"])
 def test_entrypoint(
         argstring_fpath, expect_error_context, device
     ):
@@ -64,9 +64,11 @@ def test_entrypoint(
     issues, skip_reason = check_downloads(REQUIRED_DOWNLOADS)
     if issues:
         pytest.skip(reason=skip_reason)
-    # Skip device=cuda if not available on machine
+    # Skip device if not available on machine
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip(reason="device=cuda and cuda not available")
+    elif device == "xpu" and not torch.xpu.is_available():
+        pytest.skip(reason="device=xpu and xpu not available")
     # Parse the command line string
     argstring = get_args(argstring_fpath)
     os.makedirs(OUTPUTS_DIR, exist_ok=True)

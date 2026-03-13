@@ -4,3 +4,5 @@ imageio
 fair-esm
 py
 nvidia-ml-py
+axial_positional_embedding
+linear_attention_transformer

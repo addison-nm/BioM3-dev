@@ -58,7 +58,7 @@ def parse_arguments(args):
                         help="Path to save output embeddings")
     
     parser.add_argument('--device', type=str, default="cuda", 
-                        choices=["cpu", "cuda"], help="available device")
+                        choices=["cpu", "cuda", "xpu"], help="available device")
     parser.add_argument('--batch_size', type=int, default=32, 
                         help="batch size")
     parser.add_argument('--num_workers', type=int, default=0, 

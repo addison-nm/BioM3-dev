@@ -172,7 +172,7 @@ def get_args(parser):
     parser.add_argument('--pretrained_weights', default='None', type=str,
                         help='path to .bin weight or checkpoint file containing model weights')
     
-    parser.add_argument('--scale_learning_rate', default='True', type=str,
+    parser.add_argument('--scale_learning_rate', default='False', type=str,
                         help='scale the specified learning rate by the number of devices')
     
     # Finetuning
@@ -1038,21 +1038,33 @@ def train_model(
     if pfam_data_root is None:
         checkpoint_callback = ModelCheckpoint(
             dirpath=os.path.join(tb_logger_path, tb_logger_folder, 'checkpoints', version_name),
-            save_top_k=2,
+            filename='{epoch}-{val_loss:.4f}',  # Include metric to avoid filename collisions
+            save_top_k=-1, # save top 2 checkpoints
             verbose=True,
             monitor='val_loss',
+            save_on_train_epoch_end=False,  # run after validation
             mode="min",
-            save_last=True
+            save_last=True,
+            # Prevent Lightning from creating `last-v1.ckpt` when `last.ckpt` already exists.
+            # With DeepSpeed, all ranks write shards concurrently: if Lightning renames the
+            # directory mid-write, some ranks end up writing to last-v1.ckpt/, splitting
+            # the checkpoint across two directories and breaking consolidation.
+            enable_version_counter=False,
         )
     else:
         checkpoint_callback = ModelCheckpoint(
             dirpath=os.path.join(tb_logger_path, tb_logger_folder, 'checkpoints', version_name),
-            save_top_k=2,
+            save_top_k=-1,
             verbose=True,
             monitor='val_loss',
             mode="min",
             save_last=True,
-            every_n_train_steps=log_every_n_steps  # Save checkpoints periodically by steps
+            every_n_train_steps=log_every_n_steps,  # Save checkpoints periodically by steps
+            # Prevent Lightning from creating `last-v1.ckpt` when `last.ckpt` already exists.
+            # With DeepSpeed, all ranks write shards concurrently: if Lightning renames the
+            # directory mid-write, some ranks end up writing to last-v1.ckpt/, splitting
+            # the checkpoint across two directories and breaking consolidation.
+            enable_version_counter=False,
         )
 
     # Define common trainer parameters 
@@ -1086,7 +1098,7 @@ def train_model(
         trainer_params['val_check_interval'] = val_check_interval
         trainer_params['limit_val_batches'] = limit_val_batches
 
-        trainer_params['accelerator'] = 'gpu'
+        trainer_params['accelerator'] = 'xpu'
         trainer_params['devices'] = gpu_devices
         # trainer_params['num_nodes'] = num_nodes
         trainer_params['precision'] = precision

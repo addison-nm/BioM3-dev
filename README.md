@@ -98,7 +98,7 @@ source "venvs/${ENV_NAME}/bin/activate"
 # Unzip and install custom lightning package
 unzip lightning.zip
 cd lightning
-python -m pip install -e .
+python -m pip install -e . --no-build-isolation
 cd ..
 # Install BioM3
 python -m pip install -e .

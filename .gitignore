@@ -5,6 +5,9 @@ logs/
 weights/*/*
 _my*/
 tests/_tmp/
+lightning/
+lightning_logs/
+_misc/
 
 # Misc
 **/.DS_Store

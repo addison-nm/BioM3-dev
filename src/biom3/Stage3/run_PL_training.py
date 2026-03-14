@@ -56,7 +56,7 @@ else:
     from pytorch_lightning.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
     from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor, DeviceStatsMonitor
     # Additional necessities
-    # from pytorch_lightning.plugins.environments import ClusterEnvironment
+    from pytorch_lightning.plugins.environments import ClusterEnvironment
 
 # DeepSpeed is needed for the DeepSpeedStrategy
 import deepspeed

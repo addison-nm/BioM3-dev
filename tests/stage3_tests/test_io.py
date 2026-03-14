@@ -9,6 +9,7 @@ from contextlib import nullcontext as does_not_raise
 from tests.conftest import DATDIR, TMPDIR, remove_dir
 
 import numpy as np
+import torch
 import json
 import argparse
 
@@ -35,13 +36,18 @@ WEIGHTS_DIR = os.path.join(DATDIR, "models/stage3/weights")
     [f"{CONFIGS_DIR}/minimodel2.json", None],
     [f"{CONFIGS_DIR}/orig_model.json", None],
 ])
-@pytest.mark.parametrize("device", ["cpu"])
 @pytest.mark.parametrize("eval_flag", [True, False])
+@pytest.mark.parametrize("device", ["cpu", "cuda", "xpu"])
 def test_model_load_scratch(
         config_fpath, tot_weights_exp, device, eval_flag
     ):
     config_dict = load_json_config(config_fpath)
     config_args = convert_to_namespace(config_dict)
+    # Skip device if not available on machine
+    if device == "cuda" and not torch.cuda.is_available():
+        pytest.skip(reason="device=cuda and cuda not available")
+    elif device == "xpu" and not torch.xpu.is_available():
+        pytest.skip(reason="device=xpu and xpu not available")
     model = prepare_model_ProteoScribe(
         config_args,
         weights_fpath=None,
@@ -94,7 +100,7 @@ def test_model_load_scratch(
     ],
 ])
 @pytest.mark.parametrize("strict", [True, False])
-@pytest.mark.parametrize("device", ["cpu", "cuda"])
+@pytest.mark.parametrize("device", ["cpu", "cuda", "xpu"])
 @pytest.mark.parametrize("eval_flag", [True, False])
 def test_model_load_from_bin(
         config_fpath, weights_fpath, tot_weights_exp, 
@@ -114,6 +120,11 @@ def test_model_load_from_bin(
     """
     config_dict = load_json_config(config_fpath)
     config_args = convert_to_namespace(config_dict)
+    # Skip device if not available on machine
+    if device == "cuda" and not torch.cuda.is_available():
+        pytest.skip(reason="device=cuda and cuda not available")
+    elif device == "xpu" and not torch.xpu.is_available():
+        pytest.skip(reason="device=xpu and xpu not available")
 
     if names_mismatched and strict and not attempt_correction:
         context = expect_error_context
@@ -163,7 +174,7 @@ def test_model_load_from_bin(
         True, False
     ],
 ])
-@pytest.mark.parametrize("device", ["cpu"])
+@pytest.mark.parametrize("device", ["cpu", "cuda", "xpu"])
 @pytest.mark.parametrize("eval_flag", [False])  # add True
 def test_compare_models(
         config_fpath1, config_fpath2, 
@@ -171,6 +182,11 @@ def test_compare_models(
         device, eval_flag,
         exp_same_params, exp_same_vals,
     ):
+    # Skip device if not available on machine
+    if device == "cuda" and not torch.cuda.is_available():
+        pytest.skip(reason="device=cuda and cuda not available")
+    elif device == "xpu" and not torch.xpu.is_available():
+        pytest.skip(reason="device=xpu and xpu not available")
     config_dict1 = load_json_config(config_fpath1)
     config_dict2 = load_json_config(config_fpath2)
     config_args1 = convert_to_namespace(config_dict1)
@@ -212,7 +228,13 @@ def test_compare_models(
         errors.append(msg)
     
     tol = 1e-6
-    max_diff_in_common = np.max([differences[k] for k in common_names])
+    # max_diff_in_common = np.max([differences[k] for k in common_names])
+    max_diff_in_common = np.max([
+        differences[k].detach().cpu().numpy() 
+        if isinstance(differences[k], torch.Tensor)
+        else differences[k]
+        for k in common_names
+    ])
     if exp_same_params and exp_same_vals:
         # Expect same parameter names and all values to match
         if max_diff_in_common > tol:

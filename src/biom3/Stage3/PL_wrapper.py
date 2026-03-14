@@ -4,14 +4,28 @@ from torch import nn, optim
 from torch.nn import functional as F
 from torch.distributions import OneHotCategorical
 
-# ----- PyTorch Lightning Framework -----
-import pytorch_lightning as pl
-from pytorch_lightning import Trainer, seed_everything
-from pytorch_lightning.callbacks import EarlyStopping
 
-# import lightning as pl
-# from lightning import Trainer, seed_everything
-# from lightning.pytorch.callbacks import EarlyStopping
+# Set global device based on availability
+_CUDA = "cuda"
+_XPU = "xpu"
+_CPU = "cpu"
+if torch.cuda.is_available():
+    _DEVICE = _CUDA
+elif hasattr(torch, "xpu") and torch.xpu.is_available():
+    _DEVICE = _XPU
+else:
+    _DEVICE = _CPU
+
+# ----- PyTorch Lightning Framework -----
+if _DEVICE == _XPU:
+    # lightning imports (from local installation)
+    import lightning as pl
+    from lightning import Trainer, seed_everything
+    from lightning.pytorch.callbacks import EarlyStopping
+else:
+    import pytorch_lightning as pl
+    from pytorch_lightning import Trainer, seed_everything
+    from pytorch_lightning.callbacks import EarlyStopping
 
 # ----- Distributed Training -----
 #from fairscale.nn.data_parallel import FullyShardedDataParallel as FSDP  # Old import

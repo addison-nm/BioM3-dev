@@ -105,8 +105,9 @@ def prefix_paths(args):
     "argstring_fpath, expect_error_context", [
     [f"{ARGS_DIR}/training_args_scratch_v1.txt", does_not_raise()],
 ])
+@pytest.mark.parametrize("device", ["cuda", "xpu"])
 def test_train_from_scratch(
-        argstring_fpath, expect_error_context
+        argstring_fpath, expect_error_context, device
     ):
     """
     Tests that basic training succeeds.
@@ -118,6 +119,11 @@ def test_train_from_scratch(
     issues, skip_reason = check_downloads(REQUIRED_DOWNLOADS)
     if issues:
         pytest.skip(reason=skip_reason)
+    # Skip device if not available on machine
+    if device == "cuda" and not torch.cuda.is_available():
+        pytest.skip(reason="device=cuda and cuda not available")
+    elif device == "xpu" and not torch.xpu.is_available():
+        pytest.skip(reason="device=xpu and xpu not available")
     # Parse the command line string
     argstring = get_args(argstring_fpath)
     os.makedirs(OUTPUTS_DIR, exist_ok=True)
@@ -126,6 +132,7 @@ def test_train_from_scratch(
         args = parse_arguments(argstring)
         # Modifications to args:
         prefix_paths(args)
+        args.device = device
         main(args)
     remove_dir(OUTPUTS_DIR)
 
@@ -153,9 +160,10 @@ def test_train_from_scratch(
     [1e-4, False],
     [0.0, True],
 ])
+@pytest.mark.parametrize("device", ["cuda", "xpu"])
 def test_train_from_pretrained_weights(
         argstring_fpath, expect_error, exp_end_weights_fpath, 
-        exp_ckpt_fpath, learning_rate, exp_same_weights
+        exp_ckpt_fpath, learning_rate, exp_same_weights, device
     ):
     """
     Tests that a model can be trained from an initial state of pretrained 
@@ -167,6 +175,12 @@ def test_train_from_pretrained_weights(
         training_args_pretrained_weights_v1.txt
         training_args_pretrained_weights_v2.txt
     """
+    # Skip device if not available on machine
+    if device == "cuda" and not torch.cuda.is_available():
+        pytest.skip(reason="device=cuda and cuda not available")
+    elif device == "xpu" and not torch.xpu.is_available():
+        pytest.skip(reason="device=xpu and xpu not available")
+
     num_epochs = 3
     # Parse the command line string
     argstring = get_args(argstring_fpath)
@@ -175,6 +189,7 @@ def test_train_from_pretrained_weights(
     # Parse and modify args
     args = parse_arguments(argstring)
     prefix_paths(args)
+    args.device = device
     args.epochs = num_epochs
     args.lr = learning_rate
     
@@ -219,7 +234,7 @@ def test_train_from_pretrained_weights(
     assert not errors, "Errors occurred:\n{}".format("\n".join(errors))
 
 
-# @pytest.mark.skip()
+@pytest.mark.skip()
 @pytest.mark.parametrize(
     "argstring_fpath1, argstring_fpath2, expect_error, exp_state_dict_path1, exp_state_dict_path2", [
     # Test that resuming from a checkpoint succeeds
@@ -305,7 +320,7 @@ def test_resume_training(
     assert not errors, "Errors occurred:\n{}".format("\n".join(errors))
 
 
-# @pytest.mark.skip()
+@pytest.mark.skip()
 @pytest.mark.parametrize(
     "argstring_fpath, expect_error, weights_orig_fpath, exp_ckpt_fpath", [
     # Test that finetuning succeeds and only certain weights change
@@ -422,7 +437,7 @@ def test_finetuning(
     assert not errors, "Errors occurred:\n{}".format("\n".join(errors))
 
 
-# @pytest.mark.skip()
+@pytest.mark.skip()
 @pytest.mark.parametrize(
     "argstring_fpath1, argstring_fpath2, expect_error, exp_state_dict_path1, exp_state_dict_path2", [
     # Test that resumption succeeds

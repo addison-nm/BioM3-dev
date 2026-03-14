@@ -8,6 +8,7 @@ Support for PyTorch Lightning and Weights&Biases
 
 import sys
 import os
+import socket
 import numpy as np
 import random
 import gc
@@ -19,28 +20,43 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-# PyTorch Lightning imports
-import pytorch_lightning as pl
-from pytorch_lightning import Trainer
-from pytorch_lightning.strategies import DeepSpeedStrategy
-from pytorch_lightning.loggers import TensorBoardLogger
-from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
-from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.plugins.environments import ClusterEnvironment
+# Set global device based on availability
+_CUDA = "cuda"
+_XPU = "xpu"
+_CPU = "cpu"
+if torch.cuda.is_available():
+    _DEVICE = _CUDA
+elif hasattr(torch, "xpu") and torch.xpu.is_available():
+    _DEVICE = _XPU
+else:
+    _DEVICE = _CPU
 
-# # lightning imports (from local installation)
-# import lightning as pl
-# from lightning import Trainer
-# from lightning.fabric.strategies import DeepSpeedStrategy
-# from lightning.fabric.loggers import TensorBoardLogger
-# from lightning.pytorch.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
-# from lightning.pytorch.callbacks import ModelCheckpoint
-
-# to make the model and pytorch lightning compatible with Intel hardware 
-#   i) import the ipex module and 
-#   ii) set the device to 'xpu' for the model
-# import intel_extension_for_pytorch as ipex
+# Import pytorch lightning based on device
+if _DEVICE == _XPU:
+    # lightning imports (from local installation)
+    print("*** importing lightning from local")
+    import lightning as pl
+    from lightning import Trainer
+    from lightning.fabric.strategies import DeepSpeedStrategy
+    from lightning.fabric.loggers import TensorBoardLogger
+    from lightning.pytorch.loggers import WandbLogger
+    from lightning.pytorch.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
+    from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor, DeviceStatsMonitor
+    # Additional necessities
+    from lightning.pytorch.plugins.environments import ClusterEnvironment, MPIEnvironment
+    from lightning.pytorch.utilities.model_summary import ModelSummary
+else:
+    # PyTorch Lightning imports
+    print("*** importing pytorch_lightning")
+    import pytorch_lightning as pl
+    from pytorch_lightning import Trainer
+    from pytorch_lightning.strategies import DeepSpeedStrategy
+    from pytorch_lightning.loggers import TensorBoardLogger
+    from pytorch_lightning.loggers import WandbLogger
+    from pytorch_lightning.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
+    from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor, DeviceStatsMonitor
+    # Additional necessities
+    # from pytorch_lightning.plugins.environments import ClusterEnvironment
 
 # DeepSpeed is needed for the DeepSpeedStrategy
 import deepspeed
@@ -55,45 +71,74 @@ import biom3.Stage3.helper_funcs as help_tools
 import biom3.Stage3.PL_wrapper as PL_mod
 from biom3.Stage3.io import prepare_model_ProteoScribe
 
-# from mpi4py import MPI
+
+def prepare_mpi_environment():
+    from mpi4py import MPI
+
+    # DDP: Set environmental variables used by PyTorch
+    SIZE = MPI.COMM_WORLD.Get_size() # Total number of processes
+    RANK = MPI.COMM_WORLD.Get_rank() # Global rank of the process
+    LOCAL_RANK = os.environ.get('PALS_LOCAL_RANKID', '0') # Local rank of the process on the node
+    NODE_RANK = os.environ.get('PALS_NODE_RANKID', '0') # Node rank of the process
+
+    MASTER_ADDR = socket.gethostname() if RANK == 0 else None
+    MASTER_ADDR = MPI.COMM_WORLD.bcast(MASTER_ADDR, root=0)
+
+    os.environ['RANK'] = str(RANK) # Global rank
+    os.environ['LOCAL_RANK'] = str(LOCAL_RANK) # Local rank
+    os.environ['WORLD_SIZE'] = str(SIZE) # Total number of processes
+    os.environ['NODE_RANK'] = str(NODE_RANK) # Node rank
+
+    # Set master address and port for distributed training
+    os.environ['MASTER_ADDR'] = f"{MASTER_ADDR}.hsn.cm.aurora.alcf.anl.gov"
+    os.environ['MASTER_PORT'] = str(2345 + int(os.environ.get('NODE_RANK', 0)) % 1000)
+
+    print(f"DDP: Hi from rank {RANK} of {SIZE} (total number of nodes: {SIZE/6 if SIZE >=6 else 1}) with local rank {LOCAL_RANK}. {MASTER_ADDR}")
+
+    # DDP: Initialize distributed communication with xccl backend
+    if not torch.distributed.is_initialized():
+        torch.distributed.init_process_group(backend='xccl', init_method='env://', rank=int(RANK), world_size=int(SIZE))
+
+    # DDP: Pin XPU to local rank
+    torch.xpu.set_device(int(LOCAL_RANK))
 
 
-# class MyClusterEnvironment(ClusterEnvironment):
-#     @property
-#     def creates_processes_externally(self) -> bool:
-#         """Return True if the cluster is managed (you don't launch processes yourself)"""
-#         return True
+class MyClusterEnvironment(ClusterEnvironment):
+    @property
+    def creates_processes_externally(self) -> bool:
+        """Return True if the cluster is managed (you don't launch processes yourself)"""
+        return True
 
-#     def world_size(self) -> int:
-#         return int(os.environ["WORLD_SIZE"])
+    def world_size(self) -> int:
+        return int(os.environ["WORLD_SIZE"])
 
-#     def global_rank(self) -> int:
-#         return int(os.environ["RANK"])
+    def global_rank(self) -> int:
+        return int(os.environ["RANK"])
 
-#     def local_rank(self) -> int:
-#         return int(os.environ["LOCAL_RANK"])
+    def local_rank(self) -> int:
+        return int(os.environ["LOCAL_RANK"])
 
-#     def node_rank(self) -> int:
-#         return int(os.environ["NODE_RANK"])
+    def node_rank(self) -> int:
+        return int(os.environ["NODE_RANK"])
 
-#     @property
-#     def main_address(self) -> str:
-#         return os.environ["MASTER_ADDR"]
+    @property
+    def main_address(self) -> str:
+        return os.environ["MASTER_ADDR"]
 
-#     @property
-#     def main_port(self) -> int:
-#         return int(os.environ["MASTER_PORT"])
+    @property
+    def main_port(self) -> int:
+        return int(os.environ["MASTER_PORT"])
 
-#     def set_world_size(self, size:int) -> None:
-#         pass
+    def set_world_size(self, size:int) -> None:
+        pass
 
-#     def set_global_rank(self, rank:int) -> None:
-#         pass
+    def set_global_rank(self, rank:int) -> None:
+        pass
 
-#     @staticmethod
-#     def detect() -> bool:
-#         """Detects the environment settings corresponding to this cluster and returns ``True`` if they match."""
-#         return True
+    @staticmethod
+    def detect() -> bool:
+        """Detects the environment settings corresponding to this cluster and returns ``True`` if they match."""
+        return True
 
 
 def get_args(parser):
@@ -151,7 +196,8 @@ def get_args(parser):
                         help='path to checkpoint directory')
     parser.add_argument('--checkpoint-prefix', default='channels',
                         help='prefix for local checkpoint')
-    parser.add_argument('--device', default='cuda', type=str,
+    parser.add_argument('--device', default='cuda', type=str, 
+                        choices=["cpu", "cuda", "xpu"],
                         help='computational device')
     parser.add_argument('--model_option', default='transformer', type=str,
                         choices=['Unet', 'transformer'],
@@ -362,7 +408,7 @@ def compile_model(
     model = prepare_model_ProteoScribe(
         config_args=args,
         weights_fpath=args.pretrained_weights,
-        device="cuda",
+        device=args.device,
         strict=True,
         eval=False,
         attempt_correction=True,
@@ -1072,10 +1118,10 @@ def train_model(
         
 
     # Monitor learning rate changes
-    lr_monitor = pl.callbacks.LearningRateMonitor(logging_interval='step')
+    lr_monitor = LearningRateMonitor(logging_interval='step')
 
     # Monitor GPU usage
-    gpu_logger = pl.callbacks.DeviceStatsMonitor()
+    gpu_logger = DeviceStatsMonitor()
 
     # Configure checkpoint strategy based on dataset type
     if pfam_data_root is None:
@@ -1105,7 +1151,7 @@ def train_model(
         'enable_checkpointing': True,
         'devices': gpu_devices,
         'num_nodes': num_nodes,
-        'accelerator': 'cuda',
+        'accelerator': "gpu",
         'strategy': 'deepspeed_stage_2',  # TODO: use strategy defined above?
         'accumulate_grad_batches': acc_grad_batches,
         'logger': loggers,
@@ -1113,6 +1159,8 @@ def train_model(
         'callbacks': [checkpoint_callback, lr_monitor, gpu_logger],
         # 'plugins': [MyClusterEnvironment()]  # added a la multinode_PL_train_stage3
     }
+    if _DEVICE == _XPU:
+        trainer_params["plugins"] = MyClusterEnvironment()
 
     # Configure training mode: epoch-based or step-based
     if pfam_data_root is None:
@@ -1170,6 +1218,9 @@ def train_model(
 
 
 def main(args, use_hydra=False, ds_config=None,):
+
+    if _DEVICE == _XPU:
+        prepare_mpi_environment()
 
     # SIZE = MPI.COMM_WORLD.Get_size() # Total number of processes
     # RANK = MPI.COMM_WORLD.Get_rank() # Global rank of the process

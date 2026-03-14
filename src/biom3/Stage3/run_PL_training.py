@@ -34,7 +34,6 @@ else:
 # Import pytorch lightning based on device
 if _DEVICE == _XPU:
     # lightning imports (from local installation)
-    print("*** importing lightning from local")
     import lightning as pl
     from lightning import Trainer
     from lightning.fabric.strategies import DeepSpeedStrategy
@@ -47,7 +46,6 @@ if _DEVICE == _XPU:
     from lightning.pytorch.utilities.model_summary import ModelSummary
 else:
     # PyTorch Lightning imports
-    print("*** importing pytorch_lightning")
     import pytorch_lightning as pl
     from pytorch_lightning import Trainer
     from pytorch_lightning.strategies import DeepSpeedStrategy

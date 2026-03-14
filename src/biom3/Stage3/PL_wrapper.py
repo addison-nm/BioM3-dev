@@ -275,7 +275,7 @@ class PL_ProtARDM(pl.LightningModule):
             loss = train_tuple[0]
             metrics = train_tuple[1]
 
-        if realization_idx == 0:
+        if realization_idx == 0: # and self.global_rank == 0:
             gpu_memory_usage = helper_tools.print_gpu_initialization()
             self.log(f"{stage}_gpu_memory_usage", gpu_memory_usage, sync_dist=True)
 

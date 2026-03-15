@@ -1,11 +1,11 @@
 #!/bin/bash -l
 #PBS -A NLDesignProtein
-#PBS -N pretrain_scratch_v1_n2
-#PBS -l walltime=00:30:00
-#PBS -l select=8
+#PBS -N pretrain_nblocks1
+#PBS -l walltime=1:00:00
+#PBS -l select=256
 #PBS -l place=scatter
 #PBS -l filesystems=flare
-#PBS -q debug-scaling
+#PBS -q prod
 #PBS -j oe
 
 
@@ -19,8 +19,8 @@ module load hdf5/1.14.6
 # Configurations to edit
 config_dir=./arglists
 config_name=config_pretrain_scratch_v1
-num_nodes=8
-epochs=5
+num_nodes=256
+epochs=100
 resume_from_checkpoint=None
 
 # Constant configurations

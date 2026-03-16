@@ -234,7 +234,7 @@ class exp_weight_time_sample:
 def sample_random_index_for_sampling(
         batch_size: int,
         seq_length: int,
-        device: str='cuda',
+        device: str='xpu',
         option: str='random'
     ) -> any:
     """

@@ -13,7 +13,7 @@
 projdir=${PBS_O_WORKDIR}  # Should submit job from the BioM3-dev directory
 cd ${projdir}
 
-module use frameworks
+module load frameworks
 source ./venvs/biom3-env/bin/activate
 
 # Configurations to edit
@@ -34,6 +34,8 @@ version_name=${config_name/config_/}_n${num_nodes}_d${num_devices}_e${epochs}_V$
 # Direct output to log file
 log_fpath=logs/run_logs/pretraining/${version_name}.${PBS_JOBID}.o
 
+source environment.sh
+export NUMEXPR_MAX_THREADS=64
 ./scripts/pretraining/pretrain_multinode.sh \
     ${config_dir} \
     ${config_name} \

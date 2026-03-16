@@ -24,5 +24,4 @@ def test_pytorch_lightning_imports():
 def test_stage3_imports():
     import biom3.Stage3.preprocess
     import biom3.Stage3.cond_diff_transformer_layer
-    import biom3.Stage3.helper_funcs
     import biom3.Stage3.PL_wrapper

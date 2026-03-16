@@ -20,19 +20,11 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-# Set global device based on availability
-_CUDA = "cuda"
-_XPU = "xpu"
-_CPU = "cpu"
-if torch.cuda.is_available():
-    _DEVICE = _CUDA
-elif hasattr(torch, "xpu") and torch.xpu.is_available():
-    _DEVICE = _XPU
-else:
-    _DEVICE = _CPU
+# ----- Retrieve available device -----
+from biom3.backend.device import BACKEND_NAME, _XPU
 
 # Import pytorch lightning based on device
-if _DEVICE == _XPU:
+if BACKEND_NAME == _XPU:
     # lightning imports (from local installation)
     import lightning as pl
     from lightning import Trainer
@@ -65,9 +57,9 @@ import wandb
 # Custom modules
 import biom3.Stage3.preprocess as prep
 import biom3.Stage3.cond_diff_transformer_layer as mod
-import biom3.Stage3.helper_funcs as help_tools
 import biom3.Stage3.PL_wrapper as PL_mod
 from biom3.Stage3.io import prepare_model_ProteoScribe
+from biom3.backend.device import print_gpu_initialization
 
 
 def prepare_mpi_environment():
@@ -99,6 +91,11 @@ def prepare_mpi_environment():
 
     # DDP: Pin XPU to local rank
     torch.xpu.set_device(int(LOCAL_RANK))
+
+    print("***")
+    torch.xpu.device_count()
+    torch.xpu.get_device_properties()
+    print("***")
 
 
 class MyClusterEnvironment(ClusterEnvironment):
@@ -719,7 +716,7 @@ def clear_gpu_cache():
         None
     """
     torch.set_float32_matmul_precision('medium')
-    torch.cuda.empty_cache()
+    # torch.cuda.empty_cache()
     # torch.xpu.empty_cache()
     gc.collect()
     return
@@ -844,7 +841,7 @@ def load_model(
     # Ensure diffusion steps are sufficient for data dimensions
     if diffusion_steps < int(w*h):
         print('Make sure that the number of diffusion steps is equal to or greather than the data cardinality')
-    help_tools.print_gpu_initialization()
+    print_gpu_initialization()
     # Compile model architecture
     PL_model = compile_model(
             args=args,
@@ -1030,6 +1027,7 @@ def train_model(
     Returns:
         None - results are saved to the paths specified in args
     """
+    print('Beginning Training...')
     # Note: Nested args must be accessed via dictionaries, not attributes.
     tb_logger_path = args.tb_logger_path
     tb_logger_folder = args.tb_logger_folder
@@ -1060,7 +1058,7 @@ def train_model(
         print(f"Scaling learning rate with effective batch size: " + 
               f"num_nodes x gpu_devices = {num_nodes} x {gpu_devices} = {n}")
         args.lr = args.lr * n
-        print(f"Effective learning rate: {args.lr}")
+    print(f"Effective learning rate: {args.lr}")
     
     # Configure DeepSpeed optimization settings
     if ds_config is None:
@@ -1093,6 +1091,7 @@ def train_model(
     loggers = []
 
     # Set up TensorBoard logging
+    print(f"Setting up TensorBoard logging...")
     tb_logger = TensorBoardLogger(
         os.path.join(tb_logger_path, tb_logger_folder), 
         version=version_name
@@ -1100,6 +1099,7 @@ def train_model(
     loggers.append(tb_logger)
 
     # Set up Weights&Biases logging
+    print(f"Setting up Weights&Biases logging...")
     wandb_logger = None
     if use_wandb:
         wandb_logger = WandbLogger(
@@ -1116,13 +1116,17 @@ def train_model(
         
 
     # Monitor learning rate changes
+    print(f"Setting up LearningRateMonitor...")
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
     # Monitor GPU usage
+    print(f"Setting up DeviceStatesMonitor...")
     gpu_logger = DeviceStatsMonitor()
+    print("Done")
 
     # Configure checkpoint strategy based on dataset type
     if pfam_data_root is None:
+        print(f"Configuring ModelCheckpoint...")
         checkpoint_callback = ModelCheckpoint(
             dirpath=os.path.join(tb_logger_path, tb_logger_folder, 'checkpoints', version_name),
             save_top_k=2,
@@ -1131,7 +1135,9 @@ def train_model(
             mode="min",
             save_last=True
         )
+        print(f"Done")
     else:
+        print(f"Configuring ModelCheckpoint...")
         checkpoint_callback = ModelCheckpoint(
             dirpath=os.path.join(tb_logger_path, tb_logger_folder, 'checkpoints', version_name),
             save_top_k=2,
@@ -1141,6 +1147,7 @@ def train_model(
             save_last=True,
             every_n_train_steps=log_every_n_steps  # Save checkpoints periodically by steps
         )
+        print(f"Done")
 
     # Define common trainer parameters 
     trainer_params = {
@@ -1149,7 +1156,7 @@ def train_model(
         'enable_checkpointing': True,
         'devices': gpu_devices,
         'num_nodes': num_nodes,
-        'accelerator': "gpu",
+        'accelerator': "xpu",
         'strategy': 'deepspeed_stage_2',  # TODO: use strategy defined above?
         'accumulate_grad_batches': acc_grad_batches,
         'logger': loggers,
@@ -1157,8 +1164,8 @@ def train_model(
         'callbacks': [checkpoint_callback, lr_monitor, gpu_logger],
         # 'plugins': [MyClusterEnvironment()]  # added a la multinode_PL_train_stage3
     }
-    if _DEVICE == _XPU:
-        trainer_params["plugins"] = MyClusterEnvironment()
+    # if _DEVICE == _XPU:
+    #     trainer_params["plugins"] = [MyClusterEnvironment()]
 
     # Configure training mode: epoch-based or step-based
     if pfam_data_root is None:
@@ -1181,7 +1188,11 @@ def train_model(
         # trainer_params['precision'] = precision
 
     # Initialize trainer with configured parameters
+    trainer_params['num_sanity_val_steps'] = 0
+    print('Initializing Trainer...')
     trainer = Trainer(**trainer_params)
+    print('Done')
+    # trainer.strategy.config["zero_force_ds_cpu_optimizer"] = False
 
     # wrap optimizer and model with intel extension for pytorch 
     # optimizer = torch.optim.AdamW(PL_model.parameters(), lr=lr)
@@ -1204,7 +1215,7 @@ def train_model(
             print('Continue training Proteoscribe in phase 2 ...')
             trainer.fit(PL_model, data_module, ckpt_path=resume_from_checkpoint)
 
-    help_tools.print_gpu_initialization()
+    print_gpu_initialization()
 
     # Save trained model in multiple formats
     save_model(
@@ -1217,8 +1228,7 @@ def train_model(
 
 def main(args, use_hydra=False, ds_config=None,):
 
-    if _DEVICE == _XPU:
-        prepare_mpi_environment()
+    print("Running PL training script")
 
     # SIZE = MPI.COMM_WORLD.Get_size() # Total number of processes
     # RANK = MPI.COMM_WORLD.Get_rank() # Global rank of the process
@@ -1230,14 +1240,6 @@ def main(args, use_hydra=False, ds_config=None,):
     swissprot_data_root = args.swissprot_data_root
     pfam_data_root = args.pfam_data_root
     facilitator = args.facilitator
-    
-    use_wandb = args.wandb
-    wandb_entity = args.wandb_entity
-    wandb_project = args.wandb_project
-    wandb_dir = args.wandb_logging_dir
-    wandb_tags = args.wandb_tags
-
-    
 
     # ----- Clear the GPU cache -----
     clear_gpu_cache()

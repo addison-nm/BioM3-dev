@@ -1,3 +1,7 @@
+"""XPU specific functions
+
+"""
+
 import dpctl
 import psutil
 import os
@@ -26,29 +30,3 @@ def print_memory_usage():
     memory_in_megabytes = memory_in_bytes / (1024 ** 2)
     print(f"CPU memory used by this script: {memory_in_megabytes:.2f} MB")
     return memory_in_megabytes
-
-def print_summary(result):
-    print(f"Time: {result.metrics['train_runtime']:.2f}")
-    print(f"Samples/second: {result.metrics['train_samples_per_second']:.2f}")
-    print_gpu_utilization()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

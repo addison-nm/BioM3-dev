@@ -4,20 +4,11 @@ from torch import nn, optim
 from torch.nn import functional as F
 from torch.distributions import OneHotCategorical
 
-
-# Set global device based on availability
-_CUDA = "cuda"
-_XPU = "xpu"
-_CPU = "cpu"
-if torch.cuda.is_available():
-    _DEVICE = _CUDA
-elif hasattr(torch, "xpu") and torch.xpu.is_available():
-    _DEVICE = _XPU
-else:
-    _DEVICE = _CPU
+# ----- Retrieve available device -----
+from biom3.backend.device import BACKEND_NAME, _XPU
 
 # ----- PyTorch Lightning Framework -----
-if _DEVICE == _XPU:
+if BACKEND_NAME == _XPU:
     # lightning imports (from local installation)
     import lightning as pl
     from lightning import Trainer, seed_everything
@@ -57,10 +48,9 @@ import copy
 # ----- Custom Modules & Project-Specific Imports -----
 from biom3.Stage3.DSEma import moving_average, clone_zero_model  # EMA implementation
 import biom3.Stage3.transformer_training_helper as trainer_tools
-import biom3.Stage3.helper_funcs as helper_tools
 import biom3.Stage3.eval_metrics as eval_funcs
 import biom3.Stage3.preprocess as prep
-
+from biom3.backend.device import print_gpu_initialization
 
 
 class PL_ProtARDM(pl.LightningModule):
@@ -290,7 +280,7 @@ class PL_ProtARDM(pl.LightningModule):
             metrics = train_tuple[1]
 
         if realization_idx == 0:
-            gpu_memory_usage = helper_tools.print_gpu_initialization()
+            gpu_memory_usage = print_gpu_initialization()
             self.log(f"{stage}_gpu_memory_usage", gpu_memory_usage, sync_dist=True)
 
         sync_dist = True if 'val' in stage else False
@@ -309,7 +299,7 @@ class PL_ProtARDM(pl.LightningModule):
             self.log(f"{stage}_fut_ppl", metrics[8], on_step=True, on_epoch=True, sync_dist=sync_dist)
             self.log(f"{stage}_pos_entropy", metrics[9], on_step=True, on_epoch=True, sync_dist=sync_dist)
 
-        torch.cuda.empty_cache()
+        torch.xpu.memory.empty_cache()
         return {'loss': loss}
 
     def training_step(

@@ -20,9 +20,9 @@ import time
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 
 # our packages
-import biom3.Stage1.helper_funcs as helper_tools
 import biom3.Stage1.preprocess as prep
 import biom3.Stage1.model as mod
+from biom3.backend.device import print_gpu_initialization, print_memory_usage
 
 
 ######################
@@ -123,7 +123,7 @@ class PL_PEN_CL(pl.LightningModule):
             self.log(final_key, metric_dict[key], prog_bar=True if 'f1' in key else False, on_step=True, on_epoch=True, sync_dist=True)
         
         if batch_idx == 0:
-            gpu_memory_usage = helper_tools.print_gpu_initialization()
+            gpu_memory_usage = print_gpu_initialization()
             self.log(f'gpu_memory_usage', gpu_memory_usage, sync_dist=True)
 
         return {'loss': loss}
@@ -543,7 +543,7 @@ class mask_PL_PEN_CL(pl.LightningModule):
             self.log(final_key, metric_dict[key], prog_bar=True if 'f1' in key else False, on_step=True, on_epoch=True, sync_dist=True)
         
         if batch_idx == 0:
-            gpu_memory_usage = helper_tools.print_gpu_initialization()
+            gpu_memory_usage = print_gpu_initialization()
             self.log(f'gpu_memory_usage', gpu_memory_usage, sync_dist=True)
 
         return {'loss': loss}
@@ -1104,11 +1104,11 @@ class pfam_PL_PEN_CL(pl.LightningModule):
 
         # Log GPU memory usage at the beginning of the training.
         if batch_idx == 0:
-            gpu_memory_usage = helper_tools.print_gpu_initialization()
+            gpu_memory_usage = print_gpu_initialization()
             self.log(f'gpu_memory_usage', gpu_memory_usage, sync_dist=True)
         
         # log CPU memory
-        memory_usage = helper_tools.print_memory_usage()
+        memory_usage = print_memory_usage()
         self.log(f'memory_usage', memory_usage, sync_dist=True)
  
         return {'loss': loss}
@@ -1252,7 +1252,7 @@ class pfam_PL_PEN_CL(pl.LightningModule):
         self.log('valid_loss_text_mask', loss_text_mask, prog_bar=False, on_step=True, on_epoch=True, sync_dist=True)
         self.log('valid_loss_seq_mask', loss_sequence_mask, prog_bar=False, on_step=True, on_epoch=True, sync_dist=True)
         # log CPU memory
-        memory_usage = helper_tools.print_memory_usage()
+        memory_usage = print_memory_usage()
         self.log(f'memory_usage', memory_usage, sync_dist=True)
  
         # track metrics

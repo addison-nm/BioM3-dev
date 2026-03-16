@@ -95,15 +95,12 @@ cd /path/to/BioM3-dev
 # Create environment, using packages from prebuilt one
 python -m venv venvs/${ENV_NAME} --system-site-packages
 source "venvs/${ENV_NAME}/bin/activate"
-# Unzip and install custom lightning package
-unzip lightning.zip
-cd lightning
-python -m pip install -e . --no-build-isolation
-cd ..
+# Install custom lightning package
+python -m pip install -e ./lightning --no-build-isolation
 # Install BioM3
 python -m pip install -e .
 # Install additional dependencies
-python -m pip install -r requirements_aurora.txt --ignore-installed
+python -m pip install -r requirements_aurora.txt
 ```
 
 ## Usage

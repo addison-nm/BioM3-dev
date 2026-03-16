@@ -59,7 +59,7 @@ import biom3.Stage3.preprocess as prep
 import biom3.Stage3.cond_diff_transformer_layer as mod
 import biom3.Stage3.PL_wrapper as PL_mod
 from biom3.Stage3.io import prepare_model_ProteoScribe
-from biom3.backend.device import print_gpu_initialization
+from biom3.backend.device import print_gpu_initialization, get_device
 
 
 def prepare_mpi_environment():
@@ -1156,16 +1156,13 @@ def train_model(
         'enable_checkpointing': True,
         'devices': gpu_devices,
         'num_nodes': num_nodes,
-        'accelerator': "xpu",
+        'accelerator': args.device,
         'strategy': 'deepspeed_stage_2',  # TODO: use strategy defined above?
         'accumulate_grad_batches': acc_grad_batches,
         'logger': loggers,
         'log_every_n_steps': log_every_n_steps,
         'callbacks': [checkpoint_callback, lr_monitor, gpu_logger],
-        # 'plugins': [MyClusterEnvironment()]  # added a la multinode_PL_train_stage3
     }
-    # if _DEVICE == _XPU:
-    #     trainer_params["plugins"] = [MyClusterEnvironment()]
 
     # Configure training mode: epoch-based or step-based
     if pfam_data_root is None:
@@ -1177,15 +1174,9 @@ def train_model(
         #             args=args,
         #             PL_model=PL_model
         #     )
-
         trainer_params['max_steps'] = max_steps
         trainer_params['val_check_interval'] = val_check_interval
         trainer_params['limit_val_batches'] = limit_val_batches
-
-        # trainer_params['accelerator'] = 'gpu'
-        # trainer_params['devices'] = gpu_devices
-        # trainer_params['num_nodes'] = num_nodes
-        # trainer_params['precision'] = precision
 
     # Initialize trainer with configured parameters
     trainer_params['num_sanity_val_steps'] = 0

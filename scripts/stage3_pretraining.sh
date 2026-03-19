@@ -91,3 +91,4 @@ biom3_pretrain_stage3 \
 	--wandb_entity thenaturalmachine \
 	--wandb_project "BioM3-dev" \
 	--wandb_name ${version_name} \
+	--pretrained_weights ${pretrained_weights}

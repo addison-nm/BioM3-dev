@@ -251,10 +251,11 @@ def test_train_from_pretrained_weights(
     [1e-4, 1e-4, False],
     [0., 0., True],
 ])
+@pytest.mark.parametrize("device", ["cuda", "xpu"])
 def test_resume_training(
         argstring_fpath1, argstring_fpath2, expect_error, 
         exp_state_dict_path1, exp_state_dict_path2, learning_rate1, learning_rate2, 
-        exp_same_weights
+        exp_same_weights, device
     ):
     """
     Tests that model training can resume from a saved checkpoint. Runs initial
@@ -267,6 +268,12 @@ def test_resume_training(
         training_args_resume_from_checkpoint_v1a.txt
         training_args_resume_from_checkpoint_v1b.txt
     """
+    # Skip device if not available on machine
+    if device == "cuda" and not torch.cuda.is_available():
+        pytest.skip(reason="device=cuda and cuda not available")
+    elif device == "xpu" and not torch.xpu.is_available():
+        pytest.skip(reason="device=xpu and xpu not available")
+    
     num_epochs1 = 2
     num_epochs2 = 3 # train for additional epoch(s) (n2 - n1)
 
@@ -278,12 +285,14 @@ def test_resume_training(
     # Parse and modify args for initial run
     args1 = parse_arguments(argstring1)
     prefix_paths(args1)
+    args1.device = device
     args1.epochs = num_epochs1
     args1.lr = learning_rate1
 
     # Parse and modify args for secondary run
     args2 = parse_arguments(argstring2)
     prefix_paths(args2)
+    args2.device = device
     args2.epochs = num_epochs2
     args2.lr = learning_rate2
 
@@ -344,10 +353,12 @@ def test_resume_training(
     [True, -2, -2],  # unspecified blocks, unspecified layers -> last block, last layer
     [True, 1, -2],  # last block, unspecified layers -> last block, last layer
 ])
+@pytest.mark.parametrize("device", ["cuda", "xpu"])
 def test_finetuning(
         argstring_fpath, expect_error, 
         weights_orig_fpath, exp_ckpt_fpath, 
-        finetune_output_layers, finetune_last_n_blocks, finetune_last_n_layers
+        finetune_output_layers, finetune_last_n_blocks, finetune_last_n_layers,
+        device
     ):
     """
     Tests that a model can be finetuned from pretrained weights, specifying 
@@ -357,6 +368,12 @@ def test_finetuning(
     Uses argfile(s):
         finetuning_args_v1
     """
+    # Skip device if not available on machine
+    if device == "cuda" and not torch.cuda.is_available():
+        pytest.skip(reason="device=cuda and cuda not available")
+    elif device == "xpu" and not torch.xpu.is_available():
+        pytest.skip(reason="device=xpu and xpu not available")
+
     num_epochs = 1
 
     # Parse the command line string
@@ -366,6 +383,7 @@ def test_finetuning(
     # Parse and modify args
     args = parse_arguments(argstring)
     prefix_paths(args)
+    args.device = device
     args.epochs = num_epochs
     args.finetune_output_layers = finetune_output_layers
     args.finetune_last_n_blocks = finetune_last_n_blocks
@@ -454,10 +472,11 @@ def test_finetuning(
     [1e-4, 1e-4, False],
     [0., 0., True],
 ])
+@pytest.mark.parametrize("device", ["cuda", "xpu"])
 def test_start_phase2_training(
         argstring_fpath1, argstring_fpath2, expect_error, 
         exp_state_dict_path1, exp_state_dict_path2, learning_rate1, learning_rate2, 
-        exp_same_weights
+        exp_same_weights, device
     ):
     """
     Tests phase 2 model training, in which a pretrained model is loaded and 
@@ -470,6 +489,12 @@ def test_start_phase2_training(
         training_args_phase2_training_v1a
         training_args_phase2_training_v1b
     """
+    # Skip device if not available on machine
+    if device == "cuda" and not torch.cuda.is_available():
+        pytest.skip(reason="device=cuda and cuda not available")
+    elif device == "xpu" and not torch.xpu.is_available():
+        pytest.skip(reason="device=xpu and xpu not available")
+
     # Parse the command line string
     argstring1 = get_args(argstring_fpath1)
     argstring2 = get_args(argstring_fpath2)
@@ -480,12 +505,14 @@ def test_start_phase2_training(
     # Parse and modify args for initial run
     args1 = parse_arguments(argstring1)
     prefix_paths(args1)
+    args1.device = device
     args1.lr = learning_rate1
 
     # Parse and modify args for secondary run
     args2 = parse_arguments(argstring2)
     orig_pretrained_weights = args2.pretrained_weights
     prefix_paths(args2)
+    args2.device = device
     args2.pretrained_weights = os.path.join(TMPDIR, orig_pretrained_weights)
     args2.lr = learning_rate2
 

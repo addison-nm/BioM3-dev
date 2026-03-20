@@ -62,80 +62,6 @@ from biom3.Stage3.io import prepare_model_ProteoScribe
 from biom3.backend.device import print_gpu_initialization, get_device
 
 
-def prepare_mpi_environment():
-    from mpi4py import MPI
-
-    # DDP: Set environmental variables used by PyTorch
-    SIZE = MPI.COMM_WORLD.Get_size() # Total number of processes
-    RANK = MPI.COMM_WORLD.Get_rank() # Global rank of the process
-    LOCAL_RANK = os.environ.get('PALS_LOCAL_RANKID', '0') # Local rank of the process on the node
-    NODE_RANK = os.environ.get('PALS_NODE_RANKID', '0') # Node rank of the process
-
-    MASTER_ADDR = socket.gethostname() if RANK == 0 else None
-    MASTER_ADDR = MPI.COMM_WORLD.bcast(MASTER_ADDR, root=0)
-
-    os.environ['RANK'] = str(RANK) # Global rank
-    os.environ['LOCAL_RANK'] = str(LOCAL_RANK) # Local rank
-    os.environ['WORLD_SIZE'] = str(SIZE) # Total number of processes
-    os.environ['NODE_RANK'] = str(NODE_RANK) # Node rank
-
-    # Set master address and port for distributed training
-    os.environ['MASTER_ADDR'] = f"{MASTER_ADDR}.hsn.cm.aurora.alcf.anl.gov"
-    os.environ['MASTER_PORT'] = str(2345 + int(os.environ.get('NODE_RANK', 0)) % 1000)
-
-    print(f"DDP: Hi from rank {RANK} of {SIZE} (total number of nodes: {SIZE/6 if SIZE >=6 else 1}) with local rank {LOCAL_RANK}. {MASTER_ADDR}")
-
-    # DDP: Initialize distributed communication with xccl backend
-    if not torch.distributed.is_initialized():
-        torch.distributed.init_process_group(backend='xccl', init_method='env://', rank=int(RANK), world_size=int(SIZE))
-
-    # DDP: Pin XPU to local rank
-    torch.xpu.set_device(int(LOCAL_RANK))
-
-    print("***")
-    torch.xpu.device_count()
-    torch.xpu.get_device_properties()
-    print("***")
-
-
-class MyClusterEnvironment(ClusterEnvironment):
-    @property
-    def creates_processes_externally(self) -> bool:
-        """Return True if the cluster is managed (you don't launch processes yourself)"""
-        return True
-
-    def world_size(self) -> int:
-        return int(os.environ["WORLD_SIZE"])
-
-    def global_rank(self) -> int:
-        return int(os.environ["RANK"])
-
-    def local_rank(self) -> int:
-        return int(os.environ["LOCAL_RANK"])
-
-    def node_rank(self) -> int:
-        return int(os.environ["NODE_RANK"])
-
-    @property
-    def main_address(self) -> str:
-        return os.environ["MASTER_ADDR"]
-
-    @property
-    def main_port(self) -> int:
-        return int(os.environ["MASTER_PORT"])
-
-    def set_world_size(self, size:int) -> None:
-        pass
-
-    def set_global_rank(self, rank:int) -> None:
-        pass
-
-    @staticmethod
-    def detect() -> bool:
-        """Detects the environment settings corresponding to this cluster and returns ``True`` if they match."""
-        return True
-
-
 def get_args(parser):
     """
     Configure argument parser with all training, model, and data parameters.
@@ -1003,6 +929,7 @@ def train_model(
         PL_model,
         data_module,
         ds_config=None,
+        verbosity=1,
     ):
     """
     Train a PyTorch Lightning model with DeepSpeed distributed optimization.
@@ -1027,7 +954,8 @@ def train_model(
     Returns:
         None - results are saved to the paths specified in args
     """
-    print('Beginning Training...')
+    if verbosity:
+        print('Beginning Training...')
     # Note: Nested args must be accessed via dictionaries, not attributes.
     tb_logger_path = args.tb_logger_path
     tb_logger_folder = args.tb_logger_folder
@@ -1091,7 +1019,8 @@ def train_model(
     loggers = []
 
     # Set up TensorBoard logging
-    print(f"Setting up TensorBoard logging...")
+    if verbosity:
+        print(f"Setting up TensorBoard logging...")
     tb_logger = TensorBoardLogger(
         os.path.join(tb_logger_path, tb_logger_folder), 
         version=version_name
@@ -1099,7 +1028,8 @@ def train_model(
     loggers.append(tb_logger)
 
     # Set up Weights&Biases logging
-    print(f"Setting up Weights&Biases logging...")
+    if verbosity:
+        print(f"Setting up Weights&Biases logging...")
     wandb_logger = None
     if use_wandb:
         wandb_logger = WandbLogger(
@@ -1116,17 +1046,19 @@ def train_model(
         
 
     # Monitor learning rate changes
-    print(f"Setting up LearningRateMonitor...")
+    if verbosity:
+        print(f"Setting up LearningRateMonitor...")
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
     # Monitor GPU usage
-    print(f"Setting up DeviceStatesMonitor...")
+    if verbosity:
+        print(f"Setting up DeviceStatesMonitor...")
     gpu_logger = DeviceStatsMonitor()
-    print("Done")
 
     # Configure checkpoint strategy based on dataset type
-    if pfam_data_root is None:
+    if verbosity:
         print(f"Configuring ModelCheckpoint...")
+    if pfam_data_root is None:
         checkpoint_callback = ModelCheckpoint(
             dirpath=os.path.join(tb_logger_path, tb_logger_folder, 'checkpoints', version_name),
             save_top_k=2,
@@ -1135,9 +1067,7 @@ def train_model(
             mode="min",
             save_last=True
         )
-        print(f"Done")
     else:
-        print(f"Configuring ModelCheckpoint...")
         checkpoint_callback = ModelCheckpoint(
             dirpath=os.path.join(tb_logger_path, tb_logger_folder, 'checkpoints', version_name),
             save_top_k=2,
@@ -1147,7 +1077,6 @@ def train_model(
             save_last=True,
             every_n_train_steps=log_every_n_steps  # Save checkpoints periodically by steps
         )
-        print(f"Done")
 
     # Define common trainer parameters 
     trainer_params = {
@@ -1179,11 +1108,9 @@ def train_model(
         trainer_params['limit_val_batches'] = limit_val_batches
 
     # Initialize trainer with configured parameters
-    trainer_params['num_sanity_val_steps'] = 0
-    print('Initializing Trainer...')
+    if verbosity:
+        print('Initializing Trainer...')
     trainer = Trainer(**trainer_params)
-    print('Done')
-    # trainer.strategy.config["zero_force_ds_cpu_optimizer"] = False
 
     # wrap optimizer and model with intel extension for pytorch 
     # optimizer = torch.optim.AdamW(PL_model.parameters(), lr=lr)
@@ -1197,13 +1124,16 @@ def train_model(
     else:
         # Pretraining
         if resume_from_checkpoint is None:
-            print("Train from scratch")
+            if verbosity:
+                print("Train from scratch")
             trainer.fit(PL_model, data_module)
         elif start_pfam_trainer:
-            print('Start training Proteoscribe in phase 2 ...')
+            if verbosity:
+                print('Start training Proteoscribe in phase 2 ...')
             trainer.fit(PL_model, data_module)
         else:
-            print('Continue training Proteoscribe in phase 2 ...')
+            if verbosity:
+                print('Continue training Proteoscribe in phase 2 ...')
             trainer.fit(PL_model, data_module, ckpt_path=resume_from_checkpoint)
 
     print_gpu_initialization()
@@ -1218,13 +1148,6 @@ def train_model(
 
 
 def main(args, use_hydra=False, ds_config=None,):
-
-    print("Running PL training script")
-
-    # SIZE = MPI.COMM_WORLD.Get_size() # Total number of processes
-    # RANK = MPI.COMM_WORLD.Get_rank() # Global rank of the process
-    # LOCAL_RANK = os.environ.get('PALS_LOCAL_RANKID', '0') # Local rank of the process on the node
-    # NODE_RANK = os.environ.get('PALS_NODE_RANKID', '0') # Node rank of the process
     
     # ----- Process passed parameters -----
     seed = args.seed

@@ -300,7 +300,7 @@ def main(args):
     print(homology_matrix)
 
     print("\n=== Example raw data elements ===")
-    for k in range(3):
+    for k in range(min(len(acc_id_array), 3)):
         print(f"  acc_id[{k}]:", acc_id_array[k])
         print(f"sequence[{k}]:", protein_array[k])
     

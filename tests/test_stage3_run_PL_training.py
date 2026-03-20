@@ -234,7 +234,7 @@ def test_train_from_pretrained_weights(
     assert not errors, "Errors occurred:\n{}".format("\n".join(errors))
 
 
-@pytest.mark.skip()
+# @pytest.mark.skip()
 @pytest.mark.parametrize(
     "argstring_fpath1, argstring_fpath2, expect_error, exp_state_dict_path1, exp_state_dict_path2", [
     # Test that resuming from a checkpoint succeeds
@@ -320,7 +320,7 @@ def test_resume_training(
     assert not errors, "Errors occurred:\n{}".format("\n".join(errors))
 
 
-@pytest.mark.skip()
+# @pytest.mark.skip()
 @pytest.mark.parametrize(
     "argstring_fpath, expect_error, weights_orig_fpath, exp_ckpt_fpath", [
     # Test that finetuning succeeds and only certain weights change
@@ -437,7 +437,7 @@ def test_finetuning(
     assert not errors, "Errors occurred:\n{}".format("\n".join(errors))
 
 
-@pytest.mark.skip()
+# @pytest.mark.skip()
 @pytest.mark.parametrize(
     "argstring_fpath1, argstring_fpath2, expect_error, exp_state_dict_path1, exp_state_dict_path2", [
     # Test that resumption succeeds

@@ -4,6 +4,12 @@ The Aurora cluster provides access to Intel GPUs, so a different installation is
 In order to run on Intel GPUs, we have modified a custom `lightning` package, which must be included in the installation. Download the zip file and unzip it in the `BioM3-dev` directory.
 
 ```bash
+cd /path/to/BioM3-dev
+cp /flare/NLDesignProtein/lightning.zip .
+unzip lightning.zip
+```
+
+```bash
 ENV_NAME="biom3-env"
 module load frameworks
 cd /path/to/BioM3-dev

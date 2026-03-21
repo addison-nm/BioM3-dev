@@ -5,9 +5,13 @@ In order to run on Intel GPUs, we have modified a custom `lightning` package, wh
 
 ```bash
 cd /path/to/BioM3-dev
-cp /flare/NLDesignProtein/lightning.zip .
-unzip lightning.zip
+# Copy the custom lightning source code into your BioM3-dev directory
+cp /flare/NLDesignProtein/lightning.tar
+# Extract the tar file
+tar -xf lightning.tar
 ```
+
+Now, create the conda environment.
 
 ```bash
 ENV_NAME="biom3-env"

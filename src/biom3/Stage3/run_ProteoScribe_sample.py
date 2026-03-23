@@ -28,14 +28,10 @@ import argparse
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import pytorch_lightning as pl
 
-import biom3.Stage3.PL_wrapper as Stage3_PL_mod
-import biom3.Stage3.cond_diff_transformer_layer as Stage3_mod
 import biom3.Stage3.sampling_analysis as Stage3_sample_tools
 import biom3.Stage3.animation_tools as Stage3_ani_tools
-from biom3.core.io import load_and_prepare_model
+from biom3.Stage3.io import prepare_model_ProteoScribe
 
 
 # Step 0: Argument Parser Function
@@ -51,8 +47,6 @@ def parse_arguments(args):
                         help="Path to save output embeddings")
     parser.add_argument('--seed', type=int, default=0,
                         help="seed for random number generation")
-    parser.add_argument('--load_from_checkpoint', action="store_true",
-                        help="Whether to load model from a Lightning checkpoint.")
     return parser.parse_args(args)
 
 
@@ -77,24 +71,19 @@ def convert_to_namespace(config_dict):
 def prepare_model(args, config_args) ->nn.Module:
     """
     Prepare the model and PyTorch Lightning Trainer using a flat args object.
+
+    Supports raw state dicts (.bin, .pth, .pt), Lightning checkpoints (.ckpt),
+    and sharded DeepSpeed checkpoint directories. Format is auto-detected.
     """
-    model_path = args.model_path
-    device = config_args.device
-    # Initialize the model graph
-    model = Stage3_mod.get_model(
-        args=config_args,
-        data_shape=(config_args.image_size, config_args.image_size),
-        num_classes=config_args.num_classes
-    )
-    # Load model weights
-    model = load_and_prepare_model(
-        model, model_path, 
-        device=device, 
-        strict=True, 
-        eval_mode=True,
+    model = prepare_model_ProteoScribe(
+        config_args=config_args,
+        model_fpath=args.model_path,
+        device=config_args.device,
+        strict=True,
+        eval=True,
         attempt_correction=True,
-    )    
-    print(f"Stage 3 model loaded from: {model_path} (loaded on {device})")
+    )
+    print(f"Stage 3 model loaded from: {args.model_path} (loaded on {config_args.device})")
     return model
 
 
@@ -211,23 +200,7 @@ def main(args):
     embedding_dataset = torch.load(config_args_parser.input_path)
 
     # load model
-    if config_args_parser.load_from_checkpoint:
-        model = Stage3_mod.get_model(
-            args=config_args,
-            data_shape=(config_args.image_size, config_args.image_size),
-            num_classes=config_args.num_classes
-        )
-        loaded_model = Stage3_PL_mod.PL_ProtARDM.load_from_checkpoint(
-            config_args_parser.model_path,
-            args=config_args,
-            model=model
-        )
-        model = loaded_model.model
-        model.eval()
-        model.to(config_args.device)
-        print(f"Stage 3 model loaded from checkpoint: {config_args_parser.model_path} (loaded on {config_args.device})")
-    else:
-        model = prepare_model(args=config_args_parser, config_args=config_args)
+    model = prepare_model(args=config_args_parser, config_args=config_args)
 
     # sample sequences
     design_sequence_dict = batch_stage3_generate_sequences(

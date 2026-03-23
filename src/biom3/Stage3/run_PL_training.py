@@ -419,31 +419,28 @@ def get_protein_dataloader(args=any) -> DataLoader:
 def get_deepspeed_model(args: any, PL_model) -> pl.LightningModule:
     """
     Load a model from a DeepSpeed checkpoint.
-    
-    This function handles the conversion of a DeepSpeed ZeRO checkpoint into a 
-    standard PyTorch state dictionary format and then loads it into the 
-    provided PyTorch Lightning model. The conversion process consolidates 
+
+    This function handles the conversion of a DeepSpeed ZeRO checkpoint into a
+    standard PyTorch state dictionary format and then loads it into the
+    provided PyTorch Lightning model. The conversion process consolidates
     distributed model parameters into a single file.
-    
+
     Args:
         args: Configuration object containing a 'resume_from_checkpoint' path
         PL_model: PyTorch Lightning model structure to load weights into
-        
+
     Returns:
         A PyTorch Lightning module with loaded weights from the checkpoint
     """
-    # save model
-    convert_zero_checkpoint_to_fp32_state_dict(
-        args.resume_from_checkpoint,
-        args.resume_from_checkpoint + '/single_model.pth'
+    PL_model.model = prepare_model_ProteoScribe(
+        config_args=args,
+        model_fpath=args.resume_from_checkpoint,
+        device=args.device,
+        strict=True,
+        eval=False,
+        attempt_correction=True,
     )
-    # load weights
-    loaded_model = PL_model.load_from_checkpoint(
-            args.resume_from_checkpoint + '/single_model.pth',
-            args=args,
-            model=PL_model.model
-    )
-    return loaded_model
+    return PL_model
 
 
 def save_model(
@@ -762,39 +759,42 @@ def load_model(
 
 def load_pretrained_weights(
         PL_model,
-        checkpoint_path: str
+        checkpoint_path: str,
+        args=None,
     ):
     """
-    Load pretrained model weights from a .bin checkpoint file.
-    
-    This function loads model weights saved as a PyTorch state dictionary
-    from a .bin file and applies them to the provided PyTorch Lightning model.
-    It handles missing keys and extra keys gracefully, reporting any issues
-    while still loading compatible weights.
-    
+    Load pretrained model weights into a PyTorch Lightning model.
+
+    Supports raw state dicts (.bin, .pth, .pt), Lightning checkpoints (.ckpt),
+    and sharded DeepSpeed checkpoint directories. Format is auto-detected.
+    Parameter renaming/correction is applied automatically.
+
     Args:
         PL_model: PyTorch Lightning model to load weights into
-        checkpoint_path: Path to the .bin checkpoint file containing model weights
-        
+        checkpoint_path: Path to model weights (file or directory)
+        args: Configuration namespace (used to rebuild model graph if needed).
+              If None, uses PL_model.script_args.
+
     Returns:
         The model with loaded pretrained weights
     """
+    if args is None:
+        args = PL_model.script_args
+
     print(f"Loading pretrained weights from: {checkpoint_path}")
-    
+
     if not os.path.exists(checkpoint_path):
         raise FileNotFoundError(f"Checkpoint file not found: {checkpoint_path}")
-    
-    # Load the state dictionary from the .bin file
-    state_dict = torch.load(checkpoint_path, map_location='cpu')
-    
-    # Load weights into the model, handling potential key mismatches
-    missing_keys, unexpected_keys = PL_model.model.load_state_dict(state_dict, strict=False)
-    
-    if missing_keys:
-        print(f"Warning: Missing keys in checkpoint: {missing_keys}")
-    if unexpected_keys:
-        print(f"Warning: Unexpected keys in checkpoint: {unexpected_keys}")
-    
+
+    PL_model.model = prepare_model_ProteoScribe(
+        config_args=args,
+        model_fpath=checkpoint_path,
+        device='cpu',
+        strict=True,
+        eval=False,
+        attempt_correction=True,
+    )
+
     print("Pretrained weights loaded successfully")
     return PL_model
 

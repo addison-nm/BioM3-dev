@@ -16,8 +16,8 @@ import pytorch_lightning as pl
 from biom3.Stage3.run_ProteoScribe_sample import (
     parse_arguments, main, load_json_config, convert_to_namespace
 )
+from biom3.Stage3.io import build_model_ProteoScribe
 import biom3.Stage3.PL_wrapper as Stage3_PL_mod
-import biom3.Stage3.cond_diff_transformer_layer as Stage3_mod
 
 #####################
 ##  Configuration  ##
@@ -175,11 +175,7 @@ def mini_checkpoint_path():
     config_dict = load_json_config(MINI_CONFIG)
     config_args = convert_to_namespace(config_dict)
     config_args.device = "cpu"
-    model = Stage3_mod.get_model(
-        args=config_args,
-        data_shape=(config_args.image_size, config_args.image_size),
-        num_classes=config_args.num_classes
-    )
+    model = build_model_ProteoScribe(config_args)
     # Load raw weights into model
     state_dict = torch.load(MINI_WEIGHTS, map_location="cpu")
     model.load_state_dict(state_dict, strict=True)
@@ -195,7 +191,7 @@ def mini_checkpoint_path():
 
 @pytest.mark.parametrize("device", ["cpu", "cuda", "xpu"])
 def test_entrypoint_load_from_checkpoint(mini_checkpoint_path, device):
-    """Test that main() works when --load_from_checkpoint is given with a .ckpt file."""
+    """Test that main() works when given a Lightning .ckpt file."""
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip(reason="device=cuda and cuda not available")
     elif device == "xpu" and not torch.xpu.is_available():
@@ -207,7 +203,6 @@ def test_entrypoint_load_from_checkpoint(mini_checkpoint_path, device):
         "-c", MINI_CONFIG,
         "-m", mini_checkpoint_path,
         "-o", output_path,
-        "--load_from_checkpoint",
     ]
     args = parse_arguments(argstring)
     main(args)
@@ -250,7 +245,7 @@ def test_checkpoint_and_weights_produce_same_output(mini_checkpoint_path, device
     elif device == "xpu" and not torch.xpu.is_available():
         pytest.skip(reason="device=xpu and xpu not available")
     seed = 42
-    # Run with raw weights (no --load_from_checkpoint)
+    # Run with raw state dict weights
     os.makedirs(OUTPUTS_DIR, exist_ok=True)
     output_path_raw = os.path.join(OUTPUTS_DIR, "test_raw.pt")
     args_raw = parse_arguments([
@@ -263,7 +258,7 @@ def test_checkpoint_and_weights_produce_same_output(mini_checkpoint_path, device
     main(args_raw)
     result_raw = torch.load(output_path_raw)
     remove_dir(OUTPUTS_DIR)
-    # Run with checkpoint (--load_from_checkpoint)
+    # Run with Lightning checkpoint
     os.makedirs(OUTPUTS_DIR, exist_ok=True)
     output_path_ckpt = os.path.join(OUTPUTS_DIR, "test_ckpt.pt")
     args_ckpt = parse_arguments([
@@ -271,7 +266,6 @@ def test_checkpoint_and_weights_produce_same_output(mini_checkpoint_path, device
         "-c", MINI_CONFIG,
         "-m", mini_checkpoint_path,
         "-o", output_path_ckpt,
-        "--load_from_checkpoint",
         "--seed", str(seed),
     ])
     main(args_ckpt)

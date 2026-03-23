@@ -49,8 +49,10 @@ def parse_arguments(args):
                         help="Path to the pre-trained model weights (pytorch_model.bin)")
     parser.add_argument('-o', '--output_path', type=str, required=True,
                         help="Path to save output embeddings")
-    parser.add_argument('--seed', type=int, default=0, 
+    parser.add_argument('--seed', type=int, default=0,
                         help="seed for random number generation")
+    parser.add_argument('--load_from_checkpoint', action="store_true",
+                        help="Whether to load model from a Lightning checkpoint.")
     return parser.parse_args(args)
 
 
@@ -209,7 +211,23 @@ def main(args):
     embedding_dataset = torch.load(config_args_parser.input_path)
 
     # load model
-    model = prepare_model(args=config_args_parser, config_args=config_args)
+    if config_args_parser.load_from_checkpoint:
+        model = Stage3_mod.get_model(
+            args=config_args,
+            data_shape=(config_args.image_size, config_args.image_size),
+            num_classes=config_args.num_classes
+        )
+        loaded_model = Stage3_PL_mod.PL_ProtARDM.load_from_checkpoint(
+            config_args_parser.model_path,
+            args=config_args,
+            model=model
+        )
+        model = loaded_model.model
+        model.eval()
+        model.to(config_args.device)
+        print(f"Stage 3 model loaded from checkpoint: {config_args_parser.model_path} (loaded on {config_args.device})")
+    else:
+        model = prepare_model(args=config_args_parser, config_args=config_args)
 
     # sample sequences
     design_sequence_dict = batch_stage3_generate_sequences(

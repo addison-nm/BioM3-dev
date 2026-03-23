@@ -12,7 +12,12 @@ from tests.conftest import DATDIR, TMPDIR, remove_dir
 
 import torch
 import numpy as np
-from biom3.Stage3.run_ProteoScribe_sample import parse_arguments, main
+import pytorch_lightning as pl
+from biom3.Stage3.run_ProteoScribe_sample import (
+    parse_arguments, main, load_json_config, convert_to_namespace
+)
+import biom3.Stage3.PL_wrapper as Stage3_PL_mod
+import biom3.Stage3.cond_diff_transformer_layer as Stage3_mod
 
 #####################
 ##  Configuration  ##
@@ -21,11 +26,17 @@ from biom3.Stage3.run_ProteoScribe_sample import parse_arguments, main
 # Directory containing text files with command line arguments
 ARGS_DIR = os.path.join(DATDIR, "entrypoint_args")
 OUTPUTS_DIR = os.path.join(TMPDIR, "outputs")
+CKPT_DIR = os.path.join(TMPDIR, "checkpoints")
 
 # Required weights that need to be downloaded to run entrypoint test
 REQUIRED_DOWNLOADS = [
     "weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin",
 ]
+
+# Test data paths for checkpoint tests
+MINI_WEIGHTS = os.path.join(DATDIR, "models/stage3/weights/minimodel1_weights1.pth")
+MINI_CONFIG = os.path.join(DATDIR, "configs/test_stage3_config_v2.json")
+TEST_EMBEDDINGS = os.path.join(DATDIR, "embeddings/test_Facilitator_embeddings.pt")
 
 def get_args(fpath):
     with open(fpath, 'r') as f:
@@ -149,3 +160,128 @@ def test_reproducibility(
             msg += f"\n  Replicates 1 == Replicates 2: {replicates1}"
             errors.append(msg)
     assert not errors, "Errors occurred:\n{}".format("\n".join(errors))
+
+
+###############################################################################
+######################   CHECKPOINT LOADING TESTS   ###########################
+###############################################################################
+
+@pytest.fixture
+def mini_checkpoint_path():
+    """Create a Lightning checkpoint from the mini model test weights."""
+    os.makedirs(CKPT_DIR, exist_ok=True)
+    ckpt_path = os.path.join(CKPT_DIR, "mini_checkpoint.ckpt")
+    # Load config and build model
+    config_dict = load_json_config(MINI_CONFIG)
+    config_args = convert_to_namespace(config_dict)
+    config_args.device = "cpu"
+    model = Stage3_mod.get_model(
+        args=config_args,
+        data_shape=(config_args.image_size, config_args.image_size),
+        num_classes=config_args.num_classes
+    )
+    # Load raw weights into model
+    state_dict = torch.load(MINI_WEIGHTS, map_location="cpu")
+    model.load_state_dict(state_dict, strict=True)
+    # Wrap in PL module and save as Lightning checkpoint
+    pl_model = Stage3_PL_mod.PL_ProtARDM(args=config_args, model=model)
+    trainer = pl.Trainer(max_epochs=0)
+    trainer.strategy.connect(pl_model)
+    trainer.save_checkpoint(ckpt_path)
+    yield ckpt_path
+    if os.path.exists(CKPT_DIR):
+        remove_dir(CKPT_DIR)
+
+
+@pytest.mark.parametrize("device", ["cpu", "cuda", "xpu"])
+def test_entrypoint_load_from_checkpoint(mini_checkpoint_path, device):
+    """Test that main() works when --load_from_checkpoint is given with a .ckpt file."""
+    if device == "cuda" and not torch.cuda.is_available():
+        pytest.skip(reason="device=cuda and cuda not available")
+    elif device == "xpu" and not torch.xpu.is_available():
+        pytest.skip(reason="device=xpu and xpu not available")
+    os.makedirs(OUTPUTS_DIR, exist_ok=True)
+    output_path = os.path.join(OUTPUTS_DIR, "test_ProteoScribe_samples.pt")
+    argstring = [
+        "-i", TEST_EMBEDDINGS,
+        "-c", MINI_CONFIG,
+        "-m", mini_checkpoint_path,
+        "-o", output_path,
+        "--load_from_checkpoint",
+    ]
+    args = parse_arguments(argstring)
+    main(args)
+    assert os.path.exists(output_path), "Output file was not created"
+    result = torch.load(output_path)
+    assert isinstance(result, dict), "Output should be a dict"
+    assert len(result) > 0, "Output dict should not be empty"
+    remove_dir(OUTPUTS_DIR)
+
+
+@pytest.mark.parametrize("device", ["cpu", "cuda", "xpu"])
+def test_entrypoint_without_checkpoint_flag(device):
+    """Test that main() still works without --load_from_checkpoint (raw weights)."""
+    if device == "cuda" and not torch.cuda.is_available():
+        pytest.skip(reason="device=cuda and cuda not available")
+    elif device == "xpu" and not torch.xpu.is_available():
+        pytest.skip(reason="device=xpu and xpu not available")
+    os.makedirs(OUTPUTS_DIR, exist_ok=True)
+    output_path = os.path.join(OUTPUTS_DIR, "test_ProteoScribe_samples.pt")
+    argstring = [
+        "-i", TEST_EMBEDDINGS,
+        "-c", MINI_CONFIG,
+        "-m", MINI_WEIGHTS,
+        "-o", output_path,
+    ]
+    args = parse_arguments(argstring)
+    main(args)
+    assert os.path.exists(output_path), "Output file was not created"
+    result = torch.load(output_path)
+    assert isinstance(result, dict), "Output should be a dict"
+    assert len(result) > 0, "Output dict should not be empty"
+    remove_dir(OUTPUTS_DIR)
+
+
+@pytest.mark.parametrize("device", ["cpu", "cuda", "xpu"])
+def test_checkpoint_and_weights_produce_same_output(mini_checkpoint_path, device):
+    """Test that loading from checkpoint produces the same output as loading raw weights."""
+    if device == "cuda" and not torch.cuda.is_available():
+        pytest.skip(reason="device=cuda and cuda not available")
+    elif device == "xpu" and not torch.xpu.is_available():
+        pytest.skip(reason="device=xpu and xpu not available")
+    seed = 42
+    # Run with raw weights (no --load_from_checkpoint)
+    os.makedirs(OUTPUTS_DIR, exist_ok=True)
+    output_path_raw = os.path.join(OUTPUTS_DIR, "test_raw.pt")
+    args_raw = parse_arguments([
+        "-i", TEST_EMBEDDINGS,
+        "-c", MINI_CONFIG,
+        "-m", MINI_WEIGHTS,
+        "-o", output_path_raw,
+        "--seed", str(seed),
+    ])
+    main(args_raw)
+    result_raw = torch.load(output_path_raw)
+    remove_dir(OUTPUTS_DIR)
+    # Run with checkpoint (--load_from_checkpoint)
+    os.makedirs(OUTPUTS_DIR, exist_ok=True)
+    output_path_ckpt = os.path.join(OUTPUTS_DIR, "test_ckpt.pt")
+    args_ckpt = parse_arguments([
+        "-i", TEST_EMBEDDINGS,
+        "-c", MINI_CONFIG,
+        "-m", mini_checkpoint_path,
+        "-o", output_path_ckpt,
+        "--load_from_checkpoint",
+        "--seed", str(seed),
+    ])
+    main(args_ckpt)
+    result_ckpt = torch.load(output_path_ckpt)
+    remove_dir(OUTPUTS_DIR)
+    # Compare results
+    assert len(result_raw) == len(result_ckpt)
+    for i in range(len(result_raw)):
+        seqs_raw = result_raw[f"replica_{i}"]
+        seqs_ckpt = result_ckpt[f"replica_{i}"]
+        assert seqs_raw == seqs_ckpt, (
+            f"replica_{i} mismatch:\n  raw:  {seqs_raw}\n  ckpt: {seqs_ckpt}"
+        )

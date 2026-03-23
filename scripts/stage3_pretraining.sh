@@ -32,8 +32,8 @@ epochs=$8
 resume_from_checkpoint=$9
 
 # Override `pretrained_weights` argument only if specified in 
-if [[ "$9" != "UNSPECIFIED" ]]; then
-	pretrained_weights=$10
+if [[ "${10}" != "UNSPECIFIED" ]]; then
+	pretrained_weights=${10}
 fi
 
 

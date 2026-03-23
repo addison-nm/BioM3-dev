@@ -6,7 +6,7 @@
 # USAGE: stage3_finetuning.sh \
 #		WANDB_API_KEY config_dir config_name \
 #		version_name num_nodes gpu_devices epochs resume_from_checkpoint \
-#		pretrained_weights finetune_last_n_block
+#		pretrained_weights finetune_last_n_blocks finetune_last_n_layers
 #
 # DESCRIPTION: Wraps the Stage 3 training python script PL_train_stage3.py, and 
 #	specifies arguments intended for model finetuning. 
@@ -32,7 +32,8 @@ gpu_devices=$6
 epochs=$7
 resume_from_checkpoint=$8
 pretrained_weights=$9
-finetune_last_n_block=$10
+finetune_last_n_blocks=${10}
+finetune_last_n_layers=${11}
 
 # Weights&Biases API key
 export WANDB_API_KEY=$WANDB_API_KEY

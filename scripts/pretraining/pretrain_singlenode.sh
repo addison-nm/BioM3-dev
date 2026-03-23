@@ -14,7 +14,7 @@
 if [ "$#" -eq 9 ]; then
   pretrained_weights=UNSPECIFIED
 elif [ "$#" -eq 10 ]; then
-  pretrained_weights=$10
+  pretrained_weights=${10}
 else
   echo "Usage: $0 config_dir config_name NRANKS NGPU_PER_RANK device wandb_api_key version_name epochs resume_from_checkpoint [pretrained_weights]"
   exit 1

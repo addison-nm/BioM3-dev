@@ -78,3 +78,5 @@ export tb_logger_folder=Stage3_history
 export save_hist_path=None
 
 export traindata_len=None
+
+export pretrained_weights="None"

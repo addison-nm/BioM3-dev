@@ -3,6 +3,7 @@
 """
 
 import pytest
+import os
 import shutil
 
 DATDIR = "tests/_data"  # data directory for all tests.
@@ -15,6 +16,31 @@ def remove_dir(dir:str):
         remove directories in the directory {TMPDIR}. Got: {dir}"
         raise RuntimeError(msg)
     shutil.rmtree(dir)
+
+def get_args(fpath):
+    """Read command line arguments from a text file."""
+    with open(fpath, 'r') as f:
+        # Strip whitespace and ignore empty lines
+        lines = [line.strip() for line in f if line.strip()]
+    # Join into a single string and split into arguments
+    argstring = " ".join(lines)
+    arglist = argstring.split()
+    return arglist
+
+def check_downloads(paths_to_check):
+    """Returns list of missing files and a warning message."""
+    issues = []
+    for fpath in paths_to_check:
+        if not os.path.exists(fpath):
+            msg = f"Weight files not found: {fpath}"
+            issues.append(msg)
+    msg = ""
+    if issues:
+        msg = "Entrypoint test relies on downloaded weights!"
+        msg += "\nThis test will be skipped until the following issues are resolved:"
+        for issue in issues:
+            msg += f"\n  {issue}"
+    return issues, msg
 
 #####################
 ##  Configuration  ##

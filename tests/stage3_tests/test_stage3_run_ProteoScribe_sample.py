@@ -29,9 +29,12 @@ REQUIRED_DOWNLOADS = [
 
 def get_args(fpath):
     with open(fpath, 'r') as f:
-        argstring = f.readline()
-        arglist = argstring.split(" ")
-        return arglist
+        # Strip whitespace and ignore empty lines
+        lines = [line.strip() for line in f if line.strip()]
+    # Join into a single string and split into arguments
+    argstring = " ".join(lines)
+    arglist = argstring.split()
+    return arglist
 
 def check_downloads(paths_to_check):
     """Returns list of missing files and a warning message."""

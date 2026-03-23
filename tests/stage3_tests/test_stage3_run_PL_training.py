@@ -11,7 +11,7 @@ from contextlib import nullcontext as does_not_raise
 import numpy as np
 import torch
 
-from tests.conftest import DATDIR, TMPDIR, remove_dir
+from tests.conftest import DATDIR, TMPDIR, remove_dir, get_args, check_downloads
 
 from biom3.Stage3.run_PL_training import parse_arguments, main
 from biom3.core.io import load_state_dict
@@ -35,30 +35,6 @@ TRANSFORMER_OUTPUT_LAYER_PARAMS = [
     "transformer.out.weight", "transformer.out.bias",
 ]
 
-def get_args(fpath):
-    with open(fpath, 'r') as f:
-        # Strip whitespace and ignore empty lines
-        lines = [line.strip() for line in f if line.strip()]
-    # Join into a single string and split into arguments
-    argstring = " ".join(lines)
-    arglist = argstring.split()
-    
-    return arglist
-
-def check_downloads(paths_to_check):
-    """Returns list of missing files and a warning message."""
-    issues = []
-    for fpath in paths_to_check:
-        if not os.path.exists(fpath):
-            msg = f"Weight files not found: {fpath}"
-            issues.append(msg)
-    msg = ""
-    if issues:
-        msg = "Entrypoint test relies on downloaded weights!"
-        msg += "\nThis test will be skipped until the following issues are resolved:"
-        for issue in issues:
-            msg += f"\n  {issue}"
-    return issues, msg
 
 def prefix_paths(args):
     """Prepend data files with path to test directories"""

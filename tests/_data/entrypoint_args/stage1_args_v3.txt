@@ -1,4 +1,4 @@
 -i tests/_data/stage1_inputs/sample_text_seqs1.csv 
 -c tests/_data/configs/test_stage1_config_v1.json 
--m weights/PenCL/BioM3_PenCL_epoch20.bin 
+-m weights/PenCL/PenCL_V09152023_last.ckpt
 -o tests/_tmp/outputs/test_PenCL_embeddings.pt

@@ -6,7 +6,7 @@ Tests IO module for Stage 3 ProteoScribe
 import pytest
 import os
 from contextlib import nullcontext as does_not_raise
-from tests.conftest import DATDIR, TMPDIR, remove_dir
+from tests.conftest import DATDIR, TMPDIR, remove_dir, check_downloads
 
 import numpy as np
 import torch
@@ -50,7 +50,7 @@ def test_model_load_scratch(
         pytest.skip(reason="device=xpu and xpu not available")
     model = prepare_model_ProteoScribe(
         config_args,
-        weights_fpath=None,
+        model_fpath=None,
         device=device,
         eval=eval_flag,
         verbosity=0,
@@ -118,6 +118,10 @@ def test_model_load_from_bin(
     stipulate as such by including the suitable expect_error_context.
     
     """
+    # Skip if weight file not downloaded
+    issues, skip_reason = check_downloads([weights_fpath])
+    if issues:
+        pytest.skip(reason=skip_reason)
     config_dict = load_json_config(config_fpath)
     config_args = convert_to_namespace(config_dict)
     # Skip device if not available on machine
@@ -129,12 +133,86 @@ def test_model_load_from_bin(
     if names_mismatched and strict and not attempt_correction:
         context = expect_error_context
     else:
-        context = does_not_raise()    
-    
+        context = does_not_raise()
+
     with context:
         model = prepare_model_ProteoScribe(
             config_args,
-            weights_fpath=weights_fpath,
+            model_fpath=weights_fpath,
+            strict=strict,
+            device=device,
+            eval=eval_flag,
+            attempt_correction=attempt_correction,
+            verbosity=0,
+        )
+
+    if tot_weights_exp is not None:
+        num_weights = get_num_named_weights(model)
+        msg = f"Unexpected number of (named) weights!" \
+            f" Expected {tot_weights_exp}. Got {num_weights}."
+        assert num_weights == tot_weights_exp, msg
+
+
+@pytest.mark.parametrize(
+        "config_fpath, ckpt_fpath, tot_weights_exp, " \
+        "names_mismatched, attempt_correction, expect_error_context", [
+    [
+        f"{CONFIGS_DIR}/orig_model.json", 
+        "weights/ProteoScribe/epoch200_full.ckpt/single_model.pth", 
+        None, 
+        True, 
+        True,
+        does_not_raise(),
+    ],
+    [
+        f"{CONFIGS_DIR}/orig_model.json", 
+        "weights/ProteoScribe/epoch200_full.ckpt/single_model.pth", 
+        None, 
+        True, 
+        False,
+        pytest.raises(RuntimeError, match=r"Unexpected key\(s\) in state_dict"),
+    ],
+])
+@pytest.mark.parametrize("strict", [True, False])
+@pytest.mark.parametrize("device", ["cpu", "cuda", "xpu"])
+@pytest.mark.parametrize("eval_flag", [True, False])
+def test_model_load_from_checkpoint_file(
+        config_fpath, ckpt_fpath, tot_weights_exp, 
+        names_mismatched, expect_error_context,
+        attempt_correction, strict, device, eval_flag
+    ):
+    """
+    Test the ability to load model weights contained in a lightning checkpoint file.
+    In some cases we expect a mismatch between the names of parameters specified
+    in the model definition and the saved weights. This is the case for the model
+    parameters saved and made available in the original BioM3 code on HuggingFace.
+    In this case, if we require STRICT assignment and attempt to infer the correct 
+    assignment using the argument attempt_correction=True, we may or may not be 
+    able to fix the issue. If we expect the attempt to be successful, we can 
+    stipulate as such by including the suitable expect_error_context.
+    
+    """
+    # Skip if checkpoint file not downloaded
+    issues, skip_reason = check_downloads([ckpt_fpath])
+    if issues:
+        pytest.skip(reason=skip_reason)
+    config_dict = load_json_config(config_fpath)
+    config_args = convert_to_namespace(config_dict)
+    # Skip device if not available on machine
+    if device == "cuda" and not torch.cuda.is_available():
+        pytest.skip(reason="device=cuda and cuda not available")
+    elif device == "xpu" and not torch.xpu.is_available():
+        pytest.skip(reason="device=xpu and xpu not available")
+
+    if names_mismatched and strict and not attempt_correction:
+        context = expect_error_context
+    else:
+        context = does_not_raise()
+
+    with context:
+        model = prepare_model_ProteoScribe(
+            config_args,
+            model_fpath=ckpt_fpath,
             strict=strict,
             device=device,
             eval=eval_flag,
@@ -193,7 +271,7 @@ def test_compare_models(
     config_args2 = convert_to_namespace(config_dict2)
     model1 = prepare_model_ProteoScribe(
             config_args1,
-            weights_fpath=weights_fpath1,
+            model_fpath=weights_fpath1,
             strict=True,
             device=device,
             eval=eval_flag,
@@ -202,7 +280,7 @@ def test_compare_models(
     )
     model2 = prepare_model_ProteoScribe(
             config_args2,
-            weights_fpath=weights_fpath2,
+            model_fpath=weights_fpath2,
             strict=True,
             device=device,
             eval=eval_flag,

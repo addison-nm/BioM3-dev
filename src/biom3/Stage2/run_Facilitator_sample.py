@@ -46,7 +46,7 @@ def parse_arguments(args):
     parser.add_argument('-o', '--output_data_path', type=str, required=True,
                         help="Path to save the output embeddings (e.g., Facilitator_test_outputs.pt)")
     
-    parser.add_argument('--device', type=str, default="cpu", 
+    parser.add_argument('--device', type=str, default="cuda", 
                         choices=["cpu", "cuda", "xpu"], help="available device")
     parser.add_argument("--mmd_sample_limit", type=int, default=-1,
                         help="limit on the number of samples used to compute MMD. If -1, use all")
@@ -86,6 +86,7 @@ def prepare_model(config_args, model_path, device) -> nn.Module:
         strict=True, 
         eval_mode=True,
         attempt_correction=True,
+        substitutions={"model.main.": "main."}
     )
     print("Model loaded successfully with weights!")
     return model

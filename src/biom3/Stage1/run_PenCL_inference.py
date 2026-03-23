@@ -15,12 +15,20 @@ Preparation:
     "text_model_path": "<working_directory>/weights/LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext"
     ```
 
-Example usage:
+Example usage (raw weights):
 
 biom3_PenCL_inference \
     --input_data_path None \
     --json_path "configs/stage1_config_PenCL_inference.json" \
     --model_path "./weights/PenCL/BioM3_PenCL_epoch20.bin" \
+    --output_path "outputs/test_PenCL_embeddings.pt"
+
+Example usage (PyTorch Lightning checkpoint):
+
+biom3_PenCL_inference \
+    --input_data_path None \
+    --json_path "configs/stage1_config_PenCL_inference.json" \
+    --model_path "./weights/PenCL/BioM3_PenCL_epoch20.ckpt" \
     --output_path "outputs/test_PenCL_embeddings.pt"
 
 """
@@ -53,7 +61,7 @@ def parse_arguments(args):
     parser.add_argument('-c', '--json_path', type=str, required=True,
                         help="Path to the JSON configuration file (stage1_config_PenCL_inference.json)")
     parser.add_argument('-m', '--model_path', type=str, required=True,
-                        help="Path to the pre-trained model weights (pytorch_model.bin)")
+                        help="Path to the pre-trained model weights or checkpoint")
     parser.add_argument('-o', '--output_path', type=str, required=True,
                         help="Path to save output embeddings")
     
@@ -63,6 +71,9 @@ def parse_arguments(args):
                         help="batch size")
     parser.add_argument('--num_workers', type=int, default=0, 
                         help="number of dataloading workers")
+    parser.add_argument("--load_from_checkpoint", action="store_true", 
+                        help="Flag to load model_path as a checkpoint. By default, " \
+                        "this action is inferred from a .ckpt extension of model_path")
     
     return parser.parse_args(args)
 
@@ -85,7 +96,28 @@ def convert_to_namespace(config_dict):
 
 
 # Step 3: Load Pre-trained Model
-def prepare_model(config_args, model_path, device) -> nn.Module:
+def prepare_model(
+        config_args,
+        model_path,
+        device,
+        load_from_checkpoint
+) -> nn.Module:
+    """Initialize the model, load weights, set to eval, and move to device."""
+    if load_from_checkpoint:
+        model = prepare_model_from_checkpoint(config_args, model_path, device)
+    else:
+        model = prepare_model_from_raw_weights(config_args, model_path, device)
+    model.eval()
+    model = model.to(device)
+    return model
+
+
+def prepare_model_from_raw_weights(
+        config_args, 
+        model_path, 
+        device
+    ) -> nn.Module:
+    """Prepare a model from raw weight file (e.g. .bin or .pt)"""
     model = mod.pfam_PEN_CL(args=config_args)
     model = load_and_prepare_model(
         model, model_path, 
@@ -94,7 +126,63 @@ def prepare_model(config_args, model_path, device) -> nn.Module:
         eval_mode=True,
         attempt_correction=False,
     )
-    print("Model loaded successfully with weights!")
+    return model
+
+
+def prepare_model_from_checkpoint(
+        config_args, 
+        model_path, 
+        device
+    ) -> nn.Module:
+    """Prepare a model from a lightning checkpoint."""
+    # decide on model architecture
+    model_options = {
+            'default': mod.PEN_CL,
+            'masked': mod.PEN_CL,
+            'pfam': mod.pfam_PEN_CL,
+            'pfam_ablated': mod.pfam_PEN_CL
+    }
+    model_class = model_options.get(config_args.model_type, mod.PEN_CL)
+    print('Model class:', model_class)
+
+    # Model graph (nn.Module)
+    model = model_class(args=config_args).to(device)
+    model.eval()
+
+    # Decide on PL wrapper
+    PL_wrapper_options = {
+            'default': PL_wrap.PL_PEN_CL,
+            'masked': PL_wrap.mask_PL_PEN_CL,
+            'pfam': PL_wrap.pfam_PL_PEN_CL,
+            'pfam_ablated': PL_wrap.pfam_PL_PEN_CL
+    }
+    PL_wrapper_class = PL_wrapper_options.get(
+        config_args.model_type, PL_wrap.PL_PEN_CL
+    )
+    print('PL wrapper class:', PL_wrapper_class)
+    
+    # Get PL model
+    PL_model = PL_wrapper_class(
+        args=config_args,
+        model=model,
+        text_tokenizer=model.text_encoder.tokenizer,
+        sequence_tokenizer=model.protein_encoder.alphabet
+    )
+    
+    # Load pretrained weights
+    print('Loading weights from checkpoint...') 
+    PL_model = PL_wrapper_class.load_from_checkpoint(
+        checkpoint_path=model_path,
+        args=config_args,
+        model=model,
+        text_tokenizer=model.text_encoder.tokenizer,
+        sequence_tokenizer=model.protein_encoder.alphabet, 
+        strict=False
+    )
+    # x = torch.load(model_path)
+    # print(x["state_dict"]["model.text_encoder.model.bert.embeddings.position_ids"])
+
+    model = PL_model.model
     return model
 
 
@@ -136,7 +224,7 @@ def load_test_dataset(config_args):
 def load_dataset(input_data_path, config_args, **kwargs):
     """Processes a csv file and constructs a dataset from this data."""
     df = pd.read_csv(
-        input_data_path, **kwargs
+        input_data_path, dtype={"primary_Accession": str}, **kwargs
     )
     df = df.reset_index(drop=True)
     return prep.BatchedTextSeqPairingDataset(args=config_args, df=df)
@@ -158,24 +246,28 @@ def compute_homology_matrix(z_p_tensor):
 
 def main(args):
     config_args_parser = args
+    model_path = config_args_parser.model_path
     batch_size = config_args_parser.batch_size
     num_workers = config_args_parser.num_workers
-
-    device = torch.device(config_args_parser.device)
-    
-    if device in ["xpu"]:
-        raise NotImplementedError(f"Not implemented on device {device}")
+    load_from_checkpoint = config_args_parser.load_from_checkpoint
 
     # Load configuration
     config_dict = load_json_config(config_args_parser.json_path)
     config_args = convert_to_namespace(config_dict)
 
+    # Set the device
+    device = torch.device(config_args_parser.device)
+
+    # Infer loading strategy from file extension or specified flag:
+    load_from_checkpoint = load_from_checkpoint or model_path.endswith('.ckpt')
+
     with torch.serialization.safe_globals([Namespace]):
         # Load model
         model = prepare_model(
-            config_args=config_args, 
-            model_path=config_args_parser.model_path,
+            config_args=config_args,
+            model_path=model_path,
             device=device,
+            load_from_checkpoint=load_from_checkpoint
         )
 
         # Load dataset
@@ -213,18 +305,16 @@ def main(args):
             x_p = x_p.to(device, non_blocking=True)
 
             outputs = model(x_t, x_p, compute_masked_logits=False)
-
             z_t_list.append(outputs["text_joint_latent"])
             z_p_list.append(outputs["seq_joint_latent"])
+            # z_t_list.append(outputs[0])
+            # z_p_list.append(outputs[1])
             text_list += texts
             protein_list += sequences
             acc_id_list += accessions
-            # counter += 1
-            # if counter > 3:
-            #     break
 
-    z_t = torch.cat(z_t_list).cpu()
-    z_p = torch.cat(z_p_list).cpu()
+    # z_t = torch.cat(z_t_list).cpu()
+    # z_p = torch.cat(z_p_list).cpu()
     
     # ORIGINAL CODE FROM HUGGING FACE SEEMS TO PREVENT PARALLELIZATION
     # with torch.no_grad():

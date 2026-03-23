@@ -167,6 +167,162 @@ class ProjectionHead(nn.Module):
         return h
 
 
+#############################
+# Default/mask architecture #
+#############################
+
+class PEN_CL(nn.Module):
+
+    """
+    Protein Embeddings with Natural language using Constrastive Learing (PEN-CL).
+    """
+
+    def __init__(self, args: any):
+
+        super().__init__()
+        self.protein_embedding = args.protein_encoder_embedding
+        self.text_embedding = args.text_encoder_embedding
+        self.temperature = args.temperature
+
+        # protein sequence expert
+        self.protein_encoder = ProteinEncoder(args=args)
+        # natural text expert
+        self.text_encoder = TextEncoder(args=args)
+        
+        # projection heads g_seq( . ) --> joint embedding space
+        self.protein_projection = ProjectionHead(
+                embedding_dim=self.protein_embedding,
+                args=args
+        )
+
+        # projection heads g_text( . ) --> joint embedding space
+        self.text_projection = ProjectionHead(
+                embedding_dim=self.text_embedding,
+                args=args
+        )
+
+    def forward(
+            self,
+            x_t: torch.Tensor,
+            x_s: torch.Tensor,
+            compute_masked_logits: bool=False
+        ) -> dict:
+
+        if compute_masked_logits:
+            # forward pass for computing logits for masked langauge objective
+            protein_logits = self.protein_encoder(x_s, compute_logits=True)
+            text_logits = self.text_encoder(x_t, compute_logits=True)
+
+            return {
+                    'text_masked_logits': text_logits,
+                    'protein_masked_logits': protein_logits
+            }
+
+        else:
+            # split the tuple into 2 dicts... 
+            # getting protein sequence and text inputs ...
+            z_t = self.text_encoder(x_t, compute_logits=False)
+            z_s = self.protein_encoder(x_s, compute_logits=False)
+
+            # "joint" sequence and text embedding (with same dimension)
+            z_t_joint = self.text_projection(z_t)
+            z_s_joint = self.protein_projection(z_s)
+
+            return {
+                    'text_joint_latent': z_t_joint,
+                    'seq_joint_latent': z_s_joint,
+            }
+
+
+    def compute_loss(
+            self,
+            protein_embeddings: torch.Tensor,
+            text_embeddings: torch.Tensor
+        ) -> (
+                torch.Tensor,
+                torch.Tensor
+        ):
+
+        # calc. the loss for constrsative multi-modal learning
+        # note: only account for "inter" representations
+        
+        # cosine similarity
+        logits = (text_embeddings @ protein_embeddings.T) / self.temperature
+        protein_similarity = protein_embeddings @ protein_embeddings.T
+        text_similarity = text_embeddings @ text_embeddings.T
+        
+        # ground truth
+        targets = F.softmax(
+                (protein_similarity + text_similarity) / (2 * self.temperature), dim=-1
+        )
+
+        # prediction
+        text_loss = self.cross_entropy(logits, targets, reduction='none')
+        protein_loss = self.cross_entropy(logits.T, targets.T, reduction='none')
+        loss = (protein_loss + text_loss) / 2.0
+        
+        return (
+                loss.mean(),
+                logits.cpu()
+        )
+
+    def cross_entropy(
+            self,
+            preds: torch.Tensor,
+            targets: torch.Tensor,
+            reduction: str='none'
+        ) -> torch.Tensor:
+
+        # compute categorical cross entropy
+        log_softmax = nn.LogSoftmax(dim=-1)
+        loss = (-targets * log_softmax(preds)).sum(1)
+
+        if reduction == 'none':
+            return loss
+        elif reduction == 'mean':
+            return loss.mean()
+        else:
+            assert False, print('Choose either "none" or "mean" for reduction argument')
+
+    def compute_masked_lang_loss(
+            self,
+            logits_masked: torch.Tensor,
+            targets: torch.Tensor,
+            targets_masked: torch.Tensor,
+            mask_token_id: torch.Tensor
+        ) -> torch.Tensor:
+        # compute the masked langauge objective loss for masked logits
+        
+        loss_func = nn.CrossEntropyLoss(reduction='none')
+
+        loss_mask = loss_func(
+                            logits_masked.permute(0, 2, 1), # (batch_size, vocab_size, seq_len)
+                            targets.squeeze(1) # (batch_size, seq_len)
+        )
+
+        # list to append loss values
+        batch_loss = []
+
+        for ii, target_mask_sample in enumerate(targets_masked):
+            
+            # locate mask positions 
+            masked_positions = (target_mask_sample == mask_token_id).tolist()
+            # extract the loss values at those masked positions
+            loss_mask_sample = loss_mask[ii][masked_positions]
+            
+            # append mean loss value for a given batch sample
+            if loss_mask_sample.numel() > 0:
+                batch_loss.append(torch.mean(loss_mask_sample).unsqueeze(0))
+        
+        if len(loss_mask_sample) > 0:
+            loss_mask_mean = torch.mean(torch.cat(batch_loss))
+        else:
+            # handle the case where there are no masked positions in any sample 
+            loss_mask_mean = torch.tensor(0.0, device=logits_masked.device)
+
+
+        return loss_mask_mean
+
 
 
 #####################
@@ -239,82 +395,76 @@ class pfam_PEN_CL(nn.Module):
             }
 
     def compute_inter_loss(
-        self,
-        protein_embeddings: torch.Tensor,
-        text_embeddings: torch.Tensor,
-        batch_size: int
-    ) -> (
-            torch.Tensor,
-            torch.Tensor
-            ):
-            
-            """
-            Compute the inter-modal contrastive InfoNCE loss between protein and text embeddings.
+            self,
+            protein_embeddings: torch.Tensor,
+            text_embeddings: torch.Tensor,
+            batch_size: int
+        ) -> tuple[torch.Tensor, torch.Tensor]:
+        
+        """
+        Compute the inter-modal contrastive InfoNCE loss between protein and text embeddings.
 
-            Parameters:
-            - protein_embeddings: A tensor representing the embeddings of the protein sequences.
-            - text_embeddings: A tensor representing the embeddings of the text descriptions.
-            - batch_size: The number of samples in the batch.
+        Parameters:
+        - protein_embeddings: A tensor representing the embeddings of the protein sequences.
+        - text_embeddings: A tensor representing the embeddings of the text descriptions.
+        - batch_size: The number of samples in the batch.
 
-            Steps:
-            1. Generate a masking matrix to identify off-diagonal elements.
-            2. Compute cosine similarities (i.e., logits) between text and protein embeddings.
-            3. Compute self-similarities for both protein and text embeddings.
-            4. Mask off-diagonal elements between swiss-prot and pfam in the similarity matrices.
-            5. Define ground truth by averaging the masked protein and text similarity matrices.
-            6. Compute the contrastive loss for the protein and text embeddings using the ground truth.
+        Steps:
+        1. Generate a masking matrix to identify off-diagonal elements.
+        2. Compute cosine similarities (i.e., logits) between text and protein embeddings.
+        3. Compute self-similarities for both protein and text embeddings.
+        4. Mask off-diagonal elements between swiss-prot and pfam in the similarity matrices.
+        5. Define ground truth by averaging the masked protein and text similarity matrices.
+        6. Compute the contrastive loss for the protein and text embeddings using the ground truth.
 
-            Returns:
-            - Mean contrastive loss for the given batch of protein and text embeddings.
-            - The logits (cosine similarity matrix between text and protein embeddings).
+        Returns:
+        - Mean contrastive loss for the given batch of protein and text embeddings.
+        - The logits (cosine similarity matrix between text and protein embeddings).
 
-            Note: This function assumes a specific structure in the input batches, where corresponding positive samples 
-            in the protein and text embeddings are arranged in a particular way, allowing for masking and contrastive loss calculation.
-            """
-            
-            # get off-diagonal masking matrix
-            mask = torch.zeros((2*batch_size, 2*batch_size))
-            # mask the bottom left quadrant diagonal
-            mask[batch_size:, :batch_size] = torch.eye(batch_size)
-            # mask the top right quadrant
-            mask[:batch_size, batch_size:] = torch.eye(batch_size)
-            # convert to correct device and convert to boolean
-            mask = mask.to(protein_embeddings.device).bool()
+        Note: This function assumes a specific structure in the input batches, where corresponding positive samples 
+        in the protein and text embeddings are arranged in a particular way, allowing for masking and contrastive loss calculation.
+        """
+        
+        # get off-diagonal masking matrix
+        mask = torch.zeros((2*batch_size, 2*batch_size))
+        # mask the bottom left quadrant diagonal
+        mask[batch_size:, :batch_size] = torch.eye(batch_size)
+        # mask the top right quadrant
+        mask[:batch_size, batch_size:] = torch.eye(batch_size)
+        # convert to correct device and convert to boolean
+        mask = mask.to(protein_embeddings.device).bool()
 
-            # matrix multiplication between model embeddings
-            logits = (text_embeddings @ protein_embeddings.T) / self.temperature
-            protein_similarity = protein_embeddings @ protein_embeddings.T
-            text_similarity = text_embeddings @ text_embeddings.T
+        # matrix multiplication between model embeddings
+        logits = (text_embeddings @ protein_embeddings.T) / self.temperature
+        protein_similarity = protein_embeddings @ protein_embeddings.T
+        text_similarity = text_embeddings @ text_embeddings.T
 
-            # mask the off-diagonal between swiss-prot and pfam
-            mask_protein_similarity = self.set_inf(protein_similarity, mask)
-            mask_text_similarity = self.set_inf(text_similarity, mask)
-            mask_logits = self.set_inf(logits, mask)
+        # mask the off-diagonal between swiss-prot and pfam
+        mask_protein_similarity = self.set_inf(protein_similarity, mask)
+        mask_text_similarity = self.set_inf(text_similarity, mask)
+        mask_logits = self.set_inf(logits, mask)
 
-            # ground truth
-            targets = F.softmax(
-                (mask_protein_similarity + mask_text_similarity) / (2 * self.temperature), dim=-1
-            )
+        # ground truth
+        targets = F.softmax(
+            (mask_protein_similarity + mask_text_similarity) / (2 * self.temperature), dim=-1
+        )
 
-            # compute loss
-            text_loss = self.cross_entropy(mask_logits, targets, reduction='none')
-            protein_loss = self.cross_entropy(mask_logits.T, targets.T, reduction='none')
-            loss = (protein_loss + text_loss) / 2.0
+        # compute loss
+        text_loss = self.cross_entropy(mask_logits, targets, reduction='none')
+        protein_loss = self.cross_entropy(mask_logits.T, targets.T, reduction='none')
+        loss = (protein_loss + text_loss) / 2.0
 
-            return (
-                loss.mean(),
-                mask_logits.detach().cpu()
-            )
+        return (
+            loss.mean(),
+            mask_logits.detach().cpu()
+        )
 
 
     def compute_intra_loss(  
             self,
             protein_embeddings,
             batch_size
-        ) -> (
-                torch.Tensor,
-                torch.Tensor,
-        ):
+        ) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Compute the intra-modal contrastive InfoNCE loss for protein embeddings.
 
@@ -552,5 +702,3 @@ class Facilitator(nn.Module):
 
         # Calculate MMD loss
         return x_kernel.mean() + y_kernel.mean() - 2 * xy_kernel.mean()
-
-

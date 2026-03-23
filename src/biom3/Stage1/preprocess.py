@@ -70,7 +70,7 @@ def collate_fn(
         list(texts),
         truncation=True,
         max_length=dataset.text_max_length,
-        padding=True,
+        padding="max_length",
         return_tensors="pt",
         return_attention_mask=True,
         return_token_type_ids=False,

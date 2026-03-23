@@ -1,17 +1,17 @@
-"""Tests for entrypoint biom3_Facilitator_sample
+"""Tests for entrypoint biom3_PenCL_inference
 
-Tests script: src/biom3/Stage2/run_Facilitator_sample.py
+Tests script: src/biom3/Stage1/run_PenCL_inference.py
 
 """
 
 import pytest
 import os
 from contextlib import nullcontext as does_not_raise
-
-from tests.conftest import DATDIR, TMPDIR, remove_dir
+from tests.conftest import DATDIR, TMPDIR, remove_dir, get_args, check_downloads
 
 import torch
-from biom3.Stage2.run_Facilitator_sample import parse_arguments, main
+
+from biom3.Stage1.run_PenCL_inference import parse_arguments, main
 
 #####################
 ##  Configuration  ##
@@ -23,38 +23,19 @@ OUTPUTS_DIR = os.path.join(TMPDIR, "outputs")
 
 # Required weights that need to be downloaded to run entrypoint test
 REQUIRED_DOWNLOADS = [
-    "weights/Facilitator/BioM3_Facilitator_epoch20.bin",
+    "weights/LLMs/esm2_t33_650M_UR50D.pt",
+    "weights/PenCL/BioM3_PenCL_epoch20.bin",
 ]
-
-def get_args(fpath):
-    with open(fpath, 'r') as f:
-        argstring = f.readline()
-        arglist = argstring.split(" ")
-        return arglist
-
-def check_downloads(paths_to_check):
-    """Returns list of missing files and a warning message."""
-    issues = []
-    for fpath in paths_to_check:
-        if not os.path.exists(fpath):
-            msg = f"Weight files not found: {fpath}"
-            issues.append(msg)
-    msg = ""
-    if issues:
-        msg = "Entrypoint test relies on downloaded weights!"
-        msg += "\nThis test will be skipped until the following issues are resolved:"
-        for issue in issues:
-            msg += f"\n  {issue}"
-    return issues, msg
 
 
 ###############################################################################
 ###############################   BEGIN TESTS   ###############################
 ###############################################################################
 
-@pytest.mark.parametrize(
-    "argstring_fpath, expect_error_context", [
-    [f"{ARGS_DIR}/stage2_args_v1.txt", does_not_raise()],
+@pytest.mark.parametrize("argstring_fpath, expect_error_context", [
+    [f"{ARGS_DIR}/stage1_args_v1.txt", does_not_raise()],
+    [f"{ARGS_DIR}/stage1_args_v2.txt", does_not_raise()],
+    [f"{ARGS_DIR}/stage1_args_v3.txt", does_not_raise()],
 ])
 @pytest.mark.parametrize("device", ["cpu", "cuda", "xpu"])
 def test_entrypoint(
@@ -72,18 +53,18 @@ def test_entrypoint(
     # Parse the command line string
     argstring = get_args(argstring_fpath)
     os.makedirs(OUTPUTS_DIR, exist_ok=True)
-    # Run entrypoint
+    # Run entrypoint, manually adding device to the argstring.
     with expect_error_context:
         args = parse_arguments(argstring)
         args.device = device
         main(args)
         # Verify results can be loaded
         res = torch.load(
-            os.path.join(OUTPUTS_DIR, "test_Facilitator_embeddings.pt")
+            os.path.join(OUTPUTS_DIR, "test_PenCL_embeddings.pt")
         )
         errors = []
         expected_keys = [
-            "z_t", "z_p", "z_c"
+            "z_t", "z_p", "text_prompts", "sequence", "acc_id"
         ]
         for k in expected_keys:
             if k not in res:

@@ -296,9 +296,7 @@ def set_seed(seed):
 
 def compile_model(
         args: any,
-        data_shape: tuple=(16,16),
-        num_classes: int=3
-        ) -> pl.LightningModule:
+    ) -> pl.LightningModule:
     """
     Create and compile a PyTorch Lightning model for training.
     
@@ -314,32 +312,19 @@ def compile_model(
     Returns:
         A PyTorch Lightning module ready for training
     """
-    # model = mod.get_model(
-    #         args=args,
-    #         data_shape=data_shape,
-    #         num_classes=num_classes
-    # ).cpu()
-
-    # model = mod.get_model(
-    #         args=args,
-    #         data_shape=data_shape,
-    #         num_classes=num_classes
-    # ).to("cuda")
-
     model = prepare_model_ProteoScribe(
         config_args=args,
-        weights_fpath=args.pretrained_weights,
+        model_fpath=args.pretrained_weights,
         device=args.device,
         strict=True,
         eval=False,
         attempt_correction=True,
-        verbosity=2,
+        verbosity=2
     )
 
     PL_model = PL_mod.PL_ProtARDM(
         args=args,
         model=model,
-        #ema_model=ema_model,
     )
     return PL_model
 
@@ -752,7 +737,6 @@ def load_model(
     acc_grad_batches = args.acc_grad_batches
     diffusion_steps = args.diffusion_steps
     image_size = args.image_size
-    num_classes = args.num_classes
     num_nodes = args.num_nodes
     batch_size = args.batch_size
 
@@ -770,17 +754,15 @@ def load_model(
     print_gpu_initialization()
     # Compile model architecture
     PL_model = compile_model(
-            args=args,
-            data_shape=(image_size, image_size),
-            num_classes=num_classes,
+        args=args,
     )
     print('Model size:', sum(p.numel() for p in PL_model.model.parameters()))
     return PL_model
 
 
 def load_pretrained_weights(
-    PL_model,
-    checkpoint_path: str
+        PL_model,
+        checkpoint_path: str
     ):
     """
     Load pretrained model weights from a .bin checkpoint file.
@@ -1200,7 +1182,7 @@ def main(args, use_hydra=False, ds_config=None,):
             msg = "Finetuning flag --finetune set to True but " \
                     "pretrained_weights path not specified."
             print(msg)
-            print("Proceeding with randomly initialized weights")
+            print("Proceeding with loaded weights")
         elif os.path.exists(pretrained_weights):
             PL_model = load_pretrained_weights(
                 PL_model=PL_model,

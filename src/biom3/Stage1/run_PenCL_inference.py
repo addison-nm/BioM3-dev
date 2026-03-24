@@ -15,13 +15,24 @@ Preparation:
     "text_model_path": "<working_directory>/weights/LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext"
     ```
 
-Example usage (raw weights):
+Example usage (raw weights, built-in test dataset):
 
 biom3_PenCL_inference \
     --input_data_path None \
     --json_path "configs/stage1_config_PenCL_inference.json" \
     --model_path "./weights/PenCL/BioM3_PenCL_epoch20.bin" \
-    --output_path "outputs/test_PenCL_embeddings.pt"
+    --output_path "outputs/pencl_embeddings.pt"
+
+Example usage (custom CSV input, CPU):
+
+biom3_PenCL_inference \
+    --input_data_path "data/my_proteins.csv" \
+    --json_path "configs/stage1_config_PenCL_inference.json" \
+    --model_path "./weights/PenCL/BioM3_PenCL_epoch20.bin" \
+    --output_path "outputs/pencl_embeddings.pt" \
+    --device cpu \
+    --batch_size 16 \
+    --num_workers 4
 
 Example usage (PyTorch Lightning checkpoint):
 
@@ -29,7 +40,7 @@ biom3_PenCL_inference \
     --input_data_path None \
     --json_path "configs/stage1_config_PenCL_inference.json" \
     --model_path "./weights/PenCL/BioM3_PenCL_epoch20.ckpt" \
-    --output_path "outputs/test_PenCL_embeddings.pt"
+    --output_path "outputs/pencl_embeddings.pt"
 
 """
 

@@ -11,10 +11,20 @@ Preparation:
 Example usage:
 
 biom3_ProteoScribe_sample \
-    --input_data_path None \
-    --json_path "configs/stage1_config_ProteoScribe_sample.json" \
-    --model_path "./weights/PenCL/BioM3_PenCL_epoch20.bin" \
-    --output_path "outputs/test_PenCL_embeddings.pt"
+    --input_path "outputs/facilitator_embeddings.pt" \
+    --json_path "configs/stage3_config_ProteoScribe_sample.json" \
+    --model_path "./weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin" \
+    --output_path "outputs/generated_sequences.pt"
+
+Example usage (reproducible run with fixed seed, CPU):
+
+biom3_ProteoScribe_sample \
+    --input_path "outputs/facilitator_embeddings.pt" \
+    --json_path "configs/stage3_config_ProteoScribe_sample.json" \
+    --model_path "./weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin" \
+    --output_path "outputs/generated_sequences.pt" \
+    --seed 42 \
+    --device cpu
 
 """
 
@@ -47,6 +57,8 @@ def parse_arguments(args):
                         help="Path to save output embeddings")
     parser.add_argument('--seed', type=int, default=0,
                         help="seed for random number generation")
+    parser.add_argument('--device', type=str, default="cuda",
+                        choices=["cpu", "cuda", "xpu"], help="available device")
     return parser.parse_args(args)
 
 
@@ -193,8 +205,7 @@ def main(args):
     config_dict = load_json_config(config_args_parser.json_path)
     config_args = convert_to_namespace(config_dict) 
 
-    # Set device if not specified in config
-    config_args.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    config_args.device = config_args_parser.device
 
     # load test dataset
     embedding_dataset = torch.load(config_args_parser.input_path)

@@ -12,8 +12,19 @@ The `BioM3-dev` repo is available to clone from GitHub.
 git clone https://github.com/addison-nm/BioM3-dev.git && cd BioM3-dev
 ```
 
-**Note:** *In order to run the complete suite of tests, one needs to download pretrained weights.
-Instructions to do so are included in the README located in the `weights` directory.*
+**Important:** Before running tests or scripts, source the `environment.sh` file to set required
+environment variables. The environment variables needed may differ across machines — see the
+Usage section in each machine's setup doc for details.
+
+```bash
+source environment.sh
+```
+
+**Note:** *Some tests require pretrained weights that are too large to commit to git. These tests
+are skipped automatically when the weights are absent. To run the full test suite, populate the
+`weights/` directory using the shared weights sync script — see
+[docs/setup_shared_weights.md](./docs/setup_shared_weights.md) for machine-specific paths, the
+list of required files, and setup instructions.*
 
 For installation and setup instructions on the following machines, refer to the setup instructions located in the `docs/` folder.
 

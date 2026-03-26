@@ -28,26 +28,25 @@ python -m pip install -e .
 python -m pip install -r requirements_aurora.txt
 ```
 
-Note that presently an error message may be raised due to package conflicts, but the installation should still work. 
+Note that presently an error message may be raised due to package conflicts, but the installation should still work.
 
-Note that in order to load pretrained weights, it may be necessary to set the environment variable `TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1` . For convenience, include the following line in a file `environment.sh` and source it before running tests or scripts.
+## Usage
 
-```bash
-echo "export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1" >> environment.sh
-source environment.sh
-python -m pytest tests  # Runs all tests. Warning: may take some time
-```
-
-Test the setup with a small set of tests:
+Load the Aurora frameworks module, activate the environment, and source `environment.sh` at the start of each session. The script auto-detects Aurora and sets additional variables required for Intel GPUs (`NUMEXPR_MAX_THREADS`, `ONEAPI_DEVICE_SELECTOR`).
 
 ```bash
 cd /path/to/BioM3-dev
 module load frameworks
 source venvs/biom3-env/bin/activate
-
 source environment.sh
-python -m pytest tests/test_imports.py
-# python -m pytest tests  # Runs all tests. Warning: may take some time
 ```
 
-Note that some tests will be skipped if the necessary weights have not been downloaded. Running with flags `-rs` should report these issues.
+### Running tests
+
+```bash
+python -m pytest tests/test_imports.py           # Quick import check
+python -m pytest tests                           # Full suite (may take some time)
+python -m pytest tests -rs                       # Full suite, report skipped tests
+```
+
+Some tests will be skipped if pretrained weights have not been synced. See [setup_shared_weights.md](./setup_shared_weights.md) for the list of required files.

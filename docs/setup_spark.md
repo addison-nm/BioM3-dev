@@ -19,12 +19,22 @@ Verify the installation by running a small set of import tests.
 python -m pytest tests/test_imports.py
 ```
 
-The full suite of tests may take some time to run. Note that in order to load pretrained weights, it may be necessary to set the environment variable `TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1` . For convenience, include the following line in a file `environment.sh` and source it before running tests or scripts.
+## Usage
+
+Source `environment.sh` at the start of each session to set required environment variables. The script auto-detects the machine and applies the appropriate settings.
 
 ```bash
-echo "export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1" >> environment.sh
+cd /path/to/BioM3-dev
+conda activate venvs/biom3-env-py312
 source environment.sh
-python -m pytest tests  # Runs all tests. Warning: may take some time
 ```
 
-Note that some tests will be skipped if the necessary weights have not been downloaded. Running with flags `-rs` should report these issues.
+### Running tests
+
+```bash
+python -m pytest tests/test_imports.py           # Quick import check
+python -m pytest tests                           # Full suite (may take some time)
+python -m pytest tests -rs                       # Full suite, report skipped tests
+```
+
+Some tests will be skipped if pretrained weights have not been synced. See [setup_shared_weights.md](./setup_shared_weights.md) for the list of required files.

@@ -66,35 +66,72 @@ def test_model_load_scratch(
 @pytest.mark.parametrize(
         "config_fpath, weights_fpath, tot_weights_exp, " \
         "names_mismatched, attempt_correction, expect_error_context", [
+    # --- Dummy weights (committed to git, always available) ---
+    # v0.2.x key style (weights_0): mismatches v0.3.x model, needs correction
+    # See docs/BUG_axial_positional_embedding_keys.md
     [
-        f"{CONFIGS_DIR}/orig_model.json", 
-        "weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin", 
-        None, 
-        True, 
+        f"{CONFIGS_DIR}/origkeys_mini.json",
+        f"{WEIGHTS_DIR}/origkeys_mini_v2.bin",
+        None,
+        True,
         True,
         does_not_raise(),
     ],
     [
-        f"{CONFIGS_DIR}/orig_model.json", 
-        "weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin", 
-        None, 
-        True, 
+        f"{CONFIGS_DIR}/origkeys_mini.json",
+        f"{WEIGHTS_DIR}/origkeys_mini_v2.bin",
+        None,
+        True,
+        False,
+        pytest.raises(RuntimeError, match=r"Unexpected key\(s\) in state_dict"),
+    ],
+    # v0.3.x key style (weights.0): matches v0.3.x model directly
+    [
+        f"{CONFIGS_DIR}/origkeys_mini.json",
+        f"{WEIGHTS_DIR}/origkeys_mini_v3.bin",
+        None,
+        False,
+        True,
+        does_not_raise(),
+    ],
+    [
+        f"{CONFIGS_DIR}/origkeys_mini.json",
+        f"{WEIGHTS_DIR}/origkeys_mini_v3.bin",
+        None,
+        False,
+        False,
+        does_not_raise(),
+    ],
+    # --- Full weights (skipped if not downloaded) ---
+    [
+        f"{CONFIGS_DIR}/orig_model.json",
+        "weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin",
+        None,
+        True,
+        True,
+        does_not_raise(),
+    ],
+    [
+        f"{CONFIGS_DIR}/orig_model.json",
+        "weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin",
+        None,
+        True,
         False,
         pytest.raises(RuntimeError, match=r"Unexpected key\(s\) in state_dict"),
     ],
     [
-        f"{CONFIGS_DIR}/orig_model.json", 
-        "weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.renamed.bin", 
-        None, 
-        False, 
+        f"{CONFIGS_DIR}/orig_model.json",
+        "weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.renamed.bin",
+        None,
+        False,
         True,
         does_not_raise(),
     ],
     [
-        f"{CONFIGS_DIR}/orig_model.json", 
-        "weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.renamed.bin", 
-        None, 
-        False, 
+        f"{CONFIGS_DIR}/orig_model.json",
+        "weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.renamed.bin",
+        None,
+        False,
         False,
         does_not_raise(),
     ],

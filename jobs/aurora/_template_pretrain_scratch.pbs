@@ -24,9 +24,9 @@ epochs=5                        # Number of epochs to train
 resume_from_checkpoint=None     # None to train from scratch
 
 # Constant configurations
-num_devices=6                   # number of devices per node
+num_devices=12                  # number of devices per node
 wandb_api_key=$WANDB_API_KEY    # define W&B key prior to run, e.g. via .bashrc
-device=xpu
+device=xpu                      # device available (cuda, xpu)
 
 # Construct the version name
 datetime=$(date +%Y%m%d_%H%M%S)

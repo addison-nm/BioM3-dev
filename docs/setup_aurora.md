@@ -1,27 +1,20 @@
 # Installation and setup instructions for Aurora
 
-The Aurora cluster provides access to Intel GPUs, so a different installation is required. Like Polaris, there is a prebuilt conda environment that we can extend using a virtual environment.
-In order to run on Intel GPUs, we have modified a custom `lightning` package, which must be included in the installation. Download the zip file and unzip it in the `BioM3-dev` directory.
+The Aurora cluster provides access to Intel GPUs, so a different installation is required. Like Polaris, there is a prebuilt environment that we can extend using a virtual environment.
+
+In order to run on Intel GPUs, we have modified a custom `lightning` package, which must be included in the installation. This [lightning source code](https://github.com/addison-nm/lightning) is available on GitHub, if one needs to edit this directly. The commands below install this version of lightning, originally forked from the ALCF lightning repo.
+
+Create the environment:
 
 ```bash
-cd /path/to/BioM3-dev
-# Copy the custom lightning source code into your BioM3-dev directory
-cp /flare/NLDesignProtein/lightning.tar
-# Extract the tar file
-tar -xf lightning.tar
-```
-
-Now, create the conda environment.
-
-```bash
-ENV_NAME="biom3-env"
+env_name="biom3-env"
 module load frameworks
 cd /path/to/BioM3-dev
 # Create environment, using packages from prebuilt one
-python -m venv venvs/${ENV_NAME} --system-site-packages
-source "venvs/${ENV_NAME}/bin/activate"
+python -m venv venvs/${env_name} --system-site-packages
+source "venvs/${env_name}/bin/activate"
 # Install custom lightning package
-python -m pip install -e ./lightning --no-build-isolation
+python -m pip install git+https://github.com/addison-nm/lightning.git --no-build-isolation
 # Install BioM3
 python -m pip install -e .
 # Install additional dependencies

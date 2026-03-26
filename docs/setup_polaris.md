@@ -3,13 +3,13 @@
 Polaris provides access to NVIDIA GPUs. The prebuilt conda environment on Polaris is theoretically equipped with up to date versions of ML packages optimized to run on the cluster. In order to take advantage of this optimization, while also installing additional requirements, we will create a virtual environment extending the existing environment. Note the use of pip instead of conda.
 
 ```bash
-ENV_NAME="biom3-env"
+env_name="biom3-env"
 module use /soft/modulefiles; module load conda; conda activate base
 cd /path/to/BioM3-dev
 mkdir -p venvs
 # Create environment, using packages from prebuilt one
-python -m venv venvs/${ENV_NAME} --system-site-packages
-source "venvs/${ENV_NAME}/bin/activate"
+python -m venv venvs/${env_name} --system-site-packages
+source "venvs/${env_name}/bin/activate"
 python -m pip install -r requirements_polaris.txt --ignore-installed
 python -m pip install -e .
 ```

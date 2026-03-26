@@ -3,11 +3,11 @@
 The DGX Spark has a single NVIDIA GPU. The following commands should allow one to setup a working conda environment.
 
 ```bash
-ENV_NAME="biom3-env-py312"
+env_name="biom3-env-py312"
 cd /path/to/BioM3-dev
 mkdir -p venvs
-conda create -p venvs/${ENV_NAME} python=3.12
-conda activate venvs/${ENV_NAME}
+conda create -p venvs/${env_name} python=3.12
+conda activate venvs/${env_name}
 python -m pip install torch==2.8 torchvision --index-url https://download.pytorch.org/whl/cu129
 python -m pip install -r requirements_spark_py312.txt
 python -m pip install -e .

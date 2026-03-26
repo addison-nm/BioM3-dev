@@ -8,7 +8,7 @@ import pytest
 import os
 from contextlib import nullcontext as does_not_raise
 
-from tests.conftest import DATDIR, TMPDIR, remove_dir
+from tests.conftest import DATDIR, TMPDIR, remove_dir, get_args, check_downloads
 
 import torch
 import numpy as np
@@ -37,30 +37,6 @@ REQUIRED_DOWNLOADS = [
 MINI_WEIGHTS = os.path.join(DATDIR, "models/stage3/weights/minimodel1_weights1.pth")
 MINI_CONFIG = os.path.join(DATDIR, "configs/test_stage3_config_v2.json")
 TEST_EMBEDDINGS = os.path.join(DATDIR, "embeddings/test_Facilitator_embeddings.pt")
-
-def get_args(fpath):
-    with open(fpath, 'r') as f:
-        # Strip whitespace and ignore empty lines
-        lines = [line.strip() for line in f if line.strip()]
-    # Join into a single string and split into arguments
-    argstring = " ".join(lines)
-    arglist = argstring.split()
-    return arglist
-
-def check_downloads(paths_to_check):
-    """Returns list of missing files and a warning message."""
-    issues = []
-    for fpath in paths_to_check:
-        if not os.path.exists(fpath):
-            msg = f"Weight files not found: {fpath}"
-            issues.append(msg)
-    msg = ""
-    if issues:
-        msg = "Entrypoint test relies on downloaded weights!"
-        msg += "\nThis test will be skipped until the following issues are resolved:"
-        for issue in issues:
-            msg += f"\n  {issue}"
-    return issues, msg
 
 
 ###############################################################################
@@ -205,6 +181,7 @@ def test_entrypoint_load_from_checkpoint(mini_checkpoint_path, device):
         "-o", output_path,
     ]
     args = parse_arguments(argstring)
+    args.device = device
     main(args)
     assert os.path.exists(output_path), "Output file was not created"
     result = torch.load(output_path)
@@ -229,6 +206,7 @@ def test_entrypoint_without_checkpoint_flag(device):
         "-o", output_path,
     ]
     args = parse_arguments(argstring)
+    args.device = device
     main(args)
     assert os.path.exists(output_path), "Output file was not created"
     result = torch.load(output_path)
@@ -255,6 +233,7 @@ def test_checkpoint_and_weights_produce_same_output(mini_checkpoint_path, device
         "-o", output_path_raw,
         "--seed", str(seed),
     ])
+    args_raw.device = device
     main(args_raw)
     result_raw = torch.load(output_path_raw)
     remove_dir(OUTPUTS_DIR)
@@ -268,6 +247,7 @@ def test_checkpoint_and_weights_produce_same_output(mini_checkpoint_path, device
         "-o", output_path_ckpt,
         "--seed", str(seed),
     ])
+    args_ckpt.device = device
     main(args_ckpt)
     result_ckpt = torch.load(output_path_ckpt)
     remove_dir(OUTPUTS_DIR)

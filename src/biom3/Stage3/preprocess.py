@@ -13,6 +13,10 @@ from typing import Dict, List, Tuple, Union, Optional, Any
 import torch
 from torch.utils.data import Dataset, DataLoader
 
+from biom3.backend.device import setup_logger
+
+logger = setup_logger(__name__)
+
 # If needed for sequence processing
 from collections import Counter
 import string
@@ -51,7 +55,7 @@ def get_mnist_dataset(args: any) -> DataLoader:
         SystemExit: If dataset parameter is not 'normal' or 'sequence'
     """
     if args.dataset == 'normal':
-        print(args.download)
+        logger.debug("download=%s", args.download)
         transform = Compose([ToTensor(), Resize(args.image_size), lambda x: x > 0.5])
         train_dataset = MNIST(root=args.data_root, download=True, transform=transform, train=True)
         train_dataloader = DataLoader(
@@ -74,7 +78,7 @@ def get_mnist_dataset(args: any) -> DataLoader:
                 drop_last=True
         )
     else:
-        print('Please picker either normal or sequence')
+        logger.error('Please pick either normal or sequence')
         quit()
     return train_dataloader
 
@@ -172,8 +176,8 @@ def prepare_protein_data(
     Raises:
         ValueError: If an unsupported facilitator type is provided
     """
-    print([key for key in data_dict.keys()])
-    print('Prepare dataset')
+    logger.debug("Data keys: %s", list(data_dict.keys()))
+    logger.info('Prepare dataset')
     # prepare sequences
     seq_list = [seq.replace('-','') for seq in data_dict[args.sequence_keyname]]
     seq_list = [['<START>'] + list(seq) + ['<END>'] for seq in seq_list]
@@ -200,7 +204,7 @@ def prepare_protein_data(
         raise ValueError(f"Unexpected value for 'facilitator': {args.facilitator}")
     text_emb = [text_emb[i] for i in valid_indices]
     # prune sequence and texts out based on length
-    print('Finished preparing dataset')
+    logger.info('Finished preparing dataset')
     #
     return (
             num_seq_list,

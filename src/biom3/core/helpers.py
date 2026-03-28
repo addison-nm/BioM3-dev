@@ -9,6 +9,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from biom3.backend.device import setup_logger
+
+logger = setup_logger(__name__)
+
 
 def load_json_config(json_path: str) -> dict:
     """Load JSON configuration file."""
@@ -42,16 +46,14 @@ def load_state_dict_with_correction_attempt(
     try:
         model.load_state_dict(state_dict)
     except RuntimeError as e:
-        if verbosity > 2:
-            print("Encountered error loading state_dict:")
-            print(e)
+        logger.debug("Encountered error loading state_dict: %s", e)
         missing_keys, unexpected_keys = model.load_state_dict(
             state_dict, strict=False
         )
-        if verbosity > 1 and missing_keys:
-            print(f"Warning: Missing keys in checkpoint: {missing_keys}")
-        if verbosity > 1 and unexpected_keys:
-            print(f"Warning: Unexpected keys in checkpoint: {unexpected_keys}")
+        if missing_keys:
+            logger.warning("Missing keys in checkpoint: %s", missing_keys)
+        if unexpected_keys:
+            logger.warning("Unexpected keys in checkpoint: %s", unexpected_keys)
         for k in unexpected_keys:
             new_k = k
             for s0, s1 in substitutions.items():
@@ -59,8 +61,7 @@ def load_state_dict_with_correction_attempt(
                     new_k = new_k.replace(s0, s1)
             if new_k in missing_keys:
                 state_dict[new_k] = state_dict.pop(k)
-                if verbosity > 1:
-                    print(f"Replaced state_dict key `{k}` with `{new_k}`")
+                logger.info("Replaced state_dict key `%s` with `%s`", k, new_k)
         # Reload model with updated parameter names
         model.load_state_dict(
             state_dict, strict=True
@@ -86,7 +87,7 @@ def compare_model_params(
         for name in sorted(list(intersection)):
             vals1 = params1[name]
             vals2 = params2[name]
-            print(type(vals1), type(vals2))
+            logger.debug("%s %s", type(vals1), type(vals2))
             if vals1.shape == vals2.shape:
                 max_differences[name] = torch.max(torch.abs(vals1 - vals2))
             else:                

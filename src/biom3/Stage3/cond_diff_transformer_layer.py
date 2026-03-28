@@ -5,6 +5,10 @@ import torch.nn as nn
 from axial_positional_embedding import AxialPositionalEmbedding
 from linear_attention_transformer import LinearAttentionTransformer
 
+from biom3.backend.device import setup_logger
+
+logger = setup_logger(__name__)
+
 #Adapted from ehoogeboom github repo ...
 
 class SinusoidalPosEmb(nn.Module):
@@ -242,7 +246,7 @@ def get_model(args, data_shape, num_classes):
     C, _ = num_classes, data_shape[0]*data_shape[1]
     L = args.diffusion_steps
 
-    print('Data shape index 0:', L)
+    logger.info('Data shape index 0: %s', L)
     current_shape = (L,)
 
     class DiffTransformer(nn.Module):

@@ -42,6 +42,9 @@ import torch.nn as nn
 import biom3.Stage3.sampling_analysis as Stage3_sample_tools
 import biom3.Stage3.animation_tools as Stage3_ani_tools
 from biom3.Stage3.io import prepare_model_ProteoScribe
+from biom3.backend.device import setup_logger
+
+logger = setup_logger(__name__)
 
 
 # Step 0: Argument Parser Function
@@ -95,7 +98,7 @@ def prepare_model(args, config_args) ->nn.Module:
         eval=True,
         attempt_correction=True,
     )
-    print(f"Stage 3 model loaded from: {args.model_path} (loaded on {config_args.device})")
+    logger.info("Stage 3 model loaded from: %s (loaded on %s)", args.model_path, config_args.device)
     return model
 
 
@@ -120,7 +123,7 @@ def batch_stage3_generate_sequences(
 
     # Handle z_t if passed as a list of tensors
     if isinstance(z_t, list) and all(isinstance(item, torch.Tensor) for item in z_t):
-        print(f"z_t is a list of tensors with {len(z_t)} tensors.")
+        logger.info("z_t is a list of tensors with %s tensors.", len(z_t))
         z_t = torch.stack(z_t)
 
     # Move model and inputs to the target device (CPU or CUDA)
@@ -199,7 +202,7 @@ def main(args):
         seed = np.random.randint(2**32)
         
     set_seed(seed)
-    print(f"Seed: {seed}")
+    logger.info("Seed: %s", seed)
 
     # Load and convert JSON config
     config_dict = load_json_config(config_args_parser.json_path)
@@ -220,7 +223,7 @@ def main(args):
             z_t=embedding_dataset['z_c']
     )
     
-    print(f'{design_sequence_dict=}')
+    logger.info("design_sequence_dict=%s", design_sequence_dict)
 
     torch.save(design_sequence_dict, f"{config_args_parser.output_path}")
 

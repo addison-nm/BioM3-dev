@@ -1,15 +1,11 @@
+from biom3.backend.device import setup_logger, print_gpu_utilization
 
-# def print_gpu_initialization():
-#     nvmlInit()
-#     handle = nvmlDeviceGetHandleByIndex(0)
-#     info = nvmlDeviceGetMemoryInfo(handle)
-#     print(f"GPU memory occupied: {info.used//1024**2} MB.")
-#     return info.used // 1024**2
+logger = setup_logger(__name__)
 
 
 def print_summary(result):
-    print(f"Time: {result.metrics['train_runtime']:.2f}")
-    print(f"Samples/second: {result.metrics['train_samples_per_second']:.2f}")
+    logger.info("Time: %.2f", result.metrics['train_runtime'])
+    logger.info("Samples/second: %.2f", result.metrics['train_samples_per_second'])
     print_gpu_utilization()
 
 

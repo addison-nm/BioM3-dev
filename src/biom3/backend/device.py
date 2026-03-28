@@ -2,6 +2,8 @@
 
 """
 
+import os
+import logging
 import torch
 
 _CPU = "cpu"
@@ -22,6 +24,44 @@ def get_device():
     if backend == _XPU:
         return torch.device("xpu")
     return torch.device(_CPU)
+
+def get_rank() -> int:
+    """Get the global rank from environment variables set by the launcher.
+
+    Works before and after distributed init because launchers (mpiexec,
+    torchrun, deepspeed) export RANK / LOCAL_RANK before Python starts.
+    Returns 0 when running without a launcher (single-process).
+    """
+    return int(os.environ.get("RANK", os.environ.get("LOCAL_RANK", 0)))
+
+
+def setup_logger(name: str = "biom3", level: int = logging.INFO) -> logging.Logger:
+    """Return a rank-aware logger that only emits on rank 0.
+
+    Non-zero ranks are silenced (set to CRITICAL) so that duplicate
+    messages are never printed in multi-node / multi-GPU settings.
+
+    Call once per module::
+
+        from biom3.backend.device import setup_logger
+        logger = setup_logger(__name__)
+        logger.info("only printed on rank 0")
+    """
+    logger = logging.getLogger(name)
+    rank = get_rank()
+    if rank == 0:
+        logger.setLevel(level)
+        if not logger.handlers:
+            handler = logging.StreamHandler()
+            handler.setFormatter(logging.Formatter(
+                "%(asctime)s [%(levelname)s] %(message)s",
+                datefmt="%H:%M:%S",
+            ))
+            logger.addHandler(handler)
+    else:
+        logger.setLevel(logging.CRITICAL)
+    return logger
+
 
 # Set the backend name for import convenience
 BACKEND_NAME = get_backend_name()

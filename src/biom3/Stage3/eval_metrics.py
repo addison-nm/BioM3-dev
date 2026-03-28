@@ -19,6 +19,10 @@ import torch
 # ----- Text Processing -----
 import re  # For regular expressions in sequence processing
 
+from biom3.backend.device import setup_logger
+
+logger = setup_logger(__name__)
+
 # ----- Custom Modules -----
 import biom3.Stage3.animation_tools as ani_tools  # For visualization of generation process
 
@@ -136,7 +140,7 @@ class blosum_soft_accuracy:
         if len(seq1_list) == len(seq2_list):
             self.batch_size = len(seq1_list)
         else:
-            print("Please make sequence batch size equivalent...")
+            logger.warning("Please make sequence batch size equivalent...")
 
         # make sure sequence length matches
         if len(seq1_list[0]) == len(seq2_list[0]):

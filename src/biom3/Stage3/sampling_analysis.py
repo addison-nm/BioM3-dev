@@ -12,6 +12,10 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 import biom3.Stage3.preprocess as prep
+
+from biom3.backend.device import setup_logger
+
+logger = setup_logger(__name__)
 #mport source.sampling as sample_tools
 import biom3.Stage3.cond_diff_transformer_layer as mod
 import biom3.Stage3.transformer_training_helper as train_helper
@@ -174,7 +178,7 @@ def generate_denoised_sampled(
             
             # where we need to sample next
             current_location = temp_sampling_path == temp_idx
-            print(current_location.shape)
+            logger.debug("current_location.shape: %s", current_location.shape)
 
             # make position prediction
             conditional_prob, prob  = predict_next_index(
@@ -216,7 +220,7 @@ def batch_generate_denoised_sampled(
 
     batch_size = extract_digit_samples.size(0)
     mask_realization_list, time_idx_list = [], []
-    print('batch_size:', batch_size)
+    logger.debug('batch_size: %s', batch_size)
 
     # Prepare data
     temp_y_c = extract_digit_label.to(args.device)

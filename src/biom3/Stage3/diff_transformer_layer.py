@@ -5,6 +5,10 @@ import torch.nn as nn
 from axial_positional_embedding import AxialPositionalEmbedding
 from linear_attention_transformer import LinearAttentionTransformer
 
+from biom3.backend.device import setup_logger
+
+logger = setup_logger(__name__)
+
 #Adapted from ehoogeboom github repo ...
 
 class SinusoidalPosEmb(nn.Module):
@@ -83,8 +87,8 @@ class LinearAttentionTransformerEmbedding(nn.Module):
         self.emb_dim = dim
         self.n_blocks = n_blocks
         
-        print('Input dimension', input_dim)
-        print('Output dimension', output_dim)
+        logger.debug('Input dimension %s', input_dim)
+        logger.debug('Output dimension %s', output_dim)
 
         # token embeddings
         self.x_emb_NN = nn.Embedding(input_dim, self.emb_dim)
@@ -213,7 +217,7 @@ def get_model(args, data_shape, num_classes):
 
     C, L = num_classes, data_shape[0]*data_shape[1]
 
-    print('Data shape index 0:', L)
+    logger.info('Data shape index 0: %s', L)
     current_shape = (L,)
 
     class DiffTransformer(nn.Module):

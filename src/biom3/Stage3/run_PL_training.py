@@ -9,6 +9,7 @@ Support for PyTorch Lightning and Weights&Biases
 import sys
 import os
 import socket
+import warnings
 import numpy as np
 import random
 import gc
@@ -21,7 +22,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 # ----- Retrieve available device -----
-from biom3.backend.device import BACKEND_NAME, _XPU
+from biom3.backend.device import BACKEND_NAME, _XPU, setup_logger
 
 # Import pytorch lightning based on device
 if BACKEND_NAME == _XPU:
@@ -60,6 +61,8 @@ import biom3.Stage3.cond_diff_transformer_layer as mod
 import biom3.Stage3.PL_wrapper as PL_mod
 from biom3.Stage3.io import prepare_model_ProteoScribe
 from biom3.backend.device import print_gpu_initialization, get_device
+
+logger = setup_logger(__name__)
 
 
 def get_args(parser):
@@ -374,7 +377,7 @@ def get_model_params(
     total_params = sum(
             param.numel() for param in model.parameters()
     )
-    print('Total number of model parameters:', total_params)
+    logger.info('Total number of model parameters: %s', total_params)
     model_param = {}
     model_param['total_params'] = [total_params]
     model_param_df = pd.DataFrame(model_param)
@@ -492,7 +495,7 @@ def save_model(
         convert_zero_checkpoint_to_fp32_state_dict(
             last_ckpt_fpath, last_single_ckpt_fpath
         )
-        print('Save model (last)')
+        logger.info('Save model (last)')
         new_temp_model = mod.get_model(
             args=args,
             data_shape=(image_size, image_size),
@@ -511,7 +514,7 @@ def save_model(
             # save model state dict without pytorch lightning wrapper
             torch.save(loaded_model.model.state_dict(), last_state_dict_fpath)
             if hasattr(loaded_model, 'ema_model'):
-                print('Also saving EMA model...')
+                logger.info('Also saving EMA model...')
                 torch.save(loaded_model.ema_model.state_dict(), last_state_dict_ema_fpath)
             # check model params
             get_model_params(
@@ -523,7 +526,7 @@ def save_model(
         convert_zero_checkpoint_to_fp32_state_dict(
             best_ckpt_fpath, best_single_ckpt_fpath
         )
-        print('Save model (best)')
+        logger.info('Save model (best)')
         new_temp_model = mod.get_model(
             args=args,
             data_shape=(image_size, image_size),
@@ -542,7 +545,7 @@ def save_model(
             # save model state dict without pytorch lightning wrapper
             torch.save(loaded_model.model.state_dict(), best_state_dict_fpath)
             if hasattr(loaded_model, 'ema_model'):
-                print('Also saving EMA model...')
+                logger.info('Also saving EMA model...')
                 torch.save(loaded_model.ema_model.state_dict(), best_state_dict_ema_fpath)
             # check model params
             get_model_params(
@@ -738,22 +741,22 @@ def load_model(
     batch_size = args.batch_size
 
     args.traindata_len = len(data_module.train_dataloader()) // gpu_devices // acc_grad_batches
-    print('Length of dataloader:', len(data_module.train_dataloader()))
-    print('Numer of devices:', gpu_devices)
-    print('Number of nodes:', num_nodes)
-    print('Batch size:', batch_size)
-    print('Length of dataloader per device:', len(data_module.train_dataloader()) // gpu_devices)
-    print(f'Length of a training epoch in batch gradient updates: {args.traindata_len}')
+    logger.info('Length of dataloader: %s', len(data_module.train_dataloader()))
+    logger.info('Numer of devices: %s', gpu_devices)
+    logger.info('Number of nodes: %s', num_nodes)
+    logger.info('Batch size: %s', batch_size)
+    logger.info('Length of dataloader per device: %s', len(data_module.train_dataloader()) // gpu_devices)
+    logger.info('Length of a training epoch in batch gradient updates: %s', args.traindata_len)
     w, h = image_size, image_size
     # Ensure diffusion steps are sufficient for data dimensions
     if diffusion_steps < int(w*h):
-        print('Make sure that the number of diffusion steps is equal to or greather than the data cardinality')
+        logger.warning('Make sure that the number of diffusion steps is equal to or greather than the data cardinality')
     print_gpu_initialization()
     # Compile model architecture
     PL_model = compile_model(
         args=args,
     )
-    print('Model size:', sum(p.numel() for p in PL_model.model.parameters()))
+    logger.info('Model size: %s', sum(p.numel() for p in PL_model.model.parameters()))
     return PL_model
 
 
@@ -781,7 +784,7 @@ def load_pretrained_weights(
     if args is None:
         args = PL_model.script_args
 
-    print(f"Loading pretrained weights from: {checkpoint_path}")
+    logger.info("Loading pretrained weights from: %s", checkpoint_path)
 
     if not os.path.exists(checkpoint_path):
         raise FileNotFoundError(f"Checkpoint file not found: {checkpoint_path}")
@@ -795,7 +798,7 @@ def load_pretrained_weights(
         attempt_correction=True,
     )
 
-    print("Pretrained weights loaded successfully")
+    logger.info("Pretrained weights loaded successfully")
     return PL_model
 
 
@@ -828,15 +831,15 @@ def freeze_except_last_n_blocks_and_layers(
         The model with frozen parameters (except last n blocks)
     """
     if n_blocks == -1 and n_layers == -1:
-        print("n_blocks=n_layers=-1: All parameters will remain trainable (no freezing)")
+        logger.info("n_blocks=n_layers=-1: All parameters will remain trainable (no freezing)")
         # return PL_model
-    
+
     if n_blocks == 0 and n_layers == 0:
-        print("n_blocks=n_layers=0: All parameters will be frozen (no training)")
+        logger.info("n_blocks=n_layers=0: All parameters will be frozen (no training)")
     else:
         msg = f"Freezing all parameters except the last {n_layers} layer(s) "
         msg += f"of each of the last {n_blocks} transformer block(s)..."
-        print(msg)
+        logger.info(msg)
     
     # First, freeze all parameters
     for param in PL_model.model.parameters():
@@ -852,9 +855,9 @@ def freeze_except_last_n_blocks_and_layers(
                 n_blocks = total_blocks
             blocks_to_unfreeze = min(n_blocks, total_blocks)
             # Unfreeze the last k layers of the last n blocks
-            print(f"Attemtping to unfreeze last {blocks_to_unfreeze} blocks...")
+            logger.info("Attemtping to unfreeze last %s blocks...", blocks_to_unfreeze)
             for i in range(total_blocks - blocks_to_unfreeze, total_blocks):
-                print(f"***** Freezing block {i}...")
+                logger.debug("***** Freezing block %s...", i)
                 block = transformer.transformer_blocks[i]
                 if len(block) > 0:
                     total_layers = len(block)
@@ -863,20 +866,20 @@ def freeze_except_last_n_blocks_and_layers(
                     layers_to_unfreeze = min(n_layers, total_layers)
                     for j in range(total_layers - layers_to_unfreeze, total_layers):
                         layer = block[j]
-                        print(f"*** Freezing block {i} layer {j}")
+                        logger.debug("*** Freezing block %s layer %s", i, j)
                         for param in layer.parameters():
                             param.requires_grad = True
                 else:
                     for param in block.parameters():
                         param.requires_grad = True
             
-            print(f"Unfroze last {blocks_to_unfreeze} transformer block(s) out of {total_blocks} total blocks")
+            logger.info("Unfroze last %s transformer block(s) out of %s total blocks", blocks_to_unfreeze, total_blocks)
             if blocks_to_unfreeze < n_blocks:
-                print(f"Note: Requested {n_blocks} blocks but only {total_blocks} exist in model")
+                logger.info("Note: Requested %s blocks but only %s exist in model", n_blocks, total_blocks)
         else:
-            print("Warning: Could not find transformer_blocks in model")
+            logger.warning("Could not find transformer_blocks in model")
     else:
-        print("Warning: Could not find transformer attribute in model")
+        logger.warning("Could not find transformer attribute in model")
     
     # Also unfreeze the final output layers (norm and out) for better finetuning
     if finetune_output_layers:
@@ -885,19 +888,19 @@ def freeze_except_last_n_blocks_and_layers(
             if hasattr(transformer, 'norm'):
                 for param in transformer.norm.parameters():
                     param.requires_grad = True
-                print("Unfroze final LayerNorm")
+                logger.info("Unfroze final LayerNorm")
             if hasattr(transformer, 'out'):
                 for param in transformer.out.parameters():
                     param.requires_grad = True
-                print("Unfroze final output layer")
+                logger.info("Unfroze final output layer")
     
     # Count trainable vs frozen parameters
     trainable_params = sum(p.numel() for p in PL_model.model.parameters() if p.requires_grad)
     total_params = sum(p.numel() for p in PL_model.model.parameters())
     frozen_params = total_params - trainable_params
     
-    print(f"Trainable parameters: {trainable_params:,} ({100 * trainable_params / total_params:.2f}%)")
-    print(f"Frozen parameters: {frozen_params:,} ({100 * frozen_params / total_params:.2f}%)")
+    logger.info("Trainable parameters: %s (%.2f%%)", f"{trainable_params:,}", 100 * trainable_params / total_params)
+    logger.info("Frozen parameters: %s (%.2f%%)", f"{frozen_params:,}", 100 * frozen_params / total_params)
     
     return PL_model
 
@@ -936,8 +939,7 @@ def train_model(
     Returns:
         None - results are saved to the paths specified in args
     """
-    if verbosity:
-        print('Beginning Training...')
+    logger.info('Beginning Training...')
     # Note: Nested args must be accessed via dictionaries, not attributes.
     tb_logger_path = args.tb_logger_path
     tb_logger_folder = args.tb_logger_folder
@@ -965,10 +967,10 @@ def train_model(
     # Scale the learning rate with number of total devices
     if args.scale_learning_rate:
         n = num_nodes * gpu_devices
-        print(f"Scaling learning rate with effective batch size: " + 
-              f"num_nodes x gpu_devices = {num_nodes} x {gpu_devices} = {n}")
+        logger.info("Scaling learning rate with effective batch size: "
+                     "num_nodes x gpu_devices = %s x %s = %s", num_nodes, gpu_devices, n)
         args.lr = args.lr * n
-    print(f"Effective learning rate: {args.lr}")
+    logger.info("Effective learning rate: %s", args.lr)
     
     # Configure DeepSpeed optimization settings
     if ds_config is None:
@@ -1001,8 +1003,7 @@ def train_model(
     loggers = []
 
     # Set up TensorBoard logging
-    if verbosity:
-        print(f"Setting up TensorBoard logging...")
+    logger.info("Setting up TensorBoard logging...")
     tb_logger = TensorBoardLogger(
         os.path.join(tb_logger_path, tb_logger_folder), 
         version=version_name
@@ -1010,8 +1011,7 @@ def train_model(
     loggers.append(tb_logger)
 
     # Set up Weights&Biases logging
-    if verbosity:
-        print(f"Setting up Weights&Biases logging...")
+    logger.info("Setting up Weights&Biases logging...")
     wandb_logger = None
     if use_wandb:
         wandb_logger = WandbLogger(
@@ -1028,18 +1028,15 @@ def train_model(
         
 
     # Monitor learning rate changes
-    if verbosity:
-        print(f"Setting up LearningRateMonitor...")
+    logger.info("Setting up LearningRateMonitor...")
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
     # Monitor GPU usage
-    if verbosity:
-        print(f"Setting up DeviceStatesMonitor...")
+    logger.info("Setting up DeviceStatesMonitor...")
     gpu_logger = DeviceStatsMonitor()
 
     # Configure checkpoint strategy based on dataset type
-    if verbosity:
-        print(f"Configuring ModelCheckpoint...")
+    logger.info("Configuring ModelCheckpoint...")
     if pfam_data_root is None:
         checkpoint_callback = ModelCheckpoint(
             dirpath=os.path.join(tb_logger_path, tb_logger_folder, 'checkpoints', version_name),
@@ -1090,8 +1087,7 @@ def train_model(
         trainer_params['limit_val_batches'] = limit_val_batches
 
     # Initialize trainer with configured parameters
-    if verbosity:
-        print('Initializing Trainer...')
+    logger.info('Initializing Trainer...')
     trainer = Trainer(**trainer_params)
 
     # wrap optimizer and model with intel extension for pytorch 
@@ -1101,21 +1097,18 @@ def train_model(
     # Handle different training scenarios
     if args.finetune:
         # Finetuning
-        print("Start finetuning")
+        logger.info("Start finetuning")
         trainer.fit(PL_model, data_module)
     else:
         # Pretraining
         if resume_from_checkpoint is None:
-            if verbosity:
-                print("Train from scratch")
+            logger.info("Train from scratch")
             trainer.fit(PL_model, data_module)
         elif start_pfam_trainer:
-            if verbosity:
-                print('Start training Proteoscribe in phase 2 ...')
+            logger.info('Start training Proteoscribe in phase 2 ...')
             trainer.fit(PL_model, data_module)
         else:
-            if verbosity:
-                print('Continue training Proteoscribe in phase 2 ...')
+            logger.info('Continue training Proteoscribe in phase 2 ...')
             trainer.fit(PL_model, data_module, ckpt_path=resume_from_checkpoint)
 
     print_gpu_initialization()
@@ -1130,7 +1123,11 @@ def train_model(
 
 
 def main(args, use_hydra=False, ds_config=None,):
-    
+
+    # ----- Suppress noisy library deprecation warnings -----
+    warnings.filterwarnings("ignore", message=".*LeafSpec.*is deprecated.*")
+    warnings.filterwarnings("ignore", message=".*isinstance.*treespec.*")
+
     # ----- Process passed parameters -----
     seed = args.seed
     swissprot_data_root = args.swissprot_data_root
@@ -1146,7 +1143,7 @@ def main(args, use_hydra=False, ds_config=None,):
         seed = np.random.randint(2**32)
         args.seed = seed
     set_seed(seed)
-    print(f"Using seed: {seed}")
+    logger.info("Using seed: %s", seed)
      
     # ----- Load Data -----
     data_module = load_data(
@@ -1179,10 +1176,9 @@ def main(args, use_hydra=False, ds_config=None,):
             # set to default actionable value 1
             finetune_last_n_blocks = 1
         if pretrained_weights is None:
-            msg = "Finetuning flag --finetune set to True but " \
-                    "pretrained_weights path not specified."
-            print(msg)
-            print("Proceeding with loaded weights")
+            logger.warning("Finetuning flag --finetune set to True but "
+                           "pretrained_weights path not specified.")
+            logger.warning("Proceeding with loaded weights")
         elif os.path.exists(pretrained_weights):
             PL_model = load_pretrained_weights(
                 PL_model=PL_model,
@@ -1196,8 +1192,8 @@ def main(args, use_hydra=False, ds_config=None,):
                 finetune_output_layers=finetune_output_layers
             )
         else:
-            print(f"Warning: Pretrained checkpoint not found at {pretrained_weights}")
-            print("Proceeding with randomly initialized weights")
+            logger.warning("Pretrained checkpoint not found at %s", pretrained_weights)
+            logger.warning("Proceeding with randomly initialized weights")
     else:
         pass
 

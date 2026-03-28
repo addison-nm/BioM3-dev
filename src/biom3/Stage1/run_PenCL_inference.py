@@ -62,6 +62,9 @@ import biom3.Stage1.preprocess as prep
 import biom3.Stage1.model as mod
 import biom3.Stage1.PL_wrapper as PL_wrap
 from biom3.core.io import load_and_prepare_model
+from biom3.backend.device import setup_logger
+
+logger = setup_logger(__name__)
 
 
 # Step 0: Argument Parser Function
@@ -154,7 +157,7 @@ def prepare_model_from_checkpoint(
             'pfam_ablated': mod.pfam_PEN_CL
     }
     model_class = model_options.get(config_args.model_type, mod.PEN_CL)
-    print('Model class:', model_class)
+    logger.info('Model class: %s', model_class)
 
     # Model graph (nn.Module)
     model = model_class(args=config_args).to(device)
@@ -170,7 +173,7 @@ def prepare_model_from_checkpoint(
     PL_wrapper_class = PL_wrapper_options.get(
         config_args.model_type, PL_wrap.PL_PEN_CL
     )
-    print('PL wrapper class:', PL_wrapper_class)
+    logger.info('PL wrapper class: %s', PL_wrapper_class)
     
     # Get PL model
     PL_model = PL_wrapper_class(
@@ -181,7 +184,7 @@ def prepare_model_from_checkpoint(
     )
     
     # Load pretrained weights
-    print('Loading weights from checkpoint...') 
+    logger.info('Loading weights from checkpoint...')
     PL_model = PL_wrapper_class.load_from_checkpoint(
         checkpoint_path=model_path,
         args=config_args,
@@ -381,29 +384,29 @@ def main(args):
     homology_matrix = compute_homology_matrix(z_p_tensor)
 
     # Print results
-    print("\n=== Inference Results ===")
-    print(f"Shape of z_p (protein latent): {z_p_tensor.shape}")
-    print(f"Shape of z_t (text latent): {z_t_tensor.shape}")
-    print(f"\nMagnitudes of z_p vectors: {z_p_magnitude}")
-    print(f"Magnitudes of z_t vectors: {z_t_magnitude}")
+    logger.info("\n=== Inference Results ===")
+    logger.info("Shape of z_p (protein latent): %s", z_p_tensor.shape)
+    logger.info("Shape of z_t (text latent): %s", z_t_tensor.shape)
+    logger.info("Magnitudes of z_p vectors: %s", z_p_magnitude)
+    logger.info("Magnitudes of z_t vectors: %s", z_t_magnitude)
 
-    print("\n=== Dot Product Scores Matrix ===")
-    print(dot_product_scores)
+    logger.info("\n=== Dot Product Scores Matrix ===")
+    logger.info("%s", dot_product_scores)
 
-    print("\n=== Normalized Probabilities ===")
-    print("Protein-Normalized Probabilities (Softmax across Proteins for each Text):")
-    print(protein_given_text_probs)
+    logger.info("\n=== Normalized Probabilities ===")
+    logger.info("Protein-Normalized Probabilities (Softmax across Proteins for each Text):")
+    logger.info("%s", protein_given_text_probs)
 
-    print("\nText-Normalized Probabilities (Softmax across Texts for each Protein):")
-    print(text_given_protein_probs)
+    logger.info("Text-Normalized Probabilities (Softmax across Texts for each Protein):")
+    logger.info("%s", text_given_protein_probs)
 
-    print("\n=== Homology Matrix (Dot Product of Normalized z_p) ===")
-    print(homology_matrix)
+    logger.info("\n=== Homology Matrix (Dot Product of Normalized z_p) ===")
+    logger.info("%s", homology_matrix)
 
-    print("\n=== Example raw data elements ===")
+    logger.info("\n=== Example raw data elements ===")
     for k in range(min(len(acc_id_array), 3)):
-        print(f"  acc_id[{k}]:", acc_id_array[k])
-        print(f"sequence[{k}]:", protein_array[k])
+        logger.info("  acc_id[%s]: %s", k, acc_id_array[k])
+        logger.info("sequence[%s]: %s", k, protein_array[k])
     
     # Save output
     torch.save(embedding_dict, config_args_parser.output_path)

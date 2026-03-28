@@ -9,7 +9,10 @@ import argparse
 import warnings
 from typing import Optional
 
+from biom3.backend.device import setup_logger
 from biom3.core.helpers import load_state_dict_with_correction_attempt
+
+logger = setup_logger(__name__)
 
 
 def load_and_prepare_model(
@@ -79,5 +82,5 @@ def prepare_model(
         model.eval()
 
     if verbosity:
-        print("Model prepared successfully.")
+        logger.info("Model prepared successfully.")
     return model

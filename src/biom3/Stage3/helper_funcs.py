@@ -4,7 +4,11 @@ Note: moved device-specific functions (GPU, memory usage, etc.) to backend
 
 """
 
+from biom3.backend.device import setup_logger, print_gpu_utilization
+
+logger = setup_logger(__name__)
+
 def print_summary(result):
-    print(f"Time: {result.metrics['train_runtime']:.2f}")
-    print(f"Samples/second: {result.metrics['train_samples_per_second']:.2f}")
+    logger.info("Time: %.2f", result.metrics['train_runtime'])
+    logger.info("Samples/second: %.2f", result.metrics['train_samples_per_second'])
     print_gpu_utilization()

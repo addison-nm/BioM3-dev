@@ -17,6 +17,10 @@ import esm
 from esm import pretrained
 from transformers import AutoTokenizer, AutoModel
 
+from biom3.backend.device import setup_logger
+
+logger = setup_logger(__name__)
+
 
 #########################################################
 # BATCHED VERSION: Dataset iterator with masking tokens #
@@ -217,8 +221,8 @@ class Default_DataModule(LightningDataModule):
     def setup(self, stage=None):
         
         if self.trainer is not None:
-            print(f"Number of GPUs: {self.trainer.world_size}")
-            print(f"Current GPU index: {self.trainer.local_rank}")
+            logger.info("Number of GPUs: %s", self.trainer.world_size)
+            logger.info("Current GPU index: %s", self.trainer.local_rank)
 
         # Load Swiss-Prot data
         df = self.load_swiss_prot()
@@ -230,7 +234,7 @@ class Default_DataModule(LightningDataModule):
             random_state=self.args.seed
         )
  
-        print(f"Available memory after pfam_df: {check_available_memory()} GB")
+        logger.info("Available memory after pfam_df: %s GB", check_available_memory())
 
         # Define datasets and dataloaders
         self.train_dataset = self.dataset_class(args=self.args, df=train_df)
@@ -238,7 +242,7 @@ class Default_DataModule(LightningDataModule):
 
     def load_swiss_prot(self) -> pd.Series:
         # Load and preprocess data (called on each GPU/TPU in DDP)
-        print(f'Load Swiss-Prot data...')
+        logger.info('Load Swiss-Prot data...')
 
         # Load Swiss-Prot data
         df = pd.read_csv(os.path.expanduser(self.args.data_path))
@@ -373,18 +377,18 @@ class Facilitator_DataModule(LightningDataModule):
     
         # get both the swissprot and pfam dataset iterator in one
         if (args.swissprot_data_path != 'None') and (args.pfam_data_path != 'None'):
-            print('Load both SwissProt and Pfam dataset...')
+            logger.info('Load both SwissProt and Pfam dataset...')
             self.train_dataset, self.valid_dataset, self.all_swiss_dataloader, self.all_pfam_dataloader = self.load_both()
 
         # get the swissprot dataset iterator
         elif args.pfam_data_path == 'None':
-            print('Load SwissProt dataset...')
+            logger.info('Load SwissProt dataset...')
             self.train_dataset, self.valid_dataset, self.all_swiss_dataloader = self.load_swissprot()
             self.all_pfam_dataloader = None
 
         # get the pfam dataset iterator 
         elif args.swissprot_data_path == 'None':
-            print('Load Pfam dataset...')
+            logger.info('Load Pfam dataset...')
             self.train_dataset, self.valid_dataset, self.all_pfam_dataloader = self.load_pfam()
             self.all_swiss_dataloader = None
             

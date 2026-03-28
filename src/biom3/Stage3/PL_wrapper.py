@@ -50,7 +50,9 @@ from biom3.Stage3.DSEma import moving_average, clone_zero_model  # EMA implement
 import biom3.Stage3.transformer_training_helper as trainer_tools
 import biom3.Stage3.eval_metrics as eval_funcs
 import biom3.Stage3.preprocess as prep
-from biom3.backend.device import print_gpu_initialization
+from biom3.backend.device import print_gpu_initialization, setup_logger
+
+logger = setup_logger(__name__)
 
 
 class PL_ProtARDM(pl.LightningModule):
@@ -162,7 +164,7 @@ class PL_ProtARDM(pl.LightningModule):
         if choose_optim == 'AdamW':
 
             if isinstance(self, FSDP):
-                print("Enter FSDP")
+                logger.info("Enter FSDP")
                 optimizer = torch.optim.AdamW(self.parameters(), lr=lr, weight_decay=weight_decay)
 
             else:
@@ -180,11 +182,11 @@ class PL_ProtARDM(pl.LightningModule):
         if scheduler_gamma is not None:
             if isinstance(scheduler_gamma, str):
                 if 'coswarmup' == scheduler_gamma.lower():
-                    print(f'Using cossine warmup scheduler with decay')
+                    logger.info('Using cossine warmup scheduler with decay')
                     num_warmup_steps=traindata_len
                     num_training_steps=traindata_len * epochs
-                    print(f'Num_warmup_steps={num_warmup_steps}')
-                    print(f'Num_training_steps={num_training_steps}')
+                    logger.info('Num_warmup_steps=%s', num_warmup_steps)
+                    logger.info('Num_training_steps=%s', num_training_steps)
 
                     def _get_cosine_schedule_with_warmup_lr_lambda(
                         current_step: int, num_warmup_steps: int, num_training_steps: int, num_cycles: float
@@ -216,7 +218,7 @@ class PL_ProtARDM(pl.LightningModule):
                     #    },
                     #}
             else:
-                print(f'Using Exponential learning rate decay / epoch with factor: {scheduler_gamma}')
+                logger.info('Using Exponential learning rate decay / epoch with factor: %s', scheduler_gamma)
                 return {
                     "optimizer": optimizer,
                     "lr_scheduler": {
@@ -279,7 +281,7 @@ class PL_ProtARDM(pl.LightningModule):
             loss = train_tuple[0]
             metrics = train_tuple[1]
 
-        if realization_idx == 0:
+        if realization_idx == 0 and self.global_rank == 0:
             gpu_memory_usage = print_gpu_initialization()
             self.log(f"{stage}_gpu_memory_usage", gpu_memory_usage, sync_dist=True)
 
@@ -552,14 +554,14 @@ class PFamDataModule(pl.LightningDataModule):
                 args=args,
                 data_dict=data
         )
-        print('Performing 80/20 random train/val split')
+        logger.info('Performing 80/20 random train/val split')
         num_seq_list_train, num_seq_list_val, text_emb_train, text_emb_val = train_test_split(num_seq_list,
                                                                                             text_emb_list,
                                                                                             test_size=args.valid_size,
                                                                                             #stratify=class_label_list,
                                                                                             random_state=args.seed)
-        print(f'Number of training samples: {len(num_seq_list_train)}')
-        print(f'Number of validation samples: {len(num_seq_list_val)}')
+        logger.info('Number of training samples: %s', len(num_seq_list_train))
+        logger.info('Number of validation samples: %s', len(num_seq_list_val))
         self.train_dataset = prep.protein_dataset(
             num_seq_list=num_seq_list_train,
             text_emb=text_emb_train
@@ -586,7 +588,7 @@ class PFamDataModule(pl.LightningDataModule):
             ValueError: If neither SwissProt nor PFam data is available
         """
         try:
-            print(self.args.swissprot_data_root, self.args.pfam_data_root)
+            logger.debug("swissprot_data_root=%s, pfam_data_root=%s", self.args.swissprot_data_root, self.args.pfam_data_root)
             if self.args.swissprot_data_root != "None":
                 swissprot_data = torch.load(self.args.swissprot_data_root)
             else:
@@ -916,7 +918,7 @@ class HDF5_PFamDataModule(pl.LightningDataModule):
         # Assumes 'get_sequence_lengths' method exists in HDF5Dataset
         sequence_lengths = dataset.get_sequence_lengths()
         filtered_indices = [idx for idx in indices if sequence_lengths[idx] <= self.min_seq_length]
-        print(f"Original indices count: {len(indices)}, Filtered indices count: {len(filtered_indices)}")
+        logger.info("Original indices count: %s, Filtered indices count: %s", len(indices), len(filtered_indices))
         return filtered_indices
 
     def train_dataloader(self):

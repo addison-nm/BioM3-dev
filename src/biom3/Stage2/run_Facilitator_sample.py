@@ -43,6 +43,9 @@ import warnings
 
 import biom3.Stage1.model as mod
 from biom3.core.io import load_and_prepare_model
+from biom3.backend.device import setup_logger
+
+logger = setup_logger(__name__)
 
 # Step 0: Argument Parser Function
 def parse_arguments(args):
@@ -98,7 +101,7 @@ def prepare_model(config_args, model_path, device) -> nn.Module:
         attempt_correction=True,
         substitutions={"model.main.": "main."}
     )
-    print("Model loaded successfully with weights!")
+    logger.info("Model loaded successfully with weights!")
     return model
 
 
@@ -160,27 +163,27 @@ def main(args):
     mmd_zp_zt = model.compute_mmd(z_p[0:k], z_t[0:k])
 
     # Print results
-    print("\n=== Facilitator Model Output ===")
-    print(f"Shape of z_t (Text Embeddings): {z_t.shape}")
-    print(f"Shape of z_p (Protein Embeddings): {z_p.shape}")
-    print(f"Shape of z_c (Facilitated Embeddings): {z_c.shape}\n")
+    logger.info("\n=== Facilitator Model Output ===")
+    logger.info("Shape of z_t (Text Embeddings): %s", z_t.shape)
+    logger.info("Shape of z_p (Protein Embeddings): %s", z_p.shape)
+    logger.info("Shape of z_c (Facilitated Embeddings): %s", z_c.shape)
 
-    print("=== Norm (L2 Magnitude) Results for Batch Index 0 ===")
-    print(f"Norm of z_t (Text Embedding): {norm_z_t:.6f}")
-    print(f"Norm of z_p (Protein Embedding): {norm_z_p:.6f}")
-    print(f"Norm of z_c (Facilitated Embedding): {norm_z_c:.6f}")
+    logger.info("\n=== Norm (L2 Magnitude) Results for Batch Index 0 ===")
+    logger.info("Norm of z_t (Text Embedding): %.6f", norm_z_t)
+    logger.info("Norm of z_p (Protein Embedding): %.6f", norm_z_p)
+    logger.info("Norm of z_c (Facilitated Embedding): %.6f", norm_z_c)
 
-    print("\n=== Mean Squared Error (MSE) Results ===")
-    print(f"MSE between Facilitated Embeddings (z_c) and Protein Embeddings (z_p): {mse_zc_zp:.6f}")
-    print(f"MSE between Text Embeddings (z_t) and Protein Embeddings (z_p): {mse_zt_zp:.6f}")
+    logger.info("\n=== Mean Squared Error (MSE) Results ===")
+    logger.info("MSE between Facilitated Embeddings (z_c) and Protein Embeddings (z_p): %.6f", mse_zc_zp)
+    logger.info("MSE between Text Embeddings (z_t) and Protein Embeddings (z_p): %.6f", mse_zt_zp)
 
-    print("\n=== Max Mean Discrepancy (MMD) Results ===")
-    print(f"MMD between Facilitated Embeddings (z_c) and Protein Embeddings (z_p): {mmd_zc_zp:.6f}")
-    print(f"MMD between Text Embeddings (z_t) and Protein Embeddings (z_p): {mmd_zp_zt:.6f}")
+    logger.info("\n=== Max Mean Discrepancy (MMD) Results ===")
+    logger.info("MMD between Facilitated Embeddings (z_c) and Protein Embeddings (z_p): %.6f", mmd_zc_zp)
+    logger.info("MMD between Text Embeddings (z_t) and Protein Embeddings (z_p): %.6f", mmd_zp_zt)
 
     # Save output embeddings
     torch.save(embedding_dataset, args.output_data_path)
-    print(f"\nFacilitator embeddings saved to {args.output_data_path}")
+    logger.info("Facilitator embeddings saved to %s", args.output_data_path)
 
 
 if __name__ == '__main__':

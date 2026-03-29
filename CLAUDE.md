@@ -2,7 +2,7 @@
 
 ## Practices
 
-Store session notes in docs/claude_sessions/
+Store session notes in docs/.claude_sessions/
 
 ## Project overview
 

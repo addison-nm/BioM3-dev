@@ -1,0 +1,52 @@
+#!/bin/bash -l
+#PBS -A NLDesignProtein
+#PBS -N <JOB_NAME>
+#PBS -l walltime=01:00:00
+#PBS -l select=<NUM_NODES>
+#PBS -l place=scatter
+#PBS -l filesystems=home:flare
+#PBS -q <QUEUE>
+#PBS -j oe
+# PBS -M <emailaddress>
+# PBS -m be
+
+projdir=${PBS_O_WORKDIR}  # Should submit job from the BioM3-dev directory
+cd ${projdir}
+
+module load frameworks
+source ./venvs/biom3-env/bin/activate
+
+# Configurations to edit
+config_dir=./arglists           # Directory containing config files
+config_name=<CONFIG_FILE_NAME>  # Config file name. Note: exclude .sh extension
+num_nodes=<NUM_NODES>           # Should match num requested nodes in PBS header
+epochs=5                        # Number of epochs to train. Note: Should be greater than num already trained.
+
+# Path to Lightning checkpoint directory
+# Typically logs/history/Stage3_history/checkpoints/<NAME>/last.ckpt
+resume_from_checkpoint=<CHECKPOINT_PATH>
+
+# Constant configurations
+num_devices=12                  # number of devices per node
+wandb_api_key=$WANDB_API_KEY    # define W&B key prior to run, e.g. via .bashrc
+device=xpu                      # device available (cuda, xpu)
+
+# Construct the version name
+datetime=$(date +%Y%m%d_%H%M%S)
+version_name=${config_name/config_/}_n${num_nodes}_d${num_devices}_e${epochs}_resume_V${datetime}
+
+# Direct output to log file
+log_fpath=logs/run_logs/pretraining/${version_name}.${PBS_JOBID}.o
+
+source environment.sh
+./scripts/pretraining/pretrain_multinode.sh \
+    ${config_dir} \
+    ${config_name} \
+    ${num_nodes} \
+    ${num_devices} \
+    ${device} \
+    ${wandb_api_key} \
+    ${version_name} \
+    ${epochs} \
+    ${resume_from_checkpoint} \
+> ${log_fpath} 2>&1

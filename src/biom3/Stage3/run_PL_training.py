@@ -8,6 +8,8 @@ Support for PyTorch Lightning and Weights&Biases
 
 import sys
 import os
+import io
+import contextlib
 import socket
 import logging
 import warnings
@@ -490,43 +492,18 @@ def save_model(
     symlink_to = "best"  # symlink from state_dict.pth to either best or last
     
     if trainer.is_global_zero:
-        # ---------------- LAST MODEL ----------------
-        # magically convert the folder into a single lightning loadable pytorch 
-        # file (works for ZeRO 1,2,3)
-        convert_zero_checkpoint_to_fp32_state_dict(
-            last_ckpt_fpath, last_single_ckpt_fpath
-        )
-        logger.info('Save model (last)')
-        new_temp_model = mod.get_model(
-            args=args,
-            data_shape=(image_size, image_size),
-            num_classes=num_classes
-        ).cpu()
-        loaded_model = PL_mod.PL_ProtARDM.load_from_checkpoint(
-            last_single_ckpt_fpath, 
-            args=args, model=new_temp_model
-        )
-        # make sure that datatypes are the same ...
-        if PL_model.dtype != loaded_model.dtype:
-            msg = "Data types are not matching."
-            msg += f" Expected {PL_model.dtype}. Loaded: {loaded_model.dtype}"
-            assert False, msg
-        else:
-            # save model state dict without pytorch lightning wrapper
-            torch.save(loaded_model.model.state_dict(), last_state_dict_fpath)
-            if hasattr(loaded_model, 'ema_model'):
-                logger.info('Also saving EMA model...')
-                torch.save(loaded_model.ema_model.state_dict(), last_state_dict_ema_fpath)
-            # check model params
-            get_model_params(
-                    os.path.join(checkpoint_path, 'params.csv'),
-                    model=loaded_model.model
-            )
+        # Check whether last and best point to the same checkpoint
+        # (last.ckpt is a symlink when save_last="link")
+        last_real = os.path.realpath(last_ckpt_fpath)
+        best_real = os.path.realpath(best_ckpt_fpath)
+        same_checkpoint = (last_real == best_real)
 
         # ---------------- BEST MODEL ----------------
-        convert_zero_checkpoint_to_fp32_state_dict(
-            best_ckpt_fpath, best_single_ckpt_fpath
-        )
+        logger.info('Converting DeepSpeed checkpoint to fp32 (best)...')
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            convert_zero_checkpoint_to_fp32_state_dict(
+                best_ckpt_fpath, best_single_ckpt_fpath
+            )
         logger.info('Save model (best)')
         new_temp_model = mod.get_model(
             args=args,
@@ -534,7 +511,7 @@ def save_model(
             num_classes=num_classes
         ).cpu()
         loaded_model = PL_mod.PL_ProtARDM.load_from_checkpoint(
-            best_single_ckpt_fpath, 
+            best_single_ckpt_fpath,
             args=args, model=new_temp_model
         )
         # make sure that datatypes are the same ...
@@ -553,6 +530,43 @@ def save_model(
                     os.path.join(checkpoint_path, 'params.csv'),
                     model=loaded_model.model
             )
+
+        # ---------------- LAST MODEL ----------------
+        if same_checkpoint:
+            logger.info('Last checkpoint is same as best — creating symlinks')
+            os.symlink(best_single_ckpt_fpath, last_single_ckpt_fpath)
+            os.symlink(best_state_dict_fpath, last_state_dict_fpath)
+            if os.path.exists(best_state_dict_ema_fpath):
+                os.symlink(best_state_dict_ema_fpath, last_state_dict_ema_fpath)
+        else:
+            logger.info('Converting DeepSpeed checkpoint to fp32 (last)...')
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                convert_zero_checkpoint_to_fp32_state_dict(
+                    last_ckpt_fpath, last_single_ckpt_fpath
+                )
+            logger.info('Save model (last)')
+            new_temp_model = mod.get_model(
+                args=args,
+                data_shape=(image_size, image_size),
+                num_classes=num_classes
+            ).cpu()
+            loaded_model = PL_mod.PL_ProtARDM.load_from_checkpoint(
+                last_single_ckpt_fpath,
+                args=args, model=new_temp_model
+            )
+            if PL_model.dtype != loaded_model.dtype:
+                msg = "Data types are not matching."
+                msg += f" Expected {PL_model.dtype}. Loaded: {loaded_model.dtype}"
+                assert False, msg
+            else:
+                torch.save(loaded_model.model.state_dict(), last_state_dict_fpath)
+                if hasattr(loaded_model, 'ema_model'):
+                    logger.info('Also saving EMA model...')
+                    torch.save(loaded_model.ema_model.state_dict(), last_state_dict_ema_fpath)
+                get_model_params(
+                        os.path.join(checkpoint_path, 'params.csv'),
+                        model=loaded_model.model
+                )
         
         symlink_path = os.path.join(checkpoint_path, 'state_dict.pth')
         symlink_ema_path = os.path.join(checkpoint_path, 'state_dict_ema.pth')
@@ -1130,6 +1144,7 @@ def main(args, use_hydra=False, ds_config=None,):
     # ----- Suppress noisy library warnings -----
     warnings.filterwarnings("ignore", message=".*LeafSpec.*is deprecated.*")
     warnings.filterwarnings("ignore", message=".*isinstance.*treespec.*")
+    warnings.filterwarnings("ignore", message=".*TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD.*")
     logging.getLogger("tensorboardX.x2num").setLevel(logging.ERROR)
 
     # ----- Process passed parameters -----

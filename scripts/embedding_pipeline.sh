@@ -12,7 +12,7 @@
 #   data/dataset_with_prompts.csv \
 #   outputs/embeddings \
 #   weights/PenCL/PenCL_V09152023_last.ckpt \
-#   weights/Facilitator/Facilitator_MMD15_last.ckpt/last.ckpt \
+#   weights/Facilitator/Facilitator_MMD15.ckpt/last.ckpt \
 #   configs/stage1_config_PenCL_inference.json \
 #   configs/stage2_config_Facilitator_sample.json \
 #   <dataset_name>

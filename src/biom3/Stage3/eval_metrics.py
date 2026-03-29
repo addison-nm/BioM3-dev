@@ -220,6 +220,8 @@ def compute_ppl(probs: torch.Tensor) -> float:
         float: Average perplexity across all positions in all sequences
     """
     batch_size, sequence_length, class_labels = probs.shape
+    if sequence_length == 0:
+        return float('nan')
     # flatten batch and sequence dimensions into a single dimension
     flattened_probs = probs.reshape(batch_size * sequence_length, class_labels)
     # calc. perplexity for each sequence independently
@@ -227,10 +229,12 @@ def compute_ppl(probs: torch.Tensor) -> float:
     for i in range(batch_size * sequence_length):
         sequence_probs = flattened_probs[i]
         # compute ppl per seq
-        sequence_ppl = torch.exp(-torch.sum(
-            sequence_probs * torch.log(sequence_probs)
-            )
+        log_probs = torch.where(
+            sequence_probs > 0,
+            torch.log(sequence_probs),
+            torch.zeros_like(sequence_probs),
         )
+        sequence_ppl = torch.exp(-torch.sum(sequence_probs * log_probs))
         ppl.append(sequence_ppl.item())
     ppl = torch.tensor(ppl).view(batch_size, sequence_length) # ppl per sequence in a given batch
     avg_ppl = ppl.mean().item() # average ppl per batch
@@ -251,6 +255,8 @@ def batch_compute_ppl(probs_list: list) -> float:
     Returns:
         float: Average perplexity across all tensors in the list
     """
+    if not probs_list:
+        return float('nan')
     batch_prob = sum([
         compute_ppl(probs=probs.unsqueeze(0).permute(0,2,1)) for probs in probs_list
     ]) / len(probs_list)
@@ -300,6 +306,8 @@ def batch_hard_acc(seq1_list: list, seq2_list: list) -> float:
     Returns:
         float: Average hard accuracy across all sequence pairs
     """
+    if not seq2_list:
+        return float('nan')
     hard_acc = sum([
         compute_hard_acc(seq1=seq1, seq2=seq2) for (seq1,seq2) in zip(seq1_list, seq2_list)
     ]) / len(seq2_list)

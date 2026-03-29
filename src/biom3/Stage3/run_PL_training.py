@@ -9,6 +9,7 @@ Support for PyTorch Lightning and Weights&Biases
 import sys
 import os
 import socket
+import logging
 import warnings
 import numpy as np
 import random
@@ -1044,7 +1045,8 @@ def train_model(
             verbose=True,
             monitor='val_loss',
             mode="min",
-            save_last=True
+            save_last="link",
+            enable_version_counter=False,
         )
     else:
         checkpoint_callback = ModelCheckpoint(
@@ -1053,8 +1055,9 @@ def train_model(
             verbose=True,
             monitor='val_loss',
             mode="min",
-            save_last=True,
-            every_n_train_steps=log_every_n_steps  # Save checkpoints periodically by steps
+            save_last="link",
+            enable_version_counter=False,
+            every_n_train_steps=log_every_n_steps,  # Save checkpoints periodically by steps
         )
 
     # Define common trainer parameters 
@@ -1124,9 +1127,10 @@ def train_model(
 
 def main(args, use_hydra=False, ds_config=None,):
 
-    # ----- Suppress noisy library deprecation warnings -----
+    # ----- Suppress noisy library warnings -----
     warnings.filterwarnings("ignore", message=".*LeafSpec.*is deprecated.*")
     warnings.filterwarnings("ignore", message=".*isinstance.*treespec.*")
+    logging.getLogger("tensorboardX.x2num").setLevel(logging.ERROR)
 
     # ----- Process passed parameters -----
     seed = args.seed

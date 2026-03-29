@@ -28,11 +28,20 @@ def get_device():
 def get_rank() -> int:
     """Get the global rank from environment variables set by the launcher.
 
-    Works before and after distributed init because launchers (mpiexec,
-    torchrun, deepspeed) export RANK / LOCAL_RANK before Python starts.
+    Checks variables from multiple launchers:
+    - torchrun / deepspeed: RANK, LOCAL_RANK
+    - PALS (Aurora mpiexec): PALS_RANKID, PALS_LOCAL_RANKID
+    - PMI (Cray MPICH): PMI_RANK
+    - Open MPI: OMPI_COMM_WORLD_RANK
+
     Returns 0 when running without a launcher (single-process).
     """
-    return int(os.environ.get("RANK", os.environ.get("LOCAL_RANK", 0)))
+    for var in ("RANK", "PALS_RANKID", "PMI_RANK", "OMPI_COMM_WORLD_RANK",
+                "LOCAL_RANK", "PALS_LOCAL_RANKID"):
+        val = os.environ.get(var)
+        if val is not None:
+            return int(val)
+    return 0
 
 
 def setup_logger(name: str = "biom3", level: int = logging.INFO) -> logging.Logger:
@@ -48,6 +57,7 @@ def setup_logger(name: str = "biom3", level: int = logging.INFO) -> logging.Logg
         logger.info("only printed on rank 0")
     """
     logger = logging.getLogger(name)
+    logger.propagate = False  # prevent duplicate output via root logger
     rank = get_rank()
     if rank == 0:
         logger.setLevel(level)

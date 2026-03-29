@@ -14,19 +14,18 @@ def print_gpu_initialization():
     try:
         q = dpctl.SyclQueue()
         device = q.sycl_device
-
+        memory_in_megabytes = device.global_mem_size // (1024 ** 2)
         logger.info(f"Running on device: {device.name}")
         logger.info(f"Vendor: {device.vendor}")
-        logger.info(f"Global memory: {device.global_mem_size // (1024 ** 2)} MB")
-
-        return device.global_mem_size // (1024 ** 2)
-
+        logger.info(f"Global memory: {memory_in_megabytes} MB")
+        return memory_in_megabytes
     except Exception as e:
         logger.warning(f"Failed to initialize GPU tracking: {e}")
-        return None
+        return 0.0
 
 def print_gpu_utilization():
     logger.info("Intel GPU utilization monitoring is limited at Python level.")
+    return 0.0
 
 def print_memory_usage():
     process = psutil.Process(os.getpid())

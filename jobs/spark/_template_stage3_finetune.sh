@@ -38,6 +38,7 @@ log_fpath=logs/run_logs/finetuning/${version_name}.o
     ${config_name} \
     ${num_nodes} \
     ${num_devices} \
+    ${device} \
     ${wandb_api_key} \
     ${version_name} \
     ${epochs} \

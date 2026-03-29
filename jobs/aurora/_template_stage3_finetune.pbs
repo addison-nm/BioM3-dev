@@ -44,6 +44,7 @@ source environment.sh
     ${config_name} \
     ${num_nodes} \
     ${num_devices} \
+    ${device} \
     ${wandb_api_key} \
     ${version_name} \
     ${epochs} \

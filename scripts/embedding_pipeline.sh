@@ -51,7 +51,7 @@ biom3_Facilitator_sample \
     --mmd_sample_limit 1000
 
 # Compile Stage 1 and 2 data into an hdf5 dataset ready for finetuning
-python scripts/data_prep/compile_stage2_data_to_hdf5.py \
+biom3_compile_hdf5 \
+    -i ${outdir}/${prefix}.Facilitator_emb.pt \
     -o ${outdir}/${prefix}.compiled_emb.hdf5 \
-    --dataset_key ${dataset_key} \
-    --facilitator_embeddings ${outdir}/${prefix}.Facilitator_emb.pt
+    --dataset_key ${dataset_key}

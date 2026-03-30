@@ -311,16 +311,20 @@ def main(args):
     protein_list = []
     acc_id_list = []
 
-    # counter = 0
-    with torch.no_grad():
+    # Determine autocast dtype: use fp16 on CUDA, bf16 on XPU/CPU if available
+    use_amp = device.type in ("cuda", "xpu")
+    amp_dtype = torch.float16 if device.type == "cuda" else torch.bfloat16
+
+    with torch.inference_mode():
         for item in tqdm.tqdm(loader):
             x_t, x_p, texts, sequences, accessions = item
             x_t = x_t.to(device, non_blocking=True)
             x_p = x_p.to(device, non_blocking=True)
 
-            outputs = model(x_t, x_p, compute_masked_logits=False)
-            z_t_list.append(outputs["text_joint_latent"])
-            z_p_list.append(outputs["seq_joint_latent"])
+            with torch.autocast(device_type=device.type, dtype=amp_dtype, enabled=use_amp):
+                outputs = model(x_t, x_p, compute_masked_logits=False)
+            z_t_list.append(outputs["text_joint_latent"].detach().float().cpu())
+            z_p_list.append(outputs["seq_joint_latent"].detach().float().cpu())
             # z_t_list.append(outputs[0])
             # z_p_list.append(outputs[1])
             text_list += texts

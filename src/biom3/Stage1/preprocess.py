@@ -84,14 +84,8 @@ def collate_fn(
     batch_sequences = list(zip(accessions, sequences))
     batch_labels, batch_strs, batch_tokens = dataset.batch_converter(batch_sequences)
 
-    # pad protein sequences to fixed length (1024)
-    if batch_tokens.shape[1] < dataset.seq_max_length:
-        pad_len = dataset.seq_max_length - batch_tokens.shape[1]
-        pad = torch.ones(
-            batch_tokens.shape[0], pad_len, dtype=batch_tokens.dtype
-        )
-        batch_tokens = torch.cat([batch_tokens, pad], dim=1)
-    else:
+    # truncate to max model length, but keep dynamic padding from batch_converter
+    if batch_tokens.shape[1] > dataset.seq_max_length:
         batch_tokens = batch_tokens[:, : dataset.seq_max_length]
 
     if include_raw:

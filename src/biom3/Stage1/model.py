@@ -126,10 +126,9 @@ class TextEncoder(nn.Module):
             return logits
         
         else:
-            outputs = self.model(inputs, output_hidden_states=True)
-            # use the token representations...
-            last_hidden_state = outputs.hidden_states[-1]
-            return last_hidden_state[:, self.target_token_idx, :] # return [cls] token 
+            # Use the underlying BERT model directly to skip the MLM head
+            outputs = self.model.bert(inputs)
+            return outputs.last_hidden_state[:, self.target_token_idx, :]
 
 
 

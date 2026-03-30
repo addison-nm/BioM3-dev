@@ -14,17 +14,17 @@
 #
 # Arguments:
 #   source_dir   Directory containing canonical model weights (e.g.
-#                /data/data-share/BioM3-data-share/data/models)
+#                /data/data-share/BioM3-data-share/data/weights)
 #   target_dir   Local weights directory to populate with symlinks (e.g.
 #                ./weights)
 #   --dry-run    Show what would be done without making changes
 #
 # Examples:
 #   # Preview changes
-#   ./sync_weights.sh /data/data-share/BioM3-data-share/data/models weights --dry-run
+#   ./sync_weights.sh /data/data-share/BioM3-data-share/data/weights weights --dry-run
 #
 #   # Apply symlinks
-#   ./sync_weights.sh /data/data-share/BioM3-data-share/data/models weights
+#   ./sync_weights.sh /data/data-share/BioM3-data-share/data/weights weights
 
 set -euo pipefail
 

@@ -6,14 +6,14 @@ Pretrained model weights required by BioM3 are stored in a shared directory on e
 
 | Machine | Shared weights path | Permissions |
 |---------|-------------------| -------- |
-| DGX Spark | `/data/data-share/BioM3-data-share/data/models` | read only |
-| Polaris (ALCF) | `/grand/NLDesignProtein/sharepoint/BioM3-data-share/data/models` | read only |
-| Aurora (ALCF) | `/flare/NLDesignProtein/sharepoint/BioM3-data-share/data/models` | read only |
+| DGX Spark | `/data/data-share/BioM3-data-share/data/weights` | read only |
+| Polaris (ALCF) | `/grand/NLDesignProtein/sharepoint/BioM3-data-share/data/weights` | read only |
+| Aurora (ALCF) | `/flare/NLDesignProtein/sharepoint/BioM3-data-share/data/weights` | read only |
 
 The shared directory mirrors the structure of the local `weights/` directory:
 
 ```
-models/
+weights/
   Facilitator/
   LLMs/
   PenCL/
@@ -35,8 +35,8 @@ The script `scripts/sync_weights.sh` creates symlinks in your local `weights/` d
 For example, on DGX Spark:
 
 ```bash
-./scripts/sync_weights.sh /data/data-share/BioM3-data-share/data/models weights --dry-run
-./scripts/sync_weights.sh /data/data-share/BioM3-data-share/data/models weights
+./scripts/sync_weights.sh /data/data-share/BioM3-data-share/data/weights weights --dry-run
+./scripts/sync_weights.sh /data/data-share/BioM3-data-share/data/weights weights
 ```
 
 The script will report `MATCH`, `MISMATCH`, or `LINK` for each entry. A `MISMATCH` does not necessarily indicate a problem -- files saved with different versions of PyTorch may differ at the byte level while containing identical tensor data. The script output includes a command to verify tensor-level equivalence when mismatches are found.

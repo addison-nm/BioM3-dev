@@ -137,37 +137,54 @@ def batch_stage3_generate_sequences(
         'X', 'U', 'Z', 'B', 'O'  # Special characters
     ]
 
-    # Initialize a dictionary to store generated sequences for each replica
-    design_sequence_dict = {f'replica_{ii}': [] for ii in range(args.num_replicas)}
+    # Build flat work list of (prompt_idx, replica_idx) pairs to parallelize
+    # across both prompts and replicates
+    num_prompts = z_t.size(0)
+    work_items = [
+        (p_idx, r_idx)
+        for p_idx in range(num_prompts)
+        for r_idx in range(args.num_replicas)
+    ]
 
-    # Loop over input samples (each z_t) and generate sequences
-    for idx_sample, z_text_sample in enumerate(z_t):
+    # Pre-allocate output: design_sequences[replica_idx][prompt_idx]
+    design_sequences = [[None] * num_prompts for _ in range(args.num_replicas)]
 
-        # Process in batches to optimize memory and speed
-        for batch_start in range(0, args.num_replicas, args.batch_size_sample):
-            current_batch_size = min(args.batch_size_sample, args.num_replicas - batch_start)
+    # Process all (prompt, replica) pairs in batches
+    for batch_start in range(0, len(work_items), args.batch_size_sample):
+        batch = work_items[batch_start : batch_start + args.batch_size_sample]
+        current_batch_size = len(batch)
 
-            # Prepare batched input for current batch
-            batched_z_text_sample = z_text_sample.unsqueeze(0).repeat(current_batch_size, 1)
+        # Gather conditioning vectors for this batch (different prompts per item)
+        batch_prompt_indices = [p_idx for p_idx, r_idx in batch]
+        batched_z_text_sample = z_t[batch_prompt_indices]
 
-            # Generate random permutations for each sample in the batch
-            batch_perms = torch.stack([torch.randperm(args.diffusion_steps) for _ in range(current_batch_size)])
+        # Generate random permutations for each sample in the batch
+        batch_perms = torch.stack([torch.randperm(args.diffusion_steps) for _ in range(current_batch_size)])
 
-            # Generate denoised samples using the model
-            mask_realization_list, _ = Stage3_sample_tools.batch_generate_denoised_sampled(
-                args=args,
-                model=model,
-                extract_digit_samples=torch.zeros(current_batch_size, args.diffusion_steps),
-                extract_time=torch.zeros(current_batch_size).long(),
-                extract_digit_label=batched_z_text_sample,
-                sampling_path=batch_perms
-            )
+        # Generate denoised samples using the model
+        mask_realization_list, _ = Stage3_sample_tools.batch_generate_denoised_sampled(
+            args=args,
+            model=model,
+            extract_digit_samples=torch.zeros(current_batch_size, args.diffusion_steps),
+            extract_time=torch.zeros(current_batch_size).long(),
+            extract_digit_label=batched_z_text_sample,
+            sampling_path=batch_perms
+        )
 
-            # Convert generated numeric sequences to amino acid sequences
-            for i, mask_realization in enumerate(mask_realization_list[-1]):
-                design_sequence = Stage3_ani_tools.convert_num_to_char(tokens, mask_realization[0])
-                clean_sequence = design_sequence.replace('<START>', '').replace('<END>', '').replace('<PAD>', '')
-                design_sequence_dict[f'replica_{batch_start + i}'].append(clean_sequence)
+        # Unpack results into the correct (replica, prompt) slots
+        for i, (p_idx, r_idx) in enumerate(batch):
+            mask_realization = mask_realization_list[-1][i]
+            design_sequence = Stage3_ani_tools.convert_num_to_char(tokens, mask_realization[0])
+            clean_sequence = design_sequence.replace('<START>', '').replace('<END>', '').replace('<PAD>', '')
+            design_sequences[r_idx][p_idx] = clean_sequence
+
+    assert all(seq is not None for row in design_sequences for seq in row), \
+        "Not all (prompt, replica) pairs were generated"
+
+    design_sequence_dict = {
+        f'replica_{r_idx}': design_sequences[r_idx]
+        for r_idx in range(args.num_replicas)
+    }
 
     return design_sequence_dict
 

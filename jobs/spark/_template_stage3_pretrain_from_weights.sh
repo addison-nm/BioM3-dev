@@ -26,6 +26,7 @@ pretrained_weights=<STATE_DICT_PATH>
 # Constant configurations
 num_nodes=1                     # single node
 num_devices=1                   # single GPU on Spark
+wandb=True                      # enable Weights&Biases logging
 wandb_api_key=$WANDB_API_KEY    # define W&B key prior to run, e.g. via .bashrc
 device=cuda                     # device available (cuda)
 

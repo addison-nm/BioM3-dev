@@ -263,7 +263,7 @@ def get_wrapper_args(parser):
     """
     parser.add_argument('--hydra', action="store_true", 
                         help='Whether to run with Hydra.')
-    parser.add_argument('--wandb', type=str, default="True", 
+    parser.add_argument('--wandb', type=str, default="False",
                         help='Flag to use Weights&Biases.')
     parser.add_argument('--wandb_name', type=str, default=None, 
                         help='Weights&Biases run name.')

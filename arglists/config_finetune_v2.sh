@@ -1,7 +1,7 @@
 #=============================================================================
-# Configuration file for finetuning Stage3 ProteoScribe model. Specifies the 
-# transformer architecture corresponding to the original model defined in the 
-# BioM3 paper.
+# TODO: ADD HEADER
+# 
+# 
 #=============================================================================
 
 export swissprot_data_root="./data/Stage2_MMD_swissprot_embedding_last_ckpt_all.hdf5"
@@ -84,4 +84,3 @@ export traindata_len=None
 export finetune=True
 export pretrained_weights="./weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin"
 export finetune_last_n_blocks=1
-export finetune_last_n_layers=1

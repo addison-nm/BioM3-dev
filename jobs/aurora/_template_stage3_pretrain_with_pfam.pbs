@@ -29,6 +29,7 @@ pretrained_weights=<STATE_DICT_PATH>
 
 # Constant configurations
 num_devices=12                  # number of devices per node
+wandb=True                      # enable Weights&Biases logging
 wandb_api_key=$WANDB_API_KEY    # define W&B key prior to run, e.g. via .bashrc
 device=xpu                      # device available (cuda, xpu)
 

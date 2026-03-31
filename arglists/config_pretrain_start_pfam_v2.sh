@@ -9,6 +9,7 @@ export sequence_keyname="sequence"
 export num_classes=29
 export num_y_class_labels=6
 
+export wandb=True
 export wandb_entity="thenaturalmachine"
 export wandb_project="BioM3"
 export wandb_logging_dir="./logs"

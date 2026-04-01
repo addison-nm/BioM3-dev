@@ -1,4 +1,6 @@
-"""SwissProt CSV reader with Pfam filtering."""
+"""SwissProt CSV/Parquet reader with Pfam filtering."""
+
+import os
 
 import pandas as pd
 
@@ -15,12 +17,20 @@ OUTPUT_COLS = [
 ]
 
 
-class SwissProtReader(DatabaseReader):
-    """Reads fully_annotated_swiss_prot.csv (~570K rows).
+def _parquet_path_for(csv_path):
+    """Return the corresponding .parquet path for a .csv path."""
+    base, ext = os.path.splitext(csv_path)
+    if ext.lower() == ".csv":
+        return base + ".parquet"
+    return None
 
-    Loads the entire file into memory (acceptable at ~1.5 GB).
-    The pfam_label column stores stringified Python lists like
-    "['PF00018', 'PF07714']", so filtering uses regex substring matching.
+
+class SwissProtReader(DatabaseReader):
+    """Reads fully_annotated_swiss_prot dataset (~570K rows).
+
+    Supports Parquet (preferred) and CSV formats. If the data_path points
+    to a CSV and a corresponding .parquet file exists alongside it, the
+    Parquet file is used automatically.
     """
 
     name = "swissprot"
@@ -29,10 +39,25 @@ class SwissProtReader(DatabaseReader):
         super().__init__(data_path)
         self._df = None
 
+    def _resolve_path(self):
+        """Return (path, is_parquet). Auto-detects Parquet if available."""
+        if self.data_path.endswith(".parquet"):
+            return self.data_path, True
+        parquet = _parquet_path_for(self.data_path)
+        if parquet and os.path.exists(parquet):
+            logger.info("Parquet file found, using fast path: %s", parquet)
+            return parquet, True
+        return self.data_path, False
+
     def _load(self):
         if self._df is None:
-            logger.info("Loading SwissProt CSV: %s", self.data_path)
-            self._df = pd.read_csv(self.data_path)
+            path, is_parquet = self._resolve_path()
+            if is_parquet:
+                logger.info("Loading SwissProt Parquet: %s", path)
+                self._df = pd.read_parquet(path)
+            else:
+                logger.info("Loading SwissProt CSV: %s", path)
+                self._df = pd.read_csv(path)
         return self._df
 
     def query_by_pfam(self, pfam_ids, **kwargs):

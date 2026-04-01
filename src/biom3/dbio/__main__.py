@@ -32,5 +32,11 @@ def run_build_taxid_index():
     mapper.build_sqlite_index(args.output)
 
 
+def run_convert_to_parquet():
+    from biom3.dbio.convert import parse_arguments, main
+    args = parse_arguments(sys.argv[1:])
+    main(args)
+
+
 if __name__ == "__main__":
     main()

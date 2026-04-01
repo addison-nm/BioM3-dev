@@ -17,11 +17,12 @@ set -euo pipefail
 
 OUTDIR="demo/outputs/sh3_dataset"
 
-# The taxonomy index is a derived file (~25 GB) that must be writable.
-# Store it locally alongside the symlinked database files.
-TAXID_INDEX="data/databases/ncbi_taxonomy/accession2taxid.sqlite"
+# Paths to training CSVs (from config, or override here)
+SWISSPROT_CSV="data/datasets/fully_annotated_swiss_prot.csv"
+PFAM_CSV="data/datasets/Pfam_protein_text_dataset.csv"
 
-# Source file for building the index (read-only, may be a symlink).
+# Derived index files (writable, stored locally)
+TAXID_INDEX="data/databases/ncbi_taxonomy/accession2taxid.sqlite"
 TAXID_SOURCE="data/databases/ncbi_taxonomy/prot.accession2taxid.gz"
 
 echo "============================================================"
@@ -29,13 +30,26 @@ echo "  Demo: Build SH3 Domain Dataset (PF00018)"
 echo "============================================================"
 echo ""
 
-# --- Step 0: Build taxonomy SQLite index if needed ---
-# This is a one-time operation (~10-15 min) that makes all subsequent
-# taxonomy lookups instant (seconds instead of streaming 1.55B rows).
-if [ ! -f "$TAXID_INDEX" ]; then
-    echo "[0] Building SQLite taxonomy index (one-time)..."
-    echo "    This takes ~10-15 minutes but only needs to be done once."
+# --- Step 0a: Convert CSVs to Parquet if needed (one-time) ---
+# Parquet makes Pfam queries ~5-10x faster (35 GB CSV → ~5-8 GB Parquet).
+PFAM_PARQUET="${PFAM_CSV%.csv}.parquet"
+if [ ! -f "$PFAM_PARQUET" ]; then
+    echo "[0a] Converting Pfam CSV to Parquet (one-time)..."
+    biom3_convert_to_parquet "$PFAM_CSV"
     echo ""
+fi
+
+SWISSPROT_PARQUET="${SWISSPROT_CSV%.csv}.parquet"
+if [ ! -f "$SWISSPROT_PARQUET" ]; then
+    echo "[0b] Converting SwissProt CSV to Parquet (one-time)..."
+    biom3_convert_to_parquet "$SWISSPROT_CSV"
+    echo ""
+fi
+
+# --- Step 0c: Build taxonomy SQLite index if needed (one-time) ---
+# Makes taxonomy lookups instant (seconds instead of ~10-15 min streaming).
+if [ ! -f "$TAXID_INDEX" ]; then
+    echo "[0c] Building SQLite taxonomy index (one-time)..."
     biom3_build_taxid_index "$TAXID_SOURCE" -o "$TAXID_INDEX"
     echo ""
 fi

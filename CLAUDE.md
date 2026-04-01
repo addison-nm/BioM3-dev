@@ -45,6 +45,7 @@ Defined in `pyproject.toml`:
 - `biom3_ProteoScribe_sample` → `biom3.Stage3.__main__:run_ProteoScribe_sample`
 - `biom3_build_dataset` → `biom3.dbio.__main__:run_build_dataset`
 - `biom3_build_taxid_index` → `biom3.dbio.__main__:run_build_taxid_index`
+- `biom3_convert_to_parquet` → `biom3.dbio.__main__:run_convert_to_parquet`
 
 ## Building and running
 

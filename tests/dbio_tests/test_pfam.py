@@ -57,3 +57,33 @@ class TestPfamReader:
         result_large = reader_large.query_by_pfam(["PF00018"])
         assert len(result_small) == len(result_large)
         assert set(result_small["primary_Accession"]) == set(result_large["primary_Accession"])
+
+    def test_parquet_roundtrip(self, tmp_path):
+        """Parquet file should produce identical results to CSV."""
+        from biom3.dbio.convert import csv_to_parquet
+
+        parquet_path = str(tmp_path / "mini_pfam.parquet")
+        csv_to_parquet(PFAM_PATH, parquet_path, chunk_size=10)
+
+        csv_reader = PfamReader(PFAM_PATH)
+        parquet_reader = PfamReader(parquet_path)
+
+        csv_result = csv_reader.query_by_pfam(["PF00018"])
+        parquet_result = parquet_reader.query_by_pfam(["PF00018"])
+
+        assert len(csv_result) == len(parquet_result)
+        assert set(csv_result["primary_Accession"]) == set(parquet_result["primary_Accession"])
+
+    def test_parquet_auto_detect(self, tmp_path):
+        """PfamReader should auto-detect .parquet alongside .csv."""
+        import shutil
+        from biom3.dbio.convert import csv_to_parquet
+
+        # Copy CSV to tmp and create Parquet alongside it
+        csv_copy = str(tmp_path / "test.csv")
+        shutil.copy(PFAM_PATH, csv_copy)
+        csv_to_parquet(csv_copy, chunk_size=10)
+
+        reader = PfamReader(csv_copy)
+        path, is_parquet = reader._resolve_path()
+        assert is_parquet

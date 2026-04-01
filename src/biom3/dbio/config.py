@@ -13,13 +13,11 @@ DEFAULT_CONFIG_PATH = "configs/dbio_config.json"
 
 
 def _resolve_root(raw_path, config_path):
-    """Resolve a possibly-relative path against the config file's directory."""
+    """Resolve a possibly-relative path against the current working directory."""
     p = Path(raw_path)
     if p.is_absolute():
         return p
-    if config_path:
-        return (Path(config_path).parent / p).resolve()
-    return p.resolve()
+    return Path.cwd().joinpath(p).resolve()
 
 
 def _load_config(config_path=None):

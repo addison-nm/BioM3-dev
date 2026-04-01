@@ -17,6 +17,7 @@ import numpy as np
 import random
 import gc
 import argparse
+from datetime import datetime
 from pathlib import Path
 import pandas as pd
 import h5py
@@ -63,7 +64,8 @@ import biom3.Stage3.preprocess as prep
 import biom3.Stage3.cond_diff_transformer_layer as mod
 import biom3.Stage3.PL_wrapper as PL_mod
 from biom3.Stage3.io import prepare_model_ProteoScribe
-from biom3.backend.device import print_gpu_initialization, get_device
+from biom3.core.run_utils import write_manifest
+from biom3.backend.device import print_gpu_initialization, get_device, get_rank
 
 logger = setup_logger(__name__)
 
@@ -920,6 +922,34 @@ def freeze_except_last_n_blocks_and_layers(
     return PL_model
 
 
+_TRAINING_ENV_PREFIXES = (
+    "CUDA_", "NCCL_", "TORCH_", "DEEPSPEED_", "WANDB_",
+    "MASTER_", "WORLD_SIZE", "RANK", "LOCAL_RANK",
+    "SLURM_", "PBS_", "COBALT_", "PALS_", "PMI_", "OMPI_",
+    "OMP_NUM_THREADS", "MKL_NUM_THREADS",
+)
+
+_SENSITIVE_ENV_SUBSTRINGS = (
+    "KEY", "SECRET", "TOKEN", "PASSWORD", "CREDENTIAL", "AUTH",
+)
+
+
+def _collect_training_env():
+    """Collect environment variables relevant to distributed training and HPC.
+
+    Variables whose names contain sensitive substrings (API keys, tokens, etc.)
+    are excluded.
+    """
+    env = {"hostname": socket.gethostname()}
+    for key, val in sorted(os.environ.items()):
+        if key.startswith(_TRAINING_ENV_PREFIXES):
+            upper = key.upper()
+            if any(s in upper for s in _SENSITIVE_ENV_SUBSTRINGS):
+                continue
+            env[key] = val
+    return env
+
+
 ###########################
 ##  Training Entrypoint  ##
 ###########################
@@ -1141,6 +1171,8 @@ def train_model(
 
 def main(args, use_hydra=False, ds_config=None,):
 
+    start_time = datetime.now()
+
     # ----- Suppress noisy library warnings -----
     warnings.filterwarnings("ignore", message=".*LeafSpec.*is deprecated.*")
     warnings.filterwarnings("ignore", message=".*isinstance.*treespec.*")
@@ -1223,6 +1255,69 @@ def main(args, use_hydra=False, ds_config=None,):
         data_module=data_module,
         ds_config=ds_config,
     )
+
+    # ----- Write build manifest (rank 0 only) -----
+    if get_rank() == 0:
+        elapsed = datetime.now() - start_time
+        checkpoint_dir = os.path.join(
+            args.tb_logger_path, args.tb_logger_folder,
+            "checkpoints", args.version_name,
+        )
+        total_params = sum(p.numel() for p in PL_model.model.parameters())
+        trainable_params = sum(
+            p.numel() for p in PL_model.model.parameters() if p.requires_grad
+        )
+
+        outputs = {
+            "seed": args.seed,
+            "total_params": total_params,
+            "trainable_params": trainable_params,
+            "batch_size": args.batch_size,
+            "effective_lr": args.lr,
+            "precision": args.precision,
+            "gpu_devices": args.gpu_devices,
+            "num_nodes": args.num_nodes,
+            "acc_grad_batches": args.acc_grad_batches,
+            "deepspeed_stage": "2",
+        }
+        if args.pfam_data_root is not None:
+            outputs["max_steps"] = args.max_steps
+            outputs["val_check_interval"] = args.val_check_interval
+        else:
+            outputs["epochs"] = args.epochs
+
+        if args.finetune:
+            outputs["finetune"] = True
+            outputs["finetune_last_n_blocks"] = args.finetune_last_n_blocks
+            outputs["finetune_last_n_layers"] = args.finetune_last_n_layers
+
+        resolved_paths = {
+            "checkpoint_dir": os.path.abspath(checkpoint_dir),
+        }
+        if args.swissprot_data_root is not None:
+            resolved_paths["swissprot_data_root"] = os.path.abspath(
+                args.swissprot_data_root
+            )
+        if args.pfam_data_root is not None:
+            resolved_paths["pfam_data_root"] = os.path.abspath(
+                args.pfam_data_root
+            )
+        if args.pretrained_weights is not None:
+            resolved_paths["pretrained_weights"] = os.path.abspath(
+                args.pretrained_weights
+            )
+        if args.resume_from_checkpoint is not None:
+            resolved_paths["resume_from_checkpoint"] = os.path.abspath(
+                args.resume_from_checkpoint
+            )
+
+        manifest_path = write_manifest(
+            args, checkpoint_dir, start_time, elapsed,
+            outputs=outputs,
+            resolved_paths=resolved_paths,
+            environment=_collect_training_env(),
+        )
+        logger.info("Build manifest written to %s", manifest_path)
 
     # ----- Clean up -----
     # torch.distributed.destroy_process_group()

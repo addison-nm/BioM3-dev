@@ -9,6 +9,7 @@ lightning/
 lightning_logs/
 _misc/
 .uniprot_cache/
+demo/outputs/*
 
 # Misc
 **/.DS_Store

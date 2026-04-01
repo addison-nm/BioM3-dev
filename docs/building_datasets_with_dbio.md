@@ -18,10 +18,10 @@ Install the package (editable mode):
 pip install -e .
 ```
 
-To run the quick demo against bundled mini test data (no database download):
+To run the demo showing different enrichment options:
 
 ```bash
-python demo/build_sh3_dataset.py
+bash demo/build_sh3_dataset.sh
 ```
 
 For real datasets, you need the database files. See [setup_databases.md](setup_databases.md)

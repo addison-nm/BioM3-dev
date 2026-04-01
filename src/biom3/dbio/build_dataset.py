@@ -134,6 +134,10 @@ def parse_arguments(args):
         help='Filter by taxonomy rank (e.g. "superkingdom=Bacteria")',
     )
     parser.add_argument(
+        "--taxid-index", type=str, default=None,
+        help="Path to pre-built SQLite accession2taxid index (built via biom3_build_taxid_index)",
+    )
+    parser.add_argument(
         "--uniprot-cache-dir", type=str, default=".uniprot_cache",
         help="Directory for caching UniProt API responses",
     )
@@ -314,7 +318,11 @@ def _load_taxonomy(args, accessions):
 
     accession2taxid_path = os.path.join(taxonomy_dir, "prot.accession2taxid.gz")
     mapper = AccessionTaxidMapper(accession2taxid_path)
-    accession_taxid_map = mapper.lookup(accessions)
+
+    if args.taxid_index:
+        accession_taxid_map = mapper.lookup_sqlite(accessions, args.taxid_index)
+    else:
+        accession_taxid_map = mapper.lookup(accessions)
 
     return taxonomy_tree, accession_taxid_map
 
@@ -332,7 +340,10 @@ def _apply_taxonomy_filters(df, args):
     mapper = AccessionTaxidMapper(accession2taxid_path)
 
     accessions = df["primary_Accession"].dropna().unique().tolist()
-    acc_to_taxid = mapper.lookup(accessions)
+    if args.taxid_index:
+        acc_to_taxid = mapper.lookup_sqlite(accessions, args.taxid_index)
+    else:
+        acc_to_taxid = mapper.lookup(accessions)
 
     # Build taxid -> set of accessions mapping
     taxid_to_accs = {}

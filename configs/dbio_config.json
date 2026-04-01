@@ -1,6 +1,6 @@
 {
-    "databases_root": "/data/data-share/BioM3-data-share/databases",
-    "training_data_root": "/data/data-share/BioM3-data-share/data/datasets",
+    "databases_root": "data/databases",
+    "training_data_root": "data/datasets",
     "databases": {
         "ncbi_taxonomy": "ncbi_taxonomy",
         "pfam": "pfam",

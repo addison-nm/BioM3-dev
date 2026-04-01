@@ -214,28 +214,31 @@ class AccessionTaxidMapper:
 
         conn = sqlite3.connect(output_path)
         cursor = conn.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=OFF")
         cursor.execute(
             "CREATE TABLE IF NOT EXISTS accession2taxid "
-            "(accession TEXT PRIMARY KEY, taxid INTEGER)"
+            "(accession TEXT, taxid INTEGER)"
         )
         conn.commit()
 
         rows_inserted = 0
         for chunk in pd.read_csv(
-            path, sep="\t", chunksize=5_000_000,
+            path, sep="\t", chunksize=1_000_000,
             usecols=["accession", "taxid"],
             compression="gzip" if is_gzipped else None,
         ):
-            chunk.to_sql(
-                "accession2taxid", conn,
-                if_exists="append", index=False,
-                method="multi",
+            records = list(zip(chunk["accession"], chunk["taxid"].astype(int)))
+            cursor.executemany(
+                "INSERT INTO accession2taxid (accession, taxid) VALUES (?, ?)",
+                records,
             )
+            conn.commit()
             rows_inserted += len(chunk)
-            if rows_inserted % 50_000_000 == 0:
+            if rows_inserted % 10_000_000 == 0:
                 logger.info("  Inserted %s rows", f"{rows_inserted:,}")
 
-        logger.info("Creating index on accession column...")
+        logger.info("  Inserted %s rows total. Creating index...", f"{rows_inserted:,}")
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_accession "
             "ON accession2taxid(accession)"

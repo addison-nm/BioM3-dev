@@ -51,6 +51,8 @@ The `biom3.dbio` package resolves database paths in the following order:
 2. **Config file**: the default config at `configs/dbio_config.json` sets `databases_root` to `data/databases` (relative to the repo root).
 3. **CLI flags**: the `biom3_build_dataset` command accepts `--databases-root` and per-database path overrides (`--swissprot`, `--pfam`).
 
+**Read vs. write paths**: The shared database directory is typically read-only. The `sync_databases.sh` script creates a local `data/databases/` directory with symlinks to individual shared files, so the local directory itself is writable. Derived files like the SQLite taxonomy index should be written to this local directory (or any user-specified path via `-o` / `--taxid-index`), not to the shared source.
+
 ## Available databases
 
 ### NCBI Taxonomy (`ncbi_taxonomy/`)
@@ -106,14 +108,24 @@ The `uniprot_sprot.dat.gz` file is used by `--enrich-pfam` to extract protein an
 | `enzyme.dat` | 9.1 MB | EC number entries with reaction descriptions and synonyms |
 | `enzyme.rdf` | 15 MB | RDF/OWL semantic version |
 
-## Databases required by `biom3.dbio`
+## Training CSVs required by `biom3.dbio`
 
-The `biom3_build_dataset` command requires the pre-processed training CSV files (not the raw database files above). These CSVs live in the shared data directory:
+The `biom3_build_dataset` command requires two pre-processed training CSV files (not the raw database files above). By default, the config at `configs/dbio_config.json` looks for these in `data/datasets/`:
 
-| File | Source location | Description |
-|------|-----------------|-------------|
-| `fully_annotated_swiss_prot.csv` | `BioM3-data-share/data/datasets/` | ~570K annotated Swiss-Prot entries with text captions |
-| `Pfam_protein_text_dataset.csv` | `BioM3-data-share/data/datasets/` | ~44.8M Pfam domain entries with text captions |
+| File | Size | Description |
+|------|------|-------------|
+| `fully_annotated_swiss_prot.csv` | ~1.5 GB | ~570K annotated Swiss-Prot entries with text captions |
+| `Pfam_protein_text_dataset.csv` | ~35 GB | ~44.8M Pfam domain entries with text captions |
+
+These files are available in the shared data directory on each machine (e.g., `BioM3-data-share/data/datasets/` on Spark). To make them accessible locally, symlink or copy them into `data/datasets/`:
+
+```bash
+mkdir -p data/datasets
+ln -s /data/data-share/BioM3-data-share/data/datasets/fully_annotated_swiss_prot.csv data/datasets/
+ln -s /data/data-share/BioM3-data-share/data/datasets/Pfam_protein_text_dataset.csv data/datasets/
+```
+
+Alternatively, pass paths directly on the command line with `--swissprot` and `--pfam`, bypassing the config entirely.
 
 Optional flags require additional database files to be synced in `data/databases/`:
 

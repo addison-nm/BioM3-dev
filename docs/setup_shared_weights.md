@@ -59,4 +59,4 @@ Some tests depend on pretrained weight files that are too large to commit to git
 | `ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.renamed.bin` | 3 | `test_model_load_from_bin`, `test_stage3_run_ProteoScribe_sample` |
 | `ProteoScribe/epoch200_full.ckpt/single_model.pth` | 3 | `test_model_load_from_checkpoint_file` |
 
-All of these files are available in the shared weights directory and can be populated by running `sync_weights.sh` as described above. Tests that do not depend on these files — including the key-correction tests using committed dummy weights (see `docs/BUG_axial_positional_embedding_keys.md`) — will always run.
+All of these files are available in the shared weights directory and can be populated by running `sync_weights.sh` as described above. Tests that do not depend on these files — including the key-correction tests using committed dummy weights (see `docs/bug_reports/axial_positional_embedding_keys.md`) — will always run.

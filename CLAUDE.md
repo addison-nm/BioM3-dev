@@ -134,6 +134,6 @@ Stage 3 supports multi-node training via DeepSpeed + PyTorch Lightning. The `scr
 
 ## Things to watch out for
 
-- **Padding mismatch bug** (documented in `docs/BUG_bert_embedding_mismatch.md`): BERT text encoder must use `padding="max_length"` with `max_length=512` to match training. Dynamic padding produces different embeddings because no `attention_mask` is passed to the model.
+- **Padding mismatch bug** (documented in `docs/bug_reports/bert_embedding_mismatch.md`): BERT text encoder must use `padding="max_length"` with `max_length=512` to match training. Dynamic padding produces different embeddings because no `attention_mask` is passed to the model.
 - **strict=False** is used when loading PenCL weights because some checkpoint keys may not match the current model graph. This is intentional but means missing/extra keys are silently ignored — be careful when changing model architecture.
 - **PL wrapper vs nn.Module**: PL wrappers store the model as `.model`. Inference scripts must unwrap to get the raw `nn.Module` for the forward pass.

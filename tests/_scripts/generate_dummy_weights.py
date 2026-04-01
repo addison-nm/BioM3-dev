@@ -8,7 +8,7 @@ axial-positional-embedding package:
   - *_v2.bin: v0.2.x key style (underscore: weights_0, weights_1)
   - *_v3.bin: v0.3.x key style (dot: weights.0, weights.1)
 
-See docs/BUG_axial_positional_embedding_keys.md for background.
+See docs/bug_reports/axial_positional_embedding_keys.md for background.
 
 Usage:
     python tests/_scripts/generate_dummy_weights.py \

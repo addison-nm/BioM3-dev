@@ -68,7 +68,7 @@ def test_model_load_scratch(
         "names_mismatched, attempt_correction, expect_error_context", [
     # --- Dummy weights (committed to git, always available) ---
     # v0.2.x key style (weights_0): mismatches v0.3.x model, needs correction
-    # See docs/BUG_axial_positional_embedding_keys.md
+    # See docs/bug_reports/axial_positional_embedding_keys.md
     [
         f"{CONFIGS_DIR}/origkeys_mini.json",
         f"{WEIGHTS_DIR}/origkeys_mini_v2.bin",

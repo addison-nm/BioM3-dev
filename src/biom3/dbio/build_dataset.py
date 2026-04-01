@@ -2,16 +2,22 @@
 
 import argparse
 import csv
-import json
 import logging
 import os
-import subprocess
 import sys
 from datetime import datetime
 
 import pandas as pd
 
 from biom3.backend.device import setup_logger
+from biom3.core.run_utils import (
+    get_biom3_version,
+    get_git_hash,
+    get_file_metadata,
+    setup_file_logging,
+    teardown_file_logging,
+    write_manifest,
+)
 from biom3.dbio.config import (
     get_database_path,
     get_training_data_path,
@@ -23,63 +29,67 @@ from biom3.dbio.enrich import compose_caption
 logger = setup_logger(__name__)
 
 
-def _get_biom3_version():
+def _read_release_version(filepath, pattern):
+    """Read a release file and extract a version string matching *pattern*."""
+    import re
     try:
-        from importlib.metadata import version
-        return version("biom3")
+        with open(filepath) as f:
+            text = f.read(2048)
+        match = re.search(pattern, text)
+        return match.group(1).strip() if match else None
     except Exception:
-        return "unknown"
+        return None
 
 
-def _get_git_hash():
+def _get_database_versions(args):
+    """Collect version and file metadata for databases used in this build."""
+    versions = {}
+
+    swissprot_path = _resolve_swissprot_path(args)
+    pfam_path = _resolve_pfam_path(args)
+
+    versions["swissprot_csv"] = get_file_metadata(swissprot_path)
+    versions["pfam_csv"] = get_file_metadata(pfam_path)
+
+    # UniProt release version from reldate.txt
     try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            capture_output=True, text=True, timeout=5,
+        db_root = str(get_database_path("swissprot", args.config))
+        reldate_path = os.path.join(db_root, "reldate.txt")
+        versions["uniprot_release"] = _read_release_version(
+            reldate_path, r"Release\s+(\S+)",
         )
-        return result.stdout.strip() if result.returncode == 0 else "unknown"
     except Exception:
-        return "unknown"
+        pass
 
+    # Pfam release version from relnotes.txt
+    try:
+        db_root = str(get_database_path("pfam", args.config))
+        relnotes_path = os.path.join(db_root, "relnotes.txt")
+        versions["pfam_release"] = _read_release_version(
+            relnotes_path, r"RELEASE\s+(\S+)",
+        )
+    except Exception:
+        pass
 
-def _setup_file_logging(outdir):
-    """Add a FileHandler to all biom3.dbio.* loggers so they log to both
-    console and a file in the output directory."""
-    log_path = os.path.join(outdir, "build.log")
-    file_handler = logging.FileHandler(log_path)
-    file_handler.setFormatter(logging.Formatter(
-        "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    ))
-    file_handler.setLevel(logging.INFO)
-    # Add to all existing biom3.dbio.* loggers (propagate=False prevents
-    # inheritance, so we must attach directly)
-    for name, lg in logging.Logger.manager.loggerDict.items():
-        if isinstance(lg, logging.Logger) and name.startswith("biom3.dbio"):
-            lg.addHandler(file_handler)
-    return log_path, file_handler
+    # NCBI taxonomy dump metadata
+    if args.add_taxonomy:
+        try:
+            db_root = str(get_database_path("ncbi_taxonomy", args.config))
+            rankedlineage = os.path.join(db_root, "rankedlineage.dmp")
+            versions["ncbi_taxonomy"] = get_file_metadata(rankedlineage)
+        except Exception:
+            pass
 
+    # Provenance TSV (download log with timestamps and MD5s)
+    try:
+        db_root = str(get_database_path("swissprot", args.config))
+        provenance_path = os.path.join(os.path.dirname(db_root), "provenance.tsv")
+        if os.path.exists(provenance_path):
+            versions["provenance_tsv"] = os.path.realpath(provenance_path)
+    except Exception:
+        pass
 
-def _write_manifest(args, outdir, start_time, elapsed, row_counts):
-    """Write build_manifest.json with reproduction info."""
-    manifest = {
-        "biom3_version": _get_biom3_version(),
-        "git_hash": _get_git_hash(),
-        "timestamp": start_time.isoformat(),
-        "elapsed_seconds": elapsed.total_seconds(),
-        "command": " ".join(sys.argv),
-        "args": {k: v for k, v in vars(args).items()},
-        "resolved_paths": {
-            "swissprot_csv": os.path.abspath(_resolve_swissprot_path(args)),
-            "pfam_csv": os.path.abspath(_resolve_pfam_path(args)),
-        },
-        "row_counts": row_counts,
-        "python_version": sys.version,
-    }
-    manifest_path = os.path.join(outdir, "build_manifest.json")
-    with open(manifest_path, "w") as f:
-        json.dump(manifest, f, indent=2, default=str)
-    logger.info("Saved build manifest to %s", manifest_path)
+    return versions
 
 
 def parse_arguments(args):
@@ -177,12 +187,14 @@ def main(args):
     os.makedirs(args.outdir, exist_ok=True)
 
     # Set up dual logging (console + file)
-    log_path, file_handler = _setup_file_logging(args.outdir)
+    log_path, file_handler = setup_file_logging(
+        args.outdir, logger_prefix="biom3.dbio", log_filename="build.log",
+    )
 
     start_time = datetime.now()
     logger.info("=" * 60)
     logger.info("Build fine-tuning dataset")
-    logger.info("biom3 version: %s (git: %s)", _get_biom3_version(), _get_git_hash())
+    logger.info("biom3 version: %s (git: %s)", get_biom3_version(), get_git_hash())
     logger.info("Command:     %s", " ".join(sys.argv))
     logger.info("Pfam IDs:    %s", " ".join(args.pfam_ids))
     logger.info("Output dir:  %s", os.path.abspath(args.outdir))
@@ -299,13 +311,21 @@ def main(args):
         "pfam": len(df_pfam),
         "combined": len(df_combined),
     }
-    _write_manifest(args, args.outdir, start_time, elapsed, row_counts)
+    resolved_paths = {
+        "swissprot_csv": os.path.abspath(_resolve_swissprot_path(args)),
+        "pfam_csv": os.path.abspath(_resolve_pfam_path(args)),
+    }
+    database_versions = _get_database_versions(args)
+    manifest_path = write_manifest(
+        args, args.outdir, start_time, elapsed,
+        outputs={"row_counts": row_counts},
+        resolved_paths=resolved_paths,
+        database_versions=database_versions,
+    )
+    logger.info("Saved build manifest to %s", manifest_path)
 
     # Clean up file handler
-    for name, lg in logging.Logger.manager.loggerDict.items():
-        if isinstance(lg, logging.Logger) and name.startswith("biom3.dbio"):
-            lg.removeHandler(file_handler)
-    file_handler.close()
+    teardown_file_logging("biom3.dbio", file_handler)
 
 
 def _load_taxonomy(args, accessions):
@@ -327,8 +347,31 @@ def _load_taxonomy(args, accessions):
     return taxonomy_tree, accession_taxid_map
 
 
+def _parse_annot_lineage(lineage_str):
+    """Parse an annot_lineage string into a list of taxon names.
+
+    Example input:
+        "The organism lineage is Eukaryota, Metazoa, Chordata, ..."
+    Returns:
+        ["Eukaryota", "Metazoa", "Chordata", ...]
+    """
+    prefix = "The organism lineage is "
+    if lineage_str.startswith(prefix):
+        lineage_str = lineage_str[len(prefix):]
+    return [t.strip() for t in lineage_str.split(",") if t.strip()]
+
+
 def _apply_taxonomy_filters(df, args):
-    """Filter the combined DataFrame by taxonomy rank constraints."""
+    """Filter the combined DataFrame by taxonomy rank constraints.
+
+    Uses two sources for taxonomy data:
+    1. NCBI prot.accession2taxid lookup (structured rank->value via TaxonomyTree)
+    2. The annot_lineage column populated by UniProt enrichment (flat lineage list)
+
+    Accessions found in the NCBI index use the structured approach (exact rank
+    matching). Accessions not in the NCBI index fall back to checking whether
+    the filter value appears anywhere in the annot_lineage string.
+    """
     from biom3.dbio.taxonomy import TaxonomyTree, AccessionTaxidMapper
 
     filters = _parse_taxonomy_filters(args.taxonomy_filter)
@@ -345,7 +388,7 @@ def _apply_taxonomy_filters(df, args):
     else:
         acc_to_taxid = mapper.lookup(accessions)
 
-    # Build taxid -> set of accessions mapping
+    # --- Path 1: NCBI structured lookup ---
     taxid_to_accs = {}
     for acc, tid in acc_to_taxid.items():
         taxid_to_accs.setdefault(tid, set()).add(acc)
@@ -359,10 +402,33 @@ def _apply_taxonomy_filters(df, args):
         )
         all_taxids = kept_taxids
 
-    # Collect accessions that survived filtering
     kept_accs = set()
     for tid in all_taxids:
         kept_accs.update(taxid_to_accs.get(tid, set()))
+    ncbi_kept = len(kept_accs)
+
+    # --- Path 2: fallback to annot_lineage for unmapped accessions ---
+    ncbi_mapped = set(acc_to_taxid.keys())
+    has_lineage_col = "annot_lineage" in df.columns
+    fallback_kept = 0
+
+    if has_lineage_col:
+        for _, row in df.iterrows():
+            acc = row.get("primary_Accession")
+            if pd.isna(acc) or acc in ncbi_mapped:
+                continue
+            lineage_str = row.get("annot_lineage")
+            if pd.isna(lineage_str) or not lineage_str:
+                continue
+            lineage_terms = _parse_annot_lineage(str(lineage_str))
+            passes = all(value in lineage_terms for _, value in filters)
+            if passes:
+                kept_accs.add(acc)
+                fallback_kept += 1
+
+    if has_lineage_col:
+        logger.info("Taxonomy filter matched: %s via NCBI index, %s via annot_lineage",
+                     f"{ncbi_kept:,}", f"{fallback_kept:,}")
 
     before = len(df)
     df = df[df["primary_Accession"].isin(kept_accs)].copy()

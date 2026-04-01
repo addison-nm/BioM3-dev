@@ -7,9 +7,24 @@ the ProteoScribe finetuning pipeline.
 """
 
 import argparse
+import os
+import sys
+from datetime import datetime
+
 import h5py
 import numpy as np
 import torch
+
+from biom3.backend.device import setup_logger
+from biom3.core.run_utils import (
+    get_biom3_version,
+    get_git_hash,
+    setup_file_logging,
+    teardown_file_logging,
+    write_manifest,
+)
+
+logger = setup_logger(__name__)
 
 
 # Maps internal keys to those used in the Facilitator output (.pt file).
@@ -47,7 +62,20 @@ def parse_arguments(args):
     return parser.parse_args(args)
 
 
-def main(args):
+def main(args, _setup_logging=True):
+    # Set up dual logging (console + file)
+    outdir = os.path.dirname(os.path.abspath(args.output_path))
+    os.makedirs(outdir, exist_ok=True)
+    file_handler = None
+    if _setup_logging:
+        log_path, file_handler = setup_file_logging(outdir)
+    start_time = datetime.now()
+    logger.info("=" * 60)
+    logger.info("Compile Stage 2 data to HDF5")
+    logger.info("biom3 version: %s (git: %s)", get_biom3_version(), get_git_hash())
+    logger.info("Command:     %s", " ".join(sys.argv))
+    logger.info("=" * 60)
+
     input_data = torch.load(args.input_data_path, weights_only=False)
 
     sequences = input_data[INPUT_KEYS["SEQUENCE"]]
@@ -70,5 +98,22 @@ def main(args):
                 data=data_out[k],
             )
 
-    print(f"Compiled HDF5 saved to {args.output_path} "
-          f"(group: {args.dataset_key}, {len(sequences)} samples)")
+    logger.info("Compiled HDF5 saved to %s (group: %s, %s samples)",
+                args.output_path, args.dataset_key, len(sequences))
+
+    # Write manifest and clean up logging
+    elapsed = datetime.now() - start_time
+    if _setup_logging:
+        write_manifest(
+            args, outdir, start_time, elapsed,
+            outputs={
+                "num_samples": len(sequences),
+                "dataset_key": args.dataset_key,
+                "output_file": os.path.abspath(args.output_path),
+            },
+            resolved_paths={
+                "input_data_path": os.path.abspath(args.input_data_path),
+            },
+        )
+        logger.info("Done in %s", elapsed)
+        teardown_file_logging("biom3", file_handler)

@@ -30,11 +30,13 @@ biom3_Facilitator_sample \
 
 """
 
+import os
 import sys
 import argparse
 import yaml
 from argparse import Namespace
 import json
+from datetime import datetime
 import pandas as pd
 import torch
 import torch.nn as nn
@@ -43,6 +45,13 @@ import warnings
 
 import biom3.Stage1.model as mod
 from biom3.core.io import load_and_prepare_model
+from biom3.core.run_utils import (
+    get_biom3_version,
+    get_git_hash,
+    setup_file_logging,
+    teardown_file_logging,
+    write_manifest,
+)
 from biom3.backend.device import setup_logger
 
 logger = setup_logger(__name__)
@@ -119,7 +128,20 @@ def compute_mmd_loss(x, y, kernel="rbf", sigma=1.0):
     return mmd_loss
 
 
-def main(args):
+def main(args, _setup_logging=True):
+
+    # Set up dual logging (console + file)
+    outdir = os.path.dirname(os.path.abspath(args.output_data_path))
+    os.makedirs(outdir, exist_ok=True)
+    file_handler = None
+    if _setup_logging:
+        log_path, file_handler = setup_file_logging(outdir)
+    start_time = datetime.now()
+    logger.info("=" * 60)
+    logger.info("Facilitator sampling (Stage 2)")
+    logger.info("biom3 version: %s (git: %s)", get_biom3_version(), get_git_hash())
+    logger.info("Command:     %s", " ".join(sys.argv))
+    logger.info("=" * 60)
 
     # Load configuration
     config_dict = load_json_config(args.json_path)
@@ -184,6 +206,29 @@ def main(args):
     # Save output embeddings
     torch.save(embedding_dataset, args.output_data_path)
     logger.info("Facilitator embeddings saved to %s", args.output_data_path)
+
+    # Write manifest and clean up logging
+    elapsed = datetime.now() - start_time
+    if _setup_logging:
+        write_manifest(
+            args, outdir, start_time, elapsed,
+            outputs={
+                "num_samples": int(z_t.shape[0]),
+                "embedding_dim": int(z_c.shape[1]),
+                "mse_zc_zp": float(mse_zc_zp),
+                "mse_zt_zp": float(mse_zt_zp),
+                "mmd_zc_zp": float(mmd_zc_zp),
+                "mmd_zp_zt": float(mmd_zp_zt),
+                "output_file": os.path.abspath(args.output_data_path),
+            },
+            resolved_paths={
+                "input_data_path": os.path.abspath(args.input_data_path),
+                "model_path": os.path.abspath(args.model_path),
+                "json_config": os.path.abspath(args.json_path),
+            },
+        )
+        logger.info("Done in %s", elapsed)
+        teardown_file_logging("biom3", file_handler)
 
 
 if __name__ == '__main__':

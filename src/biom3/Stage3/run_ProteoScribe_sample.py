@@ -28,8 +28,10 @@ biom3_ProteoScribe_sample \
 
 """
 
+import os
 import sys
 from argparse import Namespace
+from datetime import datetime
 import random
 import json
 import numpy as np
@@ -42,6 +44,13 @@ import torch.nn as nn
 import biom3.Stage3.sampling_analysis as Stage3_sample_tools
 import biom3.Stage3.animation_tools as Stage3_ani_tools
 from biom3.Stage3.io import prepare_model_ProteoScribe
+from biom3.core.run_utils import (
+    get_biom3_version,
+    get_git_hash,
+    setup_file_logging,
+    teardown_file_logging,
+    write_manifest,
+)
 from biom3.backend.device import setup_logger
 
 logger = setup_logger(__name__)
@@ -209,21 +218,34 @@ def set_seed(seed):
     return
 
 
-def main(args):
+def main(args, _setup_logging=True):
     # Parse arguments
     config_args_parser = args
 
+    # Set up dual logging (console + file)
+    outdir = os.path.dirname(os.path.abspath(args.output_path))
+    os.makedirs(outdir, exist_ok=True)
+    file_handler = None
+    if _setup_logging:
+        log_path, file_handler = setup_file_logging(outdir)
+    start_time = datetime.now()
+    logger.info("=" * 60)
+    logger.info("ProteoScribe sampling (Stage 3)")
+    logger.info("biom3 version: %s (git: %s)", get_biom3_version(), get_git_hash())
+    logger.info("Command:     %s", " ".join(sys.argv))
+    logger.info("=" * 60)
+
     seed = config_args_parser.seed
-    
+
     if seed <= 0:
         seed = np.random.randint(2**32)
-        
+
     set_seed(seed)
     logger.info("Seed: %s", seed)
 
     # Load and convert JSON config
     config_dict = load_json_config(config_args_parser.json_path)
-    config_args = convert_to_namespace(config_dict) 
+    config_args = convert_to_namespace(config_dict)
 
     config_args.device = config_args_parser.device
 
@@ -239,10 +261,33 @@ def main(args):
             model=model,
             z_t=embedding_dataset['z_c']
     )
-    
+
     logger.info("design_sequence_dict=%s", design_sequence_dict)
 
     torch.save(design_sequence_dict, f"{config_args_parser.output_path}")
+
+    # Write manifest and clean up logging
+    elapsed = datetime.now() - start_time
+    z_c = embedding_dataset['z_c']
+    num_prompts = z_c.size(0) if isinstance(z_c, torch.Tensor) else len(z_c)
+    if _setup_logging:
+        write_manifest(
+            args, outdir, start_time, elapsed,
+            outputs={
+                "num_prompts": num_prompts,
+                "num_replicas": config_args.num_replicas,
+                "seed": seed,
+                "total_sequences": num_prompts * config_args.num_replicas,
+                "output_file": os.path.abspath(args.output_path),
+            },
+            resolved_paths={
+                "input_path": os.path.abspath(args.input_path),
+                "model_path": os.path.abspath(args.model_path),
+                "json_config": os.path.abspath(args.json_path),
+            },
+        )
+        logger.info("Done in %s", elapsed)
+        teardown_file_logging("biom3", file_handler)
 
 
 if __name__ == '__main__':

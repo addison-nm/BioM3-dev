@@ -10,6 +10,18 @@ import argparse
 import os
 import sys
 from argparse import Namespace
+from datetime import datetime
+
+from biom3.backend.device import setup_logger
+from biom3.core.run_utils import (
+    get_biom3_version,
+    get_git_hash,
+    setup_file_logging,
+    teardown_file_logging,
+    write_manifest,
+)
+
+logger = setup_logger(__name__)
 
 
 def parse_arguments(args):
@@ -87,15 +99,24 @@ def main(args):
 
     os.makedirs(args.output_dir, exist_ok=True)
 
+    # Set up dual logging (console + file)
+    log_path, file_handler = setup_file_logging(args.output_dir)
+    start_time = datetime.now()
+    logger.info("=" * 60)
+    logger.info("Embedding pipeline (Stage 1 -> Stage 2 -> HDF5)")
+    logger.info("biom3 version: %s (git: %s)", get_biom3_version(), get_git_hash())
+    logger.info("Command:     %s", " ".join(sys.argv))
+    logger.info("=" * 60)
+
     # Intermediate file paths
     pencl_output = os.path.join(args.output_dir, f"{args.prefix}.PenCL_emb.pt")
     facilitator_output = os.path.join(args.output_dir, f"{args.prefix}.Facilitator_emb.pt")
     hdf5_output = os.path.join(args.output_dir, f"{args.prefix}.compiled_emb.hdf5")
 
     # --- Stage 1: PenCL inference ---
-    print("=" * 60)
-    print("Stage 1: PenCL inference")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("Stage 1: PenCL inference")
+    logger.info("=" * 60)
     stage1_args = parse_stage1_args([
         "-i", args.input_data_path,
         "-c", args.pencl_config,
@@ -105,12 +126,12 @@ def main(args):
         "--batch_size", str(args.batch_size),
         "--num_workers", str(args.num_workers),
     ])
-    run_stage1(stage1_args)
+    run_stage1(stage1_args, _setup_logging=False)
 
     # --- Stage 2: Facilitator sampling ---
-    print("=" * 60)
-    print("Stage 2: Facilitator sampling")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("Stage 2: Facilitator sampling")
+    logger.info("=" * 60)
     stage2_args = parse_stage2_args([
         "-i", pencl_output,
         "-c", args.facilitator_config,
@@ -119,19 +140,39 @@ def main(args):
         "--device", args.device,
         "--mmd_sample_limit", str(args.mmd_sample_limit),
     ])
-    run_stage2(stage2_args)
+    run_stage2(stage2_args, _setup_logging=False)
 
     # --- Compile to HDF5 ---
-    print("=" * 60)
-    print("Compiling Stage 2 output to HDF5")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("Compiling Stage 2 output to HDF5")
+    logger.info("=" * 60)
     compile_args = parse_compile_args([
         "-i", facilitator_output,
         "-o", hdf5_output,
         "--dataset_key", args.dataset_key,
     ])
-    run_compile(compile_args)
+    run_compile(compile_args, _setup_logging=False)
 
-    print("=" * 60)
-    print(f"Pipeline complete. Output: {hdf5_output}")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("Pipeline complete. Output: %s", hdf5_output)
+    logger.info("=" * 60)
+
+    # Write manifest and clean up logging
+    elapsed = datetime.now() - start_time
+    write_manifest(
+        args, args.output_dir, start_time, elapsed,
+        outputs={
+            "pencl_output": os.path.abspath(pencl_output),
+            "facilitator_output": os.path.abspath(facilitator_output),
+            "hdf5_output": os.path.abspath(hdf5_output),
+        },
+        resolved_paths={
+            "input_data_path": os.path.abspath(args.input_data_path),
+            "pencl_weights": os.path.abspath(args.pencl_weights),
+            "facilitator_weights": os.path.abspath(args.facilitator_weights),
+            "pencl_config": os.path.abspath(args.pencl_config),
+            "facilitator_config": os.path.abspath(args.facilitator_config),
+        },
+    )
+    logger.info("Done in %s", elapsed)
+    teardown_file_logging("biom3", file_handler)

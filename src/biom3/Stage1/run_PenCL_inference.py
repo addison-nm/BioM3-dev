@@ -44,11 +44,13 @@ biom3_PenCL_inference \
 
 """
 
+import os
 import sys
 import argparse
 import yaml
 from argparse import Namespace
 import json
+from datetime import datetime
 import numpy as np
 import pandas as pd
 import torch
@@ -62,6 +64,13 @@ import biom3.Stage1.preprocess as prep
 import biom3.Stage1.model as mod
 import biom3.Stage1.PL_wrapper as PL_wrap
 from biom3.core.io import load_and_prepare_model
+from biom3.core.run_utils import (
+    get_biom3_version,
+    get_git_hash,
+    setup_file_logging,
+    teardown_file_logging,
+    write_manifest,
+)
 from biom3.backend.device import setup_logger
 
 logger = setup_logger(__name__)
@@ -258,12 +267,25 @@ def compute_homology_matrix(z_p_tensor):
     return homology_matrix
 
 
-def main(args):
+def main(args, _setup_logging=True):
     config_args_parser = args
     model_path = config_args_parser.model_path
     batch_size = config_args_parser.batch_size
     num_workers = config_args_parser.num_workers
     load_from_checkpoint = config_args_parser.load_from_checkpoint
+
+    # Set up dual logging (console + file)
+    outdir = os.path.dirname(os.path.abspath(args.output_path))
+    os.makedirs(outdir, exist_ok=True)
+    file_handler = None
+    if _setup_logging:
+        log_path, file_handler = setup_file_logging(outdir)
+    start_time = datetime.now()
+    logger.info("=" * 60)
+    logger.info("PenCL inference (Stage 1)")
+    logger.info("biom3 version: %s (git: %s)", get_biom3_version(), get_git_hash())
+    logger.info("Command:     %s", " ".join(sys.argv))
+    logger.info("=" * 60)
 
     # Load configuration
     config_dict = load_json_config(config_args_parser.json_path)
@@ -414,6 +436,30 @@ def main(args):
     
     # Save output
     torch.save(embedding_dict, config_args_parser.output_path)
+
+    # Write manifest and clean up logging
+    elapsed = datetime.now() - start_time
+    input_display = (
+        os.path.abspath(args.input_data_path)
+        if args.input_data_path.lower() != "none"
+        else "None (test dataset)"
+    )
+    if _setup_logging:
+        write_manifest(
+            args, outdir, start_time, elapsed,
+            outputs={
+                "num_samples": len(acc_id_array),
+                "embedding_dim": int(z_t_tensor.shape[1]),
+                "output_file": os.path.abspath(args.output_path),
+            },
+            resolved_paths={
+                "input_data_path": input_display,
+                "model_path": os.path.abspath(args.model_path),
+                "json_config": os.path.abspath(args.json_path),
+            },
+        )
+        logger.info("Done in %s", elapsed)
+        teardown_file_logging("biom3", file_handler)
 
 
 # Main Execution

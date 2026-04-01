@@ -150,6 +150,6 @@ class TestBuildDataset:
         assert "command" in manifest
         assert "args" in manifest
         assert manifest["args"]["pfam_ids"] == ["PF00018"]
-        assert manifest["row_counts"]["swissprot"] == 4
-        assert manifest["row_counts"]["pfam"] == 5
-        assert manifest["row_counts"]["combined"] == 9
+        assert manifest["outputs"]["row_counts"]["swissprot"] == 4
+        assert manifest["outputs"]["row_counts"]["pfam"] == 5
+        assert manifest["outputs"]["row_counts"]["combined"] == 9

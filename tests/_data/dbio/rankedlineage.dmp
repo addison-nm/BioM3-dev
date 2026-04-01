@@ -1,0 +1,10 @@
+1	|	root	|		|		|		|		|		|		|		|		|
+2	|	Bacteria	|		|		|		|		|		|		|		|	Bacteria	|
+9606	|	Homo sapiens	|	Homo sapiens	|	Homo	|	Hominidae	|	Primates	|	Mammalia	|	Chordata	|	Metazoa	|	Eukaryota	|
+10090	|	Mus musculus	|	Mus musculus	|	Mus	|	Muridae	|	Rodentia	|	Mammalia	|	Chordata	|	Metazoa	|	Eukaryota	|
+562	|	Escherichia coli	|	Escherichia coli	|	Escherichia	|	Enterobacteriaceae	|	Enterobacterales	|	Gammaproteobacteria	|	Pseudomonadota	|		|	Bacteria	|
+287	|	Pseudomonas aeruginosa	|	Pseudomonas aeruginosa	|	Pseudomonas	|	Pseudomonadaceae	|	Pseudomonadales	|	Gammaproteobacteria	|	Pseudomonadota	|		|	Bacteria	|
+4932	|	Saccharomyces cerevisiae	|	Saccharomyces cerevisiae	|	Saccharomyces	|	Saccharomycetaceae	|	Saccharomycetales	|	Saccharomycetes	|	Ascomycota	|	Fungi	|	Eukaryota	|
+10239	|	Viruses	|		|		|		|		|		|		|		|	Viruses	|
+2697049	|	SARS-CoV-2	|	SARS-CoV-2	|	Betacoronavirus	|	Coronaviridae	|	Nidovirales	|		|		|		|	Viruses	|
+3702	|	Arabidopsis thaliana	|	Arabidopsis thaliana	|	Arabidopsis	|	Brassicaceae	|	Brassicales	|	Magnoliopsida	|	Streptophyta	|	Viridiplantae	|	Eukaryota	|

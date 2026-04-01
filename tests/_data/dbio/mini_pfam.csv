@@ -1,0 +1,21 @@
+id,range,description,pfam_label,sequence,family_name,family_description,[final]text_caption
+A0A001,10-65,A0A001.1 PF00018,PF00018,ALYGRDEETH,SH3 domain,SH3 domains bind proline-rich ligands.,Protein name: SH3 domain.
+A0A002,20-80,A0A002.1 PF00018,PF00018,EETHALVGRD,SH3 domain,SH3 domains bind proline-rich ligands.,Protein name: SH3 domain.
+A0A003,5-55,A0A003.1 PF00018,PF00018,GRDEETHALY,SH3 domain,SH3 domains bind proline-rich ligands.,Protein name: SH3 domain.
+A0A004,15-70,A0A004.1 PF00018,PF00018,HALVGRDEET,SH3 domain,SH3 domains bind proline-rich ligands.,Protein name: SH3 domain.
+A0A005,25-90,A0A005.1 PF00018,PF00018,VGRDEETHAK,SH3 domain,SH3 domains bind proline-rich ligands.,Protein name: SH3 domain.
+A0A006,30-100,A0A006.1 PF07714,PF07714,MKTWLVHFIP,Pkinase_Tyr,Protein tyrosine kinase domain.,Protein name: Pkinase Tyr.
+A0A007,1-50,A0A007.1 PF07714,PF07714,WLVHFIPKST,Pkinase_Tyr,Protein tyrosine kinase domain.,Protein name: Pkinase Tyr.
+A0A008,10-60,A0A008.1 PF07714,PF07714,HIPKSTWLVF,Pkinase_Tyr,Protein tyrosine kinase domain.,Protein name: Pkinase Tyr.
+A0A009,40-110,A0A009.1 PF00042,PF00042,DLTAAHKLRV,Globin,Globin family.,Protein name: Globin.
+A0A010,5-75,A0A010.1 PF00042,PF00042,AHKLRVDPVN,Globin,Globin family.,Protein name: Globin.
+A0A011,20-85,A0A011.1 PF00042,PF00042,KLRVDPVNFK,Globin,Globin family.,Protein name: Globin.
+A0A012,30-95,A0A012.1 PF00071,PF00071,MTEYKLVVVG,Ras,Small GTPase superfamily.,Protein name: Ras.
+A0A013,1-40,A0A013.1 PF00071,PF00071,EYKLVVVGAG,Ras,Small GTPase superfamily.,Protein name: Ras.
+A0A014,15-65,A0A014.1 PF00342,PF00342,MNIFEMLRID,PGI,Phosphoglucose isomerase.,Protein name: PGI.
+A0A015,25-75,A0A015.1 PF00342,PF00342,FEMLRIDERG,PGI,Phosphoglucose isomerase.,Protein name: PGI.
+A0A016,10-55,A0A016.1 PF00870,PF00870,MEEPQSDPSV,P53,p53 DNA-binding domain.,Protein name: P53.
+A0A017,20-70,A0A017.1 PF00870,PF00870,QSDPSVEPPL,P53,p53 DNA-binding domain.,Protein name: P53.
+A0A018,5-50,A0A018.1 PF00273,PF00273,MALWMRLLPL,Serum_albumin,Serum albumin family.,Protein name: Serum albumin.
+A0A019,1-45,A0A019.1 PF00022,PF00022,MASMTGGQQM,Actin,Actin family.,Protein name: Actin.
+A0A020,10-55,A0A020.1 PF00036,PF00036,MADDLDFEEF,EF-hand,EF-hand calcium-binding domain.,Protein name: EF-hand.

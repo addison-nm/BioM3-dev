@@ -35,6 +35,41 @@ For installation and setup instructions on the following machines, refer to the 
 | DGX Spark | [setup_spark.md](./docs/setup_spark.md) |
 
 
+## Reference databases
+
+Building fine-tuning datasets with `biom3.dbio` requires access to protein reference databases (NCBI Taxonomy, Pfam, Swiss-Prot, etc.) and pre-processed training CSVs. These files are too large to commit to git and are stored in a shared directory on each machine.
+
+The local `data/databases/` directory is populated with symlinks to the shared databases using a sync script — the same pattern used for model weights. To set up:
+
+```bash
+# Preview what will be linked
+./scripts/sync_databases.sh <shared_databases_path> data/databases --dry-run
+
+# Create symlinks
+./scripts/sync_databases.sh <shared_databases_path> data/databases
+```
+
+For example, on DGX Spark:
+
+```bash
+./scripts/sync_databases.sh /data/data-share/BioM3-data-share/databases data/databases
+```
+
+Once synced, you can use `biom3_build_dataset` to construct fine-tuning datasets by subsetting Swiss-Prot and Pfam by Pfam ID, optionally enriched with UniProt annotations and taxonomy data:
+
+```bash
+# Basic extraction
+biom3_build_dataset -p PF00018 -o outputs/SH3_dataset
+
+# With UniProt-enriched captions (PROTEIN NAME, FUNCTION, GENE ONTOLOGY, etc.)
+biom3_build_dataset -p PF00018 --enrich-pfam -o outputs/SH3_dataset
+
+# With enrichment + NCBI taxonomy lineage and filtering
+biom3_build_dataset -p PF00018 --enrich-pfam --add-taxonomy --taxonomy-filter "superkingdom=Bacteria" -o outputs/SH3_bacteria
+```
+
+See [docs/setup_databases.md](./docs/setup_databases.md) for machine-specific shared paths, the full list of databases, and configuration details.
+
 ## Usage
 
 After the pip installation, a number of entrypoints should be available from the command line. These include scripts to run Stages 1, 2, and 3 in inference mode, as well as a general Stage 3 training script for both pretraining and finetuning ProteoScribe.
@@ -225,6 +260,69 @@ biom3_ProteoScribe_sample \
     --model_path ./weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin \
     --output_path outputs/generated_sequences.pt \
     --seed 42
+```
+
+### Dataset construction
+
+The `biom3.dbio` subpackage provides tools for constructing fine-tuning datasets from local protein databases. The main entrypoint is `biom3_build_dataset`, which subsets the Swiss-Prot and Pfam training CSVs by one or more Pfam IDs.
+
+**Arguments:**
+
+| Flag | Long form | Required | Description |
+| ---- | --------- | -------- | ----------- |
+| `-p` | `--pfam-ids` | Yes | One or more Pfam IDs to extract (e.g. `PF00018 PF00169`) |
+| `-o` | `--outdir` | Yes | Output directory (created if it doesn't exist) |
+| | `--swissprot` | No | Path to Swiss-Prot CSV (default: from `configs/dbio_config.json`) |
+| | `--pfam` | No | Path to Pfam CSV (default: from config) |
+| | `--enrich-pfam` | No | Enrich Pfam captions with UniProt annotations (API by default) |
+| | `--uniprot-dat` | No | Use local `.dat.gz` file(s) instead of API. Accepts multiple paths for full coverage (e.g. Swiss-Prot + TrEMBL) |
+| | `--add-taxonomy` | No | Add NCBI taxonomy lineage to Pfam captions (local, no API) |
+| | `--taxonomy-filter` | No | Filter by taxonomy rank (e.g. `"superkingdom=Bacteria"`) |
+| | `--chunk-size` | No | Pfam CSV chunk size (default: 500000) |
+
+#### Example: build an SH3 domain dataset
+
+```bash
+biom3_build_dataset \
+    -p PF00018 \
+    -o outputs/SH3_dataset
+```
+
+#### Example: with taxonomy lineage and filtering
+
+```bash
+biom3_build_dataset \
+    -p PF00018 \
+    --add-taxonomy \
+    --taxonomy-filter "superkingdom=Bacteria" \
+    -o outputs/SH3_bacteria
+```
+
+#### Example: multiple Pfam IDs with UniProt enrichment
+
+```bash
+biom3_build_dataset \
+    -p PF00018 PF07714 \
+    --enrich-pfam \
+    --add-taxonomy \
+    -o outputs/SH3_Pkinase
+```
+
+#### Example: offline enrichment with local `.dat` files
+
+```bash
+biom3_build_dataset \
+    -p PF00018 \
+    --enrich-pfam \
+    --uniprot-dat data/databases/swissprot/uniprot_sprot.dat.gz \
+                  data/databases/swissprot/uniprot_trembl.dat.gz \
+    -o outputs/SH3_dataset
+```
+
+A separate utility builds a SQLite index for fast taxonomy lookups:
+
+```bash
+biom3_build_taxid_index data/databases/ncbi_taxonomy/prot.accession2taxid.gz
 ```
 
 ## References

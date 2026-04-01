@@ -8,6 +8,7 @@ tests/_tmp/
 lightning/
 lightning_logs/
 _misc/
+.uniprot_cache/
 
 # Misc
 **/.DS_Store

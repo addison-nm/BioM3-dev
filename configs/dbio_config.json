@@ -1,0 +1,15 @@
+{
+    "databases_root": "/data/data-share/BioM3-data-share/databases",
+    "training_data_root": "/data/data-share/BioM3-data-share/data/datasets",
+    "databases": {
+        "ncbi_taxonomy": "ncbi_taxonomy",
+        "pfam": "pfam",
+        "swissprot": "swissprot",
+        "smart": "smart",
+        "expasy": "expasy"
+    },
+    "training_datasets": {
+        "swissprot_csv": "fully_annotated_swiss_prot.csv",
+        "pfam_csv": "Pfam_protein_text_dataset.csv"
+    }
+}

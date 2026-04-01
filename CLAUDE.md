@@ -22,12 +22,14 @@ Input (CSV: sequences + text)
 src/biom3/
   backend/          # Device abstraction (CPU / CUDA / XPU)
   core/             # Shared utilities: model I/O (io.py), state-dict helpers (helpers.py)
+  dbio/             # Database I/O: readers for SwissProt/Pfam/NCBI taxonomy, enrichment, dataset building
   Stage1/           # PenCL: model.py (encoders + projection), preprocess.py, PL_wrapper.py
   Stage2/           # Facilitator: run_Facilitator_sample.py
   Stage3/           # ProteoScribe: diffusion model, PL training, sampling
-configs/            # JSON configs for each stage's inference
+configs/            # JSON configs for each stage's inference and dbio
 arglists/           # Shell-variable configs for Stage 3 training
-scripts/            # Bash wrappers (embedding_pipeline, pretraining, finetuning, generation)
+scripts/            # Bash wrappers (embedding_pipeline, pretraining, finetuning, generation, sync)
+data/databases/     # Symlinked reference databases (gitignored, see docs/setup_databases.md)
 tests/              # pytest suite (conftest.py, per-stage tests, test data in tests/_data/)
 weights/            # Pre-trained model weights (gitignored, see weights/README.md)
 docs/               # Per-machine setup guides (Polaris, Aurora, DGX Spark)
@@ -41,6 +43,8 @@ Defined in `pyproject.toml`:
 - `biom3_Facilitator_sample` → `biom3.Stage2.__main__:run_Facilitator_sample`
 - `biom3_pretrain_stage3` → `biom3.Stage3.__main__:run_stage3_pretraining`
 - `biom3_ProteoScribe_sample` → `biom3.Stage3.__main__:run_ProteoScribe_sample`
+- `biom3_build_dataset` → `biom3.dbio.__main__:run_build_dataset`
+- `biom3_build_taxid_index` → `biom3.dbio.__main__:run_build_taxid_index`
 
 ## Building and running
 

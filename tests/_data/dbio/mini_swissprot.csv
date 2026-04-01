@@ -1,0 +1,21 @@
+primary_Accession,protein_sequence,[final]text_caption,pfam_label
+P12345,MSKGEELFTG,Kinase involved in signal transduction.,"['PF00018', 'PF07714']"
+P12346,MVLSPADKTN,Hemoglobin subunit alpha.,['PF00042']
+P12347,MGCVQCKDKE,Tyrosine-protein kinase Fyn.,"['PF00018', 'PF00017']"
+P12348,MNIFEMLRID,Glucose-6-phosphate isomerase.,['PF00342']
+P12349,MEEPQSDPSV,Cellular tumor antigen p53.,['PF00870']
+P12350,MTEYKLVVVG,GTPase KRas.,['PF00071']
+P12351,MQIFVKTLTG,Ubiquitin-like protein.,"['PF00018']"
+P12352,MSLEQKKGAD,SH3 domain-containing protein.,['PF00018']
+P12353,MALWMRLLPL,Serum albumin.,['PF00273']
+P12354,MGSSHHHHH,Crystallin zeta.,['PF00107']
+P12355,MRGSHHHHHH,Test protein no pfam.,[]
+P12356,MASMTGGQQM,Actin cytoplasmic 1.,['PF00022']
+P12357,MEAIYAGKDI,60S ribosomal protein.,['PF00428']
+P12358,MPKFYCDYCD,Zinc finger protein.,['PF00096']
+P12359,MSDSEKCINP,Insulin receptor.,['PF07714']
+P12360,MADDLDFEEF,Calmodulin binding.,['PF00036']
+P12361,MSQKSKPQIA,Nuclear factor NF-kappa-B.,['PF00554']
+P12362,MQKLQLCVYH,Interferon alpha.,['PF00143']
+P12363,MEFSSPSREC,Apoptosis regulator Bcl-2.,['PF00452']
+P12364,MVHLTPEEKS,Hemoglobin subunit beta.,['PF00042']

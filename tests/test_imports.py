@@ -25,3 +25,15 @@ def test_stage3_imports():
     import biom3.Stage3.preprocess
     import biom3.Stage3.cond_diff_transformer_layer
     import biom3.Stage3.PL_wrapper
+
+
+def test_dbio_imports():
+    import biom3.dbio
+    import biom3.dbio.config
+    import biom3.dbio.base
+    import biom3.dbio.swissprot
+    import biom3.dbio.pfam
+    import biom3.dbio.taxonomy
+    import biom3.dbio.enrich
+    import biom3.dbio.uniprot_client
+    import biom3.dbio.build_dataset

@@ -48,17 +48,22 @@ def check_downloads(paths_to_check):
 
 def pytest_addoption(parser):
     parser.addoption(
-        "--benchmark", action="store_true", default=False, 
+        "--benchmark", action="store_true", default=False,
         help="run benchmarking tests"
     )
     parser.addoption(
-        "--use_gpu", action="store_true", default=False, 
+        "--use_gpu", action="store_true", default=False,
         help="run GPU specific tests"
+    )
+    parser.addoption(
+        "--database_files", action="store_true", default=False,
+        help="run tests that require full database files"
     )
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "benchmark: mark test as benchmarking")
     config.addinivalue_line("markers", "use_gpu: mark test as GPU specific")
+    config.addinivalue_line("markers", "database_files: mark test as requiring full database files")
 
 def pytest_collection_modifyitems(config, items):
     benchmark_flag_given = False
@@ -69,10 +74,16 @@ def pytest_collection_modifyitems(config, items):
     if config.getoption("--use_gpu"):
         # --use_gpu given in cli: do not skip GPU tests
         use_gpu_flag_given = True
+    database_files_flag_given = False
+    if config.getoption("--database_files"):
+        database_files_flag_given = True
     skip_benchmark = pytest.mark.skip(reason="need --benchmark option to run")
     skip_use_gpu = pytest.mark.skip(reason="need --use_gpu option to run")
+    skip_database_files = pytest.mark.skip(reason="need --database_files option to run")
     for item in items:
         if "benchmark" in item.keywords and not benchmark_flag_given:
             item.add_marker(skip_benchmark)
         if "use_gpu" in item.keywords and not use_gpu_flag_given:
             item.add_marker(skip_use_gpu)
+        if "database_files" in item.keywords and not database_files_flag_given:
+            item.add_marker(skip_database_files)

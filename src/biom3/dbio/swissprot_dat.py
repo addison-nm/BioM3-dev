@@ -4,6 +4,12 @@ Replaces the UniProt REST API for annotation extraction. Parses
 uniprot_sprot.dat.gz and produces the same annotation dict as
 enrich.extract_annotations(), keyed by accession.
 
+Two usage modes:
+  1. parse(accessions) — targeted extraction for a set of accessions
+     (used by the enrichment pipeline).
+  2. parse_all() — bulk generator over every entry in the file
+     (used to build fully_annotated_swiss_prot.csv from scratch).
+
 The .dat format is documented at:
 https://web.expasy.org/docs/userman.html
 """
@@ -34,11 +40,12 @@ def _clean_text(text):
 
 
 class SwissProtDatParser:
-    """Parses uniprot_sprot.dat.gz to extract annotations for a set of accessions.
+    """Parses uniprot_sprot.dat.gz to extract annotations, sequences, and
+    Pfam cross-references.
 
-    This replaces the UniProt REST API for enrichment. The .dat file
-    (~661 MB compressed) is streamed line by line, and only entries
-    matching the requested accessions are parsed in detail.
+    Two modes:
+      - parse(accessions): targeted extraction (enrichment pipeline)
+      - parse_all(): bulk generator over all entries (source dataset builder)
     """
 
     def __init__(self, dat_path):
@@ -99,6 +106,49 @@ class SwissProtDatParser:
                      f"{parsed_count:,}", f"{len(accession_set):,}",
                      f"{skipped_count:,}")
         return results
+
+    def parse_all(self, require_pfam=False):
+        """Yield (accession, entry_dict) for every entry in the .dat file.
+
+        Args:
+            require_pfam: if True, skip entries without Pfam DR cross-refs.
+
+        Yields:
+            (accession, dict) where dict has keys:
+                'sequence': str — full protein sequence
+                'pfam_ids': list[str] — Pfam accessions (e.g. ['PF04947'])
+                'annotations': dict — annot_* keys (same as _parse_entry)
+        """
+        is_gzipped = self.dat_path.endswith(".gz")
+        opener = gzip.open if is_gzipped else open
+
+        logger.info("Bulk-parsing Swiss-Prot .dat file: %s", self.dat_path)
+
+        entry_lines = []
+        current_acc = None
+        parsed_count = 0
+        skipped_count = 0
+
+        with opener(self.dat_path, "rt") as f:
+            for line in tqdm(f, desc="Parsing Swiss-Prot .dat (bulk)", unit=" lines"):
+                if line.startswith("AC   ") and current_acc is None:
+                    current_acc = line[5:].split(";")[0].strip()
+
+                entry_lines.append(line)
+
+                if line.startswith("//"):
+                    if current_acc:
+                        result = _parse_entry_full(entry_lines)
+                        if require_pfam and not result["pfam_ids"]:
+                            skipped_count += 1
+                        else:
+                            parsed_count += 1
+                            yield current_acc, result
+                    entry_lines = []
+                    current_acc = None
+
+        logger.info("Bulk parse complete: %s entries yielded, %s skipped",
+                     f"{parsed_count:,}", f"{skipped_count:,}")
 
 
 def _parse_entry(lines):
@@ -277,3 +327,143 @@ def _map_cc_subcellular_location(cc_blocks, annotations):
     val = val.split("Note=")[0].strip().rstrip(".")
     if val:
         annotations["annot_subcellular_location"] = val
+
+
+# ---------------------------------------------------------------------------
+# Full entry parser (annotations + sequence + Pfam cross-refs)
+# ---------------------------------------------------------------------------
+
+def _parse_entry_full(lines):
+    """Parse a .dat entry into a dict with annotations, sequence, and Pfam IDs.
+
+    Returns:
+        dict with keys:
+            'annotations': dict of annot_* keys (superset of _parse_entry output)
+            'sequence': str, the full protein sequence
+            'pfam_ids': list of str, Pfam accessions without version
+    """
+    annotations = {}
+
+    de_lines = []
+    oc_lines = []
+    cc_blocks = {}
+    go_terms = []
+    pfam_ids = []
+    seq_lines = []
+    tax_id = None
+    in_sq = False
+
+    current_cc_topic = None
+    current_cc_text = []
+
+    for line in lines:
+        code = line[:2]
+
+        if in_sq:
+            if code == "//":
+                in_sq = False
+            else:
+                seq_lines.append(line.strip().replace(" ", ""))
+            continue
+
+        if code == "DE":
+            de_lines.append(line[5:].rstrip("\n"))
+
+        elif code == "OC":
+            oc_lines.append(line[5:].rstrip("\n"))
+
+        elif code == "OX":
+            # OX   NCBI_TaxID=654924;
+            text = line[5:].rstrip("\n")
+            match = re.search(r"NCBI_TaxID=(\d+)", text)
+            if match:
+                tax_id = int(match.group(1))
+
+        elif code == "CC":
+            text = line[5:].rstrip("\n")
+            if text.startswith("-!- "):
+                if current_cc_topic and current_cc_text:
+                    cc_blocks.setdefault(current_cc_topic, []).append(
+                        " ".join(current_cc_text)
+                    )
+                topic_text = text[4:]
+                if ":" in topic_text:
+                    topic, rest = topic_text.split(":", 1)
+                    current_cc_topic = topic.strip()
+                    current_cc_text = [rest.strip()] if rest.strip() else []
+                else:
+                    current_cc_topic = topic_text.strip()
+                    current_cc_text = []
+            elif text.startswith("-----") or text.startswith("Copyrighted"):
+                if current_cc_topic and current_cc_text:
+                    cc_blocks.setdefault(current_cc_topic, []).append(
+                        " ".join(current_cc_text)
+                    )
+                current_cc_topic = None
+                current_cc_text = []
+            elif current_cc_topic:
+                current_cc_text.append(text.strip())
+
+        elif code == "DR":
+            text = line[5:].rstrip("\n")
+            if text.startswith("Pfam;"):
+                parts = text.split(";")
+                if len(parts) >= 2:
+                    pfam_acc = parts[1].strip().split(".")[0]
+                    if pfam_acc not in pfam_ids:
+                        pfam_ids.append(pfam_acc)
+            elif text.startswith("GO;"):
+                parts = text.split(";")
+                if len(parts) >= 3:
+                    go_desc = parts[2].strip().rstrip(".")
+                    if len(go_desc) > 2 and go_desc[1] == ":":
+                        go_desc = go_desc[2:]
+                    go_terms.append(go_desc)
+
+        elif code == "SQ":
+            in_sq = True
+
+    # Save last CC block
+    if current_cc_topic and current_cc_text:
+        cc_blocks.setdefault(current_cc_topic, []).append(
+            " ".join(current_cc_text)
+        )
+
+    # Build sequence (strip trailing line counts like "  128")
+    sequence = re.sub(r"[^A-Z]", "", "".join(seq_lines))
+
+    # Build annotations
+    protein_name = _parse_de_lines(de_lines)
+    if protein_name:
+        annotations["annot_protein_name"] = protein_name
+
+    lineage = _parse_oc_lines(oc_lines)
+    if lineage:
+        annotations["annot_lineage"] = lineage
+
+    _map_cc_field(cc_blocks, "FUNCTION", "annot_function", annotations)
+    _map_cc_catalytic_activity(cc_blocks, annotations)
+    _map_cc_field(cc_blocks, "COFACTOR", "annot_cofactor", annotations)
+    _map_cc_field(cc_blocks, "ACTIVITY REGULATION", "annot_activity_regulation", annotations)
+    _map_cc_biophysicochemical(cc_blocks, annotations)
+    _map_cc_field(cc_blocks, "PATHWAY", "annot_pathway", annotations)
+    _map_cc_field(cc_blocks, "SUBUNIT", "annot_subunit", annotations)
+    _map_cc_subcellular_location(cc_blocks, annotations)
+    _map_cc_field(cc_blocks, "TISSUE SPECIFICITY", "annot_tissue_specificity", annotations)
+    _map_cc_field(cc_blocks, "PTM", "annot_ptm", annotations)
+    _map_cc_field(cc_blocks, "SIMILARITY", "annot_similarity", annotations)
+    _map_cc_field(cc_blocks, "DOMAIN", "annot_domain", annotations)
+    _map_cc_field(cc_blocks, "MISCELLANEOUS", "annot_miscellaneous", annotations)
+    _map_cc_field(cc_blocks, "INDUCTION", "annot_induction", annotations)
+    _map_cc_field(cc_blocks, "DEVELOPMENTAL STAGE", "annot_developmental_stage", annotations)
+    _map_cc_field(cc_blocks, "BIOTECHNOLOGY", "annot_biotechnology", annotations)
+
+    if go_terms:
+        annotations["annot_gene_ontology"] = ", ".join(go_terms)
+
+    return {
+        "annotations": annotations,
+        "sequence": sequence,
+        "pfam_ids": pfam_ids,
+        "tax_id": tax_id,
+    }

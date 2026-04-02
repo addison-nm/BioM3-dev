@@ -1,0 +1,24 @@
+# STOCKHOLM 1.0
+#=GF ID   Pox_VLTF3
+#=GF AC   PF04947.18
+#=GF DE   Viral late transcription factor 3
+#=GF CC   This family includes viral late transcription factor 3
+#=GF CC   proteins found in poxviruses and iridoviruses. These
+#=GF CC   proteins activate late gene transcription.
+#=GF SQ   100
+//
+# STOCKHOLM 1.0
+#=GF ID   Cutinase
+#=GF AC   PF01083.27
+#=GF DE   Cutinase
+#=GF CC   Cutinases are serine esterases that catalyze the
+#=GF CC   cleavage of cutin, the structural polymer of plant
+#=GF CC   cuticles.
+#=GF SQ   200
+//
+# STOCKHOLM 1.0
+#=GF ID   SH3_1
+#=GF AC   PF00018.31
+#=GF DE   SH3 domain
+#=GF SQ   50
+//

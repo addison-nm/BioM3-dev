@@ -38,5 +38,17 @@ def run_convert_to_parquet():
     main(args)
 
 
+def run_build_source_swissprot():
+    from biom3.dbio.build_source_swissprot import parse_arguments, main
+    args = parse_arguments(sys.argv[1:])
+    main(args)
+
+
+def run_build_source_pfam():
+    from biom3.dbio.build_source_pfam import parse_arguments, main
+    args = parse_arguments(sys.argv[1:])
+    main(args)
+
+
 if __name__ == "__main__":
     main()

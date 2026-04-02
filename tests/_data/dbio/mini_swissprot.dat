@@ -1,0 +1,84 @@
+ID   001R_FRG3G              Reviewed;         256 AA.
+AC   Q6GZX4;
+DT   28-JUN-2011, integrated into UniProtKB/Swiss-Prot.
+DE   RecName: Full=Putative transcription factor 001R;
+OS   Frog virus 3 (isolate Goorha) (FV-3).
+OC   Viruses; Varidnaviria; Bamfordvirae; Nucleocytoviricota; Megaviricetes;
+OC   Pimascovirales; Iridoviridae; Alphairidovirinae; Ranavirus.
+CC   -!- FUNCTION: Transcription activation. {ECO:0000305}.
+CC   ---------------------------------------------------------------------------
+CC   Copyrighted by the UniProt Consortium, see https://www.uniprot.org/terms
+DR   GO; GO:0046782; P:regulation of viral transcription; IEA:InterPro.
+DR   Pfam; PF04947; Pox_VLTF3; 1.
+SQ   SEQUENCE   256 AA;  29735 MW;  B4840739BF7D4121 CRC64;
+     MAFSAEDVLK EYDRRRRMEA LLLSLYYPND RKLLDYKEWS PPRVQVECPK APVEWNNPPS
+     EKGLIVGHFS GIKYKGEKAQ ASEVDVNKMC CWVSKFKDAM RRYQGIQTCK IPGKVLSDLD
+     AKIKAYNLTV EGVEGFVRYS RVTKQHVAAF LKELRHSKQY ENVNLIHYIL TDKRVDIQHL
+     EKDLVKDFKA LVESAHRMRQ GHMINVKYIL YQLLKKHGHG PDGPDILTVK TGSKGVLYDD
+     SFRKIYTDLG WKFTPL
+//
+ID   002R_IIV3               Reviewed;         458 AA.
+AC   Q197F8;
+DT   16-JUN-2009, integrated into UniProtKB/Swiss-Prot.
+DE   RecName: Full=Uncharacterized protein 002R;
+OS   Invertebrate iridescent virus 3 (IIV-3).
+OC   Viruses; Varidnaviria; Bamfordvirae; Nucleocytoviricota; Megaviricetes;
+OC   Pimascovirales; Iridoviridae; Betairidovirinae; Chloriridovirus.
+CC   ---------------------------------------------------------------------------
+CC   Copyrighted by the UniProt Consortium, see https://www.uniprot.org/terms
+SQ   SEQUENCE   458 AA;  53921 MW;  E46E5C85D7ACA139 CRC64;
+     MASNTVSAQG GSNRPVRDFS NIQDVAQFLL FDPIWNEQPG SIVPWKMNRE QALAERYPEL
+     QTSEPSEDYS GPVESLELLP LEIKLDIMQY LSWEQISWCK HPWLWTRWYK DNVVRVSAIT
+     FEDFQREYAF PEKIQEIHFT DTRAEEIKAI LETTPNVTRL VIRRIDDMNY NTHGDLGLDD
+     LEFLTHLMVE DACGFTDFWA PSLTHLTIKN LDMHPRWFGP VMDGIKSMQS TLKYLYIFET
+     YGVNKPFVQW CTDNIETFYC TNSYRYENVP RPIYVWVLFQ EDEWHGYRVE DNKFHRRYMY
+     STILHKRDTD WVENNPLKTP AQVEMYKFLL RISQLNRDGT GYESDSDPEN EHFDDESFSS
+     GEEDSSDEDD PTWAPDSDDS DWETETEEEP SVAARILEKG KLTITNLMKS LGFKPKPKKI
+     QSIDRYFCSL DSNYNSEDED FEYDSDSEDD DSDSEDDC
+//
+ID   CUT1_TRIHA              Reviewed;         247 AA.
+AC   A0A024SC78;
+DT   01-JAN-2020, integrated into UniProtKB/Swiss-Prot.
+DE   RecName: Full=Cutinase;
+OS   Trichoderma harzianum.
+OC   Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes;
+OC   Hypocreomycetidae; Hypocreales; Hypocreaceae; Trichoderma.
+CC   -!- FUNCTION: Catalyzes the hydrolysis of complex carboxylic polyesters found in the cell wall of plants (PubMed:25219509). Degrades cutin, a macromolecule that forms the structure of the plant cuticle (PubMed:25219509).
+CC   -!- CATALYTIC ACTIVITY:
+CC       Reaction=cutin + H2O = cutin monomers; EC=3.1.1.74;
+CC   -!- ACTIVITY REGULATION: Weakly inhibited by n-undecyl phosphonate (C11Y4) (PubMed:25219509). Activity unaffected by paraoxon (PubMed:25219509).
+CC   -!- BIOPHYSICOCHEMICAL PROPERTIES:
+CC       pH dependence:
+CC         Optimum pH is 4-7.;
+CC   -!- SUBCELLULAR LOCATION: Secreted.
+CC   -!- DOMAIN: In contract to classical cutinases, possesses a lid formed by two N-terminal helices which covers its active site (PubMed:25219509).
+CC   -!- PTM: The 2 disulfide bonds play a critical role in holding the catalytic residues in juxta-position.
+CC   -!- SIMILARITY: Belongs to the cutinase family.
+CC   ---------------------------------------------------------------------------
+CC   Copyrighted by the UniProt Consortium, see https://www.uniprot.org/terms
+DR   Pfam; PF01083; Cutinase; 1.
+DR   GO; GO:0005576; C:extracellular region; IEA:UniProtKB-SubcellLoc.
+SQ   SEQUENCE   247 AA;  25000 MW;  ABC123DEF456 CRC64;
+     MRSLAILTTL LAGHAFAYPK PAPQSVNRRD WPSINEFLSE LAKVMPIGDT ITAACDLISD
+     GEDAAASLFG ISETENDPCG DVTVLFARGT CDPGNVGVLV GPWFFDSLQT ALGSRTLGVK
+     GVPYPASVQD FLSGSVQNGI NMANQIKSVL QSCPNTKLVL GGYSQGSMVV HNAASNLDAA
+     TMSKISAVVL FGDPYYGKPV ANFDAAKTLV VCHDGDNICQ GGDIILLPHL TYAEDADTAA
+     AFVVPLV
+//
+ID   MULT_ENTRY              Reviewed;          50 AA.
+AC   P99999;
+DT   01-JAN-2020, integrated into UniProtKB/Swiss-Prot.
+DE   RecName: Full=Multi-domain protein;
+OS   Homo sapiens (Human).
+OC   Eukaryota; Metazoa; Chordata; Mammalia; Primates; Hominidae; Homo.
+CC   -!- FUNCTION: Does multiple things.
+CC   -!- TISSUE SPECIFICITY: Expressed in liver and kidney.
+CC   -!- DEVELOPMENTAL STAGE: Expressed during embryogenesis.
+CC   ---------------------------------------------------------------------------
+CC   Copyrighted by the UniProt Consortium, see https://www.uniprot.org/terms
+DR   Pfam; PF01083; Cutinase; 1.
+DR   Pfam; PF04947; Pox_VLTF3; 1.
+DR   GO; GO:0005737; C:cytoplasm; IDA:UniProtKB.
+SQ   SEQUENCE   50 AA;  5500 MW;  123456789ABC CRC64;
+     MAFSAEDVLK EYDRRRRMEA LLLSLYYPND RKLLDYKEWS PPRVQVECPK
+//

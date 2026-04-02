@@ -11,6 +11,9 @@ _misc/
 .uniprot_cache/
 demos/outputs/*
 
+# Claude Code
+.claude/
+
 # Misc
 **/.DS_Store
 venvs/

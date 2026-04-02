@@ -91,15 +91,16 @@ for subdir in "$SRC_DIR"/*/; do
 
     # Ensure the subdirectory exists in the target
     if [ ! -d "$TGT_DIR/$subdir_name" ]; then
-        echo "  LINK (new subdir): $subdir_name/ -> $subdir"
+        echo "  MKDIR: $subdir_name/"
         if ! $DRY_RUN; then
-            ln -s "$subdir" "$TGT_DIR/$subdir_name"
+            mkdir -p "$TGT_DIR/$subdir_name"
         fi
-        linked=$((linked + 1))
-        continue
     fi
 
     for entry in "$subdir"*; do
+        # Skip if glob didn't match anything (empty directory)
+        [ -e "$entry" ] || continue
+
         name="$(basename "$entry")"
 
         # Skip .git and README files

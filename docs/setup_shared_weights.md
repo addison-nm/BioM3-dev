@@ -45,6 +45,8 @@ The script will report `MATCH`, `MISMATCH`, or `LINK` for each entry. A `MISMATC
 
 The local `weights/` directory supports a mix of symlinked shared files and additional local files. To add new weights that are not in the shared directory, simply place them in the appropriate subdirectory under `weights/`. Running `sync_weights.sh` again will skip any files that already exist locally.
 
+The script creates real directories for each component (e.g. `weights/PenCL/`) and symlinks only the individual files within them. This ensures you can always write new local files alongside the shared symlinks.
+
 ## Weights required by the test suite
 
 Some tests depend on pretrained weight files that are too large to commit to git. These tests are skipped automatically when the required files are absent (via `check_downloads()` in `tests/conftest.py`). To run the full test suite, the following files must be present in the `weights/` directory:

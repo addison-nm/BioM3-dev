@@ -3,7 +3,7 @@
 Python scripts that compose `biom3.dbio` building blocks into dataset
 "recipes" for research workflows. Copy and modify for new experiments.
 
-For introductory demos, see `demo/` instead.
+For introductory demos, see `demos/` instead.
 
 ## Directory layout
 
@@ -106,4 +106,4 @@ Then pass it to a builder:
 build_swissprot_csv(..., caption_spec=my_spec)
 ```
 
-See `demo/custom_caption_format.py` for a complete working example.
+See `demos/custom_caption_format.py` for a complete working example.

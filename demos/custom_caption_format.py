@@ -5,7 +5,7 @@ Shows how CaptionSpec controls which annotation fields appear in captions,
 their labels, ordering, and formatting — without modifying library code.
 
 Run:
-    python demo/custom_caption_format.py
+    python demos/custom_caption_format.py
 """
 
 import os
@@ -14,7 +14,7 @@ from biom3.dbio.caption import CaptionSpec
 from biom3.dbio.pfam_metadata import PfamMetadataParser
 from biom3.dbio.build_source_swissprot import build_swissprot_csv
 
-OUTDIR = "demo/outputs/custom_captions"
+OUTDIR = "demos/outputs/custom_captions"
 
 # Only include protein name and function — no lineage, no family names
 minimal_spec = CaptionSpec(

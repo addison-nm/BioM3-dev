@@ -5,7 +5,7 @@ Shows how to use iter_pfam_fasta() and _parse_fasta_header() directly
 for custom processing without going through the full CSV builder.
 
 Run:
-    python demo/minimal_pfam_extract.py
+    python demos/minimal_pfam_extract.py
 """
 
 import csv
@@ -15,7 +15,7 @@ from biom3.dbio.build_source_pfam import iter_pfam_fasta, _parse_fasta_header
 
 FASTA_PATH = "data/databases/pfam/Pfam-A.fasta.gz"
 TARGET_FAMILY = "PF00018"  # SH3 domain
-OUTDIR = "demo/outputs/pfam_extract"
+OUTDIR = "demos/outputs/pfam_extract"
 OUTPUT_PATH = os.path.join(OUTDIR, "sh3_domains.csv")
 
 

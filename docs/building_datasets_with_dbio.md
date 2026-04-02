@@ -21,7 +21,7 @@ pip install -e .
 To run the demo showing different enrichment options:
 
 ```bash
-bash demo/build_sh3_dataset.sh
+bash demos/build_sh3_dataset.sh
 ```
 
 For real datasets, you need the database files. See [setup_databases.md](setup_databases.md)
@@ -402,5 +402,5 @@ dataset.csv
       Generates novel protein sequences via diffusion
 ```
 
-See `scripts/data_prep/` for example shell wrappers that run SH3 data through
+See `demos/SH3/` for example shell wrappers that run SH3 data through
 this pipeline.

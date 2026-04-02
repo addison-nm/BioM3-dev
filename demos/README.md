@@ -2,7 +2,7 @@
 
 End-to-end demonstrations of the `biom3.dbio` dataset building pipeline.
 Run these to verify the installation works and to examine outputs. All
-results go in `demo/outputs/` — nothing is written to the shared
+results go in `demos/outputs/` — nothing is written to the shared
 `data/datasets/` directory.
 
 ## Shell scripts (run-and-check)
@@ -13,7 +13,7 @@ Subsets the pre-existing SwissProt and Pfam training CSVs to build SH3
 domain (PF00018) finetuning datasets with four levels of enrichment.
 
 ```bash
-bash demo/build_sh3_dataset.sh
+bash demos/build_sh3_dataset.sh
 ```
 
 **What it demonstrates:**
@@ -23,7 +23,7 @@ bash demo/build_sh3_dataset.sh
 - Local `.dat` file enrichment (offline, no API calls)
 - NCBI taxonomy lineage + rank-based filtering (bacteria only)
 
-**Outputs** → `demo/outputs/sh3_dataset/`
+**Outputs** → `demos/outputs/sh3_dataset/`
 
 | Subdirectory | Description |
 |-------------|-------------|
@@ -43,7 +43,7 @@ them into `biom3_build_dataset` to produce a finetuning dataset — demonstratin
 the full raw-to-finetuning pipeline.
 
 ```bash
-bash demo/build_source_datasets.sh
+bash demos/build_source_datasets.sh
 ```
 
 **What it demonstrates:**
@@ -51,7 +51,7 @@ bash demo/build_source_datasets.sh
 - Pfam CSV construction from `Pfam-A.fasta.gz` (SH3 subset for speed)
 - Newly-built CSVs working as drop-in inputs to `biom3_build_dataset`
 
-**Outputs** → `demo/outputs/source_datasets/`
+**Outputs** → `demos/outputs/source_datasets/`
 
 | File | Description |
 |------|-------------|
@@ -71,10 +71,10 @@ Shows how `CaptionSpec` controls caption composition — different field
 selections, labels, separators, and formatting — without modifying library code.
 
 ```bash
-python demo/custom_caption_format.py
+python demos/custom_caption_format.py
 ```
 
-**Outputs** → `demo/outputs/custom_captions/`
+**Outputs** → `demos/outputs/custom_captions/`
 
 | File | Caption style |
 |------|--------------|
@@ -91,10 +91,10 @@ Shows how to use `iter_pfam_fasta()` directly for custom extraction
 without the full CSV builder.
 
 ```bash
-python demo/minimal_pfam_extract.py
+python demos/minimal_pfam_extract.py
 ```
 
-**Outputs** → `demo/outputs/pfam_extract/sh3_domains.csv`
+**Outputs** → `demos/outputs/pfam_extract/sh3_domains.csv`
 
 Runtime: ~2.5 min (scans full Pfam FASTA for SH3 entries).
 

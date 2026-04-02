@@ -25,11 +25,11 @@
 #   ./scripts/sync_databases.sh <shared_path> data/databases
 #
 # Usage:
-#   bash demo/build_source_datasets.sh
+#   bash demos/build_source_datasets.sh
 
 set -euo pipefail
 
-OUTDIR="demo/outputs/source_datasets"
+OUTDIR="demos/outputs/source_datasets"
 mkdir -p "$OUTDIR"
 
 # --- Database paths ---
@@ -133,5 +133,5 @@ echo "  Fine-tuning dataset (from source CSVs):"
 echo "    sh3_from_source/dataset.csv          — SH3 domain dataset"
 echo ""
 echo "  To compare with legacy-sourced dataset:"
-echo "    bash demo/build_sh3_dataset.sh"
+echo "    bash demos/build_sh3_dataset.sh"
 echo "============================================================"

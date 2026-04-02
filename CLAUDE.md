@@ -29,6 +29,7 @@ src/biom3/
 configs/            # JSON configs for each stage's inference and dbio
 arglists/           # Shell-variable configs for Stage 3 training
 scripts/            # Bash wrappers (embedding_pipeline, pretraining, finetuning, generation, sync)
+demos/              # End-to-end demos (dbio dataset building, SH3 embedding pipeline)
 data/databases/     # Symlinked reference databases (gitignored, see docs/setup_databases.md)
 tests/              # pytest suite (conftest.py, per-stage tests, test data in tests/_data/)
 weights/            # Pre-trained model weights (gitignored, see weights/README.md)

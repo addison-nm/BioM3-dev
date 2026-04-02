@@ -11,11 +11,11 @@
 #   ./scripts/sync_databases.sh <shared_path> data/databases
 #
 # Usage:
-#   bash demo/build_sh3_dataset.sh
+#   bash demos/build_sh3_dataset.sh
 
 set -euo pipefail
 
-OUTDIR="demo/outputs/sh3_dataset"
+OUTDIR="demos/outputs/sh3_dataset"
 
 # Paths to training CSVs (from config, or override here)
 SWISSPROT_CSV="data/datasets/fully_annotated_swiss_prot.csv"

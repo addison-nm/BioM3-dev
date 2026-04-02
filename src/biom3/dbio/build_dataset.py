@@ -136,6 +136,14 @@ def parse_arguments(args):
              "For full Pfam coverage, include the TrEMBL file.",
     )
     parser.add_argument(
+        "--annotation-cache", type=str, nargs="+", default=None,
+        metavar="PATH",
+        help="Pre-built annotation Parquet cache(s) for fast enrichment "
+             "(built via biom3_build_annotation_cache). Checked before "
+             "--uniprot-dat; .dat files are only parsed for accessions "
+             "not found in the cache.",
+    )
+    parser.add_argument(
         "--add-taxonomy", action="store_true", default=False,
         help="Add NCBI taxonomy lineage (local, no API needed)",
     )
@@ -229,22 +237,39 @@ def main(args):
         accession_set = set(accessions)
 
         if args.enrich_pfam:
-            if args.uniprot_dat:
-                from biom3.dbio.swissprot_dat import SwissProtDatParser
+            local_annotations = {}
 
-                local_annotations = {}
-                for dat_path in args.uniprot_dat:
-                    logger.info("Parsing local .dat file: %s", dat_path)
-                    parser = SwissProtDatParser(dat_path)
-                    remaining = accession_set - set(local_annotations.keys())
-                    if not remaining:
-                        logger.info("All accessions already found, skipping %s", dat_path)
-                        break
-                    local_annotations.update(parser.parse(remaining))
-                logger.info("Local .dat enrichment: %s/%s accessions found",
+            # Priority 1: Parquet annotation cache (instant lookup)
+            if args.annotation_cache:
+                from biom3.dbio.build_annotation_cache import load_annotation_cache
+
+                local_annotations = load_annotation_cache(
+                    args.annotation_cache, accession_set,
+                )
+                logger.info("Annotation cache: %s/%s accessions found",
                             f"{len(local_annotations):,}",
                             f"{len(accessions):,}")
-            else:
+
+            # Priority 2: Raw .dat file parsing (remaining accessions)
+            if args.uniprot_dat:
+                remaining = accession_set - set(local_annotations.keys())
+                if remaining:
+                    from biom3.dbio.swissprot_dat import SwissProtDatParser
+
+                    for dat_path in args.uniprot_dat:
+                        logger.info("Parsing local .dat file: %s", dat_path)
+                        parser = SwissProtDatParser(dat_path)
+                        still_remaining = accession_set - set(local_annotations.keys())
+                        if not still_remaining:
+                            logger.info("All accessions already found, skipping %s", dat_path)
+                            break
+                        local_annotations.update(parser.parse(still_remaining))
+                    logger.info("Local enrichment total: %s/%s accessions found",
+                                f"{len(local_annotations):,}",
+                                f"{len(accessions):,}")
+
+            # Priority 3: UniProt REST API (fallback)
+            if not local_annotations and not args.uniprot_dat and not args.annotation_cache:
                 from biom3.dbio.uniprot_client import UniProtClient
 
                 logger.info("Enriching Pfam rows via UniProt REST API...")
@@ -256,6 +281,8 @@ def main(args):
                 uniprot_data = client.fetch_all(
                     accessions, batch_size=args.uniprot_batch_size,
                 )
+
+            local_annotations = local_annotations or None
 
         if args.add_taxonomy:
             taxonomy_tree, accession_taxid_map = _load_taxonomy(

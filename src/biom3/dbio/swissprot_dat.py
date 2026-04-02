@@ -15,13 +15,42 @@ https://web.expasy.org/docs/userman.html
 """
 
 import gzip
+import os
 import re
+import shutil
+import subprocess
 
 from tqdm import tqdm
 
 from biom3.backend.device import setup_logger
 
 logger = setup_logger(__name__)
+
+
+def _open_gz(path):
+    """Open a .gz file using pigz (parallel) if available, else gzip.
+
+    Returns a file-like object yielding raw bytes (binary mode).
+    When pigz is on PATH, decompression is parallelised across cores,
+    which is 4-8x faster than Python's single-threaded gzip module on
+    large files like uniprot_trembl.dat.gz.
+
+    For non-.gz files, returns a plain binary file handle.
+    """
+    if not path.endswith(".gz"):
+        return open(path, "rb")
+
+    pigz = shutil.which("pigz")
+    if pigz:
+        proc = subprocess.Popen(
+            [pigz, "-dc", path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+        logger.info("Using pigz for parallel decompression")
+        return proc.stdout
+
+    return gzip.open(path, "rb")
 
 # Evidence tags in curly braces that we strip from text
 _EVIDENCE_RE = re.compile(r"\s*\{ECO:\d+.*?\}")
@@ -62,9 +91,8 @@ class SwissProtDatParser:
             (same format as enrich.extract_annotations).
         """
         accession_set = set(accessions)
+        accession_set_bytes = {a.encode() for a in accession_set}
         results = {}
-        is_gzipped = self.dat_path.endswith(".gz")
-        opener = gzip.open if is_gzipped else open
 
         logger.info("Parsing Swiss-Prot .dat file for %s accessions: %s",
                      f"{len(accession_set):,}", self.dat_path)
@@ -75,19 +103,23 @@ class SwissProtDatParser:
         parsed_count = 0
         skipped_count = 0
 
-        with opener(self.dat_path, "rt") as f:
-            for line in tqdm(f, desc="Parsing Swiss-Prot .dat", unit=" lines"):
-                if line.startswith("AC   "):
-                    # First AC line of an entry — extract primary accession
+        AC_PREFIX = b"AC   "
+        ENTRY_END = b"//"
+
+        fh = _open_gz(self.dat_path)
+        try:
+            for raw_line in tqdm(fh, desc="Parsing .dat", unit=" lines"):
+                if raw_line[:5] == AC_PREFIX:
                     if current_acc is None:
-                        acc = line[5:].split(";")[0].strip()
-                        current_acc = acc
-                        matched = acc in accession_set
+                        acc_bytes = raw_line[5:].split(b";", 1)[0].strip()
+                        if acc_bytes in accession_set_bytes:
+                            current_acc = acc_bytes.decode()
+                            matched = True
 
                 if matched:
-                    entry_lines.append(line)
+                    entry_lines.append(raw_line.decode())
 
-                if line.startswith("//"):
+                if raw_line[:2] == ENTRY_END:
                     if matched and current_acc:
                         annotations = _parse_entry(entry_lines)
                         results[current_acc] = annotations
@@ -98,9 +130,10 @@ class SwissProtDatParser:
                     current_acc = None
                     matched = False
 
-                    # Early exit if all found
                     if len(results) == len(accession_set):
                         break
+        finally:
+            fh.close()
 
         logger.info("Parsed %s/%s accessions (%s entries skipped)",
                      f"{parsed_count:,}", f"{len(accession_set):,}",
@@ -119,9 +152,6 @@ class SwissProtDatParser:
                 'pfam_ids': list[str] — Pfam accessions (e.g. ['PF04947'])
                 'annotations': dict — annot_* keys (same as _parse_entry)
         """
-        is_gzipped = self.dat_path.endswith(".gz")
-        opener = gzip.open if is_gzipped else open
-
         logger.info("Bulk-parsing Swiss-Prot .dat file: %s", self.dat_path)
 
         entry_lines = []
@@ -129,14 +159,20 @@ class SwissProtDatParser:
         parsed_count = 0
         skipped_count = 0
 
-        with opener(self.dat_path, "rt") as f:
-            for line in tqdm(f, desc="Parsing Swiss-Prot .dat (bulk)", unit=" lines"):
-                if line.startswith("AC   ") and current_acc is None:
+        AC_PREFIX = b"AC   "
+        ENTRY_END = b"//"
+
+        fh = _open_gz(self.dat_path)
+        try:
+            for raw_line in tqdm(fh, desc="Parsing .dat (bulk)", unit=" lines"):
+                line = raw_line.decode()
+
+                if raw_line[:5] == AC_PREFIX and current_acc is None:
                     current_acc = line[5:].split(";")[0].strip()
 
                 entry_lines.append(line)
 
-                if line.startswith("//"):
+                if raw_line[:2] == ENTRY_END:
                     if current_acc:
                         result = _parse_entry_full(entry_lines)
                         if require_pfam and not result["pfam_ids"]:
@@ -146,6 +182,8 @@ class SwissProtDatParser:
                             yield current_acc, result
                     entry_lines = []
                     current_acc = None
+        finally:
+            fh.close()
 
         logger.info("Bulk parse complete: %s entries yielded, %s skipped",
                      f"{parsed_count:,}", f"{skipped_count:,}")

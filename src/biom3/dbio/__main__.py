@@ -50,5 +50,11 @@ def run_build_source_pfam():
     main(args)
 
 
+def run_build_annotation_cache():
+    from biom3.dbio.build_annotation_cache import parse_arguments, main
+    args = parse_arguments(sys.argv[1:])
+    main(args)
+
+
 if __name__ == "__main__":
     main()

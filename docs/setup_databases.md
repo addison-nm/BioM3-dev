@@ -132,6 +132,7 @@ Optional flags require additional database files to be synced in `data/databases
 | Flag | Required files |
 |------|----------------|
 | `--enrich-pfam` | None (uses UniProt REST API; results are cached in `--uniprot-cache-dir`) |
+| `--enrich-pfam --annotation-cache <paths>` | Pre-built annotation Parquet cache(s) — fastest option |
 | `--enrich-pfam --uniprot-dat <paths>` | One or more local `.dat.gz` files (no API needed) |
 | `--add-taxonomy` | `ncbi_taxonomy/rankedlineage.dmp`, `ncbi_taxonomy/prot.accession2taxid.gz` |
 | `--taxonomy-filter` | Same as `--add-taxonomy` |
@@ -145,7 +146,17 @@ biom3_build_dataset -p PF00018 --enrich-pfam \
     -o outputs/SH3_dataset
 ```
 
-The TrEMBL file (`uniprot_trembl.dat.gz`, ~130 GB) must be downloaded separately — see the [UniProt downloads page](https://www.uniprot.org/help/downloads).
+The TrEMBL file (`uniprot_trembl.dat.gz`, ~161 GB) must be downloaded separately — see the [UniProt downloads page](https://www.uniprot.org/help/downloads).
+
+**Annotation Parquet cache**: Because parsing TrEMBL takes hours, you can build a Parquet cache once and reuse it for all subsequent `biom3_build_dataset` runs:
+
+```bash
+biom3_build_annotation_cache \
+    --dat data/databases/trembl/uniprot_trembl.dat.gz \
+    -o data/databases/trembl/trembl_annotations.parquet
+```
+
+Then use `--annotation-cache` instead of `--uniprot-dat` for instant enrichment. See [building_datasets_with_dbio.md](building_datasets_with_dbio.md) for details.
 
 ## Provenance tracking
 

@@ -13,6 +13,8 @@
   "stage3_output_data_path": "None",
   "data_root": "None",
   "num_replicas": 2,
+  "unmasking_order": "random",
+  "token_strategy": "sample",
   "batch_size_sample": 32,
   "diffusion_steps": 1024,
   "seed": 42,

@@ -230,6 +230,7 @@ def batch_generate_denoised_sampled(
 
     max_diffusion_step = args.diffusion_steps
     batch_idx = torch.arange(batch_size, device=args.device)
+    token_strategy = getattr(args, 'token_strategy', 'sample')
 
     # Pre-allocate GPU tensors to avoid per-iteration CPU transfers
     all_realizations = torch.empty(
@@ -241,12 +242,13 @@ def batch_generate_denoised_sampled(
         dtype=temp_idx.dtype, device=args.device
     )
 
-    # Pre-allocate Gumbel noise buffer (reused each step via in-place fill).
-    # See docs/gumbel_max_sampling.md for derivation.
-    gumbel_buffer = torch.empty(
-        batch_size, seq_len, args.num_classes,
-        dtype=temp_y_c.dtype, device=args.device
-    )
+    if token_strategy == 'sample':
+        # Pre-allocate Gumbel noise buffer (reused each step via in-place fill).
+        # See docs/gumbel_max_sampling.md for derivation.
+        gumbel_buffer = torch.empty(
+            batch_size, seq_len, args.num_classes,
+            dtype=temp_y_c.dtype, device=args.device
+        )
 
     for ii in tqdm(range(max_diffusion_step)):
 
@@ -259,14 +261,16 @@ def batch_generate_denoised_sampled(
                 idx=temp_idx
         )
 
-        # Sample next token via Gumbel-max trick (equivalent to
-        # Categorical(conditional_prob.probs).sample()). Uses only
-        # element-wise ops + argmax, avoiding torch.multinomial and
-        # the OneHotCategorical one-hot allocation roundtrip.
-        gumbel_buffer.exponential_()
-        next_temp_realization = (
-            conditional_prob.probs.log() - gumbel_buffer.log()
-        ).argmax(dim=-1)
+        # Token selection
+        if token_strategy == 'argmax':
+            next_temp_realization = conditional_prob.probs.argmax(dim=-1)
+        else:
+            # Gumbel-max trick (equivalent to Categorical sampling).
+            # See docs/gumbel_max_sampling.md for derivation.
+            gumbel_buffer.exponential_()
+            next_temp_realization = (
+                conditional_prob.probs.log() - gumbel_buffer.log()
+            ).argmax(dim=-1)
 
         # Update temp_mask_realization per sample (advanced indexing)
         current_location = (temp_sampling_path == temp_idx).long().argmax(dim=-1)
@@ -287,6 +291,99 @@ def batch_generate_denoised_sampled(
 
     return mask_realization_list, time_idx_list
 
+
+def batch_generate_denoised_sampled_confidence(
+        args: any,
+        model: nn.Module,
+        extract_digit_samples: torch.Tensor,
+        extract_time: torch.Tensor,
+        extract_digit_label: torch.Tensor,
+    ) -> tuple[list, list]:
+    """Confidence-based unmasking: at each step, unmask the position where the
+    model's max class probability is highest among still-masked positions.
+
+    Token selection is controlled by ``args.token_strategy``:
+        - ``"argmax"``: deterministic (take the most-likely token)
+        - ``"sample"``: stochastic (Gumbel-max trick)
+    """
+
+    batch_size = extract_digit_samples.size(0)
+    seq_len = extract_digit_samples.size(1)
+    logger.debug('batch_size: %s', batch_size)
+
+    # Prepare data
+    temp_y_c = extract_digit_label.to(args.device)
+    temp_mask_realization = extract_digit_samples.unsqueeze(1).long().to(args.device)
+    temp_idx = extract_time.unsqueeze(-1).to(args.device)
+
+    max_diffusion_step = args.diffusion_steps
+    batch_idx = torch.arange(batch_size, device=args.device)
+
+    token_strategy = getattr(args, 'token_strategy', 'sample')
+
+    # Pre-allocate GPU tensors
+    all_realizations = torch.empty(
+        max_diffusion_step, batch_size, 1, seq_len,
+        dtype=temp_mask_realization.dtype, device=args.device
+    )
+    all_time_idx = torch.empty(
+        max_diffusion_step, batch_size, 1,
+        dtype=temp_idx.dtype, device=args.device
+    )
+
+    if token_strategy == 'sample':
+        gumbel_buffer = torch.empty(
+            batch_size, seq_len, args.num_classes,
+            dtype=temp_y_c.dtype, device=args.device
+        )
+
+    for ii in tqdm(range(max_diffusion_step)):
+
+        # Model prediction
+        conditional_prob, prob = predict_next_index(
+                model=model,
+                args=args,
+                mask_realization=temp_mask_realization,
+                y_c=temp_y_c,
+                idx=temp_idx
+        )
+
+        # Per-position confidence: max class probability
+        # conditional_prob.probs shape: [batch, seq_len, num_classes]
+        max_probs, max_classes = conditional_prob.probs.max(dim=-1)
+
+        # Mask out already-unmasked positions so they are never selected
+        is_masked = (temp_mask_realization.squeeze(1) == 0)
+        max_probs[~is_masked] = -float('inf')
+
+        # Greedy position selection
+        current_location = max_probs.argmax(dim=-1)
+
+        # Token selection
+        if token_strategy == 'argmax':
+            chosen_tokens = max_classes[batch_idx, current_location]
+        else:
+            gumbel_buffer.exponential_()
+            sampled = (
+                conditional_prob.probs.log() - gumbel_buffer.log()
+            ).argmax(dim=-1)
+            chosen_tokens = sampled[batch_idx, current_location]
+
+        temp_mask_realization[batch_idx, 0, current_location] = chosen_tokens
+
+        # Store on GPU
+        all_realizations[ii] = temp_mask_realization
+        all_time_idx[ii] = temp_idx
+
+        temp_idx += 1
+
+    # Single GPU→CPU transfer at the end
+    all_realizations_np = all_realizations.cpu().numpy()
+    all_time_idx_np = all_time_idx.cpu().numpy()
+    mask_realization_list = [all_realizations_np[i] for i in range(max_diffusion_step)]
+    time_idx_list = [all_time_idx_np[i] for i in range(max_diffusion_step)]
+
+    return mask_realization_list, time_idx_list
 
 
 # convert sequence with numerical variables into character letters

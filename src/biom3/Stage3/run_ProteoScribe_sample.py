@@ -73,6 +73,12 @@ def parse_arguments(args):
                         help="seed for random number generation")
     parser.add_argument('--device', type=str, default="cuda",
                         choices=["cpu", "cuda", "xpu"], help="available device")
+    parser.add_argument('--unmasking_order', type=str, default=None,
+                        choices=["random", "confidence"],
+                        help="Position unmasking order: 'random' (default) or 'confidence' (most-confident first)")
+    parser.add_argument('--token_strategy', type=str, default=None,
+                        choices=["sample", "argmax"],
+                        help="Token selection: 'sample' (Gumbel-max, default) or 'argmax' (deterministic)")
     return parser.parse_args(args)
 
 
@@ -172,18 +178,26 @@ def batch_stage3_generate_sequences(
         batch_prompt_indices = [p_idx for p_idx, r_idx in batch]
         batched_z_text_sample = z_t[batch_prompt_indices]
 
-        # Generate random permutations for each sample in the batch
-        batch_perms = torch.stack([torch.randperm(args.diffusion_steps) for _ in range(current_batch_size)])
-
         # Generate denoised samples using the model
-        mask_realization_list, _ = Stage3_sample_tools.batch_generate_denoised_sampled(
-            args=args,
-            model=model,
-            extract_digit_samples=torch.zeros(current_batch_size, args.diffusion_steps),
-            extract_time=torch.zeros(current_batch_size).long(),
-            extract_digit_label=batched_z_text_sample,
-            sampling_path=batch_perms
-        )
+        unmasking_order = getattr(args, 'unmasking_order', 'random')
+        if unmasking_order == 'confidence':
+            mask_realization_list, _ = Stage3_sample_tools.batch_generate_denoised_sampled_confidence(
+                args=args,
+                model=model,
+                extract_digit_samples=torch.zeros(current_batch_size, args.diffusion_steps),
+                extract_time=torch.zeros(current_batch_size).long(),
+                extract_digit_label=batched_z_text_sample,
+            )
+        else:
+            batch_perms = torch.stack([torch.randperm(args.diffusion_steps) for _ in range(current_batch_size)])
+            mask_realization_list, _ = Stage3_sample_tools.batch_generate_denoised_sampled(
+                args=args,
+                model=model,
+                extract_digit_samples=torch.zeros(current_batch_size, args.diffusion_steps),
+                extract_time=torch.zeros(current_batch_size).long(),
+                extract_digit_label=batched_z_text_sample,
+                sampling_path=batch_perms,
+            )
 
         # Unpack results into the correct (replica, prompt) slots
         for i, (p_idx, r_idx) in enumerate(batch):
@@ -255,6 +269,17 @@ def main(args, _setup_logging=True):
 
     config_args.device = config_args_parser.device
 
+    # Merge CLI overrides for sampling parameters (fall back to JSON, then defaults)
+    for attr, default in [('unmasking_order', 'random'), ('token_strategy', 'sample')]:
+        cli_val = getattr(config_args_parser, attr, None)
+        if cli_val is not None:
+            setattr(config_args, attr, cli_val)
+        elif not hasattr(config_args, attr):
+            setattr(config_args, attr, default)
+
+    logger.info("Unmasking order: %s", config_args.unmasking_order)
+    logger.info("Token strategy: %s", config_args.token_strategy)
+
     # load test dataset
     embedding_dataset = torch.load(config_args_parser.input_path)
 
@@ -288,6 +313,8 @@ def main(args, _setup_logging=True):
                 "num_prompts": num_prompts,
                 "num_replicas": config_args.num_replicas,
                 "seed": seed,
+                "unmasking_order": config_args.unmasking_order,
+                "token_strategy": config_args.token_strategy,
                 "total_sequences": num_prompts * config_args.num_replicas,
                 "output_file": os.path.abspath(args.output_path),
             },

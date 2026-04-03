@@ -238,6 +238,9 @@ This stage generates protein sequences from the facilitated text embeddings (`z_
 | `-o` | `--output_path` | Yes | Path to save generated sequences (`.pt`) |
 | | `--seed` | No | Random seed for reproducibility. Pass `0` or omit for a random seed (default: 0) |
 | | `--device` | No | Device to use: `cuda` (default), `cpu`, or `xpu` |
+| | `--animate_prompts` | No | Prompt indices to animate (e.g. `0 1 2`), `all`, or `none`. Omit to disable animation. |
+| | `--animate_replicas` | No | Replicas to animate: integer `i` selects `range(0, i)`, `all`, or `none` (default: `1`) |
+| | `--animation_dir` | No | Directory for GIF output. Default: `<output_dir>/animations/` |
 
 > **Note:** To control sampling behavior (number of sequences per prompt, batch size, diffusion steps), edit `num_replicas`, `batch_size_sample`, and `diffusion_steps` in the JSON config.
 
@@ -261,6 +264,20 @@ biom3_ProteoScribe_sample \
     --output_path outputs/generated_sequences.pt \
     --seed 42
 ```
+
+#### Example: animate the denoising process for selected prompts
+
+```bash
+biom3_ProteoScribe_sample \
+    --input_path outputs/facilitator_embeddings.pt \
+    --json_path configs/stage3_config_ProteoScribe_sample.json \
+    --model_path ./weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin \
+    --output_path outputs/generated_sequences.pt \
+    --animate_prompts 0 1 2 \
+    --animate_replicas 2
+```
+
+GIFs are written to `outputs/animations/prompt_<P>_replica_<R>.gif`. See [docs/sequence_generation_animation.md](./docs/sequence_generation_animation.md) for details.
 
 ### Dataset construction
 

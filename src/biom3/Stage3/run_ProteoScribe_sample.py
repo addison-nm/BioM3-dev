@@ -234,8 +234,11 @@ def batch_stage3_generate_sequences(
 
     # Process all (prompt, replica) pairs in batches
     num_batches = (len(work_items) + args.batch_size_sample - 1) // args.batch_size_sample
-    logger.info("Prompts: %d | Replicas/prompt: %d | Batches: %d | Batch size: %d",
-                num_prompts, args.num_replicas, num_batches, args.batch_size_sample)
+    logger.info(
+        "Prompts: %d | Reps/prompt: %d | Total reps: %d | Batch size: %d | Batches: %d",
+        num_prompts, args.num_replicas, num_prompts * args.num_replicas, 
+        args.batch_size_sample, num_batches
+    )
     for batch_start in tqdm.trange(0, len(work_items), args.batch_size_sample, desc="batch"):
         batch = work_items[batch_start : batch_start + args.batch_size_sample]
         current_batch_size = len(batch)

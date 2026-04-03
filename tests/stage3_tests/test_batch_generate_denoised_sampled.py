@@ -98,20 +98,17 @@ def test_different_seeds_differ(mini_model_and_args):
 def test_batch_independence(mini_model_and_args, monkeypatch):
     """Each batch item's update must only touch its own position.
 
-    Monkeypatches OneHotCategorical.sample to return the mode (argmax of
-    probs) so that identical inputs yield identical outputs, removing RNG
-    differences between batch elements. With correct per-sample advanced
-    indexing, two items sharing the same conditioning and sampling path
-    must produce the same sequence.
+    Monkeypatches Tensor.exponential_ to fill with a constant, making the
+    Gumbel-max sampling deterministic. With identical inputs and no
+    randomness, two batch items sharing the same conditioning and sampling
+    path must produce the same sequence. Cross-contamination from incorrect
+    indexing would break this symmetry.
     """
-    from torch.distributions import OneHotCategorical
+    def deterministic_exponential(self, lambd=1.0):
+        self.fill_(1.0)
+        return self
 
-    def deterministic_sample(self, sample_shape=torch.Size()):
-        return torch.nn.functional.one_hot(
-            self.probs.argmax(dim=-1), num_classes=self.probs.shape[-1]
-        ).float()
-
-    monkeypatch.setattr(OneHotCategorical, "sample", deterministic_sample)
+    monkeypatch.setattr(torch.Tensor, "exponential_", deterministic_exponential)
 
     model, args = mini_model_and_args
     torch.manual_seed(42)

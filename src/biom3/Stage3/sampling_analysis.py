@@ -241,6 +241,13 @@ def batch_generate_denoised_sampled(
         dtype=temp_idx.dtype, device=args.device
     )
 
+    # Pre-allocate Gumbel noise buffer (reused each step via in-place fill).
+    # See docs/gumbel_max_sampling.md for derivation.
+    gumbel_buffer = torch.empty(
+        batch_size, seq_len, args.num_classes,
+        dtype=temp_y_c.dtype, device=args.device
+    )
+
     for ii in tqdm(range(max_diffusion_step)):
 
         # Make position prediction
@@ -252,8 +259,14 @@ def batch_generate_denoised_sampled(
                 idx=temp_idx
         )
 
-        # Get the label for the next token position
-        next_temp_realization = torch.argmax(conditional_prob.sample(), dim=-1)
+        # Sample next token via Gumbel-max trick (equivalent to
+        # Categorical(conditional_prob.probs).sample()). Uses only
+        # element-wise ops + argmax, avoiding torch.multinomial and
+        # the OneHotCategorical one-hot allocation roundtrip.
+        gumbel_buffer.exponential_()
+        next_temp_realization = (
+            conditional_prob.probs.log() - gumbel_buffer.log()
+        ).argmax(dim=-1)
 
         # Update temp_mask_realization per sample (advanced indexing)
         current_location = (temp_sampling_path == temp_idx).long().argmax(dim=-1)

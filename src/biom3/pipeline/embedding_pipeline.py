@@ -13,6 +13,7 @@ from argparse import Namespace
 from datetime import datetime
 
 from biom3.backend.device import setup_logger
+from biom3.core.helpers import load_json_config
 from biom3.core.run_utils import (
     get_biom3_version,
     get_git_hash,
@@ -108,6 +109,10 @@ def main(args):
     logger.info("Command:     %s", " ".join(sys.argv))
     logger.info("=" * 60)
 
+    # Load config contents for manifest
+    pencl_config_contents = load_json_config(args.pencl_config)
+    facilitator_config_contents = load_json_config(args.facilitator_config)
+
     # Intermediate file paths
     pencl_output = os.path.join(args.output_dir, f"{args.prefix}.PenCL_emb.pt")
     facilitator_output = os.path.join(args.output_dir, f"{args.prefix}.Facilitator_emb.pt")
@@ -172,6 +177,10 @@ def main(args):
             "facilitator_weights": os.path.abspath(args.facilitator_weights),
             "pencl_config": os.path.abspath(args.pencl_config),
             "facilitator_config": os.path.abspath(args.facilitator_config),
+        },
+        config_contents={
+            "pencl": pencl_config_contents,
+            "facilitator": facilitator_config_contents,
         },
     )
     logger.info("Done in %s", elapsed)

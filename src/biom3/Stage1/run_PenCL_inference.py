@@ -44,6 +44,7 @@ biom3_PenCL_inference \
 
 """
 
+import copy
 import os
 import sys
 import argparse
@@ -289,6 +290,7 @@ def main(args, _setup_logging=True):
 
     # Load configuration
     config_dict = load_json_config(config_args_parser.json_path)
+    raw_config = copy.deepcopy(config_dict)
     config_args = convert_to_namespace(config_dict)
 
     # Set the device
@@ -457,6 +459,7 @@ def main(args, _setup_logging=True):
                 "model_path": os.path.abspath(args.model_path),
                 "json_config": os.path.abspath(args.json_path),
             },
+            config_contents=raw_config,
         )
         logger.info("Done in %s", elapsed)
         teardown_file_logging("biom3", file_handler)

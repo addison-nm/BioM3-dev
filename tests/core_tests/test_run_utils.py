@@ -136,3 +136,53 @@ def test_write_manifest_default_excludes_optional_keys():
 
         assert "outputs" not in manifest
         assert "resolved_paths" not in manifest
+        assert "config_contents" not in manifest
+
+
+def test_write_manifest_with_config_contents():
+    """Config contents dict is embedded in the manifest."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        args = Namespace(x=1)
+        start = datetime.now()
+        elapsed = timedelta(seconds=0.1)
+        config = {
+            "model_type": "pfam",
+            "batch_size": 64,
+            "nested": {"lr": 0.001, "weight_decay": 1e-5},
+        }
+
+        path = write_manifest(
+            args, tmpdir, start, elapsed,
+            config_contents=config,
+        )
+
+        with open(path) as f:
+            manifest = json.load(f)
+
+        assert "config_contents" in manifest
+        assert manifest["config_contents"]["model_type"] == "pfam"
+        assert manifest["config_contents"]["batch_size"] == 64
+        assert manifest["config_contents"]["nested"]["lr"] == 0.001
+
+
+def test_write_manifest_with_multi_config_contents():
+    """Dict-of-dicts config_contents works for the pipeline case."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        args = Namespace(x=1)
+        start = datetime.now()
+        elapsed = timedelta(seconds=0.1)
+        config = {
+            "pencl": {"dim": 512, "layers": 33},
+            "facilitator": {"dim": 1024, "dropout": 0.1},
+        }
+
+        path = write_manifest(
+            args, tmpdir, start, elapsed,
+            config_contents=config,
+        )
+
+        with open(path) as f:
+            manifest = json.load(f)
+
+        assert manifest["config_contents"]["pencl"]["dim"] == 512
+        assert manifest["config_contents"]["facilitator"]["dropout"] == 0.1

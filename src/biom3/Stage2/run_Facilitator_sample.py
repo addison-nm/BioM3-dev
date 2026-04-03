@@ -30,6 +30,7 @@ biom3_Facilitator_sample \
 
 """
 
+import copy
 import os
 import sys
 import argparse
@@ -145,6 +146,7 @@ def main(args, _setup_logging=True):
 
     # Load configuration
     config_dict = load_json_config(args.json_path)
+    raw_config = copy.deepcopy(config_dict)
     config_args = convert_to_namespace(config_dict)
 
     mmd_sample_limit = args.mmd_sample_limit
@@ -226,6 +228,7 @@ def main(args, _setup_logging=True):
                 "model_path": os.path.abspath(args.model_path),
                 "json_config": os.path.abspath(args.json_path),
             },
+            config_contents=raw_config,
         )
         logger.info("Done in %s", elapsed)
         teardown_file_logging("biom3", file_handler)

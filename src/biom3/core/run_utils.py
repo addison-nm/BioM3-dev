@@ -140,6 +140,7 @@ def get_file_metadata(filepath):
 def write_manifest(args, outdir, start_time, elapsed,
                    outputs=None, resolved_paths=None,
                    database_versions=None, environment=None,
+                   config_contents=None,
                    manifest_filename="build_manifest.json"):
     """Write a JSON manifest with version info, args, timing, and outputs.
 
@@ -166,6 +167,8 @@ def write_manifest(args, outdir, start_time, elapsed,
         manifest["database_versions"] = database_versions
     if environment is not None:
         manifest["environment"] = environment
+    if config_contents is not None:
+        manifest["config_contents"] = config_contents
 
     manifest_path = os.path.join(outdir, manifest_filename)
     with open(manifest_path, "w") as f:

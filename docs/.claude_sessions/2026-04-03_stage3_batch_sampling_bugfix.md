@@ -115,9 +115,26 @@ affected. The single-sample `generate_denoised_sampled` function has a latent
 version of the bug (hardcoded `[0]` index) but is safe at batch_size=1 and has
 no callers in the current codebase.
 
-## Not committed
+## Commits
 
-All changes are staged but **not committed** — awaiting user review. Rollback:
+```
+007e105 perf: replace OneHotCategorical sampling with Gumbel-max trick
+f778a8d fix: correct batch indexing and remove per-iteration GPU syncs in Stage 3 sampling
+```
+
+### Post-session follow-up (same day)
+
+Added `torch.compile` for CUDA inference and batch logging to
+`run_ProteoScribe_sample.py`:
+
+- `torch.compile(model)` applied conditionally when `get_backend_name() == "cuda"`.
+  Not yet validated on XPU (Aurora) — `inductor` backend may not be available there.
+- Batch summary log line: prompts, replicas/prompt, total batches, batch size.
+- Return type annotations in `sampling_analysis.py` updated from `-> (...)` to
+  `-> tuple[...]`.
+
+## Rollback
+
 ```bash
 git checkout 6616dff -- src/biom3/Stage3/sampling_analysis.py src/biom3/Stage3/run_ProteoScribe_sample.py
 ```

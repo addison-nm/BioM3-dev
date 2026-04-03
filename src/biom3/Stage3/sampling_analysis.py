@@ -30,13 +30,13 @@ def cond_autocomplete_real_samples(
         realization: torch.Tensor,
         y_c: torch.Tensor,
         idx: torch.Tensor
-    ) -> (
+    ) -> tuple[
             any,
             torch.Tensor,
             torch.Tensor,
             torch.Tensor,
             torch.Tensor
-    ):
+    ]:
 
         model.eval()
         bs, channel, seq_length = realization.size()
@@ -131,14 +131,14 @@ def predict_next_index(
         mask_realization: torch.Tensor,
         y_c: torch.Tensor,
         idx: torch.Tensor
-    ) -> (
+    ) -> tuple[
             any,
             torch.Tensor,
             torch.Tensor,
             torch.Tensor,
             torch.Tensor,
             torch.Tensor
-    ):
+    ]:
 
         model.eval()
         bs, channel, seq_length = mask_realization.size()
@@ -161,10 +161,10 @@ def generate_denoised_sampled(
         extract_time: torch.Tensor,
         extract_digit_label: torch.Tensor,
         sampling_path: torch.Tensor
-    ) -> (
+    ) -> tuple[
             list,
             list
-    ):
+    ]:
 
         mask_realization_list, time_idx_list = [], []
 
@@ -213,7 +213,7 @@ def batch_generate_denoised_sampled(
         extract_time: torch.Tensor,
         extract_digit_label: torch.Tensor,
         sampling_path: torch.Tensor
-    ) -> (list, list):
+    ) -> tuple[list, list]:
 
     # Ensure batch dimension consistency across input tensors
     assert extract_digit_samples.size(0) == extract_digit_label.size(0) == sampling_path.size(0) == extract_time.size(0), "Mismatched batch dimensions"

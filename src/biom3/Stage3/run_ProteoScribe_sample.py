@@ -53,7 +53,7 @@ from biom3.core.run_utils import (
     teardown_file_logging,
     write_manifest,
 )
-from biom3.backend.device import setup_logger
+from biom3.backend.device import setup_logger, get_backend_name
 
 logger = setup_logger(__name__)
 
@@ -161,6 +161,9 @@ def batch_stage3_generate_sequences(
     design_sequences = [[None] * num_prompts for _ in range(args.num_replicas)]
 
     # Process all (prompt, replica) pairs in batches
+    num_batches = (len(work_items) + args.batch_size_sample - 1) // args.batch_size_sample
+    logger.info("Prompts: %d | Replicas/prompt: %d | Batches: %d | Batch size: %d",
+                num_prompts, args.num_replicas, num_batches, args.batch_size_sample)
     for batch_start in tqdm.trange(0, len(work_items), args.batch_size_sample, desc="batch"):
         batch = work_items[batch_start : batch_start + args.batch_size_sample]
         current_batch_size = len(batch)
@@ -257,6 +260,11 @@ def main(args, _setup_logging=True):
 
     # load model
     model = prepare_model(args=config_args_parser, config_args=config_args)
+
+    # torch.compile for faster inference on supported backends
+    if get_backend_name() == "cuda":
+        model = torch.compile(model)
+        logger.info("Model compiled with torch.compile (inductor)")
 
     # sample sequences
     design_sequence_dict = batch_stage3_generate_sequences(

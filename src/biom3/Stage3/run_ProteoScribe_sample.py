@@ -38,6 +38,7 @@ import json
 import numpy as np
 import pandas as pd
 import argparse
+import tqdm as tqdm
 
 import torch
 import torch.nn as nn
@@ -160,7 +161,7 @@ def batch_stage3_generate_sequences(
     design_sequences = [[None] * num_prompts for _ in range(args.num_replicas)]
 
     # Process all (prompt, replica) pairs in batches
-    for batch_start in range(0, len(work_items), args.batch_size_sample):
+    for batch_start in tqdm.trange(0, len(work_items), args.batch_size_sample, desc="batch"):
         batch = work_items[batch_start : batch_start + args.batch_size_sample]
         current_batch_size = len(batch)
 

@@ -148,7 +148,7 @@ def predict_next_index(
         
         return (
                 conditional_prob,
-                probs.cpu(),
+                probs,
         )
 
 
@@ -219,20 +219,29 @@ def batch_generate_denoised_sampled(
     assert extract_digit_samples.size(0) == extract_digit_label.size(0) == sampling_path.size(0) == extract_time.size(0), "Mismatched batch dimensions"
 
     batch_size = extract_digit_samples.size(0)
-    mask_realization_list, time_idx_list = [], []
+    seq_len = extract_digit_samples.size(1)
     logger.debug('batch_size: %s', batch_size)
 
     # Prepare data
     temp_y_c = extract_digit_label.to(args.device)
     temp_mask_realization = extract_digit_samples.unsqueeze(1).long().to(args.device)
-    temp_idx = extract_time.unsqueeze(-1).to(args.device)  # Adding an extra dimension for batch processing
+    temp_idx = extract_time.unsqueeze(-1).to(args.device)
     temp_sampling_path = sampling_path.to(args.device)
 
     max_diffusion_step = args.diffusion_steps
+    batch_idx = torch.arange(batch_size, device=args.device)
+
+    # Pre-allocate GPU tensors to avoid per-iteration CPU transfers
+    all_realizations = torch.empty(
+        max_diffusion_step, batch_size, 1, seq_len,
+        dtype=temp_mask_realization.dtype, device=args.device
+    )
+    all_time_idx = torch.empty(
+        max_diffusion_step, batch_size, 1,
+        dtype=temp_idx.dtype, device=args.device
+    )
+
     for ii in tqdm(range(max_diffusion_step)):
-        
-        # Broadcast ii to match the batch size
-        current_ii = torch.full((batch_size,), ii, dtype=torch.long, device=args.device)
 
         # Make position prediction
         conditional_prob, prob = predict_next_index(
@@ -242,22 +251,26 @@ def batch_generate_denoised_sampled(
                 y_c=temp_y_c,
                 idx=temp_idx
         )
-    
 
         # Get the label for the next token position
         next_temp_realization = torch.argmax(conditional_prob.sample(), dim=-1)
 
-        # Update temp_mask_realization for each item in the batch
-        current_location = temp_sampling_path == temp_idx  # Adding an extra dimension for comparison
-        current_location = torch.argmax(current_location.detach().cpu()*1, dim=-1)
-        temp_mask_realization[:, 0, current_location] = next_temp_realization[:,current_location]
-        
-        # Append results for each item in the batch
-        mask_realization_list.append(temp_mask_realization.cpu().numpy())
-        time_idx_list.append(temp_idx.cpu().numpy())
+        # Update temp_mask_realization per sample (advanced indexing)
+        current_location = (temp_sampling_path == temp_idx).long().argmax(dim=-1)
+        temp_mask_realization[batch_idx, 0, current_location] = next_temp_realization[batch_idx, current_location]
+
+        # Store on GPU
+        all_realizations[ii] = temp_mask_realization
+        all_time_idx[ii] = temp_idx
 
         # Increment temp_idx for the next iteration
         temp_idx += 1
+
+    # Single GPU→CPU transfer at the end
+    all_realizations_np = all_realizations.cpu().numpy()
+    all_time_idx_np = all_time_idx.cpu().numpy()
+    mask_realization_list = [all_realizations_np[i] for i in range(max_diffusion_step)]
+    time_idx_list = [all_time_idx_np[i] for i in range(max_diffusion_step)]
 
     return mask_realization_list, time_idx_list
 

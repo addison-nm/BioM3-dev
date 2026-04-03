@@ -286,10 +286,11 @@ def main(args, _setup_logging=True):
     # load model
     model = prepare_model(args=config_args_parser, config_args=config_args)
 
-    # torch.compile for faster inference on supported backends
-    if get_backend_name() == "cuda":
-        model = torch.compile(model)
-        logger.info("Model compiled with torch.compile (inductor)")
+    # TODO: re-enable torch.compile once Triton supports this GPU's compute
+    # capability (sm_121a / CUDA 12.1). See ptxas "gpu-name" error in tests.
+    # if get_backend_name() == "cuda":
+    #     model = torch.compile(model)
+    #     logger.info("Model compiled with torch.compile (inductor)")
 
     # sample sequences
     design_sequence_dict = batch_stage3_generate_sequences(

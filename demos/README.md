@@ -7,6 +7,40 @@ results go in `demos/outputs/` — nothing is written to the shared
 
 ## Shell scripts (run-and-check)
 
+### `animate_generation.sh` — GIF animations of the diffusion denoising process
+
+Runs Stage 3 (ProteoScribe) sampling on an existing set of Facilitator
+embeddings and produces per-step GIF animations showing each sequence being
+built up from masked positions (`-`) to final amino acids.
+
+```bash
+bash demos/animate_generation.sh
+```
+
+**What it demonstrates:**
+
+- Animating a single prompt with the default replica count (`--animate_prompts 0`)
+- Animating a specific subset of prompts (`--animate_prompts 0 1 2`)
+- Animating all prompts with multiple replicas (`--animate_prompts all --animate_replicas 3`)
+- Writing animations to a custom directory (`--animation_dir`)
+
+**Outputs** → `demos/outputs/animate_generation/`
+
+| File / directory | Description |
+| ---------------- | ----------- |
+| `ex*_sequences.pt` | Generated sequences for each example run |
+| `animations/` | Default GIF output directory (examples 1–3) |
+| `ex4_animations/` | Custom GIF output directory (example 4) |
+
+GIFs are named `prompt_<P>_replica_<R>.gif`. Each frame is one diffusion step;
+`-` characters mark positions not yet sampled.
+
+Runtime: depends on model and hardware; each example re-runs full sampling.
+
+---
+
+
+
 ### `build_sh3_dataset.sh` — Finetuning dataset from legacy CSVs
 
 Subsets the pre-existing SwissProt and Pfam training CSVs to build SH3

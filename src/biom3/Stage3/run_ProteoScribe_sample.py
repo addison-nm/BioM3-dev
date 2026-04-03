@@ -73,6 +73,17 @@ def parse_arguments(args):
                         help="seed for random number generation")
     parser.add_argument('--device', type=str, default="cuda",
                         choices=["cpu", "cuda", "xpu"], help="available device")
+    parser.add_argument('--animate_prompts', type=str, nargs='+', default=None,
+                        metavar='IDX',
+                        help="Prompt indices to animate (e.g. 0 1 2), 'all', or 'none'. "
+                             "Animation is disabled by default (omit this flag).")
+    parser.add_argument('--animate_replicas', type=str, default='1',
+                        metavar='N',
+                        help="Replicas to animate: integer i animates range(0, i), "
+                             "'all' animates every replica, 'none' disables. Default: 1.")
+    parser.add_argument('--animation_dir', type=str, default=None,
+                        help="Output directory for GIF animations. "
+                             "Default: <output_dir>/animations/")
     return parser.parse_args(args)
 
 
@@ -113,13 +124,65 @@ def prepare_model(args, config_args) ->nn.Module:
     return model
 
 
+def parse_animate_prompts(values):
+    """Parse --animate_prompts raw values. Returns None, 'all', or a list of ints."""
+    if values is None:
+        return None
+    if len(values) == 1 and values[0].lower() == 'none':
+        return None
+    if len(values) == 1 and values[0].lower() == 'all':
+        return 'all'
+    return [int(v) for v in values]
+
+
+def parse_animate_replicas(value):
+    """Parse --animate_replicas raw value. Returns None, 'all', or an int."""
+    if value is None or value.lower() == 'none':
+        return None
+    if value.lower() == 'all':
+        return 'all'
+    return int(value)
+
+
+def resolve_animate_prompts(parsed, num_prompts):
+    """Resolve parsed prompt spec to a set of indices, or None if animation is off."""
+    if parsed is None:
+        return None
+    if parsed == 'all':
+        return set(range(num_prompts))
+    invalid = [i for i in parsed if not (0 <= i < num_prompts)]
+    if invalid:
+        raise ValueError(
+            f"--animate_prompts indices out of range: {invalid} "
+            f"(valid range: 0–{num_prompts - 1})"
+        )
+    return set(parsed)
+
+
+def resolve_animate_replicas(parsed, num_replicas):
+    """Resolve parsed replica spec to a set of indices, or None if animation is off."""
+    if parsed is None:
+        return None
+    if parsed == 'all':
+        return set(range(num_replicas))
+    if parsed > num_replicas:
+        logger.warning(
+            "--animate_replicas=%d exceeds num_replicas=%d; clamping to %d",
+            parsed, num_replicas, num_replicas,
+        )
+        parsed = num_replicas
+    return set(range(parsed))
+
+
 # Step 4: Sample sequences from the model
 @torch.no_grad()
 def batch_stage3_generate_sequences(
         args: any,
         model: nn.Module,
-        z_t: torch.Tensor
-    ) -> pd.Series:
+        z_t: torch.Tensor,
+        animate_prompts: set = None,
+        animate_replicas: set = None,
+    ) -> tuple:
     """
     Generates protein sequences in batches using a denoising model.
 
@@ -160,6 +223,9 @@ def batch_stage3_generate_sequences(
     # Pre-allocate output: design_sequences[replica_idx][prompt_idx]
     design_sequences = [[None] * num_prompts for _ in range(args.num_replicas)]
 
+    animate = animate_prompts is not None and animate_replicas is not None
+    animation_frames = {}  # (p_idx, r_idx) -> list of strings, one per diffusion step
+
     # Process all (prompt, replica) pairs in batches
     num_batches = (len(work_items) + args.batch_size_sample - 1) // args.batch_size_sample
     logger.info("Prompts: %d | Replicas/prompt: %d | Batches: %d | Batch size: %d",
@@ -192,6 +258,12 @@ def batch_stage3_generate_sequences(
             clean_sequence = design_sequence.replace('<START>', '').replace('<END>', '').replace('<PAD>', '')
             design_sequences[r_idx][p_idx] = clean_sequence
 
+            if animate and p_idx in animate_prompts and r_idx in animate_replicas:
+                animation_frames[(p_idx, r_idx)] = [
+                    Stage3_ani_tools.convert_num_to_char(tokens, mask_realization_list[step][i][0])
+                    for step in range(args.diffusion_steps)
+                ]
+
     assert all(seq is not None for row in design_sequences for seq in row), \
         "Not all (prompt, replica) pairs were generated"
 
@@ -200,7 +272,7 @@ def batch_stage3_generate_sequences(
         for r_idx in range(args.num_replicas)
     }
 
-    return design_sequence_dict
+    return design_sequence_dict, animation_frames
 
 
 def set_seed(seed):
@@ -266,21 +338,44 @@ def main(args, _setup_logging=True):
         model = torch.compile(model)
         logger.info("Model compiled with torch.compile (inductor)")
 
+    # Resolve animation targets
+    z_c = embedding_dataset['z_c']
+    num_prompts = z_c.size(0) if isinstance(z_c, torch.Tensor) else len(z_c)
+    animate_prompts_set = resolve_animate_prompts(
+        parse_animate_prompts(config_args_parser.animate_prompts),
+        num_prompts,
+    )
+    animate_replicas_set = resolve_animate_replicas(
+        parse_animate_replicas(config_args_parser.animate_replicas),
+        config_args.num_replicas,
+    )
+
     # sample sequences
-    design_sequence_dict = batch_stage3_generate_sequences(
+    design_sequence_dict, animation_frames = batch_stage3_generate_sequences(
             args=config_args,
             model=model,
-            z_t=embedding_dataset['z_c']
+            z_t=z_c,
+            animate_prompts=animate_prompts_set,
+            animate_replicas=animate_replicas_set,
     )
 
     logger.info("design_sequence_dict=%s", design_sequence_dict)
 
     torch.save(design_sequence_dict, f"{config_args_parser.output_path}")
 
+    # Generate GIF animations
+    if animation_frames:
+        animation_dir = config_args_parser.animation_dir or os.path.join(outdir, "animations")
+        os.makedirs(animation_dir, exist_ok=True)
+        temp_dir = os.path.join(animation_dir, "_tmp")
+        logger.info("Saving %d animation(s) to %s", len(animation_frames), animation_dir)
+        for (p_idx, r_idx), frames in animation_frames.items():
+            gif_path = os.path.join(animation_dir, f"prompt_{p_idx}_replica_{r_idx}.gif")
+            Stage3_ani_tools.generate_text_animation(frames, gif_path, output_temp_path=temp_dir)
+            logger.info("Animation saved: %s", gif_path)
+
     # Write manifest and clean up logging
     elapsed = datetime.now() - start_time
-    z_c = embedding_dataset['z_c']
-    num_prompts = z_c.size(0) if isinstance(z_c, torch.Tensor) else len(z_c)
     if _setup_logging:
         write_manifest(
             args, outdir, start_time, elapsed,

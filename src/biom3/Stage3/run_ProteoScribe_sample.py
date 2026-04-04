@@ -277,7 +277,7 @@ def batch_stage3_generate_sequences(
 
             if animate and p_idx in animate_prompts and r_idx in animate_replicas:
                 animation_frames[(p_idx, r_idx)] = [
-                    Stage3_ani_tools.convert_num_to_char(tokens, mask_realization_list[step][i][0])
+                    mask_realization_list[step][i][0].copy()
                     for step in range(args.diffusion_steps)
                 ]
 
@@ -289,7 +289,7 @@ def batch_stage3_generate_sequences(
         for r_idx in range(args.num_replicas)
     }
 
-    return design_sequence_dict, animation_frames
+    return design_sequence_dict, animation_frames, tokens
 
 
 def set_seed(seed):
@@ -380,7 +380,7 @@ def main(args, _setup_logging=True):
     )
 
     # sample sequences
-    design_sequence_dict, animation_frames = batch_stage3_generate_sequences(
+    design_sequence_dict, animation_frames, tokens = batch_stage3_generate_sequences(
             args=config_args,
             model=model,
             z_t=z_c,
@@ -396,11 +396,15 @@ def main(args, _setup_logging=True):
     if animation_frames:
         animation_dir = config_args_parser.animation_dir or os.path.join(outdir, "animations")
         os.makedirs(animation_dir, exist_ok=True)
-        temp_dir = os.path.join(animation_dir, "_tmp")
         logger.info("Saving %d animation(s) to %s", len(animation_frames), animation_dir)
         for (p_idx, r_idx), frames in animation_frames.items():
             gif_path = os.path.join(animation_dir, f"prompt_{p_idx}_replica_{r_idx}.gif")
-            Stage3_ani_tools.generate_text_animation(frames, gif_path, output_temp_path=temp_dir)
+            Stage3_ani_tools.generate_sequence_animation(
+                frames=frames,
+                tokens=tokens,
+                output_path=gif_path,
+                title=f"Prompt {p_idx} \u00b7 Replica {r_idx}",
+            )
             logger.info("Animation saved: %s", gif_path)
 
     # Write manifest and clean up logging

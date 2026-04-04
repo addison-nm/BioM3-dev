@@ -74,8 +74,11 @@ def parse_arguments(args):
     parser.add_argument('--device', type=str, default="cuda",
                         choices=["cpu", "cuda", "xpu"], help="available device")
     parser.add_argument('--unmasking_order', type=str, default=None,
-                        choices=["random", "confidence"],
-                        help="Position unmasking order: 'random' (default) or 'confidence' (most-confident first)")
+                        choices=["random", "confidence", "confidence_no_pad"],
+                        help="Position unmasking order: 'random' (default), "
+                             "'confidence' (most-confident first), or "
+                             "'confidence_no_pad' (most-confident first, "
+                             "skipping positions predicted as PAD)")
     parser.add_argument('--token_strategy', type=str, default=None,
                         choices=["sample", "argmax"],
                         help="Token selection: 'sample' (Gumbel-max, default) or 'argmax' (deterministic)")
@@ -223,6 +226,10 @@ def batch_stage3_generate_sequences(
         'X', 'U', 'Z', 'B', 'O'  # Special characters
     ]
 
+    if '<PAD>' not in tokens:
+        raise ValueError("Token vocabulary is missing '<PAD>' — cannot resolve pad_token_id")
+    args.pad_token_id = tokens.index('<PAD>')
+
     # Build flat work list of (prompt_idx, replica_idx) pairs to parallelize
     # across both prompts and replicates
     num_prompts = z_t.size(0)
@@ -256,7 +263,7 @@ def batch_stage3_generate_sequences(
 
         # Generate denoised samples using the model
         unmasking_order = getattr(args, 'unmasking_order', 'random')
-        if unmasking_order == 'confidence':
+        if unmasking_order in ('confidence', 'confidence_no_pad'):
             mask_realization_list, _, batch_probs = Stage3_sample_tools.batch_generate_denoised_sampled_confidence(
                 args=args,
                 model=model,
@@ -264,6 +271,7 @@ def batch_stage3_generate_sequences(
                 extract_time=torch.zeros(current_batch_size).long(),
                 extract_digit_label=batched_z_text_sample,
                 store_probabilities=store_probabilities,
+                skip_pad=(unmasking_order == 'confidence_no_pad'),
             )
         else:
             batch_perms = torch.stack([torch.randperm(args.diffusion_steps) for _ in range(current_batch_size)])

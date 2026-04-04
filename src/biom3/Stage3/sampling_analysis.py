@@ -311,9 +311,15 @@ def batch_generate_denoised_sampled_confidence(
         extract_time: torch.Tensor,
         extract_digit_label: torch.Tensor,
         store_probabilities: bool = False,
+        skip_pad: bool = False,
     ) -> tuple[list, list, np.ndarray | None]:
     """Confidence-based unmasking: at each step, unmask the position where the
     model's max class probability is highest among still-masked positions.
+
+    When ``skip_pad`` is True, positions whose most-likely token is ``<PAD>``
+    are deprioritised so that sequence-content positions are unmasked first.
+    PAD-dominant positions are still unmasked once no other masked positions
+    remain.
 
     Token selection is controlled by ``args.token_strategy``:
         - ``"argmax"``: deterministic (take the most-likely token)
@@ -377,6 +383,14 @@ def batch_generate_denoised_sampled_confidence(
         # Mask out already-unmasked positions so they are never selected
         is_masked = (temp_mask_realization.squeeze(1) == 0)
         max_probs[~is_masked] = -float('inf')
+
+        # Deprioritise positions whose top prediction is <PAD>
+        if skip_pad:
+            pad_idx = getattr(args, 'pad_token_id', 23)
+            is_pad_top = (max_classes == pad_idx) & is_masked
+            # Only suppress if there are non-PAD masked positions remaining
+            has_non_pad = (is_masked & ~is_pad_top).any(dim=-1, keepdim=True)
+            max_probs[is_pad_top & has_non_pad.expand_as(is_pad_top)] = -float('inf')
 
         # Greedy position selection
         current_location = max_probs.argmax(dim=-1)

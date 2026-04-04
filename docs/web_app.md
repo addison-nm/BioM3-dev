@@ -41,7 +41,7 @@ listed in the sidebar.
 
 | # | Page | Description |
 |---|------|-------------|
-| 1 | [View Structure](#view-structure) | Upload, paste, or fold a PDB structure and view it interactively |
+| 1 | [View Structure](#view-structure) | Browse, upload, paste, or fold a PDB structure and view it interactively |
 | 2 | [Align Structures](#align-structures) | Superimpose two structures on C-alpha atoms, view overlay and RMSD |
 | 3 | [Highlight Residues](#highlight-residues) | Select residues by number and highlight them with custom colors and styles |
 | 4 | [Color by Values](#color-by-values) | Map per-residue float values (pLDDT, conservation, etc.) onto a structure |
@@ -50,18 +50,19 @@ listed in the sidebar.
 
 ### View Structure
 
-Upload a `.pdb` file, paste PDB text directly, or enter an amino acid sequence
-to fold with ESMFold. Controls in the sidebar let you switch between rendering
-styles (`cartoon`, `stick`, `sphere`, `line`) and color schemes (`spectrum`,
-`chain`, `ssJmol`, `residue`).
+Browse a PDB from configured data directories, upload a `.pdb` file, paste PDB
+text directly, or enter an amino acid sequence to fold with ESMFold. Controls
+let you switch between rendering styles (`cartoon`, `stick`, `sphere`, `line`)
+and color schemes (`spectrum`, `chain`, `ssJmol`, `residue`).
 
 ESMFold requires a GPU and the optional `omegaconf` dependency. If unavailable,
-the other two input methods still work.
+the other input methods still work.
 
 ### Align Structures
 
-Upload a reference (fixed) PDB and a mobile (moving) PDB. Click **Superimpose**
-to align them on C-alpha atoms. The page displays:
+Select a reference (fixed) PDB and a mobile (moving) PDB — either by browsing
+data directories or uploading files. Click **Superimpose** to align them on
+C-alpha atoms. The page displays:
 
 - RMSD in angstroms
 - Number of paired CA atoms
@@ -69,14 +70,14 @@ to align them on C-alpha atoms. The page displays:
 
 ### Highlight Residues
 
-Upload a PDB and enter comma-separated residue numbers (1-based PDB numbering).
+Select a PDB and enter comma-separated residue numbers (1-based PDB numbering).
 Choose a highlight color, highlight style (`stick`, `sphere`, `line`), and
 background style. The viewer renders the full structure with the selected
 residues emphasized.
 
 ### Color by Values
 
-Upload a PDB and enter comma-separated per-residue float values (one value per
+Select a PDB and enter comma-separated per-residue float values (one value per
 residue). Choose a matplotlib colormap (`coolwarm`, `bwr`, `viridis`, `plasma`,
 `RdYlGn`, `RdBu`). Values are auto-normalized to [0, 1] and mapped onto the
 structure.
@@ -86,7 +87,7 @@ any other per-residue metric.
 
 ### Unmasking Order
 
-Upload a PDB structure and a Stage 3 `.pt` file containing either:
+Select a PDB structure and a Stage 3 `.pt` file containing either:
 
 - **Animation frames** -- the `animation_frames` dict saved during generation
   (keys are `(prompt_idx, replica_idx)` tuples, values are lists of per-step
@@ -94,9 +95,9 @@ Upload a PDB structure and a Stage 3 `.pt` file containing either:
 - **Sampling path** -- the random permutation tensor (`batch_perms`) from
   generation
 
-The structure is colored on a gradient from blue (earliest unmasked) to red
-(latest unmasked), showing the order in which ProteoScribe generated each
-residue.
+Both PDB and `.pt` files can be browsed from data directories or uploaded. The
+structure is colored on a gradient from blue (earliest unmasked) to red (latest
+unmasked), showing the order in which ProteoScribe generated each residue.
 
 ### BLAST Search
 
@@ -110,6 +111,30 @@ search:
 Click **Run BLAST** to query NCBI remotely (typically 30--60 seconds). Results
 are displayed as expandable cards showing hit ID, percent identity, E-value,
 score, and the full pairwise alignment.
+
+## Data browser
+
+Every file input in the app offers two modes: **Browse data** (select from
+configured directories) or **Upload file**. This lets you work directly with
+files on disk without uploading them through the browser.
+
+### Configuration
+
+Browsable directories are defined in `configs/app_data_dirs.json`:
+
+```json
+{
+  "data_dirs": [
+    {"label": "Outputs", "path": "outputs/"},
+    {"label": "Weights", "path": "weights/"},
+    {"label": "Test Data", "path": "tests/_data/"}
+  ]
+}
+```
+
+Each entry needs a `label` (displayed in the dropdown) and a `path` (directory
+to scan, relative to the project root or absolute). Files are listed
+recursively. To add a new directory, just add another entry to the array.
 
 ## Adding new pages
 
@@ -125,12 +150,11 @@ To add a new analysis page:
 2. Use shared helpers from `biom3.app._helpers`:
    ```python
    import streamlit as st
-   from biom3.app._helpers import render_view, upload_pdb
+   from biom3.app._helpers import render_view, pick_pdb
 
    st.header("My Analysis")
-   pdb_data = upload_pdb()
+   pdb_data = pick_pdb(key="my_pdb")
    if pdb_data:
-       # Use biom3.viz functions to build a view
        from biom3.viz import view_pdb
        v = view_pdb(pdb_data)
        render_view(v)
@@ -143,7 +167,11 @@ To add a new analysis page:
 | Helper | Description |
 |--------|-------------|
 | `render_view(view, height=500)` | Embed a `py3Dmol.view` in the Streamlit page as an HTML component |
-| `upload_pdb(label, key)` | File uploader widget that returns PDB string content or `None` |
+| `pick_pdb(label, key)` | Browse-or-upload widget for PDB files, returns string content or `None` |
+| `pick_pt(label, key)` | Browse-or-upload widget for `.pt` files, returns `Path` or `UploadedFile` or `None` |
+| `pick_file(label, extensions, upload_types, key, read_text)` | Generic browse-or-upload widget |
+| `load_pt(file_or_path)` | Load a `.pt` file from either a `Path` or Streamlit `UploadedFile` |
+| `upload_pdb(label, key)` | Upload-only widget for PDB files (legacy, prefer `pick_pdb`) |
 
 ## Architecture
 
@@ -159,6 +187,7 @@ src/biom3/
     app/                    # Web app (depends on viz + streamlit)
         __init__.py         #   Landing page, main() entry point
         _helpers.py         #   Shared Streamlit utilities
+        _data_browser.py    #   Data directory config loader + file browser widget
         pages/              #   One file per page (auto-discovered)
             1_View_Structure.py
             2_Align_Structures.py
@@ -166,6 +195,9 @@ src/biom3/
             4_Color_by_Values.py
             5_Unmasking_Order.py
             6_BLAST_Search.py
+
+configs/
+    app_data_dirs.json      # Browsable data directory configuration
 ```
 
 `viz` is a pure Python library with no web framework dependency -- it works in

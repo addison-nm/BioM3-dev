@@ -1,15 +1,19 @@
 import streamlit as st
 
 from biom3.viz.viewer import view_pdb
-from biom3.app._helpers import render_view, upload_pdb
+from biom3.app._helpers import render_view, pick_pdb
 
 st.header("View Structure")
 
-pdb_source = st.radio("PDB source", ["Upload file", "Paste PDB text", "Fold sequence"], horizontal=True)
+pdb_source = st.radio(
+    "PDB source",
+    ["Browse / Upload", "Paste PDB text", "Fold sequence"],
+    horizontal=True,
+)
 
 pdb_data = None
-if pdb_source == "Upload file":
-    pdb_data = upload_pdb()
+if pdb_source == "Browse / Upload":
+    pdb_data = pick_pdb(key="view_pdb")
 elif pdb_source == "Paste PDB text":
     pdb_data = st.text_area("Paste PDB content", height=200, key="paste_pdb")
     if not pdb_data.strip():

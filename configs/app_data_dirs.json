@@ -1,0 +1,16 @@
+{
+  "data_dirs": [
+    {
+      "label": "Outputs",
+      "path": "outputs/"
+    },
+    {
+      "label": "Weights",
+      "path": "weights/"
+    },
+    {
+      "label": "Test Data",
+      "path": "tests/_data/"
+    }
+  ]
+}

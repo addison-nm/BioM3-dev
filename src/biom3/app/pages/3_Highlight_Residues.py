@@ -1,11 +1,11 @@
 import streamlit as st
 
 from biom3.viz.viewer import view_pdb, highlight_residues
-from biom3.app._helpers import render_view, upload_pdb
+from biom3.app._helpers import render_view, pick_pdb
 
 st.header("Highlight Residues")
 
-pdb_data = upload_pdb()
+pdb_data = pick_pdb(key="hl_pdb")
 if pdb_data:
     residues_str = st.text_input(
         "Residue numbers to highlight (comma-separated, 1-based)",

@@ -2,16 +2,16 @@ import streamlit as st
 
 from biom3.viz.viewer import view_overlay
 from biom3.viz.alignment import superimpose
-from biom3.app._helpers import render_view, upload_pdb
+from biom3.app._helpers import render_view, pick_pdb
 
 st.header("Align Structures")
-st.write("Upload two PDB files to superimpose on C-alpha atoms.")
+st.write("Select two PDB files to superimpose on C-alpha atoms.")
 
 col_up1, col_up2 = st.columns(2)
 with col_up1:
-    pdb_fixed = upload_pdb("Reference (fixed) PDB", key="fixed")
+    pdb_fixed = pick_pdb("Reference (fixed) PDB", key="fixed")
 with col_up2:
-    pdb_moving = upload_pdb("Mobile (moving) PDB", key="moving")
+    pdb_moving = pick_pdb("Mobile (moving) PDB", key="moving")
 
 if pdb_fixed and pdb_moving:
     if st.button("Superimpose"):

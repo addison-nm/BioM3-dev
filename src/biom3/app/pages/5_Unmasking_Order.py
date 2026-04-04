@@ -1,56 +1,47 @@
-import os
-import tempfile
-
 import streamlit as st
-import torch
 
 from biom3.viz.unmasking import view_unmasking_order
-from biom3.app._helpers import render_view, upload_pdb
+from biom3.app._helpers import render_view, pick_pdb, pick_pt, load_pt
 
 st.header("Unmasking Order Visualization")
 st.write(
-    "Upload a PDB structure and Stage 3 diffusion data to color residues "
+    "Select a PDB structure and Stage 3 diffusion data to color residues "
     "by their generation order (blue = early, red = late)."
 )
 
-pdb_data = upload_pdb()
+pdb_data = pick_pdb(key="unmask_pdb")
 
 data_source = st.radio(
     "Unmasking data source",
-    ["Upload .pt animation frames", "Upload .pt sampling path"],
+    ["Animation frames (.pt)", "Sampling path (.pt)"],
     horizontal=True,
 )
 
-frames_file = None
-path_file = None
-if data_source == "Upload .pt animation frames":
-    frames_file = st.file_uploader("Animation frames (.pt)", type=["pt"], key="frames")
+pt_data = None
+if data_source == "Animation frames (.pt)":
+    pt_file = pick_pt("Animation frames", key="frames")
+    if pt_file is not None:
+        pt_data = ("frames", pt_file)
 else:
-    path_file = st.file_uploader("Sampling path (.pt)", type=["pt"], key="spath")
+    pt_file = pick_pt("Sampling path", key="spath")
+    if pt_file is not None:
+        pt_data = ("path", pt_file)
 
 colormap = st.selectbox("Colormap", ["coolwarm", "bwr", "viridis", "plasma", "RdYlGn"])
 
-if pdb_data and (frames_file or path_file):
+if pdb_data and pt_data:
+    kind, file_or_path = pt_data
     try:
-        if frames_file:
-            with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as tmp:
-                tmp.write(frames_file.read())
-                tmp_path = tmp.name
-            frames_data = torch.load(tmp_path, map_location="cpu", weights_only=False)
-            os.unlink(tmp_path)
-            if isinstance(frames_data, dict):
-                key = st.selectbox("Select (prompt, replica) key", list(frames_data.keys()))
-                frames = frames_data[key]
+        loaded = load_pt(file_or_path)
+        if kind == "frames":
+            if isinstance(loaded, dict):
+                key = st.selectbox("Select (prompt, replica) key", list(loaded.keys()))
+                frames = loaded[key]
             else:
-                frames = frames_data
+                frames = loaded
             v = view_unmasking_order(pdb_data, mask_realization_list=frames, colormap=colormap)
         else:
-            with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as tmp:
-                tmp.write(path_file.read())
-                tmp_path = tmp.name
-            sp = torch.load(tmp_path, map_location="cpu", weights_only=False)
-            os.unlink(tmp_path)
-            v = view_unmasking_order(pdb_data, sampling_path=sp, colormap=colormap)
+            v = view_unmasking_order(pdb_data, sampling_path=loaded, colormap=colormap)
 
         render_view(v)
     except Exception as e:

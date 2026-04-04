@@ -1,12 +1,12 @@
 import streamlit as st
 
 from biom3.viz.viewer import view_pdb, color_by_values
-from biom3.app._helpers import render_view, upload_pdb
+from biom3.app._helpers import render_view, pick_pdb
 
 st.header("Color by Per-Residue Values")
-st.write("Upload a PDB and provide per-residue float values (e.g. pLDDT, conservation scores).")
+st.write("Select a PDB and provide per-residue float values (e.g. pLDDT, conservation scores).")
 
-pdb_data = upload_pdb()
+pdb_data = pick_pdb(key="cbv_pdb")
 if pdb_data:
     values_str = st.text_area(
         "Per-residue values (comma-separated floats, one per residue)",

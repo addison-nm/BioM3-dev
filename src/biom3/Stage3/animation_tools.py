@@ -1,5 +1,7 @@
 import math
 import textwrap
+from dataclasses import dataclass
+from typing import Callable
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import imageio
@@ -45,6 +47,92 @@ _CELL = 20
 _PAD = 2
 _STRIDE = _CELL + _PAD
 
+_BAR_H = 6
+_LOGO_H = 28
+_EXTRA_PAD = 2
+_LOGO_TOP_K = 4
+
+# ── Metric annotation system ──────────────────────────────────────────────
+
+
+@dataclass
+class MetricAnnotation:
+    """A per-position annotation rendered as a coloured box above or below
+    each residue cell in the animation.
+
+    Parameters
+    ----------
+    name : str
+        Label for the metric (used in legends / logging).
+    values : np.ndarray
+        Scalar values in ``[0, 1]``.  Shape ``[steps, seq_len]`` for dynamic
+        metrics that change each denoising step, or ``[seq_len]`` for static
+        metrics that are constant across all frames (set ``static=True``).
+    colormap : callable
+        ``float → (R, G, B)`` mapping a value in ``[0, 1]`` to an RGB tuple.
+    height : int
+        Box height in pixels.
+    position : str
+        ``"above"`` or ``"below"`` the residue cell.
+    static : bool
+        If ``True``, *values* is 1-D ``[seq_len]`` and the same data is used
+        for every frame.  If ``False`` (default), *values* must be 2-D
+        ``[steps, seq_len]``.
+    """
+    name: str
+    values: np.ndarray
+    colormap: Callable[[float], tuple[int, int, int]]
+    height: int = 6
+    position: str = "above"
+    static: bool = False
+
+    def value_at(self, step: int, pos: int) -> float:
+        if self.static:
+            return float(self.values[pos])
+        return float(self.values[step, pos])
+
+
+# ── Built-in colormaps ────────────────────────────────────────────────────
+
+
+def red_yellow_green(value):
+    """Diverging colormap: red (0) → yellow (0.5) → green (1)."""
+    if value < 0.5:
+        t = value * 2
+        return (220, int(60 + 140 * t), 60)
+    t = (value - 0.5) * 2
+    return (int(220 - 160 * t), 200, int(60 + 20 * t))
+
+
+def blue_white_red(value):
+    """Diverging colormap: blue (0) → white (0.5) → red (1)."""
+    if value < 0.5:
+        t = value * 2
+        return (int(60 + 195 * t), int(60 + 195 * t), 255)
+    t = (value - 0.5) * 2
+    return (255, int(255 - 195 * t), int(255 - 195 * t))
+
+
+# ── Convenience factories ─────────────────────────────────────────────────
+
+
+def confidence_metric(probs, position="above", height=6):
+    """Create a dynamic confidence MetricAnnotation from probability arrays.
+
+    Parameters
+    ----------
+    probs : np.ndarray
+        Shape ``[steps, seq_len, num_classes]``.
+    """
+    return MetricAnnotation(
+        name="confidence",
+        values=probs.max(axis=-1),
+        colormap=red_yellow_green,
+        height=height,
+        position=position,
+    )
+
+
 _FONT_PATHS = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
@@ -74,11 +162,66 @@ def _cell_color(token_str):
     return AA_COLORS.get(token_str, (140, 140, 140))
 
 
+def _confidence_modulate(color, confidence, floor=0.25):
+    """Scale RGB brightness by model confidence (0 → dim, 1 → full color)."""
+    scale = floor + (1.0 - floor) * confidence
+    return tuple(int(c * scale) for c in color)
+
+
+def _draw_logo(draw, x, y, width, height, probs_vec, tokens,
+               font_logo=None, draw_letters=True):
+    """Draw a stacked-bar sequence logo for one position.
+
+    Bars are stacked bottom-up so the highest-probability AA is closest
+    to the residue cell below.  When *draw_letters* is False, only the
+    coloured bars are drawn (compact "colorbar" mode).
+    """
+    top_k = min(_LOGO_TOP_K, len(probs_vec))
+    indices = np.argsort(probs_vec)[::-1][:top_k]
+
+    cursor_y = y + height  # start at bottom, draw upward
+    for idx in indices:
+        bar_h = int(probs_vec[idx] * height)
+        if bar_h < 1:
+            continue
+        bar_top = cursor_y - bar_h
+        tok = tokens[idx]
+        color = AA_COLORS.get(tok, (140, 140, 140))
+        draw.rectangle([x, bar_top, x + width, cursor_y], fill=color)
+        if draw_letters and font_logo is not None and bar_h >= 8:
+            bbox = font_logo.getbbox(tok)
+            tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+            tx = x + (width - tw) // 2
+            ty = bar_top + (bar_h - th) // 2
+            draw.text((tx, ty), tok, fill=_TEXT_COLOR, font=font_logo)
+        cursor_y = bar_top
+
+
 def _render_frame(token_indices, prev_indices, tokens, step, total_steps,
-                  title, cols_per_row, font, font_sm):
+                  title, cols_per_row, font, font_sm, step_probs=None,
+                  prob_style=None, font_logo=None, metrics=None):
     seq_len = len(token_indices)
     num_rows = math.ceil(seq_len / cols_per_row)
     actual_cols = min(seq_len, cols_per_row)
+
+    metrics = metrics or []
+    above_metrics = [m for m in metrics if m.position == "above"]
+    below_metrics = [m for m in metrics if m.position == "below"]
+
+    # Height contributions above the cell
+    above_metrics_h = sum(m.height + _EXTRA_PAD for m in above_metrics)
+    if prob_style == "colorbar":
+        logo_h = _BAR_H + _EXTRA_PAD
+    elif prob_style == "logo":
+        logo_h = _LOGO_H + _EXTRA_PAD
+    else:
+        logo_h = 0
+    above_total = above_metrics_h + logo_h
+
+    # Height contributions below the cell
+    below_total = sum(m.height + _EXTRA_PAD for m in below_metrics)
+
+    row_stride = above_total + _CELL + below_total + _PAD
 
     margin = 12
     row_label_w = 40
@@ -87,7 +230,7 @@ def _render_frame(token_indices, prev_indices, tokens, step, total_steps,
     grid_x0 = margin + row_label_w
     grid_y0 = margin + header_h
     grid_w = actual_cols * _STRIDE
-    grid_h = num_rows * _STRIDE
+    grid_h = num_rows * row_stride
 
     img_w = grid_x0 + grid_w + margin
     img_h = grid_y0 + grid_h + margin
@@ -129,17 +272,43 @@ def _render_frame(token_indices, prev_indices, tokens, step, total_steps,
         row = j // cols_per_row
         col = j % cols_per_row
         x = grid_x0 + col * _STRIDE
-        cy = grid_y0 + row * _STRIDE
+        row_y = grid_y0 + row * row_stride
 
         tok_str = tokens[token_indices[j]]
+        is_aa = tok_str != '-' and tok_str not in _SPECIAL_TOKENS
+
+        # -- Above-cell annotations (metrics, then logo/colorbar) --
+        cursor_y = row_y
+
+        for m in above_metrics:
+            if is_aa:
+                v = m.value_at(step, j)
+                draw.rectangle([x, cursor_y, x + _CELL, cursor_y + m.height],
+                               fill=m.colormap(v))
+            cursor_y += m.height + _EXTRA_PAD
+
+        if step_probs is not None and is_aa and logo_h > 0:
+            if prob_style == "colorbar":
+                _draw_logo(draw, x, cursor_y, _CELL, _BAR_H,
+                           step_probs[j], tokens, draw_letters=False)
+            elif prob_style == "logo":
+                _draw_logo(draw, x, cursor_y, _CELL, _LOGO_H,
+                           step_probs[j], tokens,
+                           font_logo=font_logo, draw_letters=True)
+        cursor_y += logo_h
+
+        # -- Residue cell --
+        cy = cursor_y
         bg = _cell_color(tok_str)
+        if step_probs is not None and is_aa and prob_style in (None, "brightness"):
+            confidence = float(step_probs[j].max())
+            bg = _confidence_modulate(bg, confidence)
         draw.rectangle([x, cy, x + _CELL, cy + _CELL], fill=bg)
 
         if j in newly_unmasked:
             draw.rectangle([x, cy, x + _CELL, cy + _CELL],
                            outline=_HIGHLIGHT_COLOR, width=2)
 
-        # Display character
         if tok_str == '-':
             char, color = '\u00b7', _DIM_TEXT_COLOR
         elif tok_str in _SPECIAL_TOKENS:
@@ -153,17 +322,27 @@ def _render_frame(token_indices, prev_indices, tokens, step, total_steps,
         ty = cy + (_CELL - th) // 2 - 1
         draw.text((tx, ty), char, fill=color, font=font)
 
-    # -- Row position labels --
+        # -- Below-cell annotations --
+        cursor_y = cy + _CELL + _EXTRA_PAD
+        for m in below_metrics:
+            if is_aa:
+                v = m.value_at(step, j)
+                draw.rectangle([x, cursor_y, x + _CELL, cursor_y + m.height],
+                               fill=m.colormap(v))
+            cursor_y += m.height + _EXTRA_PAD
+
+    # -- Row position labels (aligned to cell) --
     for row in range(num_rows):
         label = str(row * cols_per_row)
-        ly = grid_y0 + row * _STRIDE + 3
+        ly = grid_y0 + row * row_stride + above_total + 3
         draw.text((margin, ly), label, fill=_DIM_TEXT_COLOR, font=font_sm)
 
     return img
 
 
 def generate_sequence_animation(frames, tokens, output_path,
-                                title=None, cols_per_row=50,
+                                probs=None, prob_style=None,
+                                metrics=None, title=None, cols_per_row=50,
                                 duration=0.15, loop=0):
     """Render a GIF showing the diffusion denoising process as a colored grid.
 
@@ -175,6 +354,26 @@ def generate_sequence_animation(frames, tokens, output_path,
         Token vocabulary (index → string).
     output_path : str
         Path for the output ``.gif`` file.
+    probs : np.ndarray, optional
+        Per-step conditional probabilities, shape ``[steps, seq_len, num_classes]``.
+        When ``None``, renders without any confidence visualisation.
+    prob_style : str, optional
+        How to visualise the full probability distribution.  One of:
+
+        - ``None`` or ``"brightness"`` — scale cell colour brightness by
+          confidence (dim = uncertain, vivid = confident).
+        - ``"colorbar"`` — draw compact stacked amino-acid bars above each
+          cell (no letters).
+        - ``"logo"`` — draw a sequence-logo (stacked bars with letters)
+          above each cell, heights proportional to probability.
+
+        Ignored when *probs* is ``None``.
+    metrics : list[MetricAnnotation], optional
+        Per-position scalar annotations rendered as coloured boxes above or
+        below each residue cell.  Metrics with ``position="above"`` stack
+        above the logo/colorbar; those with ``position="below"`` stack below
+        the cell.  Both dynamic (per-step) and static (constant across
+        frames) metrics are supported.
     title : str, optional
         Header text drawn on every frame.
     cols_per_row : int
@@ -184,13 +383,18 @@ def generate_sequence_animation(frames, tokens, output_path,
     loop : int
         GIF loop count (0 = infinite).
     """
+    if prob_style is None and probs is not None:
+        prob_style = "brightness"
+
     font = _get_font(13)
     font_sm = _get_font(11)
+    font_logo = _get_font(9) if prob_style == "logo" else None
     total_steps = len(frames)
 
     images = []
     prev = None
     for step, frame in enumerate(frames):
+        step_probs = probs[step] if probs is not None else None
         img = _render_frame(
             token_indices=frame,
             prev_indices=prev,
@@ -201,6 +405,10 @@ def generate_sequence_animation(frames, tokens, output_path,
             cols_per_row=cols_per_row,
             font=font,
             font_sm=font_sm,
+            step_probs=step_probs,
+            prob_style=prob_style,
+            font_logo=font_logo,
+            metrics=metrics,
         )
         images.append(np.array(img))
         prev = frame

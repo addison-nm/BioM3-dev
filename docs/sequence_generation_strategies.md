@@ -100,7 +100,25 @@ Saves the full `[steps, seq_len, num_classes]` probability tensor for each gener
 
 ### `--animate_prompts` / `--animate_replicas`
 
-Generates GIF animations showing the denoising process as a colored amino acid grid. Each frame is one diffusion step; residues are colored by physicochemical property and newly unmasked positions are highlighted. See [sequence_generation_animation.md](sequence_generation_animation.md).
+Generates GIF animations showing the denoising process as a colored amino acid grid. Each frame is one diffusion step; residues are colored by physicochemical property and newly unmasked positions are highlighted.
+
+### `--animation_style`
+
+Controls how the full probability distribution is visualised in animations (requires `--store_probabilities`):
+
+| Value        | Effect                                                                 |
+|--------------|------------------------------------------------------------------------|
+| `brightness` | Scale residue cell brightness by confidence (default)                  |
+| `colorbar`   | Compact stacked amino-acid bars above each cell (no letters)           |
+| `logo`       | Sequence-logo style stacked bars with letters above each cell          |
+
+### `--animation_metrics`
+
+Adds per-position scalar metric boxes above or below each residue cell. Multiple metrics can be stacked. Currently supported:
+
+- `confidence` — red→yellow→green box derived from `max(probs)` at each position (requires `--store_probabilities`)
+
+The metric annotation system (`MetricAnnotation` in `animation_tools.py`) is extensible: new metrics need only a name, a `[steps, seq_len]` or `[seq_len]` value array, and a colormap function. Static (per-position constant) and dynamic (per-step) metrics are both supported.
 
 ## CLI examples
 
@@ -118,6 +136,13 @@ biom3_ProteoScribe_sample -i embeddings.pt -c config.json -m weights.bin -o outp
     --unmasking_order confidence \
     --token_strategy argmax \
     --store_probabilities
+
+# Animated sequence logo with confidence metric boxes
+biom3_ProteoScribe_sample -i embeddings.pt -c config.json -m weights.bin -o output.pt \
+    --animate_prompts all \
+    --store_probabilities \
+    --animation_style logo \
+    --animation_metrics confidence
 
 # Override config defaults via CLI
 biom3_ProteoScribe_sample -i embeddings.pt -c config.json -m weights.bin -o output.pt \

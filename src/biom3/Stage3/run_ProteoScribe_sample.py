@@ -93,6 +93,18 @@ def parse_arguments(args):
     parser.add_argument('--animation_dir', type=str, default=None,
                         help="Output directory for GIF animations. "
                              "Default: <output_dir>/animations/")
+    parser.add_argument('--animation_style', type=str, default='brightness',
+                        choices=['brightness', 'colorbar', 'logo'],
+                        help="Probability distribution visualization: "
+                             "'brightness' (dim/vivid cells), "
+                             "'colorbar' (stacked AA bars above cells), "
+                             "'logo' (stacked AA bars with letters). "
+                             "Requires --store_probabilities for colorbar/logo.")
+    parser.add_argument('--animation_metrics', type=str, nargs='*', default=None,
+                        metavar='NAME',
+                        help="Per-position metric boxes to add to the animation. "
+                             "Currently supported: 'confidence' (derived from "
+                             "--store_probabilities). Multiple metrics are stacked.")
     parser.add_argument('--store_probabilities', action='store_true', default=False,
                         help="Store per-step conditional probabilities for each "
                              "(prompt, replica) pair as .npz files. "
@@ -418,14 +430,35 @@ def main(args, _setup_logging=True):
     # Generate GIF animations
     if animation_frames:
         animation_dir = config_args_parser.animation_dir or os.path.join(outdir, "animations")
+        animation_style = getattr(config_args_parser, 'animation_style', 'brightness')
+        requested_metrics = getattr(config_args_parser, 'animation_metrics', None) or []
+        if (animation_style != 'brightness' or requested_metrics) and not stored_probs:
+            logger.warning("--animation_style=%s / --animation_metrics requires "
+                           "--store_probabilities; falling back to default animation",
+                           animation_style)
         os.makedirs(animation_dir, exist_ok=True)
         logger.info("Saving %d animation(s) to %s", len(animation_frames), animation_dir)
         for (p_idx, r_idx), frames in animation_frames.items():
             gif_path = os.path.join(animation_dir, f"prompt_{p_idx}_replica_{r_idx}.gif")
+            frame_probs = stored_probs.get((p_idx, r_idx)) if stored_probs else None
+
+            # Build metric annotations for this (prompt, replica)
+            metrics = []
+            if frame_probs is not None and requested_metrics:
+                for name in requested_metrics:
+                    if name == "confidence":
+                        metrics.append(
+                            Stage3_ani_tools.confidence_metric(frame_probs))
+                    else:
+                        logger.warning("Unknown animation metric %r, skipping", name)
+
             Stage3_ani_tools.generate_sequence_animation(
                 frames=frames,
                 tokens=tokens,
                 output_path=gif_path,
+                probs=frame_probs,
+                prob_style=animation_style,
+                metrics=metrics or None,
                 title=f"Prompt {p_idx} \u00b7 Replica {r_idx}",
             )
             logger.info("Animation saved: %s", gif_path)

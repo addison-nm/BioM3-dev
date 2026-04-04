@@ -16,6 +16,17 @@ Input (CSV: sequences + text)
   → Stage 3: ProteoScribe (diffusion model, z_c → generated sequences)
 ```
 
+## Ecosystem context
+
+BioM3-dev is the core library in a multi-repo ecosystem. See [docs/biom3_ecosystem.md](docs/biom3_ecosystem.md) for full details.
+
+Related repositories:
+- **BioM3-data-share** — shared model weights, datasets, and reference databases
+- **BioM3-workflow-demo** — end-to-end demo of finetuning and generation
+- **BioM3-workspace-template** — *(planned)* workspace configuration template
+
+Machine-specific repo paths are in `.claude/repo_paths.json` (gitignored, not version controlled). This file maps repo names to absolute paths on the current machine.
+
 ## Repository layout
 
 ```

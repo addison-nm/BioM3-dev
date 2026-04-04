@@ -33,7 +33,7 @@ pip install -e .
 
 # From GitHub (specific branch or tag)
 pip install 'biom3 @ git+https://github.com/addison-nm/BioM3-dev.git'
-pip install 'biom3 @ git+https://github.com/addison-nm/BioM3-dev.git@v0.0.1'
+pip install 'biom3 @ git+https://github.com/addison-nm/BioM3-dev.git@v0.1.0a1'
 ```
 
 To include the Streamlit web app and visualization tools, install with the `app` extra:
@@ -381,6 +381,24 @@ A separate utility builds a SQLite index for fast taxonomy lookups:
 ```bash
 biom3_build_taxid_index data/databases/ncbi_taxonomy/prot.accession2taxid.gz
 ```
+
+### Web app and visualization
+
+BioM3 includes a Streamlit web app for browsing data and visualizing protein structures, and a Python visualization library for 3D structure rendering and sequence analysis.
+
+Install with the `app` extra (see [Installation](#pip-install)):
+
+```bash
+pip install -e '.[app]'
+```
+
+Launch the web app:
+
+```bash
+biom3_app
+```
+
+See [docs/web_app.md](./docs/web_app.md) for app pages, configuration, and architecture. See [docs/structure_visualization.md](./docs/structure_visualization.md) for the `biom3.viz` Python API (3D rendering, structural alignment, BLAST, unmasking-order visualization).
 
 ## References
 

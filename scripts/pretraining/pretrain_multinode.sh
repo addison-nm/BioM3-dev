@@ -4,7 +4,7 @@
 # FILE: pretrain_multinode.sh
 #
 # USAGE: pretrain_multinode.sh config_dir config_name \
-#       NRANKS NGPU_PER_RANK device wandb_api_key version_name epochs \
+#       NRANKS NGPU_PER_RANK device wandb_api_key run_id epochs \
 #       resume_from_checkpoint [pretrained_weights]
 #
 # DESCRIPTION: Wrapper for running the stage3_pretraining.sh script in a 
@@ -17,7 +17,7 @@ if [ "$#" -eq 9 ]; then
 elif [ "$#" -eq 10 ]; then
   pretrained_weights=${10}
 else
-  echo "Usage: $0 config_dir config_name NRANKS NGPU_PER_RANK device wandb_api_key version_name epochs resume_from_checkpoint [pretrained_weights]"
+  echo "Usage: $0 config_dir config_name NRANKS NGPU_PER_RANK device wandb_api_key run_id epochs resume_from_checkpoint [pretrained_weights]"
   exit 1
 fi
 
@@ -27,7 +27,7 @@ NRANKS=$3
 NGPU_PER_RANK=$4
 device=$5
 wandb_api_key=$6
-version_name=$7
+run_id=$7
 epochs=$8
 resume_from_checkpoint=$9
 
@@ -44,7 +44,7 @@ mpiexec \
     --hostfile="${PBS_NODEFILE}" \
     ./scripts/stage3_pretraining.sh \
         $wandb_api_key $config_dir $config_name \
-        $version_name \
+        $run_id \
         $NRANKS \
         $NGPU_PER_RANK \
         $device \

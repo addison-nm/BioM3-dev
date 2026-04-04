@@ -5,7 +5,7 @@
   "output_folder": "./",
   "save_hist_path": "None",
   "tb_logger_path": "None",
-  "tb_logger_folder": "None",
+  "checkpoint_folder": "None",
   "model_option": "transformer",
   "model_path_checkpoint": null,
   "stage3_model_path": null,

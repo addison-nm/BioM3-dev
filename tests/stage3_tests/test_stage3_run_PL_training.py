@@ -50,21 +50,9 @@ def prefix_paths(args):
         args.pretrained_weights = os.path.join(
             DATDIR, args.pretrained_weights
         )
-    if args.wandb_logging_dir != "None" and args.wandb_logging_dir is not None:
-        args.wandb_logging_dir = os.path.join(
-            TMPDIR, args.wandb_logging_dir
-        )
-    if args.output_folder != "None" and args.output_folder is not None:
-        args.output_folder = os.path.join(
-            TMPDIR, args.output_folder
-        )
-    if args.output_hist_folder != "None" and args.output_hist_folder is not None:
-        args.output_hist_folder = os.path.join(
-            TMPDIR, args.output_hist_folder
-        )
-    if args.tb_logger_path != "None" and args.tb_logger_path is not None:
-        args.tb_logger_path = os.path.join(
-            TMPDIR, args.tb_logger_path
+    if args.output_root != "None" and args.output_root is not None:
+        args.output_root = os.path.join(
+            TMPDIR, args.output_root
         )
     if args.resume_from_checkpoint != "None" and args.resume_from_checkpoint is not None:
         args.resume_from_checkpoint = os.path.join(
@@ -121,7 +109,7 @@ def test_train_from_scratch(
         f"{ARGS_DIR}/training_args_pretrained_weights_v1.txt", 
         False, 
         f"{DATDIR}/models/stage3/weights/minimodel1_weights1.pth",
-        f"{TMPDIR}/outputs/logs/history/checkpoints/training_args_pretrained_weights_v1/state_dict.pth"
+        f"{TMPDIR}/outputs/logs/history/training_args_pretrained_weights_v1/state_dict.pth"
     ],
     # Test that an error is raised when incompatible weights are specified.
     [
@@ -218,8 +206,8 @@ def test_train_from_pretrained_weights(
         f"{ARGS_DIR}/training_args_resume_from_checkpoint_v1a.txt", 
         f"{ARGS_DIR}/training_args_resume_from_checkpoint_v1b.txt", 
         False, 
-        f"{TMPDIR}/outputs/logs/history/checkpoints/training_args_resume_from_checkpoint_v1a/state_dict.pth",
-        f"{TMPDIR}/outputs/logs/history/checkpoints/training_args_resume_from_checkpoint_v1b/state_dict.pth"
+        f"{TMPDIR}/outputs/logs/history/training_args_resume_from_checkpoint_v1a/state_dict.pth",
+        f"{TMPDIR}/outputs/logs/history/training_args_resume_from_checkpoint_v1b/state_dict.pth"
     ],
 ])
 @pytest.mark.parametrize(
@@ -313,7 +301,7 @@ def test_resume_training(
         f"{ARGS_DIR}/finetuning_args_v1.txt", 
         False, 
         f"{DATDIR}/models/stage3/weights/minimodel1_weights1.pth",
-        f"{TMPDIR}/outputs/logs/history/checkpoints/finetuning_args_v1/state_dict.pth",
+        f"{TMPDIR}/outputs/logs/history/finetuning_args_v1/state_dict.pth",
     ],
 ])
 @pytest.mark.parametrize(
@@ -439,8 +427,8 @@ def test_finetuning(
         f"{ARGS_DIR}/training_args_phase2_training_v1a.txt", 
         f"{ARGS_DIR}/training_args_phase2_training_v1b.txt", 
         False, 
-        f"{TMPDIR}/outputs/logs/history/checkpoints/training_args_phase2_training_v1a/state_dict.best.pth",
-        f"{TMPDIR}/outputs/logs/history/checkpoints/training_args_phase2_training_v1b/state_dict.last.pth"
+        f"{TMPDIR}/outputs/logs/history/training_args_phase2_training_v1a/state_dict.best.pth",
+        f"{TMPDIR}/outputs/logs/history/training_args_phase2_training_v1b/state_dict.last.pth"
     ],
 ])
 @pytest.mark.parametrize(

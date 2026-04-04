@@ -4,7 +4,7 @@
 # FILE: finetune_singlenode.sh
 #
 # USAGE: finetune_singlenode.sh config_dir config_name \
-#       NRANKS NGPU_PER_RANK device wandb_api_key version_name epochs \
+#       NRANKS NGPU_PER_RANK device wandb_api_key run_id epochs \
 #       resume_from_checkpoint \
 #       pretrained_weights finetune_last_n_blocks finetune_last_n_layers
 #
@@ -13,7 +13,7 @@
 #=============================================================================
 
 if [ "$#" -ne 12 ]; then
-    echo "Usage: $0 config_dir config_name NRANKS NGPU_PER_RANK device wandb_api_key version_name epochs resume_from_checkpoint pretrained_weights finetune_last_n_blocks finetune_last_n_layers"
+    echo "Usage: $0 config_dir config_name NRANKS NGPU_PER_RANK device wandb_api_key run_id epochs resume_from_checkpoint pretrained_weights finetune_last_n_blocks finetune_last_n_layers"
     exit 1
 fi
 
@@ -23,7 +23,7 @@ NRANKS=$3
 NGPU_PER_RANK=$4
 device=$5
 wandb_api_key=$6
-version_name=$7
+run_id=$7
 epochs=$8
 resume_from_checkpoint=$9
 pretrained_weights=${10}
@@ -42,7 +42,7 @@ echo "NRANKS: ${NRANKS}, NGPU_PER_RANK: ${NGPU_PER_RANK}, NGPUS: ${NGPUS} ($devi
 
 ./scripts/stage3_finetuning.sh \
     $wandb_api_key $config_dir $config_name \
-    $version_name \
+    $run_id \
     $NRANKS \
     $NGPU_PER_RANK \
     $device \

@@ -12,7 +12,7 @@ export num_y_class_labels=6
 export wandb=True
 export wandb_entity="thenaturalmachine"
 export wandb_project="BioM3"
-export wandb_logging_dir="./logs"
+
 export wandb_tags="pretrain_start_pfam"
 
 export choose_optim="AdamW"
@@ -27,7 +27,6 @@ export valid_size=0.2
 export enter_eval=1000
 export resume_from_checkpoint=None  # overwritten
 export batch_size=32
-export output_folder=None
 export model_option=transformer
 export diffusion_steps=1024
 export warmup_steps=500
@@ -72,11 +71,9 @@ export transformer_local_size=128
 export text_emb_dim=512
 export facilitator=MMD
 
-export version_name=None
-export output_hist_folder=./logs/history/test_stage3
-export tb_logger_path=./logs/history
-export tb_logger_folder=Stage3_history
-export save_hist_path=None
+export run_id=None
+export output_root=./outputs/Stage3/pretraining
+export checkpoints_folder=checkpoints
 
 export traindata_len=None
 

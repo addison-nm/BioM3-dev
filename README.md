@@ -245,14 +245,14 @@ It also allows one to continue training from a specified checkpoint or model wei
 In order to organize and document different training runs, we use a config file and wrapper shell script to specify the many command line arguments, and pass these to the training script.
 Example config files are stored in the `arglists` directory.
 The wrapper script `scripts/stage3_pretraining.sh` takes as arguments the config directory and config file name (without extension) and uses this file to source the command line arguments contained within.
-It also takes additional arguments, including a Weights&Biases API key for logging with W&B; a version name to identify the particular training run; the device, number of nodes, and GPUs per node available; the number of training epochs; and a string specifying a checkpoint or model weights from which to resume training (or None if training from scratch).
+It also takes additional arguments, including a Weights&Biases API key for logging with W&B; a run ID to identify the particular training run; the device, number of nodes, and GPUs per node available; the number of training epochs; and a string specifying a checkpoint or model weights from which to resume training (or None if training from scratch).
 
 Running this script will perform model training using the arguments specified in the config file, as well as those specified from the command line, allowing one to override particular configurations (e.g. the particular device available).
 
 A final wrapper script can be found at `scripts/pretraining/pretrain_multinode.sh`.
 This script wraps the `stage3_pretraining.sh` script described above, and executes it using an `mpiexec` call.
 This allows us to easily run model training from a job submission script, as demonstrated in the Polaris and Aurora demo job files: `jobs/polaris/_template_pretrain_scratch.pbs` and `jobs/aurora/_template_pretrain_scratch.pbs`.
-In these files, we request and specify 2 nodes. We also specify the desired configuration file and number of training epochs. The W&B API key should be available as an environment variable. A version name is automatically produced from the given configurations.
+In these files, we request and specify 2 nodes. We also specify the desired configuration file and number of training epochs. The W&B API key should be available as an environment variable. A run ID is automatically produced from the given configurations.
 
 #### Finetuning
 

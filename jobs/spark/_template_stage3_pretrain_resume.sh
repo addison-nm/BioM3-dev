@@ -26,13 +26,13 @@ wandb=True                      # enable Weights&Biases logging
 wandb_api_key=$WANDB_API_KEY    # define W&B key prior to run, e.g. via .bashrc
 device=cuda                     # device available (cuda)
 
-# Construct the version name
+# Construct the run ID
 datetime=$(date +%Y%m%d_%H%M%S)
-version_name=${config_name/config_/}_n${num_nodes}_d${num_devices}_e${epochs}_resume_V${datetime}
+run_id=${config_name/config_/}_n${num_nodes}_d${num_devices}_e${epochs}_resume_V${datetime}
 
 # Direct output to log file
 mkdir -p logs/run_logs/pretraining
-log_fpath=logs/run_logs/pretraining/${version_name}.o
+log_fpath=logs/run_logs/pretraining/${run_id}.o
 
 ./scripts/pretraining/pretrain_singlenode.sh \
     ${config_dir} \
@@ -41,7 +41,7 @@ log_fpath=logs/run_logs/pretraining/${version_name}.o
     ${num_devices} \
     ${device} \
     ${wandb_api_key} \
-    ${version_name} \
+    ${run_id} \
     ${epochs} \
     ${resume_from_checkpoint} \
 > ${log_fpath} 2>&1

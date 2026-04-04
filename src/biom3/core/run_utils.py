@@ -116,6 +116,26 @@ def teardown_file_logging(logger_prefix, file_handler):
     file_handler.close()
 
 
+def backup_if_exists(filepath):
+    """If *filepath* exists, rename it with a timestamp suffix derived from its mtime.
+
+    Returns the backup path if a backup was made, or None if the file did not exist.
+    """
+    if not os.path.lexists(filepath):
+        return None
+    mtime = os.lstat(filepath).st_mtime
+    stamp = datetime.fromtimestamp(mtime).strftime("%Y%m%d_%H%M%S")
+    backup_path = f"{filepath}.bak.{stamp}"
+    # Avoid clobbering an existing backup with the same timestamp
+    counter = 1
+    while os.path.exists(backup_path):
+        backup_path = f"{filepath}.bak.{stamp}_{counter}"
+        counter += 1
+    os.rename(filepath, backup_path)
+    logging.getLogger(__name__).info("Backed up %s -> %s", filepath, backup_path)
+    return backup_path
+
+
 def get_file_metadata(filepath):
     """Return a dict with size, mtime, and real path for a file.
 
@@ -168,6 +188,7 @@ def write_manifest(args, outdir, start_time, elapsed,
         manifest["config_contents"] = config_contents
 
     manifest_path = os.path.join(outdir, manifest_filename)
+    backup_if_exists(manifest_path)
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2, default=str)
     return manifest_path

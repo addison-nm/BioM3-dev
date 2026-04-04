@@ -142,6 +142,18 @@ When loading models, use `core.io.load_and_prepare_model` for raw weights. For L
 - **Inference**: JSON files in `configs/` → loaded with `load_json_config()` → converted to `argparse.Namespace`
 - **Training**: Shell-variable files in `arglists/` → sourced by wrapper scripts in `scripts/`
 
+### Training output structure
+Stage 3 training (`biom3_pretrain_stage3`) organizes outputs under `--output_root` with three key CLI args: `--checkpoints_folder` (default `checkpoints`), `--runs_folder` (default `runs`), and `--run_id` (unique per run, constructed automatically by HPC job templates).
+
+```
+{output_root}/
+├── {checkpoints_folder}/{run_id}/    ← Lightning/DeepSpeed .ckpt dirs + derived weights
+├── {runs_folder}/{run_id}/
+│   ├── logs/                         ← lightning_logs/, wandb/
+│   └── artifacts/                    ← state_dict.best.pth copy, args.json,
+│                                       build_manifest.json, run.log
+```
+
 ### Distributed training
 Stage 3 supports multi-node training via DeepSpeed + PyTorch Lightning. The `scripts/pretraining/pretrain_multinode.sh` wrapper uses `mpiexec`. Environment variable `TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=true` is set in training scripts.
 

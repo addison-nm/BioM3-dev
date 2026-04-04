@@ -2,7 +2,7 @@
   "data_path": "None",
   "pfam_data_path": "None",
   "tb_logger_path": "None",
-  "tb_logger_folder": "None",
+  "checkpoint_folder": "None",
   "version_name": "None",
   "model_checkpoint_path": "None",
   "output_dict_path": "None",

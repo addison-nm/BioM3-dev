@@ -5,7 +5,6 @@
 --num_y_class_labels 6 
 --wandb_entity thenaturalmachine 
 --wandb_project BioM3 
---wandb_logging_dir outputs/logs 
 --wandb_tags test_training 
 --choose_optim AdamW 
 --lr 1e-4 
@@ -17,7 +16,6 @@
 --enter_eval 10 
 --resume_from_checkpoint None 
 --batch-size 8 
---output_folder outputs/tmp_training_output 
 --model_option transformer 
 --diffusion_steps 1024 
 --warmup-steps 1 
@@ -52,10 +50,8 @@
 --transformer_local_size 16 
 --text_emb_dim 512 
 --facilitator MMD 
---version_name training_args_resume_from_checkpoint_v1a 
---output_hist_folder outputs/logs/history 
---tb_logger_path outputs/logs 
---tb_logger_folder history 
---save_hist_path None 
+--run_id training_args_resume_from_checkpoint_v1a 
+--output_root outputs/logs 
+--checkpoints_folder history 
 --pretrained_weights None
 --wandb False

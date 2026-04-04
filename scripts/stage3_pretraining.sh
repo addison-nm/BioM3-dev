@@ -5,7 +5,7 @@
 #
 # USAGE: stage3_pretraining.sh \
 #		WANDB_API_KEY config_dir config_name \
-# 		version_name num_nodes gpu_devices device epochs \
+# 		run_id num_nodes gpu_devices device epochs \
 # 		resume_from_checkpoint pretrained_weights
 #
 # DESCRIPTION: Wraps the Stage 3 training python script PL_train_stage3.py.
@@ -24,7 +24,7 @@ config_name=$3
 source ${config_dir}/${config_name}.sh
 
 # Override config file with given args
-version_name=$4
+run_id=$4
 num_nodes=$5
 gpu_devices=$6
 device=$7
@@ -43,9 +43,6 @@ export WANDB_API_KEY=$WANDB_API_KEY
 # Run training script
 export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=true
 biom3_pretrain_stage3 \
-	--output_hist_folder ${output_hist_folder} \
-	--output_folder ${output_folder} \
-	--save_hist_path ${save_hist_path} \
 	--model_option ${model_option} \
 	--swissprot_data_root ${swissprot_data_root} \
 	--pfam_data_root ${pfam_data_root} \
@@ -74,13 +71,13 @@ biom3_pretrain_stage3 \
 	--acc_grad_batches ${acc_grad_batches} \
 	--gpu_devices ${gpu_devices} \
 	--num_nodes ${num_nodes} \
-	--version_name ${version_name} \
+	--run_id ${run_id} \
 	--scheduler_gamma ${scheduler_gamma} \
 	--text_emb_dim ${text_emb_dim} \
 	--sequence_keyname ${sequence_keyname} \
 	--facilitator ${facilitator} \
-	--tb_logger_path ${tb_logger_path} \
-	--tb_logger_folder ${tb_logger_folder} \
+	--output_root ${output_root} \
+	--checkpoints_folder ${checkpoints_folder} \
 	--resume_from_checkpoint ${resume_from_checkpoint} \
 	--valid_size ${valid_size} \
 	--max_steps ${max_steps} \
@@ -92,5 +89,5 @@ biom3_pretrain_stage3 \
 	--wandb ${wandb} \
 	--wandb_entity thenaturalmachine \
 	--wandb_project "BioM3-dev" \
-	--wandb_name ${version_name} \
+	--wandb_name ${run_id} \
 	--pretrained_weights ${pretrained_weights}

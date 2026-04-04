@@ -9,6 +9,8 @@ Support for PyTorch Lightning and Weights&Biases
 import sys
 import os
 import io
+import json
+import shutil
 import contextlib
 import socket
 import logging
@@ -64,10 +66,15 @@ import biom3.Stage3.preprocess as prep
 import biom3.Stage3.cond_diff_transformer_layer as mod
 import biom3.Stage3.PL_wrapper as PL_mod
 from biom3.Stage3.io import prepare_model_ProteoScribe
-from biom3.core.run_utils import write_manifest
+from biom3.core.run_utils import (
+    backup_if_exists, setup_file_logging, teardown_file_logging, write_manifest,
+)
 from biom3.backend.device import print_gpu_initialization, get_device, get_rank
 
 logger = setup_logger(__name__)
+
+_LOGS_SUBDIR = "logs"
+_ARTIFACTS_SUBDIR = "artifacts"
 
 
 def get_args(parser):
@@ -88,10 +95,10 @@ def get_args(parser):
     parser.add_argument('--data-root', default="./data/ARDM_temp_homolog_family_dataset.csv", type=Path,
                         help='path to dataset root directory')
 
-    parser.add_argument('--tb_logger_path', default=None, type=str,
-                        help='checkpoint path to pretrained weights')
-    parser.add_argument('--tb_logger_folder', default=None, type=str,
-                        help='tensorboard path containing checkpoints')
+    parser.add_argument('--output_root', default=None, type=str,
+                        help='base directory for all training outputs')
+    parser.add_argument('--checkpoints_folder', default=None, type=str,
+                        help='subdirectory under output_root for checkpoints')
     parser.add_argument('--resume_from_checkpoint', default='None', type=str,
                         help='checkpoint path to last model iteration (usually last.ckpt)')
 
@@ -246,14 +253,10 @@ def get_path_args(parser):
     Returns:
         The parser with added path-specific arguments
     """
-    parser.add_argument('--output_hist_folder', default='./outputs/training_history', type=str,
-                        help='Path to save model weights')
-    parser.add_argument('--output_folder', default='./outputs/', type=str,
-                        help='Folder containing all the necessary subfolders')
-    parser.add_argument('--save_hist_path', default='./outputs/training_history/transformer_MNIST_train_hist.csv', type=str,
-                        help='Path to save history training logs')
-    parser.add_argument('--version_name', default=None, type=str,
-                        help='Name of version sub-directory')
+    parser.add_argument('--run_id', default=None, type=str,
+                        help='unique identifier for this training run')
+    parser.add_argument('--runs_folder', default='runs', type=str,
+                        help='subdirectory under output_root for per-run logs and artifacts')
     parser.add_argument('--resume_from_checkpoint_state_dict_path', default=None, type=str,
                         help='Path to the deepspeed pytorch ckpt saved as state dict...')
     return parser
@@ -273,9 +276,7 @@ def get_wrapper_args(parser):
                         help='Weights&Biases entity.')
     parser.add_argument('--wandb_project', type=str, default=None, 
                         help='Weights&Biases project.')
-    parser.add_argument('--wandb_logging_dir', type=str, default="./logs", 
-                        help='Weights&Biases logging directory.')
-    parser.add_argument('--wandb_tags', type=str, nargs="*", default=[], 
+    parser.add_argument('--wandb_tags', type=str, nargs="*", default=[],
                         help='Weights&Biases tags.')
     
 
@@ -336,28 +337,6 @@ def compile_model(
     )
     return PL_model
 
-
-def save_history_log(
-        args: any,
-        hist_log: dict
-    ) -> None:
-    """
-    Save training history logs to a CSV file.
-    
-    This function converts a dictionary containing training history metrics
-    into a pandas DataFrame and saves it to the path specified in the arguments.
-    
-    Args:
-        args: Configuration object containing a 'save_hist_path' attribute
-        hist_log: Dictionary containing training metrics and history
-        
-    Returns:
-        None
-    """
-    # history dataframe
-    hist_df = pd.DataFrame(hist_log)
-    hist_df.to_csv(args.save_hist_path, index=False)
-    return
 
 
 def get_model_params(
@@ -454,28 +433,26 @@ def get_deepspeed_model(args: any, PL_model) -> pl.LightningModule:
 def save_model(
         args: any,
         checkpoint_path: str,
+        artifacts_path: str,
         PL_model: pl.LightningModule,
         trainer: Trainer
     ) -> None:
     """
     Save a PyTorch Lightning model trained with DeepSpeed.
-    
-    This function handles the conversion of a DeepSpeed ZeRO checkpoint into 
-    standard PyTorch state dictionaries. It saves the model both in Lightning 
-    format and as a pure PyTorch state dictionary. If an EMA (Exponential Moving 
-    Average) model is present, it will also be saved. The function additionally 
-    generates parameter statistics and performs type checking to ensure consistency.
-    
-    Note: This function only executes operations on the global_zero process when 
-    running in a distributed environment.
-    
+
+    Converts DeepSpeed ZeRO checkpoints into standard PyTorch state
+    dictionaries. All derived weight files are written to checkpoint_path
+    (alongside the raw .ckpt dirs). A copy of the best state_dict is
+    also placed in artifacts_path for convenient downstream access.
+
+    Only executes on the global_zero process in distributed environments.
+
     Args:
         args: Configuration object containing model parameters
-        checkpoint_path: Directory where checkpoint files will be saved
+        checkpoint_path: Directory containing Lightning checkpoints
+        artifacts_path: Directory for run artifacts (receives best state_dict copy)
         PL_model: PyTorch Lightning model to be saved
-        
-    Returns:
-        None
+        trainer: Trainer instance with checkpoint callback info
     """
     image_size = args.image_size
     num_classes = args.num_classes
@@ -494,6 +471,16 @@ def save_model(
     symlink_to = "best"  # symlink from state_dict.pth to either best or last
     
     if trainer.is_global_zero:
+        # Back up any derived files from a previous run in this directory
+        for fpath in (
+            best_single_ckpt_fpath, best_state_dict_fpath, best_state_dict_ema_fpath,
+            last_single_ckpt_fpath, last_state_dict_fpath, last_state_dict_ema_fpath,
+            os.path.join(checkpoint_path, 'state_dict.pth'),
+            os.path.join(checkpoint_path, 'state_dict_ema.pth'),
+            os.path.join(checkpoint_path, 'params.csv'),
+        ):
+            backup_if_exists(fpath)
+
         # Check whether last and best point to the same checkpoint
         # (last.ckpt is a symlink when save_last="link")
         last_real = os.path.realpath(last_ckpt_fpath)
@@ -580,6 +567,13 @@ def save_model(
             os.symlink(last_state_dict_fpath, symlink_path)
             if os.path.exists(last_state_dict_ema_fpath):
                 os.symlink(last_state_dict_ema_fpath, symlink_ema_path)
+
+        # Copy best state_dict to artifacts directory
+        os.makedirs(artifacts_path, exist_ok=True)
+        artifact_best = os.path.join(artifacts_path, 'state_dict.best.pth')
+        backup_if_exists(artifact_best)
+        shutil.copy2(best_state_dict_fpath, artifact_best)
+        logger.info("Copied best state_dict to %s", artifact_best)
     return
 
 
@@ -986,9 +980,10 @@ def train_model(
     """
     logger.info('Beginning Training...')
     # Note: Nested args must be accessed via dictionaries, not attributes.
-    tb_logger_path = args.tb_logger_path
-    tb_logger_folder = args.tb_logger_folder
-    version_name = args.version_name
+    output_root = args.output_root
+    checkpoints_folder = args.checkpoints_folder
+    runs_folder = args.runs_folder
+    run_id = args.run_id
     log_every_n_steps = args.log_every_n_steps
     pfam_data_root = args.pfam_data_root
     gpu_devices = args.gpu_devices
@@ -1045,13 +1040,19 @@ def train_model(
     #     config=ds_config
     # )
 
+    # Derived output paths
+    checkpoint_dir = os.path.join(output_root, checkpoints_folder, run_id)
+    run_dir = os.path.join(output_root, runs_folder, run_id)
+    logs_dir = os.path.join(run_dir, _LOGS_SUBDIR)
+    artifacts_dir = os.path.join(run_dir, _ARTIFACTS_SUBDIR)
+
     loggers = []
 
     # Set up TensorBoard logging
     logger.info("Setting up TensorBoard logging...")
     tb_logger = TensorBoardLogger(
-        os.path.join(tb_logger_path, tb_logger_folder), 
-        version=version_name
+        save_dir=logs_dir,
+        version="",
     )
     loggers.append(tb_logger)
 
@@ -1060,17 +1061,16 @@ def train_model(
     wandb_logger = None
     if use_wandb:
         wandb_logger = WandbLogger(
-            name=args.wandb_name,
-            save_dir=args.wandb_logging_dir,
-            project=args.wandb_project, 
-            entity=args.wandb_entity, 
-            config=args, 
+            name=args.wandb_name if args.wandb_name else run_id,
+            save_dir=logs_dir,
+            project=args.wandb_project,
+            entity=args.wandb_entity,
+            config=args,
             tags=args.wandb_tags,
-            group=args.version_name,
+            group=run_id,
             log_model="all",
         )  # TODO: investigate "all"
         loggers.append(wandb_logger)
-        
 
     # Monitor learning rate changes
     logger.info("Setting up LearningRateMonitor...")
@@ -1084,7 +1084,7 @@ def train_model(
     logger.info("Configuring ModelCheckpoint...")
     if pfam_data_root is None:
         checkpoint_callback = ModelCheckpoint(
-            dirpath=os.path.join(tb_logger_path, tb_logger_folder, 'checkpoints', version_name),
+            dirpath=checkpoint_dir,
             save_top_k=2,
             verbose=True,
             monitor='val_loss',
@@ -1094,7 +1094,7 @@ def train_model(
         )
     else:
         checkpoint_callback = ModelCheckpoint(
-            dirpath=os.path.join(tb_logger_path, tb_logger_folder, 'checkpoints', version_name),
+            dirpath=checkpoint_dir,
             save_top_k=2,
             verbose=True,
             monitor='val_loss',
@@ -1164,6 +1164,7 @@ def train_model(
     save_model(
             args=args,
             checkpoint_path=checkpoint_callback.dirpath,
+            artifacts_path=artifacts_dir,
             PL_model=PL_model,
             trainer=trainer,
     )
@@ -1178,6 +1179,18 @@ def main(args, use_hydra=False, ds_config=None,):
     warnings.filterwarnings("ignore", message=".*isinstance.*treespec.*")
     warnings.filterwarnings("ignore", message=".*TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD.*")
     logging.getLogger("tensorboardX.x2num").setLevel(logging.ERROR)
+
+    # ----- Set up output directories and file logging -----
+    run_dir = os.path.join(args.output_root, args.runs_folder, args.run_id)
+    logs_dir = os.path.join(run_dir, _LOGS_SUBDIR)
+    artifacts_dir = os.path.join(run_dir, _ARTIFACTS_SUBDIR)
+    checkpoint_dir = os.path.join(
+        args.output_root, args.checkpoints_folder, args.run_id,
+    )
+    if get_rank() == 0:
+        os.makedirs(logs_dir, exist_ok=True)
+        os.makedirs(artifacts_dir, exist_ok=True)
+    log_path, file_handler = setup_file_logging(artifacts_dir)
 
     # ----- Process passed parameters -----
     seed = args.seed
@@ -1256,13 +1269,17 @@ def main(args, use_hydra=False, ds_config=None,):
         ds_config=ds_config,
     )
 
-    # ----- Write build manifest (rank 0 only) -----
+    # ----- Write args.json and build manifest (rank 0 only) -----
     if get_rank() == 0:
         elapsed = datetime.now() - start_time
-        checkpoint_dir = os.path.join(
-            args.tb_logger_path, args.tb_logger_folder,
-            "checkpoints", args.version_name,
-        )
+
+        # Save args.json
+        args_path = os.path.join(artifacts_dir, "args.json")
+        backup_if_exists(args_path)
+        with open(args_path, "w") as f:
+            json.dump(vars(args), f, indent=2, default=str)
+        logger.info("Args written to %s", args_path)
+
         total_params = sum(p.numel() for p in PL_model.model.parameters())
         trainable_params = sum(
             p.numel() for p in PL_model.model.parameters() if p.requires_grad
@@ -1293,6 +1310,7 @@ def main(args, use_hydra=False, ds_config=None,):
 
         resolved_paths = {
             "checkpoint_dir": os.path.abspath(checkpoint_dir),
+            "artifacts_dir": os.path.abspath(artifacts_dir),
         }
         if args.swissprot_data_root is not None:
             resolved_paths["swissprot_data_root"] = os.path.abspath(
@@ -1312,7 +1330,7 @@ def main(args, use_hydra=False, ds_config=None,):
             )
 
         manifest_path = write_manifest(
-            args, checkpoint_dir, start_time, elapsed,
+            args, artifacts_dir, start_time, elapsed,
             outputs=outputs,
             resolved_paths=resolved_paths,
             environment=_collect_training_env(),
@@ -1320,7 +1338,7 @@ def main(args, use_hydra=False, ds_config=None,):
         logger.info("Build manifest written to %s", manifest_path)
 
     # ----- Clean up -----
-    # torch.distributed.destroy_process_group()
+    teardown_file_logging("biom3", file_handler)
 
 
 def parse_arguments(args):

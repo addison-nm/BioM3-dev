@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from biom3.core.run_utils import (
+    backup_if_exists,
     get_biom3_version,
     get_git_hash,
     setup_file_logging,
@@ -186,3 +187,104 @@ def test_write_manifest_with_multi_config_contents():
 
         assert manifest["config_contents"]["pencl"]["dim"] == 512
         assert manifest["config_contents"]["facilitator"]["dropout"] == 0.1
+
+
+# ---- backup_if_exists tests ----
+
+def test_backup_if_exists_no_file():
+    """Returns None when the file does not exist."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        result = backup_if_exists(os.path.join(tmpdir, "nonexistent.json"))
+        assert result is None
+
+
+def test_backup_if_exists_creates_backup():
+    """Renames existing file to a .bak.<timestamp> path."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fpath = os.path.join(tmpdir, "data.json")
+        with open(fpath, "w") as f:
+            f.write("original")
+
+        backup_path = backup_if_exists(fpath)
+
+        assert backup_path is not None
+        assert not os.path.exists(fpath)
+        assert os.path.exists(backup_path)
+        assert ".bak." in os.path.basename(backup_path)
+        with open(backup_path) as f:
+            assert f.read() == "original"
+
+
+def test_backup_if_exists_avoids_clobbering():
+    """When a backup with the same timestamp already exists, appends a counter."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fpath = os.path.join(tmpdir, "data.json")
+
+        # Create first file and back it up
+        with open(fpath, "w") as f:
+            f.write("v1")
+        first_backup = backup_if_exists(fpath)
+
+        # Create second file with the same mtime and back it up
+        with open(fpath, "w") as f:
+            f.write("v2")
+        # Force same mtime as the original
+        mtime = os.path.getmtime(first_backup)
+        os.utime(fpath, (mtime, mtime))
+        second_backup = backup_if_exists(fpath)
+
+        assert first_backup != second_backup
+        assert os.path.exists(first_backup)
+        assert os.path.exists(second_backup)
+        with open(first_backup) as f:
+            assert f.read() == "v1"
+        with open(second_backup) as f:
+            assert f.read() == "v2"
+
+
+def test_backup_if_exists_handles_symlinks():
+    """Backs up symlinks (renames the link, not the target)."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        target = os.path.join(tmpdir, "target.pth")
+        link = os.path.join(tmpdir, "state_dict.pth")
+        with open(target, "w") as f:
+            f.write("weights")
+        os.symlink(target, link)
+
+        backup_path = backup_if_exists(link)
+
+        assert backup_path is not None
+        assert not os.path.exists(link)
+        # Target should still exist (rename moved the symlink, not the target)
+        assert os.path.exists(target)
+        # Backup is the renamed symlink
+        assert os.path.islink(backup_path)
+
+
+# ---- write_manifest overwrite protection ----
+
+def test_write_manifest_backs_up_existing():
+    """Calling write_manifest twice backs up the first manifest."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        args_v1 = Namespace(run="first")
+        args_v2 = Namespace(run="second")
+        start = datetime.now()
+        elapsed = timedelta(seconds=1)
+
+        path1 = write_manifest(args_v1, tmpdir, start, elapsed)
+        assert os.path.exists(path1)
+
+        path2 = write_manifest(args_v2, tmpdir, start, elapsed)
+        assert path1 == path2  # same canonical path
+
+        # The current manifest should have the second run's data
+        with open(path2) as f:
+            current = json.load(f)
+        assert current["args"]["run"] == "second"
+
+        # There should be exactly one .bak file with the first run's data
+        bak_files = [f for f in os.listdir(tmpdir) if ".bak." in f]
+        assert len(bak_files) == 1
+        with open(os.path.join(tmpdir, bak_files[0])) as f:
+            backed_up = json.load(f)
+        assert backed_up["args"]["run"] == "first"

@@ -11,8 +11,7 @@ cd ${projdir}
 source environment.sh
 
 # Configurations to edit
-config_dir=./arglists           # Directory containing config files
-config_name=<CONFIG_FILE_NAME>  # Config file name. Note: exclude .sh extension
+config_path=./configs/training/<CONFIG_NAME>.json  # JSON config file
 epochs=5                        # Number of epochs to finetune
 resume_from_checkpoint=None     # None to start finetuning fresh
 pretrained_weights=<WEIGHTS_PATH>  # Path to pretrained weights (.bin)
@@ -28,23 +27,23 @@ device=cuda                     # device available (cuda)
 
 # Construct the run ID
 datetime=$(date +%Y%m%d_%H%M%S)
-run_id=${config_name/config_/}_n${num_nodes}_d${num_devices}_e${epochs}_V${datetime}
+config_name=$(basename "${config_path}" .json)
+run_id=${config_name}_n${num_nodes}_d${num_devices}_e${epochs}_V${datetime}
 
 # Direct output to log file
 mkdir -p logs/run_logs/finetuning
 log_fpath=logs/run_logs/finetuning/${run_id}.o
 
-./scripts/finetuning/finetune_singlenode.sh \
-    ${config_dir} \
-    ${config_name} \
-    ${num_nodes} \
+./scripts/stage3_train_singlenode.sh \
+    ${config_path} \
     ${num_devices} \
     ${device} \
     ${wandb_api_key} \
     ${run_id} \
-    ${epochs} \
-    ${resume_from_checkpoint} \
-    ${pretrained_weights} \
-    ${finetune_last_n_blocks} \
-    ${finetune_last_n_layers} \
+    --epochs ${epochs} \
+    --resume_from_checkpoint ${resume_from_checkpoint} \
+    --finetune True \
+    --pretrained_weights ${pretrained_weights} \
+    --finetune_last_n_blocks ${finetune_last_n_blocks} \
+    --finetune_last_n_layers ${finetune_last_n_layers} \
 > ${log_fpath} 2>&1

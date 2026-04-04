@@ -12,7 +12,7 @@ Example usage:
 
 biom3_ProteoScribe_sample \
     --input_path "outputs/facilitator_embeddings.pt" \
-    --json_path "configs/stage3_config_ProteoScribe_sample.json" \
+    --config_path "configs/stage3_config_ProteoScribe_sample.json" \
     --model_path "./weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin" \
     --output_path "outputs/generated_sequences.pt"
 
@@ -20,7 +20,7 @@ Example usage (reproducible run with fixed seed, CPU):
 
 biom3_ProteoScribe_sample \
     --input_path "outputs/facilitator_embeddings.pt" \
-    --json_path "configs/stage3_config_ProteoScribe_sample.json" \
+    --config_path "configs/stage3_config_ProteoScribe_sample.json" \
     --model_path "./weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin" \
     --output_path "outputs/generated_sequences.pt" \
     --seed 42 \
@@ -63,7 +63,7 @@ def parse_arguments(args):
     parser = argparse.ArgumentParser(description="BioM3 Inference Script (Stage 1)")
     parser.add_argument('-i', '--input_path', type=str, required=True,
                         help="Path to input embeddings")
-    parser.add_argument('-c', '--json_path', type=str, required=True,
+    parser.add_argument('-c', '--config_path', type=str, required=True,
                         help="Path to the JSON configuration file (stage3_config_ProteoScribe_sample.json)")
     parser.add_argument('-m', '--model_path', type=str, required=True,
                         help="Path to the pre-trained model weights (pytorch_model.bin)")
@@ -371,7 +371,7 @@ def main(args, _setup_logging=True):
     logger.info("Seed: %s", seed)
 
     # Load and convert JSON config
-    config_dict = load_json_config(config_args_parser.json_path)
+    config_dict = load_json_config(config_args_parser.config_path)
     raw_config = copy.deepcopy(config_dict)
     config_args = convert_to_namespace(config_dict)
 
@@ -492,7 +492,7 @@ def main(args, _setup_logging=True):
             resolved_paths={
                 "input_path": os.path.abspath(args.input_path),
                 "model_path": os.path.abspath(args.model_path),
-                "json_config": os.path.abspath(args.json_path),
+                "json_config": os.path.abspath(args.config_path),
             },
             config_contents=raw_config,
         )

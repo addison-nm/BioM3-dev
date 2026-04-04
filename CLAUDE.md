@@ -37,9 +37,8 @@ src/biom3/
   Stage1/           # PenCL: model.py (encoders + projection), preprocess.py, PL_wrapper.py
   Stage2/           # Facilitator: run_Facilitator_sample.py
   Stage3/           # ProteoScribe: diffusion model, PL training, sampling
-configs/            # JSON configs for each stage's inference and dbio
-arglists/           # Shell-variable configs for Stage 3 training
-scripts/            # Bash wrappers (embedding_pipeline, pretraining, finetuning, generation, sync)
+configs/            # JSON configs for each stage's inference, training, and dbio
+scripts/            # Bash wrappers (embedding_pipeline, training, generation, sync)
 demos/              # End-to-end demos (dbio dataset building, SH3 embedding pipeline)
 data/databases/     # Symlinked reference databases (gitignored, see docs/setup_databases.md)
 tests/              # pytest suite (conftest.py, per-stage tests, test data in tests/_data/)
@@ -139,8 +138,8 @@ The codebase handles three weight formats:
 When loading models, use `core.io.load_and_prepare_model` for raw weights. For Lightning checkpoints, use the stage-specific `prepare_model_from_checkpoint` functions which handle PL wrapper construction and unwrapping.
 
 ### Configuration
-- **Inference**: JSON files in `configs/` → loaded with `load_json_config()` → converted to `argparse.Namespace`
-- **Training**: Shell-variable files in `arglists/` → sourced by wrapper scripts in `scripts/`
+- **Inference**: JSON files in `configs/` → loaded via `--config_path` with `load_json_config()` → converted to `argparse.Namespace`
+- **Training**: JSON files in `configs/training/` → loaded via `--config_path` into argparse defaults. CLI args override JSON values; JSON overrides argparse defaults.
 
 ### Training output structure
 Stage 3 training (`biom3_pretrain_stage3`) organizes outputs under `--output_root` with three key CLI args: `--checkpoints_folder` (default `checkpoints`), `--runs_folder` (default `runs`), and `--run_id` (unique per run, constructed automatically by HPC job templates).
@@ -155,7 +154,7 @@ Stage 3 training (`biom3_pretrain_stage3`) organizes outputs under `--output_roo
 ```
 
 ### Distributed training
-Stage 3 supports multi-node training via DeepSpeed + PyTorch Lightning. The `scripts/pretraining/pretrain_multinode.sh` wrapper uses `mpiexec`. Environment variable `TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=true` is set in training scripts.
+Stage 3 supports multi-node training via DeepSpeed + PyTorch Lightning. The `scripts/stage3_train_multinode.sh` wrapper uses `mpiexec`. Environment variable `TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=true` is set in training scripts.
 
 ## Things to watch out for
 

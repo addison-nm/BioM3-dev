@@ -19,8 +19,7 @@ conda activate base
 source ./venvs/biom3-env/bin/activate
 
 # Configurations to edit
-config_dir=./arglists           # Directory containing config files
-config_name=<CONFIG_FILE_NAME>  # Config file name. Note: exclude .sh extension
+config_path=./configs/training/<CONFIG_NAME>.json  # JSON config file
 num_nodes=<NUM_NODES>           # Should match num requested nodes in PBS header
 epochs=5                        # Number of epochs to train
 resume_from_checkpoint=None     # None to train from scratch
@@ -33,20 +32,20 @@ device=cuda                     # device available (cuda, xpu)
 
 # Construct the run ID
 datetime=$(date +%Y%m%d_%H%M%S)
-run_id=${config_name/config_/}_n${num_nodes}_d${num_devices}_e${epochs}_V${datetime}
+config_name=$(basename "${config_path}" .json)
+run_id=${config_name}_n${num_nodes}_d${num_devices}_e${epochs}_V${datetime}
 
 # Direct output to log file
 log_fpath=logs/run_logs/pretraining/${run_id}.${PBS_JOBID}.o
 
-./scripts/pretraining/pretrain_multinode.sh \
-    ${config_dir} \
-    ${config_name} \
+./scripts/stage3_train_multinode.sh \
+    ${config_path} \
     ${num_nodes} \
     ${num_devices} \
     ${device} \
     ${wandb_api_key} \
     ${run_id} \
-    ${epochs} \
-    ${resume_from_checkpoint} \
+    --epochs ${epochs} \
+    --resume_from_checkpoint ${resume_from_checkpoint} \
 > ${log_fpath} 2>&1
 

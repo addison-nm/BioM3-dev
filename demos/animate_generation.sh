@@ -36,7 +36,7 @@ echo ""
 echo "[1] Animate prompt 0, replica 0 (default replica count)..."
 biom3_ProteoScribe_sample \
     --input_path  "$FACILITATOR_EMB" \
-    --json_path   "$CONFIG" \
+    --config_path   "$CONFIG" \
     --model_path  "$WEIGHTS" \
     --output_path "${OUTDIR}/ex1_sequences.pt" \
     --animate_prompts 0
@@ -49,7 +49,7 @@ echo ""
 echo "[2] Animate prompts 0, 1, 2 — replica 0..."
 biom3_ProteoScribe_sample \
     --input_path  "$FACILITATOR_EMB" \
-    --json_path   "$CONFIG" \
+    --config_path   "$CONFIG" \
     --model_path  "$WEIGHTS" \
     --output_path "${OUTDIR}/ex2_sequences.pt" \
     --animate_prompts 0 1 2
@@ -62,7 +62,7 @@ echo ""
 echo "[3] Animate all prompts, replicas 0–2..."
 biom3_ProteoScribe_sample \
     --input_path  "$FACILITATOR_EMB" \
-    --json_path   "$CONFIG" \
+    --config_path   "$CONFIG" \
     --model_path  "$WEIGHTS" \
     --output_path "${OUTDIR}/ex3_sequences.pt" \
     --animate_prompts all \
@@ -76,7 +76,7 @@ echo ""
 echo "[4] Animate prompt 0, all replicas — custom animation dir..."
 biom3_ProteoScribe_sample \
     --input_path   "$FACILITATOR_EMB" \
-    --json_path    "$CONFIG" \
+    --config_path    "$CONFIG" \
     --model_path   "$WEIGHTS" \
     --output_path  "${OUTDIR}/ex4_sequences.pt" \
     --animate_prompts 0 \

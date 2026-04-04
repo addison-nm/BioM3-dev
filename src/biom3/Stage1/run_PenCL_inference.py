@@ -19,7 +19,7 @@ Example usage (raw weights, built-in test dataset):
 
 biom3_PenCL_inference \
     --input_data_path None \
-    --json_path "configs/stage1_config_PenCL_inference.json" \
+    --config_path "configs/stage1_config_PenCL_inference.json" \
     --model_path "./weights/PenCL/BioM3_PenCL_epoch20.bin" \
     --output_path "outputs/pencl_embeddings.pt"
 
@@ -27,7 +27,7 @@ Example usage (custom CSV input, CPU):
 
 biom3_PenCL_inference \
     --input_data_path "data/my_proteins.csv" \
-    --json_path "configs/stage1_config_PenCL_inference.json" \
+    --config_path "configs/stage1_config_PenCL_inference.json" \
     --model_path "./weights/PenCL/BioM3_PenCL_epoch20.bin" \
     --output_path "outputs/pencl_embeddings.pt" \
     --device cpu \
@@ -38,7 +38,7 @@ Example usage (PyTorch Lightning checkpoint):
 
 biom3_PenCL_inference \
     --input_data_path None \
-    --json_path "configs/stage1_config_PenCL_inference.json" \
+    --config_path "configs/stage1_config_PenCL_inference.json" \
     --model_path "./weights/PenCL/BioM3_PenCL_epoch20.ckpt" \
     --output_path "outputs/pencl_embeddings.pt"
 
@@ -82,7 +82,7 @@ def parse_arguments(args):
     parser = argparse.ArgumentParser(description="BioM3 Inference Script (Stage 1)")
     parser.add_argument('-i', '--input_data_path', type=str, required=True,
                         help="Path to input data in csv format. Use None for test case.")
-    parser.add_argument('-c', '--json_path', type=str, required=True,
+    parser.add_argument('-c', '--config_path', type=str, required=True,
                         help="Path to the JSON configuration file (stage1_config_PenCL_inference.json)")
     parser.add_argument('-m', '--model_path', type=str, required=True,
                         help="Path to the pre-trained model weights or checkpoint")
@@ -289,7 +289,7 @@ def main(args, _setup_logging=True):
     logger.info("=" * 60)
 
     # Load configuration
-    config_dict = load_json_config(config_args_parser.json_path)
+    config_dict = load_json_config(config_args_parser.config_path)
     raw_config = copy.deepcopy(config_dict)
     config_args = convert_to_namespace(config_dict)
 
@@ -457,7 +457,7 @@ def main(args, _setup_logging=True):
             resolved_paths={
                 "input_data_path": input_display,
                 "model_path": os.path.abspath(args.model_path),
-                "json_config": os.path.abspath(args.json_path),
+                "json_config": os.path.abspath(args.config_path),
             },
             config_contents=raw_config,
         )

@@ -24,6 +24,9 @@ from biom3.core.io import load_state_dict
 ARGS_DIR = os.path.join(DATDIR, "entrypoint_args", "training")
 OUTPUTS_DIR = os.path.join(TMPDIR, "outputs")
 
+# JSON training configs (relative to repo root, same as DATDIR)
+CONFIGS_DIR = "configs/training"
+
 # Required weights that need to be downloaded to run entrypoint test
 REQUIRED_DOWNLOADS = [
     "weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin",
@@ -511,3 +514,92 @@ def test_start_phase2_training(
                 errors.append(msg)
     remove_dir(OUTPUTS_DIR)
     assert not errors, "Errors occurred:\n{}".format("\n".join(errors))
+
+
+###############################################################################
+#####################   JSON Config Loading Tests   ###########################
+###############################################################################
+
+@pytest.mark.parametrize("json_filename", [
+    "pretrain_scratch_v1.json",
+    "pretrain_scratch_v2.json",
+    "pretrain_start_pfam_v2.json",
+    "finetune_v1.json",
+])
+def test_parse_from_json_config(json_filename):
+    """Verify that --config_path loads JSON values correctly."""
+    json_path = os.path.join(CONFIGS_DIR, json_filename)
+    args = parse_arguments(["--config_path", json_path, "--run_id", "test"])
+
+    assert args.config_path == json_path
+    assert args.run_id == "test"
+    assert args.model_option == "transformer"
+    assert args.num_classes == 29
+    assert isinstance(args.wandb, bool) and args.wandb is True
+    assert isinstance(args.start_pfam_trainer, bool)
+    assert isinstance(args.scale_learning_rate, bool)
+
+
+def test_cli_overrides_json():
+    """CLI arguments must take precedence over JSON config values."""
+    json_path = os.path.join(CONFIGS_DIR, "pretrain_scratch_v1.json")
+    args = parse_arguments([
+        "--config_path", json_path,
+        "--run_id", "override_test",
+        "--lr", "0.001",
+        "--seed", "999",
+    ])
+    assert args.lr == 0.001
+    assert args.seed == 999
+
+
+def test_json_overrides_argparse_defaults():
+    """JSON config values must override argparse defaults."""
+    json_path = os.path.join(CONFIGS_DIR, "pretrain_scratch_v1.json")
+    args = parse_arguments(["--config_path", json_path, "--run_id", "test"])
+    # JSON has lr=1e-4; argparse default is 3e-4
+    assert args.lr == 1e-4
+    # JSON has batch_size=32; argparse default is 16
+    assert args.batch_size == 32
+    # JSON has pfam_data_root=null -> None
+    assert args.pfam_data_root is None
+
+
+def test_json_native_types():
+    """JSON booleans and nulls flow through without str conversion issues."""
+    json_path = os.path.join(CONFIGS_DIR, "finetune_v1.json")
+    args = parse_arguments(["--config_path", json_path, "--run_id", "test"])
+    assert args.finetune is True
+    assert isinstance(args.finetune, bool)
+    assert args.pretrained_weights is not None
+    assert args.resume_from_checkpoint is None
+    assert isinstance(args.finetune_output_layers, bool)
+
+
+def test_description_tags_notes():
+    """_description, tags, and notes fields are loaded from JSON and CLI."""
+    json_path = os.path.join(CONFIGS_DIR, "pretrain_scratch_v1.json")
+    args = parse_arguments(["--config_path", json_path, "--run_id", "test"])
+    assert isinstance(args._description, str) and len(args._description) > 0
+    assert isinstance(args.tags, list)
+    assert isinstance(args.notes, list)
+
+    # CLI tags and notes
+    args2 = parse_arguments([
+        "--config_path", json_path,
+        "--run_id", "test",
+        "--notes", "first_note", "second_note",
+        "--tags", "experiment", "baseline",
+    ])
+    assert args2.notes == ["first_note", "second_note"]
+    assert args2.tags == ["experiment", "baseline"]
+
+
+def test_no_config_path_uses_defaults():
+    """Without --config_path, argparse defaults are used."""
+    args = parse_arguments(["--run_id", "test"])
+    assert args.config_path is None
+    assert args.lr == 3e-4  # argparse default
+    assert args._description == ""
+    assert args.tags == []
+    assert args.notes == []

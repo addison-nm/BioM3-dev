@@ -66,6 +66,7 @@ import biom3.Stage3.preprocess as prep
 import biom3.Stage3.cond_diff_transformer_layer as mod
 import biom3.Stage3.PL_wrapper as PL_mod
 from biom3.Stage3.io import prepare_model_ProteoScribe
+from biom3.core.helpers import load_json_config
 from biom3.core.run_utils import (
     backup_if_exists, setup_file_logging, teardown_file_logging, write_manifest,
 )
@@ -92,6 +93,13 @@ def get_args(parser):
     Returns:
         The parser with the complete set of arguments added
     """
+    parser.add_argument('--_description', default="", type=str,
+                        help='human-readable description of this config (stored in args.json)')
+    parser.add_argument('--tags', type=str, nargs='+', default=[],
+                        help='tags for categorizing this run (stored in args.json)')
+    parser.add_argument('--notes', type=str, nargs='+', default=[],
+                        help='free-form notes about this run (stored in args.json)')
+
     parser.add_argument('--data-root', default="./data/ARDM_temp_homolog_family_dataset.csv", type=Path,
                         help='path to dataset root directory')
 
@@ -647,40 +655,50 @@ def clear_gpu_cache():
 def retrieve_all_args(args):
     """
     Collect and consolidate all command line arguments from various components.
-    
-    This function creates an ArgumentParser and populates it with arguments 
-    from multiple sources including general parameters, model-specific settings,
-    architecture-specific parameters, and file path configurations. It then
-    parses the command line input and returns the complete argument object.
-    
-    This serves as the central point for collecting all configuration parameters
-    needed across the entire application.
-    
+
+    Supports an optional ``--config_path`` argument pointing to a JSON file.
+    When provided, the JSON values override argparse defaults but are themselves
+    overridden by any explicitly passed CLI arguments (i.e. CLI > JSON > defaults).
+
     Args:
-        None
-        
+        args: list of CLI argument strings (typically ``sys.argv[1:]``)
+
     Returns:
         argparse.Namespace: A namespace object containing all parsed arguments
     """
+    # Pre-parse to extract --config_path before building the full parser,
+    # so we can set JSON values as defaults before the real parse.
+    pre_parser = argparse.ArgumentParser(add_help=False)
+    pre_parser.add_argument('--config_path', '-c', type=str, default=None)
+    pre_args, _ = pre_parser.parse_known_args(args)
+
     parser = argparse.ArgumentParser(description='Stage 3: ProteoScribe')
+    parser.add_argument('--config_path', '-c', type=str, default=None,
+                        help='Path to JSON config file. Values are overridden by CLI args.')
     get_args(parser=parser)
     get_model_args(parser=parser)
     mod.add_model_args(parser=parser)
     get_path_args(parser=parser)
     get_wrapper_args(parser=parser)
+
+    if pre_args.config_path is not None:
+        json_config = load_json_config(pre_args.config_path)
+        parser.set_defaults(**json_config)
+
     args = parser.parse_args(args)
 
-    # Type conversions
+    # Type conversions (idempotent — pass through values already of the target type)
     args.resume_from_checkpoint = nonestr_to_none(args.resume_from_checkpoint)
     args.download = str_to_bool(args.download)
     args.swissprot_data_root = nonestr_to_none(args.swissprot_data_root)
     args.pfam_data_root = nonestr_to_none(args.pfam_data_root)
     args.start_pfam_trainer = str_to_bool(args.start_pfam_trainer)
     args.finetune = str_to_bool(args.finetune)
+    args.finetune_output_layers = str_to_bool(args.finetune_output_layers)
     args.pretrained_weights = nonestr_to_none(args.pretrained_weights)
     args.wandb = str_to_bool(args.wandb)
     args.scale_learning_rate = str_to_bool(args.scale_learning_rate)
-    
+
     return args
 
 

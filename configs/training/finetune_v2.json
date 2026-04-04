@@ -1,0 +1,75 @@
+{
+  "_description": "Finetuning ProteoScribe. Original paper architecture (1 transformer block). Variant without finetune_last_n_layers specified.",
+
+  "swissprot_data_root": "./data/Stage2_MMD_swissprot_embedding_last_ckpt_all.hdf5",
+  "pfam_data_root": null,
+  "sequence_keyname": "sequence",
+  "num_classes": 29,
+  "num_y_class_labels": 6,
+
+  "wandb": true,
+  "wandb_entity": "thenaturalmachine",
+  "wandb_project": "BioM3",
+  "wandb_tags": ["finetuning"],
+
+  "choose_optim": "AdamW",
+  "lr": 1e-4,
+  "scale_learning_rate": false,
+  "weight_decay": 1e-6,
+  "scheduler_gamma": "coswarmup",
+
+  "seed": 123,
+  "epochs": 100,
+  "valid_size": 0.2,
+  "enter_eval": 1000,
+  "resume_from_checkpoint": null,
+  "batch_size": 32,
+  "model_option": "transformer",
+  "diffusion_steps": 1024,
+  "warmup_steps": 500,
+  "image_size": 32,
+  "ema_inv_gamma": 1.0,
+  "ema_power": 0.75,
+  "ema_max_value": 0.95,
+  "task": "proteins",
+  "max_steps": 3000000,
+
+  "device": "cuda",
+  "precision": "bf16",
+  "gpu_devices": 4,
+  "num_nodes": 1,
+  "acc_grad_batches": 1,
+
+  "val_check_interval": 20,
+  "limit_val_batches": 0.05,
+
+  "log_every_n_steps": 100,
+  "start_pfam_trainer": false,
+  "num_workers": 1,
+
+  "num_steps": 1,
+  "actnorm": false,
+  "perm_channel": "none",
+  "perm_length": "reverse",
+
+  "input_dp_rate": 0.0,
+
+  "transformer_dim": 512,
+  "transformer_heads": 16,
+  "transformer_depth": 16,
+  "transformer_blocks": 1,
+  "transformer_dropout": 0.1,
+  "transformer_reversible": false,
+  "transformer_local_heads": 8,
+  "transformer_local_size": 128,
+
+  "text_emb_dim": 512,
+  "facilitator": "MMD",
+
+  "output_root": "./outputs/Stage3/finetuning",
+  "checkpoints_folder": "checkpoints",
+
+  "finetune": true,
+  "pretrained_weights": "./weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin",
+  "finetune_last_n_blocks": 1
+}

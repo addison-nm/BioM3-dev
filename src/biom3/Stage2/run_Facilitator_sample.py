@@ -14,7 +14,7 @@ Example usage:
 
 biom3_Facilitator_sample \
     --input_data_path "outputs/pencl_embeddings.pt" \
-    --json_path "configs/stage2_config_Facilitator_sample.json" \
+    --config_path "configs/stage2_config_Facilitator_sample.json" \
     --model_path "./weights/Facilitator/BioM3_Facilitator_epoch20.bin" \
     --output_data_path "outputs/facilitator_embeddings.pt"
 
@@ -22,7 +22,7 @@ Example usage (CPU, limited MMD computation):
 
 biom3_Facilitator_sample \
     --input_data_path "outputs/pencl_embeddings.pt" \
-    --json_path "configs/stage2_config_Facilitator_sample.json" \
+    --config_path "configs/stage2_config_Facilitator_sample.json" \
     --model_path "./weights/Facilitator/BioM3_Facilitator_epoch20.bin" \
     --output_data_path "outputs/facilitator_embeddings.pt" \
     --device cpu \
@@ -62,7 +62,7 @@ def parse_arguments(args):
     parser = argparse.ArgumentParser(description="BioM3 Facilitator Model (Stage 2)")
     parser.add_argument('-i', '--input_data_path', type=str, required=True,
                         help="Path to the input embeddings (e.g., PenCL_test_outputs.pt)")
-    parser.add_argument('-c', '--json_path', type=str, required=True,
+    parser.add_argument('-c', '--config_path', type=str, required=True,
                         help="Path to the JSON configuration file (stage2_config_Facilitator_sample.json)")
     parser.add_argument('-m', '--model_path', type=str, required=True,
                         help="Path to the Facilitator model weights (e.g., BioM3_Facilitator_epoch20.bin)")
@@ -145,7 +145,7 @@ def main(args, _setup_logging=True):
     logger.info("=" * 60)
 
     # Load configuration
-    config_dict = load_json_config(args.json_path)
+    config_dict = load_json_config(args.config_path)
     raw_config = copy.deepcopy(config_dict)
     config_args = convert_to_namespace(config_dict)
 
@@ -226,7 +226,7 @@ def main(args, _setup_logging=True):
             resolved_paths={
                 "input_data_path": os.path.abspath(args.input_data_path),
                 "model_path": os.path.abspath(args.model_path),
-                "json_config": os.path.abspath(args.json_path),
+                "json_config": os.path.abspath(args.config_path),
             },
             config_contents=raw_config,
         )

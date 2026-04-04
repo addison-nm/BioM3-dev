@@ -37,3 +37,11 @@ def test_dbio_imports():
     import biom3.dbio.enrich
     import biom3.dbio.uniprot_client
     import biom3.dbio.build_dataset
+
+
+def test_viz_imports():
+    import biom3.viz
+    import biom3.viz.viewer
+    import biom3.viz.alignment
+    import biom3.viz.unmasking
+    import biom3.viz._tokens

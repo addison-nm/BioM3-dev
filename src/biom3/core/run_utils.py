@@ -9,11 +9,8 @@ from datetime import datetime, timedelta
 
 
 def get_biom3_version():
-    try:
-        from importlib.metadata import version
-        return version("biom3")
-    except Exception:
-        return "unknown"
+    from biom3 import __version__
+    return __version__
 
 
 def get_git_hash():

@@ -212,8 +212,9 @@ def batch_generate_denoised_sampled(
         extract_digit_samples: torch.Tensor,
         extract_time: torch.Tensor,
         extract_digit_label: torch.Tensor,
-        sampling_path: torch.Tensor
-    ) -> tuple[list, list]:
+        sampling_path: torch.Tensor,
+        store_probabilities: bool = False,
+    ) -> tuple[list, list, np.ndarray | None]:
 
     # Ensure batch dimension consistency across input tensors
     assert extract_digit_samples.size(0) == extract_digit_label.size(0) == sampling_path.size(0) == extract_time.size(0), "Mismatched batch dimensions"
@@ -242,6 +243,12 @@ def batch_generate_denoised_sampled(
         dtype=temp_idx.dtype, device=args.device
     )
 
+    if store_probabilities:
+        all_probs = torch.empty(
+            max_diffusion_step, batch_size, seq_len, args.num_classes,
+            dtype=torch.float32, device=args.device
+        )
+
     if token_strategy == 'sample':
         # Pre-allocate Gumbel noise buffer (reused each step via in-place fill).
         # See docs/gumbel_max_sampling.md for derivation.
@@ -260,6 +267,9 @@ def batch_generate_denoised_sampled(
                 y_c=temp_y_c,
                 idx=temp_idx
         )
+
+        if store_probabilities:
+            all_probs[ii] = conditional_prob.probs
 
         # Token selection
         if token_strategy == 'argmax':
@@ -289,7 +299,9 @@ def batch_generate_denoised_sampled(
     mask_realization_list = [all_realizations_np[i] for i in range(max_diffusion_step)]
     time_idx_list = [all_time_idx_np[i] for i in range(max_diffusion_step)]
 
-    return mask_realization_list, time_idx_list
+    probs_np = all_probs.cpu().numpy() if store_probabilities else None
+
+    return mask_realization_list, time_idx_list, probs_np
 
 
 def batch_generate_denoised_sampled_confidence(
@@ -298,7 +310,8 @@ def batch_generate_denoised_sampled_confidence(
         extract_digit_samples: torch.Tensor,
         extract_time: torch.Tensor,
         extract_digit_label: torch.Tensor,
-    ) -> tuple[list, list]:
+        store_probabilities: bool = False,
+    ) -> tuple[list, list, np.ndarray | None]:
     """Confidence-based unmasking: at each step, unmask the position where the
     model's max class probability is highest among still-masked positions.
 
@@ -331,6 +344,12 @@ def batch_generate_denoised_sampled_confidence(
         dtype=temp_idx.dtype, device=args.device
     )
 
+    if store_probabilities:
+        all_probs = torch.empty(
+            max_diffusion_step, batch_size, seq_len, args.num_classes,
+            dtype=torch.float32, device=args.device
+        )
+
     if token_strategy == 'sample':
         gumbel_buffer = torch.empty(
             batch_size, seq_len, args.num_classes,
@@ -347,6 +366,9 @@ def batch_generate_denoised_sampled_confidence(
                 y_c=temp_y_c,
                 idx=temp_idx
         )
+
+        if store_probabilities:
+            all_probs[ii] = conditional_prob.probs
 
         # Per-position confidence: max class probability
         # conditional_prob.probs shape: [batch, seq_len, num_classes]
@@ -383,7 +405,9 @@ def batch_generate_denoised_sampled_confidence(
     mask_realization_list = [all_realizations_np[i] for i in range(max_diffusion_step)]
     time_idx_list = [all_time_idx_np[i] for i in range(max_diffusion_step)]
 
-    return mask_realization_list, time_idx_list
+    probs_np = all_probs.cpu().numpy() if store_probabilities else None
+
+    return mask_realization_list, time_idx_list, probs_np
 
 
 # convert sequence with numerical variables into character letters

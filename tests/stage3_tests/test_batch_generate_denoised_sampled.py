@@ -40,7 +40,7 @@ def _run_batch_generate(model, args, batch_size, seed):
     np.random.seed(seed)
     perms = torch.stack([torch.randperm(args.diffusion_steps) for _ in range(batch_size)])
     cond = torch.randn(batch_size, args.text_emb_dim)
-    mask_list, time_list = Stage3_sample_tools.batch_generate_denoised_sampled(
+    mask_list, time_list, _ = Stage3_sample_tools.batch_generate_denoised_sampled(
         args=args,
         model=model,
         extract_digit_samples=torch.zeros(batch_size, args.diffusion_steps),
@@ -118,7 +118,7 @@ def test_batch_independence(mini_model_and_args, monkeypatch):
     perms = perm.unsqueeze(0).expand(2, -1).clone()
     cond = torch.randn(1, args.text_emb_dim).expand(2, -1).clone()
 
-    mask_list, _ = Stage3_sample_tools.batch_generate_denoised_sampled(
+    mask_list, _, _ = Stage3_sample_tools.batch_generate_denoised_sampled(
         args=args,
         model=model,
         extract_digit_samples=torch.zeros(2, args.diffusion_steps),
@@ -145,7 +145,7 @@ def _run_batch_generate_confidence(model, args, batch_size, seed, token_strategy
     args_copy = type(args)(**vars(args))
     args_copy.token_strategy = token_strategy
     cond = torch.randn(batch_size, args.text_emb_dim)
-    mask_list, time_list = Stage3_sample_tools.batch_generate_denoised_sampled_confidence(
+    mask_list, time_list, _ = Stage3_sample_tools.batch_generate_denoised_sampled_confidence(
         args=args_copy,
         model=model,
         extract_digit_samples=torch.zeros(batch_size, args.diffusion_steps),
@@ -163,7 +163,7 @@ def _run_batch_generate_with_token_strategy(model, args, batch_size, seed, token
     args_copy.token_strategy = token_strategy
     perms = torch.stack([torch.randperm(args.diffusion_steps) for _ in range(batch_size)])
     cond = torch.randn(batch_size, args.text_emb_dim)
-    mask_list, time_list = Stage3_sample_tools.batch_generate_denoised_sampled(
+    mask_list, time_list, _ = Stage3_sample_tools.batch_generate_denoised_sampled(
         args=args_copy,
         model=model,
         extract_digit_samples=torch.zeros(batch_size, args.diffusion_steps),
@@ -243,7 +243,7 @@ def test_confidence_batch_independence(mini_model_and_args):
 
     cond = torch.randn(1, args.text_emb_dim).expand(2, -1).clone()
 
-    mask_list, _ = Stage3_sample_tools.batch_generate_denoised_sampled_confidence(
+    mask_list, _, _ = Stage3_sample_tools.batch_generate_denoised_sampled_confidence(
         args=args_copy,
         model=model,
         extract_digit_samples=torch.zeros(2, args.diffusion_steps),

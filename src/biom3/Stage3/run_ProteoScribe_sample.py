@@ -90,6 +90,11 @@ def parse_arguments(args):
     parser.add_argument('--animation_dir', type=str, default=None,
                         help="Output directory for GIF animations. "
                              "Default: <output_dir>/animations/")
+    parser.add_argument('--store_probabilities', action='store_true', default=False,
+                        help="Store per-step conditional probabilities for each "
+                             "(prompt, replica) pair as .npz files. "
+                             "Shapes: probs[steps, seq_len, num_classes]. "
+                             "Memory-intensive for long sequences or many replicas.")
     return parser.parse_args(args)
 
 
@@ -188,6 +193,7 @@ def batch_stage3_generate_sequences(
         z_t: torch.Tensor,
         animate_prompts: set = None,
         animate_replicas: set = None,
+        store_probabilities: bool = False,
     ) -> tuple:
     """
     Generates protein sequences in batches using a denoising model.
@@ -230,7 +236,8 @@ def batch_stage3_generate_sequences(
     design_sequences = [[None] * num_prompts for _ in range(args.num_replicas)]
 
     animate = animate_prompts is not None and animate_replicas is not None
-    animation_frames = {}  # (p_idx, r_idx) -> list of strings, one per diffusion step
+    animation_frames = {}  # (p_idx, r_idx) -> list of numpy arrays, one per diffusion step
+    stored_probs = {}      # (p_idx, r_idx) -> np.ndarray [steps, seq_len, num_classes]
 
     # Process all (prompt, replica) pairs in batches
     num_batches = (len(work_items) + args.batch_size_sample - 1) // args.batch_size_sample
@@ -250,22 +257,24 @@ def batch_stage3_generate_sequences(
         # Generate denoised samples using the model
         unmasking_order = getattr(args, 'unmasking_order', 'random')
         if unmasking_order == 'confidence':
-            mask_realization_list, _ = Stage3_sample_tools.batch_generate_denoised_sampled_confidence(
+            mask_realization_list, _, batch_probs = Stage3_sample_tools.batch_generate_denoised_sampled_confidence(
                 args=args,
                 model=model,
                 extract_digit_samples=torch.zeros(current_batch_size, args.diffusion_steps),
                 extract_time=torch.zeros(current_batch_size).long(),
                 extract_digit_label=batched_z_text_sample,
+                store_probabilities=store_probabilities,
             )
         else:
             batch_perms = torch.stack([torch.randperm(args.diffusion_steps) for _ in range(current_batch_size)])
-            mask_realization_list, _ = Stage3_sample_tools.batch_generate_denoised_sampled(
+            mask_realization_list, _, batch_probs = Stage3_sample_tools.batch_generate_denoised_sampled(
                 args=args,
                 model=model,
                 extract_digit_samples=torch.zeros(current_batch_size, args.diffusion_steps),
                 extract_time=torch.zeros(current_batch_size).long(),
                 extract_digit_label=batched_z_text_sample,
                 sampling_path=batch_perms,
+                store_probabilities=store_probabilities,
             )
 
         # Unpack results into the correct (replica, prompt) slots
@@ -281,6 +290,10 @@ def batch_stage3_generate_sequences(
                     for step in range(args.diffusion_steps)
                 ]
 
+            if batch_probs is not None:
+                # batch_probs shape: [steps, batch, seq_len, num_classes]
+                stored_probs[(p_idx, r_idx)] = batch_probs[:, i]
+
     assert all(seq is not None for row in design_sequences for seq in row), \
         "Not all (prompt, replica) pairs were generated"
 
@@ -289,7 +302,7 @@ def batch_stage3_generate_sequences(
         for r_idx in range(args.num_replicas)
     }
 
-    return design_sequence_dict, animation_frames, tokens
+    return design_sequence_dict, animation_frames, tokens, stored_probs
 
 
 def set_seed(seed):
@@ -380,12 +393,14 @@ def main(args, _setup_logging=True):
     )
 
     # sample sequences
-    design_sequence_dict, animation_frames, tokens = batch_stage3_generate_sequences(
+    store_probs = getattr(config_args_parser, 'store_probabilities', False)
+    design_sequence_dict, animation_frames, tokens, stored_probs = batch_stage3_generate_sequences(
             args=config_args,
             model=model,
             z_t=z_c,
             animate_prompts=animate_prompts_set,
             animate_replicas=animate_replicas_set,
+            store_probabilities=store_probs,
     )
 
     logger.info("design_sequence_dict=%s", design_sequence_dict)
@@ -406,6 +421,18 @@ def main(args, _setup_logging=True):
                 title=f"Prompt {p_idx} \u00b7 Replica {r_idx}",
             )
             logger.info("Animation saved: %s", gif_path)
+
+    # Save per-step conditional probabilities
+    if stored_probs:
+        probs_dir = os.path.join(outdir, "probabilities")
+        os.makedirs(probs_dir, exist_ok=True)
+        logger.info("Saving probabilities for %d (prompt, replica) pairs to %s",
+                     len(stored_probs), probs_dir)
+        for (p_idx, r_idx), probs_array in stored_probs.items():
+            # probs_array shape: [steps, seq_len, num_classes]
+            npz_path = os.path.join(probs_dir, f"prompt_{p_idx}_replica_{r_idx}.npz")
+            np.savez_compressed(npz_path, probs=probs_array, tokens=tokens)
+            logger.info("Probabilities saved: %s (shape=%s)", npz_path, probs_array.shape)
 
     # Write manifest and clean up logging
     elapsed = datetime.now() - start_time

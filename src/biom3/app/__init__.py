@@ -11,8 +11,23 @@ import streamlit as st
 
 
 def main():
-    import subprocess, sys
-    subprocess.run([sys.executable, "-m", "streamlit", "run", __file__], check=True)
+    import argparse, os, subprocess, sys
+    from pathlib import Path
+
+    from biom3.app.config import SETTINGS_ENV_VAR
+
+    parser = argparse.ArgumentParser(description="BioM3 Streamlit app")
+    parser.add_argument(
+        "--config", type=str, default=None,
+        help="Path to app settings JSON (overrides bundled defaults)",
+    )
+    args, extra = parser.parse_known_args()
+    if args.config:
+        os.environ[SETTINGS_ENV_VAR] = str(Path(args.config).resolve())
+    subprocess.run(
+        [sys.executable, "-m", "streamlit", "run", __file__] + extra,
+        check=True,
+    )
 
 
 st.set_page_config(

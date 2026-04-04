@@ -1,36 +1,25 @@
 """Data directory browser for the BioM3 Streamlit app.
 
-Reads allowed directories from a JSON config and provides Streamlit widgets
+Reads allowed directories from app settings and provides Streamlit widgets
 for browsing and selecting files.
 """
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import streamlit as st
 
-DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[3] / "configs" / "app_data_dirs.json"
+from biom3.app.config import load_settings
 
 
-@st.cache_data
-def _load_config(config_path: str) -> list[dict]:
-    p = Path(config_path)
-    if not p.is_file():
-        return []
-    with open(p) as f:
-        data = json.load(f)
-    return data.get("data_dirs", [])
-
-
-def get_data_dirs(config_path: str | Path | None = None) -> list[dict]:
+def get_data_dirs() -> list[dict]:
     """Return the list of configured data directories.
 
     Each entry is {"label": str, "path": str}.
     """
-    path = str(config_path or DEFAULT_CONFIG_PATH)
-    return _load_config(path)
+    settings = load_settings()
+    return settings.get("data_dirs", [])
 
 
 def list_files(
@@ -74,7 +63,10 @@ def browse_file(
     """
     dirs = get_data_dirs()
     if not dirs:
-        st.info("No data directories configured. Edit `configs/app_data_dirs.json` to add directories.")
+        st.info(
+            "No data directories configured. Provide an app settings JSON via "
+            "`biom3_app --config <path>` or the `BIOM3_APP_CONFIG` env var."
+        )
         return None
 
     dir_labels = [d["label"] for d in dirs]

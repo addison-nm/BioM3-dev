@@ -23,6 +23,35 @@ The `BioM3-dev` repo is available to clone from GitHub.
 git clone https://github.com/addison-nm/BioM3-dev.git && cd BioM3-dev
 ```
 
+### pip install
+
+Install the core package:
+
+```bash
+# Editable (development) install
+pip install -e .
+
+# From GitHub (specific branch or tag)
+pip install 'biom3 @ git+https://github.com/addison-nm/BioM3-dev.git'
+pip install 'biom3 @ git+https://github.com/addison-nm/BioM3-dev.git@v0.0.1'
+```
+
+To include the Streamlit web app and visualization tools, install with the `app` extra:
+
+```bash
+# Editable install with app dependencies
+pip install -e '.[app]'
+
+# From GitHub with app dependencies
+pip install 'biom3[app] @ git+https://github.com/addison-nm/BioM3-dev.git'
+```
+
+> **Note:** The quotes around `'.[app]'` and `'biom3[app] @ ...'` are required.
+> Without them, shells like `zsh` interpret the square brackets as glob patterns
+> and the command will fail.
+
+### Environment setup
+
 **Important:** Before running tests or scripts, source the `environment.sh` file to set required
 environment variables. The environment variables needed may differ across machines — see the
 Usage section in each machine's setup doc for details.

@@ -36,7 +36,7 @@ if BACKEND_NAME == _XPU:
     import lightning as pl
     from lightning import Trainer
     from lightning.fabric.strategies import DeepSpeedStrategy
-    from lightning.fabric.loggers import TensorBoardLogger
+    from lightning.pytorch.loggers import TensorBoardLogger
     from lightning.pytorch.loggers import WandbLogger
     from lightning.pytorch.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
     from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor, DeviceStatsMonitor

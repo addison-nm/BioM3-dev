@@ -577,10 +577,10 @@ def test_json_native_types():
 
 
 def test_description_tags_notes():
-    """_description, tags, and notes fields are loaded from JSON and CLI."""
+    """description, tags, and notes fields are loaded from JSON and CLI."""
     json_path = os.path.join(CONFIGS_DIR, "pretrain_scratch_v1.json")
     args = parse_arguments(["--config_path", json_path, "--run_id", "test"])
-    assert isinstance(args._description, str) and len(args._description) > 0
+    assert isinstance(args.description, str) and len(args.description) > 0
     assert isinstance(args.tags, list)
     assert isinstance(args.notes, list)
 
@@ -600,6 +600,6 @@ def test_no_config_path_uses_defaults():
     args = parse_arguments(["--run_id", "test"])
     assert args.config_path is None
     assert args.lr == 3e-4  # argparse default
-    assert args._description == ""
+    assert args.description == ""
     assert args.tags == []
     assert args.notes == []

@@ -93,7 +93,7 @@ def get_args(parser):
     Returns:
         The parser with the complete set of arguments added
     """
-    parser.add_argument('--_description', default="", type=str,
+    parser.add_argument('--description', default="", type=str,
                         help='human-readable description of this config (stored in args.json)')
     parser.add_argument('--tags', type=str, nargs='+', default=[],
                         help='tags for categorizing this run (stored in args.json)')

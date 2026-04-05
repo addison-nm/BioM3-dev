@@ -1,5 +1,5 @@
 {
-  "_description": "Finetuning ProteoScribe. Original paper architecture (1 transformer block). Variant without finetune_last_n_layers specified.",
+  "description": "Finetuning ProteoScribe. Original paper architecture (1 transformer block). Variant without finetune_last_n_layers specified.",
 
   "swissprot_data_root": "./data/Stage2_MMD_swissprot_embedding_last_ckpt_all.hdf5",
   "pfam_data_root": null,

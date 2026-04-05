@@ -40,7 +40,7 @@ the value directly as a bool.
 ### 3. New metadata arguments
 
 Added three new argparse arguments to `get_args()`:
-- `--_description` (str, default `""`) — loaded from JSON configs
+- `--description` (str, default `""`) — loaded from JSON configs
 - `--tags` (str, nargs='+', default `[]`) — for categorizing runs
 - `--notes` (str, nargs='+', default `[]`) — free-form run notes
 

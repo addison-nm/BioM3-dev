@@ -1,5 +1,5 @@
 {
-  "_description": "Pretraining from scratch. Reproduces the original BioM3 paper architecture (1 transformer block).",
+  "description": "Pretraining from scratch. Reproduces the original BioM3 paper architecture (1 transformer block).",
 
   "swissprot_data_root": "./data/Stage2_MMD_swissprot_embedding_last_ckpt_all.hdf5",
   "pfam_data_root": null,

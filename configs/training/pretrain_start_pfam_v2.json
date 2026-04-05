@@ -1,5 +1,5 @@
 {
-  "_description": "Phase 2 pretraining with Pfam dataset. Continues training of 16-block model.",
+  "description": "Phase 2 pretraining with Pfam dataset. Continues training of 16-block model.",
 
   "swissprot_data_root": "./data/Stage2_MMD_swissprot_embedding_last_ckpt_all.hdf5",
   "pfam_data_root": "./data/Stage2_MMD_pfam_embedding_last_ckpt_all.hdf5",

@@ -304,7 +304,10 @@ class PL_ProtARDM(pl.LightningModule):
             self.log(f"{stage}_fut_ppl", metrics[8], on_step=True, on_epoch=True, sync_dist=sync_dist)
             self.log(f"{stage}_pos_entropy", metrics[9], on_step=True, on_epoch=True, sync_dist=sync_dist)
 
-        torch.xpu.memory.empty_cache()
+        if BACKEND_NAME == _XPU:
+            torch.xpu.memory.empty_cache()
+        elif BACKEND_NAME == "cuda":
+            torch.cuda.empty_cache()
         return {'loss': loss}
 
     def training_step(
@@ -342,6 +345,12 @@ class PL_ProtARDM(pl.LightningModule):
         """
         self.common_step(realization, realization_idx, stage='val')
         #self.common_step(realization, realization_idx, stage='EMA_val')
+
+    def on_before_optimizer_step(self, optimizer):
+        norms = [p.grad.detach().norm(2) for p in self.parameters() if p.grad is not None]
+        if norms:
+            total_norm = torch.stack(norms).norm(2)
+            self.log("train_grad_norm", total_norm, on_step=True, on_epoch=False)
 
     def apply_OneHotCat(self, probs: torch.Tensor) -> any:
         """
@@ -771,18 +780,17 @@ class HDF5Dataset(torch.utils.data.Dataset):
 
 
 
-class HDF5_PFamDataModule(pl.LightningDataModule):
+class HDF5DataModule(pl.LightningDataModule):
     """
     PyTorch Lightning DataModule for HDF5-formatted protein sequence datasets.
 
-    This module specializes in handling protein sequence data stored in HDF5 format,
-    particularly from SwissProt and PFam databases. It supports loading from one or
-    both sources, applying train/validation splits, filtering sequences by length,
-    and creating efficient DataLoaders for model training.
+    Supports loading from a primary data source and optionally one or more
+    secondary sources.  Each source is split into train/validation, filtered
+    by sequence length, and the splits from all sources are concatenated.
 
     Key features:
     - Memory-efficient access to large sequence datasets via HDF5
-    - Supports combining data from multiple sources (SwissProt and PFam)
+    - Supports combining data from multiple sources
     - Automatic filtering of sequences that exceed maximum length
     - Proper resource management with HDF5 file closing
     """
@@ -794,26 +802,20 @@ class HDF5_PFamDataModule(pl.LightningDataModule):
         seed,
         diffusion_steps,
         image_size,
+        primary_path=None,
+        secondary_paths=None,
+        group_name='data',
+        # Deprecated aliases
         swissprot_path=None,
         pfam_path=None,
-        group_name='data'
     ):
-        """
-        Initialize the HDF5 PFam DataModule.
-
-        Args:
-            args: Configuration object containing:
-                - batch_size: Number of samples per batch
-                - num_workers: Number of worker processes for data loading
-                - valid_size: Fraction of data to use for validation
-                - seed: Random seed for reproducible splitting
-                - diffusion_steps: Used to calculate maximum sequence length
-            swissprot_path: Path to the SwissProt HDF5 file (or 'None' to skip)
-            pfam_path: Path to the PFam HDF5 file (or 'None' to skip)
-            group_name: Name of the group within HDF5 files to access
-                       (e.g., 'MMD_data', 'MSE_data', 'data')
-        """
         super().__init__()
+        # Handle deprecated aliases
+        if swissprot_path is not None and primary_path is None:
+            primary_path = swissprot_path
+        if pfam_path is not None and secondary_paths is None:
+            secondary_paths = [pfam_path]
+
         self.args = {
             "batch_size": batch_size,
             "num_workers": num_workers,
@@ -822,60 +824,37 @@ class HDF5_PFamDataModule(pl.LightningDataModule):
             "diffusion_steps": diffusion_steps,
             "image_size": image_size,
         }
-        self.swissprot_path = swissprot_path
-        self.pfam_path = pfam_path
+        self.primary_path = primary_path
+        self.secondary_paths = secondary_paths or []
         self.group_name = group_name
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.valid_size = valid_size
         self.seed = seed
-        self.min_seq_length = diffusion_steps - 2  # Minimum sequence length threshold
+        self.min_seq_length = diffusion_steps - 2
 
     def setup(self, stage=None):
-        """
-        Prepare datasets based on available data sources.
-
-        This method:
-        1. Creates empty lists for train and validation datasets
-        2. Loads SwissProt data if the path is provided
-            - Splits it into train/validation
-            - Filters by sequence length
-        3. Does the same for PFam data if available
-        4. Combines datasets from both sources
-
-        Args:
-            stage: Current stage ('fit', 'validate', 'test', or None)
-                  Not used but kept for compatibility with Lightning
-
-        Raises:
-            ValueError: If no valid dataset paths are provided
-        """
         train_datasets = []
         val_datasets = []
 
-        if self.swissprot_path is not None:
-            swissprot_dataset = HDF5Dataset(
-                args=self.args,
-                file_path=self.swissprot_path,
-                group_name=self.group_name
-            )
-            train_idx, val_idx = self.split_indices(swissprot_dataset)
-            train_idx = self.filter_by_sequence_length(swissprot_dataset, train_idx)
-            val_idx = self.filter_by_sequence_length(swissprot_dataset, val_idx)
-            train_datasets.append(Subset(swissprot_dataset, train_idx))
-            val_datasets.append(Subset(swissprot_dataset, val_idx))
+        all_paths = []
+        if self.primary_path is not None:
+            all_paths.append(self.primary_path)
+        all_paths.extend(self.secondary_paths)
 
-        if self.pfam_path is not None:
-            pfam_dataset = HDF5Dataset(
+        for path in all_paths:
+            dataset = HDF5Dataset(
                 args=self.args,
-                file_path=self.pfam_path,
-                group_name=self.group_name
+                file_path=path,
+                group_name=self.group_name,
             )
-            train_idx, val_idx = self.split_indices(pfam_dataset)
-            train_idx = self.filter_by_sequence_length(pfam_dataset, train_idx)
-            val_idx = self.filter_by_sequence_length(pfam_dataset, val_idx)
-            train_datasets.append(Subset(pfam_dataset, train_idx))
-            val_datasets.append(Subset(pfam_dataset, val_idx))
+            train_idx, val_idx = self.split_indices(dataset)
+            train_idx = self.filter_by_sequence_length(dataset, train_idx)
+            val_idx = self.filter_by_sequence_length(dataset, val_idx)
+            train_datasets.append(Subset(dataset, train_idx))
+            val_datasets.append(Subset(dataset, val_idx))
+            logger.info("Loaded dataset from %s (%d train, %d val)",
+                        path, len(train_idx), len(val_idx))
 
         if not train_datasets:
             raise ValueError("No dataset paths provided")
@@ -960,4 +939,8 @@ class HDF5_PFamDataModule(pl.LightningDataModule):
                 dataset.dataset.close()
             for dataset in self.val_dataset.datasets:
                 dataset.dataset.close()
+
+
+# Backward compatibility alias
+HDF5_PFamDataModule = HDF5DataModule
 

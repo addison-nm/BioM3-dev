@@ -39,7 +39,7 @@ if BACKEND_NAME == _XPU:
     from lightning.pytorch.loggers import TensorBoardLogger
     from lightning.pytorch.loggers import WandbLogger
     from lightning.pytorch.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
-    from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor, DeviceStatsMonitor
+    from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor, DeviceStatsMonitor, EarlyStopping
     # Additional necessities
     from lightning.pytorch.plugins.environments import ClusterEnvironment, MPIEnvironment
     from lightning.pytorch.utilities.model_summary import ModelSummary
@@ -51,7 +51,7 @@ else:
     from pytorch_lightning.loggers import TensorBoardLogger
     from pytorch_lightning.loggers import WandbLogger
     from pytorch_lightning.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
-    from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor, DeviceStatsMonitor
+    from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor, DeviceStatsMonitor, EarlyStopping
     # Additional necessities
     from pytorch_lightning.plugins.environments import ClusterEnvironment
 
@@ -148,10 +148,19 @@ def get_args(parser):
                         help='Choose model architecture')
     parser.add_argument('--download', default='True', type=str,
                         help='Download dataset')
+    # Dataset paths (generalized)
+    parser.add_argument('--primary_data_path', default='None', type=str,
+                        help='path to primary training HDF5 dataset')
+    parser.add_argument('--secondary_data_paths', default=None, type=str, nargs='+',
+                        help='one or more paths to secondary HDF5 datasets')
+    parser.add_argument('--training_strategy', default='auto', type=str,
+                        choices=['auto', 'primary_only', 'combine'],
+                        help='data handling strategy (auto: primary_only if no secondary, combine otherwise)')
+    # Deprecated aliases (mapped to primary/secondary in retrieve_all_args)
     parser.add_argument('--swissprot_data_root', default='None', type=str,
-                        help='path to SwissProt data')
+                        help='(deprecated, use --primary_data_path) path to SwissProt data')
     parser.add_argument('--pfam_data_root', default='None', type=str,
-                        help='path to Pfam data')
+                        help='(deprecated, use --secondary_data_paths) path to Pfam data')
 
     parser.add_argument('--pretrained_weights', default='None', type=str,
                         help='path to .bin weight or checkpoint file containing model weights')
@@ -200,9 +209,40 @@ def get_args(parser):
                         help='number of samples to validate on...')
     parser.add_argument('--log_every_n_steps', default=10001, type=float,
                         help='number of samples to validate on...')
+    parser.add_argument('--start_secondary', default='False', type=str,
+                        help='flag for phase transition: load primary weights then train on primary+secondary')
+    # Deprecated alias
     parser.add_argument('--start_pfam_trainer', default='False', type=str,
-                        help='decide whether we are running script that transitions from swissprot to swissprot+pfam')
+                        help='(deprecated, use --start_secondary)')
 
+    # Metrics history
+    parser.add_argument('--save_metrics_history', default='True', type=str,
+                        help='Save training/validation metrics history to artifacts dir')
+    parser.add_argument('--metrics_history_ranks', type=int, nargs='+', default=[0],
+                        help='Rank indices on which to save metrics history')
+    parser.add_argument('--metrics_history_every_n_steps', default=1, type=int,
+                        help='Record training metrics every N global steps')
+
+    # Early stopping
+    parser.add_argument('--early_stopping_metric', default=None, type=str,
+                        help='Metric to monitor for early stopping (e.g. val_loss). None to disable.')
+    parser.add_argument('--early_stopping_patience', default=10, type=int,
+                        help='Number of checks with no improvement before stopping')
+    parser.add_argument('--early_stopping_min_delta', default=0.0, type=float,
+                        help='Minimum change to qualify as an improvement')
+    parser.add_argument('--early_stopping_mode', default='min', type=str,
+                        choices=['min', 'max'],
+                        help='Whether to minimize or maximize the monitored metric')
+
+    # Periodic checkpoint saving
+    parser.add_argument('--checkpoint_every_n_steps', default=None, type=int,
+                        help='Save checkpoints every N training steps (in addition to best-metric saves)')
+    parser.add_argument('--checkpoint_every_n_epochs', default=None, type=int,
+                        help='Save checkpoints every N epochs (in addition to best-metric saves)')
+
+    # Multi-metric checkpoint monitors (JSON config only)
+    parser.add_argument('--checkpoint_monitors', default=None, type=str,
+                        help='JSON list of {metric, mode} dicts for checkpoint saving (set via config)')
 
     return parser
 
@@ -443,7 +483,8 @@ def save_model(
         checkpoint_path: str,
         artifacts_path: str,
         PL_model: pl.LightningModule,
-        trainer: Trainer
+        trainer: Trainer,
+        extra_checkpoint_callbacks=None,
     ) -> None:
     """
     Save a PyTorch Lightning model trained with DeepSpeed.
@@ -582,6 +623,63 @@ def save_model(
         backup_if_exists(artifact_best)
         shutil.copy2(best_state_dict_fpath, artifact_best)
         logger.info("Copied best state_dict to %s", artifact_best)
+
+        # ---- Process additional checkpoint monitors ----
+        checkpoint_summary = {
+            "primary": {
+                "metric": "val_loss",
+                "best_path": artifact_best,
+                "best_score": float(trainer.checkpoint_callback.best_model_score)
+                    if trainer.checkpoint_callback.best_model_score is not None else None,
+            },
+            "additional": [],
+        }
+        if extra_checkpoint_callbacks:
+            for cb in extra_checkpoint_callbacks:
+                if not cb.best_model_path:
+                    logger.warning("No best checkpoint found for monitor %s", cb.monitor)
+                    continue
+                metric_slug = cb.monitor.replace("/", "_")
+                extra_sd_fname = f"state_dict.best_{metric_slug}.pth"
+                extra_sd_fpath = os.path.join(checkpoint_path, extra_sd_fname)
+                backup_if_exists(extra_sd_fpath)
+                # Convert DeepSpeed checkpoint to state_dict
+                extra_single_fpath = os.path.join(checkpoint_path, f"single_model.best_{metric_slug}.pth")
+                backup_if_exists(extra_single_fpath)
+                logger.info("Converting DeepSpeed checkpoint for %s...", cb.monitor)
+                with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                    convert_zero_checkpoint_to_fp32_state_dict(
+                        cb.best_model_path, extra_single_fpath
+                    )
+                extra_temp_model = mod.get_model(
+                    args=args,
+                    data_shape=(image_size, image_size),
+                    num_classes=num_classes
+                ).cpu()
+                extra_loaded = PL_mod.PL_ProtARDM.load_from_checkpoint(
+                    extra_single_fpath,
+                    args=args, model=extra_temp_model
+                )
+                torch.save(extra_loaded.model.state_dict(), extra_sd_fpath)
+                # Copy to artifacts
+                artifact_extra = os.path.join(artifacts_path, extra_sd_fname)
+                backup_if_exists(artifact_extra)
+                shutil.copy2(extra_sd_fpath, artifact_extra)
+                logger.info("Saved best state_dict for %s to %s", cb.monitor, artifact_extra)
+                checkpoint_summary["additional"].append({
+                    "metric": cb.monitor,
+                    "mode": cb.mode,
+                    "best_score": float(cb.best_model_score)
+                        if cb.best_model_score is not None else None,
+                    "artifact": extra_sd_fname,
+                })
+
+        summary_path = os.path.join(artifacts_path, 'checkpoint_summary.json')
+        backup_if_exists(summary_path)
+        with open(summary_path, 'w') as f:
+            json.dump(checkpoint_summary, f, indent=2)
+        logger.info("Checkpoint summary written to %s", summary_path)
+
     return
 
 
@@ -690,49 +788,74 @@ def retrieve_all_args(args):
     # Type conversions (idempotent — pass through values already of the target type)
     args.resume_from_checkpoint = nonestr_to_none(args.resume_from_checkpoint)
     args.download = str_to_bool(args.download)
+
+    # New generalized dataset args
+    args.primary_data_path = nonestr_to_none(args.primary_data_path)
+    args.start_secondary = str_to_bool(args.start_secondary)
+
+    # Map deprecated aliases to new names
     args.swissprot_data_root = nonestr_to_none(args.swissprot_data_root)
     args.pfam_data_root = nonestr_to_none(args.pfam_data_root)
     args.start_pfam_trainer = str_to_bool(args.start_pfam_trainer)
+    if args.primary_data_path is None and args.swissprot_data_root is not None:
+        logger.warning("--swissprot_data_root is deprecated; use --primary_data_path")
+        args.primary_data_path = args.swissprot_data_root
+    if args.secondary_data_paths is None and args.pfam_data_root is not None:
+        logger.warning("--pfam_data_root is deprecated; use --secondary_data_paths")
+        args.secondary_data_paths = [args.pfam_data_root]
+    if not args.start_secondary and args.start_pfam_trainer:
+        logger.warning("--start_pfam_trainer is deprecated; use --start_secondary")
+        args.start_secondary = args.start_pfam_trainer
+
+    # Resolve training_strategy
+    if args.training_strategy == 'auto':
+        args.training_strategy = 'combine' if args.secondary_data_paths else 'primary_only'
+
     args.finetune = str_to_bool(args.finetune)
     args.finetune_output_layers = str_to_bool(args.finetune_output_layers)
     args.pretrained_weights = nonestr_to_none(args.pretrained_weights)
     args.wandb = str_to_bool(args.wandb)
     args.scale_learning_rate = str_to_bool(args.scale_learning_rate)
+    args.save_metrics_history = str_to_bool(args.save_metrics_history)
+    args.early_stopping_metric = nonestr_to_none(args.early_stopping_metric)
+    args.checkpoint_every_n_steps = nonestr_to_none(args.checkpoint_every_n_steps)
+    args.checkpoint_every_n_epochs = nonestr_to_none(args.checkpoint_every_n_epochs)
 
     return args
 
 
 def load_data(
         args, *,
-        swissprot_data_root,
-        pfam_data_root,
+        primary_data_path,
+        secondary_data_paths,
         facilitator,
     ):
     """
     Initialize and prepare a data module for protein sequence datasets.
-    
-    This function creates a PyTorch Lightning data module that handles loading
-    and preprocessing protein sequence data from HDF5 files. It supports both
-    SwissProt and Pfam datasets, and can configure different data groupings
-    based on the specified facilitator (MMD or MSE).
-    
+
+    Creates an :class:`HDF5DataModule` from one primary HDF5 file and zero
+    or more secondary HDF5 files.  The *facilitator* name determines the
+    HDF5 group name (e.g. ``MMD_data``).
+
     Args:
-        args: Configuration object containing dataset paths and parameters
-              including swissprot_data_root, pfam_data_root, and facilitator
-        
+        args: Configuration namespace (batch_size, num_workers, etc.)
+        primary_data_path: Path to the primary HDF5 training dataset.
+        secondary_data_paths: List of paths to secondary HDF5 datasets, or None.
+        facilitator: Facilitator name used as HDF5 group prefix.
+
     Returns:
-        A configured PyTorch Lightning data module ready for use in training
+        A configured PyTorch Lightning data module ready for training.
     """
-    data_module = PL_mod.HDF5_PFamDataModule(
-                            batch_size=args.batch_size,
-                            num_workers=args.num_workers,
-                            valid_size=args.valid_size,
-                            seed=args.seed,
-                            diffusion_steps=args.diffusion_steps,
-                            image_size=args.image_size,
-                            swissprot_path=swissprot_data_root,
-                            pfam_path=pfam_data_root,
-                            group_name=facilitator + '_data'  # Uses facilitator type as prefix
+    data_module = PL_mod.HDF5DataModule(
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        valid_size=args.valid_size,
+        seed=args.seed,
+        diffusion_steps=args.diffusion_steps,
+        image_size=args.image_size,
+        primary_path=primary_data_path,
+        secondary_paths=secondary_data_paths,
+        group_name=facilitator + '_data',
     )
     data_module.setup()
     return data_module
@@ -1003,13 +1126,13 @@ def train_model(
     runs_folder = args.runs_folder
     run_id = args.run_id
     log_every_n_steps = args.log_every_n_steps
-    pfam_data_root = args.pfam_data_root
+    training_strategy = args.training_strategy
     gpu_devices = args.gpu_devices
     num_nodes = args.num_nodes
     acc_grad_batches = args.acc_grad_batches
     epochs = args.epochs
-    start_pfam_trainer = args.start_pfam_trainer  # Expect bool
-    assert isinstance(start_pfam_trainer, bool), "start_fpam_trainer not bool"
+    start_secondary = args.start_secondary  # Expect bool
+    assert isinstance(start_secondary, bool), "start_secondary not bool"
     max_steps = args.max_steps
     val_check_interval = args.val_check_interval
     limit_val_batches = args.limit_val_batches
@@ -1098,31 +1221,77 @@ def train_model(
     logger.info("Setting up DeviceStatesMonitor...")
     gpu_logger = DeviceStatsMonitor()
 
-    # Configure checkpoint strategy based on dataset type
+    # ---- Checkpoint callbacks ----
     logger.info("Configuring ModelCheckpoint...")
-    if pfam_data_root is None:
-        checkpoint_callback = ModelCheckpoint(
+
+    # Parse checkpoint_monitors from config (list of {metric, mode} dicts)
+    checkpoint_monitors = getattr(args, 'checkpoint_monitors', None)
+    if checkpoint_monitors is None:
+        checkpoint_monitors = [{"metric": "val_loss", "mode": "min"}]
+    elif isinstance(checkpoint_monitors, str):
+        checkpoint_monitors = json.loads(checkpoint_monitors)
+
+    # Optional periodic saving
+    every_n_steps = getattr(args, 'checkpoint_every_n_steps', None)
+    every_n_epochs = getattr(args, 'checkpoint_every_n_epochs', None)
+    # For step-based training (combine strategy), default periodic saving to log_every_n_steps
+    if training_strategy == 'combine' and every_n_steps is None:
+        every_n_steps = int(log_every_n_steps)
+
+    checkpoint_callbacks = []
+    for i, mon in enumerate(checkpoint_monitors):
+        ckpt_kwargs = dict(
             dirpath=checkpoint_dir,
-            save_top_k=2,
             verbose=True,
-            monitor='val_loss',
-            mode="min",
-            save_last="link",
+            monitor=mon["metric"],
+            mode=mon["mode"],
             enable_version_counter=False,
+        )
+        if i == 0:
+            # Primary monitor: keep top-2, save last symlink
+            ckpt_kwargs["save_top_k"] = 2
+            ckpt_kwargs["save_last"] = "link"
+            if every_n_steps is not None:
+                ckpt_kwargs["every_n_train_steps"] = int(every_n_steps)
+        else:
+            # Additional monitors: keep best-1, unique filename
+            metric_slug = mon["metric"].replace("/", "_")
+            ckpt_kwargs["save_top_k"] = 1
+            ckpt_kwargs["save_last"] = False
+            ckpt_kwargs["filename"] = f"best-{metric_slug}-{{epoch}}"
+        checkpoint_callbacks.append(ModelCheckpoint(**ckpt_kwargs))
+
+    # ---- Metrics history ----
+    if getattr(args, 'save_metrics_history', True):
+        from biom3.Stage3.callbacks import MetricsHistoryCallback
+        metrics_cb = MetricsHistoryCallback(
+            output_dir=artifacts_dir,
+            save_ranks=getattr(args, 'metrics_history_ranks', [0]),
+            every_n_steps=getattr(args, 'metrics_history_every_n_steps', 1),
         )
     else:
-        checkpoint_callback = ModelCheckpoint(
-            dirpath=checkpoint_dir,
-            save_top_k=2,
-            verbose=True,
-            monitor='val_loss',
-            mode="min",
-            save_last="link",
-            enable_version_counter=False,
-            every_n_train_steps=log_every_n_steps,  # Save checkpoints periodically by steps
-        )
+        metrics_cb = None
 
-    # Define common trainer parameters 
+    # ---- Early stopping ----
+    early_stopping_metric = getattr(args, 'early_stopping_metric', None)
+    if isinstance(early_stopping_metric, str) and early_stopping_metric.lower() == 'none':
+        early_stopping_metric = None
+
+    callbacks = checkpoint_callbacks + [lr_monitor, gpu_logger]
+    if metrics_cb is not None:
+        callbacks.append(metrics_cb)
+    if early_stopping_metric is not None:
+        logger.info("Enabling early stopping on %s (patience=%d)",
+                     early_stopping_metric, args.early_stopping_patience)
+        callbacks.append(EarlyStopping(
+            monitor=early_stopping_metric,
+            patience=args.early_stopping_patience,
+            min_delta=getattr(args, 'early_stopping_min_delta', 0.0),
+            mode=getattr(args, 'early_stopping_mode', 'min'),
+            verbose=True,
+        ))
+
+    # Define common trainer parameters
     trainer_params = {
         'enable_progress_bar': True,
         'enable_model_summary': True,
@@ -1134,19 +1303,13 @@ def train_model(
         'accumulate_grad_batches': acc_grad_batches,
         'logger': loggers,
         'log_every_n_steps': log_every_n_steps,
-        'callbacks': [checkpoint_callback, lr_monitor, gpu_logger],
+        'callbacks': callbacks,
     }
 
-    # Configure training mode: epoch-based or step-based
-    if pfam_data_root is None:
+    # Configure training mode: epoch-based (primary_only) or step-based (combine)
+    if training_strategy == 'primary_only':
         trainer_params['max_epochs'] = epochs
     else:
-        # if start_pfam_trainer:
-        #     print('load weights from swissprot phase...')
-        #     PL_model = get_deepspeed_model(
-        #             args=args,
-        #             PL_model=PL_model
-        #     )
         trainer_params['max_steps'] = max_steps
         trainer_params['val_check_interval'] = val_check_interval
         trainer_params['limit_val_batches'] = limit_val_batches
@@ -1169,11 +1332,11 @@ def train_model(
         if resume_from_checkpoint is None:
             logger.info("Train from scratch")
             trainer.fit(PL_model, data_module)
-        elif start_pfam_trainer:
-            logger.info('Start training Proteoscribe in phase 2 ...')
+        elif start_secondary:
+            logger.info('Start training ProteoScribe with secondary data ...')
             trainer.fit(PL_model, data_module)
         else:
-            logger.info('Continue training Proteoscribe in phase 2 ...')
+            logger.info('Continue training ProteoScribe from checkpoint ...')
             trainer.fit(PL_model, data_module, ckpt_path=resume_from_checkpoint)
 
     print_gpu_initialization()
@@ -1181,10 +1344,11 @@ def train_model(
     # Save trained model in multiple formats
     save_model(
             args=args,
-            checkpoint_path=checkpoint_callback.dirpath,
+            checkpoint_path=checkpoint_callbacks[0].dirpath,
             artifacts_path=artifacts_dir,
             PL_model=PL_model,
             trainer=trainer,
+            extra_checkpoint_callbacks=checkpoint_callbacks[1:],
     )
 
 
@@ -1212,8 +1376,8 @@ def main(args, use_hydra=False, ds_config=None,):
 
     # ----- Process passed parameters -----
     seed = args.seed
-    swissprot_data_root = args.swissprot_data_root
-    pfam_data_root = args.pfam_data_root
+    primary_data_path = args.primary_data_path
+    secondary_data_paths = args.secondary_data_paths
     facilitator = args.facilitator
 
     # ----- Clear the GPU cache -----
@@ -1221,17 +1385,16 @@ def main(args, use_hydra=False, ds_config=None,):
 
     # ----- For reproducibility -----
     if seed <= 0:
-        # If the seed is not specified, generate a random seed and use this.
         seed = np.random.randint(2**32)
         args.seed = seed
     set_seed(seed)
     logger.info("Using seed: %s", seed)
-     
+
     # ----- Load Data -----
     data_module = load_data(
         args=args,
-        swissprot_data_root=swissprot_data_root,
-        pfam_data_root=pfam_data_root,
+        primary_data_path=primary_data_path,
+        secondary_data_paths=secondary_data_paths,
         facilitator=facilitator,
     )
 
@@ -1315,7 +1478,8 @@ def main(args, use_hydra=False, ds_config=None,):
             "acc_grad_batches": args.acc_grad_batches,
             "deepspeed_stage": "2",
         }
-        if args.pfam_data_root is not None:
+        outputs["training_strategy"] = args.training_strategy
+        if args.training_strategy == 'combine':
             outputs["max_steps"] = args.max_steps
             outputs["val_check_interval"] = args.val_check_interval
         else:
@@ -1330,14 +1494,14 @@ def main(args, use_hydra=False, ds_config=None,):
             "checkpoint_dir": os.path.abspath(checkpoint_dir),
             "artifacts_dir": os.path.abspath(artifacts_dir),
         }
-        if args.swissprot_data_root is not None:
-            resolved_paths["swissprot_data_root"] = os.path.abspath(
-                args.swissprot_data_root
+        if args.primary_data_path is not None:
+            resolved_paths["primary_data_path"] = os.path.abspath(
+                args.primary_data_path
             )
-        if args.pfam_data_root is not None:
-            resolved_paths["pfam_data_root"] = os.path.abspath(
-                args.pfam_data_root
-            )
+        if args.secondary_data_paths is not None:
+            resolved_paths["secondary_data_paths"] = [
+                os.path.abspath(p) for p in args.secondary_data_paths
+            ]
         if args.pretrained_weights is not None:
             resolved_paths["pretrained_weights"] = os.path.abspath(
                 args.pretrained_weights

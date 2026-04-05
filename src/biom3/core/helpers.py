@@ -4,6 +4,7 @@ Common helper functions
 """
 
 import json
+import os
 from argparse import Namespace
 import numpy as np
 import torch
@@ -14,11 +15,66 @@ from biom3.backend.device import setup_logger
 logger = setup_logger(__name__)
 
 
-def load_json_config(json_path: str) -> dict:
-    """Load JSON configuration file."""
+def _resolve_config_paths(paths: list[str], base_dir: str) -> list[str]:
+    """Resolve config paths relative to *base_dir*."""
+    resolved = []
+    for p in paths:
+        if not os.path.isabs(p):
+            p = os.path.join(base_dir, p)
+        resolved.append(p)
+    return resolved
+
+
+def load_json_config(json_path: str, _visited=None) -> dict:
+    """Load JSON configuration with optional config composition.
+
+    Two special keys control composition:
+
+    ``_base_configs``
+        List of paths loaded **before** the current file.  The current
+        file's values override base values.
+
+    ``_overwrite_configs``
+        List of paths loaded **after** the current file.  Their values
+        override the current file's values.
+
+    Priority (lowest → highest):
+        _base_configs  <  current file  <  _overwrite_configs  <  CLI
+
+    Paths are resolved relative to the directory containing the JSON file.
+    Both keys are removed from the returned dict.  Circular references
+    raise ``ValueError``.
+    """
+    if _visited is None:
+        _visited = set()
+
+    real_path = os.path.realpath(json_path)
+    if real_path in _visited:
+        raise ValueError(f"Circular config reference detected: {json_path}")
+    _visited.add(real_path)
+
     with open(json_path, "r") as f:
         config = json.load(f)
-    return config
+
+    base_dir = os.path.dirname(os.path.abspath(json_path))
+    base_configs_list = config.pop("_base_configs", None)
+    overwrite_configs_list = config.pop("_overwrite_configs", None)
+
+    # Start from bases (earlier < later)
+    merged: dict = {}
+    if base_configs_list:
+        for bp in _resolve_config_paths(base_configs_list, base_dir):
+            merged.update(load_json_config(bp, _visited=_visited))
+
+    # Current file overrides bases
+    merged.update(config)
+
+    # Overwrite configs override current file (earlier < later)
+    if overwrite_configs_list:
+        for op in _resolve_config_paths(overwrite_configs_list, base_dir):
+            merged.update(load_json_config(op, _visited=_visited))
+
+    return merged
 
 
 def convert_to_namespace(config_dict: dict) -> Namespace:

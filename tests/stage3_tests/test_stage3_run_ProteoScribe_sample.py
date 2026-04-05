@@ -116,24 +116,26 @@ def test_reproducibility(
         os.path.join(OUTPUTS_DIR, "test_ProteoScribe_samples.pt")
     )
     remove_dir(OUTPUTS_DIR)
-    # Compare results
+    # Compare results (prompt-indexed: {prompt_N: [replica_seqs], _metadata: {...}})
     expect_same = seed1 == seed2
     errors = []
-    assert len(res_dict1) == len(res_dict2)
-    for i in range(len(res_dict1)):
-        replicates1 = res_dict1[f"replica_{i}"]
-        replicates2 = res_dict2[f"replica_{i}"]
+    prompt_keys1 = [k for k in res_dict1 if not k.startswith("_")]
+    prompt_keys2 = [k for k in res_dict2 if not k.startswith("_")]
+    assert len(prompt_keys1) == len(prompt_keys2)
+    for key in prompt_keys1:
+        replicas1 = res_dict1[key]
+        replicas2 = res_dict2[key]
         observed_same = np.all(
-            [s1 == s2 for s1, s2 in zip(replicates1, replicates2)]
+            [s1 == s2 for s1, s2 in zip(replicas1, replicas2)]
         )
         if expect_same and not observed_same:
-            msg = "Expected same results but results differed."
-            msg += f"\n  Replicates 1: {replicates1}"
-            msg += f"\n  Replicates 2: {replicates2}"
+            msg = f"Expected same results for {key} but results differed."
+            msg += f"\n  Replicas 1: {replicas1}"
+            msg += f"\n  Replicas 2: {replicas2}"
             errors.append(msg)
         elif not expect_same and observed_same:
-            msg = "Expected different results but results matched."
-            msg += f"\n  Replicates 1 == Replicates 2: {replicates1}"
+            msg = f"Expected different results for {key} but results matched."
+            msg += f"\n  Replicas 1 == Replicas 2: {replicas1}"
             errors.append(msg)
     assert not errors, "Errors occurred:\n{}".format("\n".join(errors))
 
@@ -251,11 +253,13 @@ def test_checkpoint_and_weights_produce_same_output(mini_checkpoint_path, device
     main(args_ckpt)
     result_ckpt = torch.load(output_path_ckpt)
     remove_dir(OUTPUTS_DIR)
-    # Compare results
-    assert len(result_raw) == len(result_ckpt)
-    for i in range(len(result_raw)):
-        seqs_raw = result_raw[f"replica_{i}"]
-        seqs_ckpt = result_ckpt[f"replica_{i}"]
+    # Compare results (prompt-indexed structure)
+    prompt_keys_raw = sorted(k for k in result_raw if not k.startswith("_"))
+    prompt_keys_ckpt = sorted(k for k in result_ckpt if not k.startswith("_"))
+    assert prompt_keys_raw == prompt_keys_ckpt
+    for key in prompt_keys_raw:
+        seqs_raw = result_raw[key]
+        seqs_ckpt = result_ckpt[key]
         assert seqs_raw == seqs_ckpt, (
-            f"replica_{i} mismatch:\n  raw:  {seqs_raw}\n  ckpt: {seqs_ckpt}"
+            f"{key} mismatch:\n  raw:  {seqs_raw}\n  ckpt: {seqs_ckpt}"
         )

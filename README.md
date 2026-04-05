@@ -243,6 +243,7 @@ Training configuration is specified via a JSON config file passed with `--config
 CLI arguments override JSON values, which override argparse defaults.
 
 Example JSON configs are in `configs/training/`.
+Configs support layered composition: `_base_configs` for shared model architectures (`configs/training/models/`) and `_overwrite_configs` for per-machine settings (`configs/training/machines/`). See [docs/stage3_training.md](./docs/stage3_training.md) for details.
 Wrapper scripts `scripts/stage3_train_multinode.sh` (multi-node via `mpiexec`) and `scripts/stage3_train_singlenode.sh` (single-node) handle environment setup and launch the entrypoint.
 HPC job templates in `jobs/{polaris,aurora,spark}/` demonstrate how to use these wrappers.
 
@@ -274,7 +275,7 @@ biom3_pretrain_stage3 \
     --device cuda \
     --pretrained_weights ./weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin \
     --finetune_last_n_blocks 1 \
-    --finetune_last_n_layers 1
+    --finetune_last_n_layers -1
 ```
 
 #### Inference (Generation)
@@ -295,6 +296,9 @@ This stage generates protein sequences from the facilitated text embeddings (`z_
 | | `--animate_prompts` | No | Prompt indices to animate (e.g. `0 1 2`), `all`, or `none`. Omit to disable animation. |
 | | `--animate_replicas` | No | Replicas to animate: integer `i` selects `range(0, i)`, `all`, or `none` (default: `1`) |
 | | `--animation_dir` | No | Directory for GIF output. Default: `<output_dir>/animations/` |
+| | `--fasta` | No | Write one FASTA file per prompt to `<output_dir>/fasta/` |
+| | `--fasta_merge` | No | Also write a single merged FASTA with all sequences (requires `--fasta`) |
+| | `--fasta_dir` | No | Custom output directory for FASTA files |
 
 > **Note:** To control sampling behavior (number of sequences per prompt, batch size, diffusion steps), edit `num_replicas`, `batch_size_sample`, and `diffusion_steps` in the JSON config.
 

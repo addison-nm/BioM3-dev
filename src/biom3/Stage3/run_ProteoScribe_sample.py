@@ -110,6 +110,14 @@ def parse_arguments(args):
                              "(prompt, replica) pair as .npz files. "
                              "Shapes: probs[steps, seq_len, num_classes]. "
                              "Memory-intensive for long sequences or many replicas.")
+    parser.add_argument('--fasta', action='store_true', default=False,
+                        help="Write one FASTA file per prompt to <output_dir>/fasta/")
+    parser.add_argument('--fasta_merge', action='store_true', default=False,
+                        help="Also write a single merged FASTA with all sequences "
+                             "(requires --fasta)")
+    parser.add_argument('--fasta_dir', type=str, default=None,
+                        help="Output directory for FASTA files. "
+                             "Default: <output_dir>/fasta/")
     return parser.parse_args(args)
 
 
@@ -317,9 +325,18 @@ def batch_stage3_generate_sequences(
     assert all(seq is not None for row in design_sequences for seq in row), \
         "Not all (prompt, replica) pairs were generated"
 
+    num_prompts = z_t.size(0)
     design_sequence_dict = {
-        f'replica_{r_idx}': design_sequences[r_idx]
-        for r_idx in range(args.num_replicas)
+        f'prompt_{p_idx}': [
+            design_sequences[r_idx][p_idx]
+            for r_idx in range(args.num_replicas)
+        ]
+        for p_idx in range(num_prompts)
+    }
+    design_sequence_dict['_metadata'] = {
+        'format_version': 2,
+        'num_prompts': num_prompts,
+        'num_replicas': args.num_replicas,
     }
 
     return design_sequence_dict, animation_frames, tokens, stored_probs
@@ -426,6 +443,28 @@ def main(args, _setup_logging=True):
     logger.info("design_sequence_dict=%s", design_sequence_dict)
 
     torch.save(design_sequence_dict, f"{config_args_parser.output_path}")
+
+    # Write FASTA files
+    if getattr(config_args_parser, 'fasta', False):
+        fasta_dir = config_args_parser.fasta_dir or os.path.join(outdir, "fasta")
+        os.makedirs(fasta_dir, exist_ok=True)
+        for prompt_key, replicas in design_sequence_dict.items():
+            if prompt_key.startswith("_"):
+                continue
+            fasta_path = os.path.join(fasta_dir, f"{prompt_key}.fasta")
+            with open(fasta_path, 'w') as fh:
+                for r_idx, seq in enumerate(replicas):
+                    fh.write(f">{prompt_key}_replica_{r_idx} seed={seed}\n{seq}\n")
+        logger.info("FASTA files written to %s", fasta_dir)
+        if getattr(config_args_parser, 'fasta_merge', False):
+            merged_path = os.path.join(fasta_dir, "all_sequences.fasta")
+            with open(merged_path, 'w') as fh:
+                for prompt_key, replicas in design_sequence_dict.items():
+                    if prompt_key.startswith("_"):
+                        continue
+                    for r_idx, seq in enumerate(replicas):
+                        fh.write(f">{prompt_key}_replica_{r_idx} seed={seed}\n{seq}\n")
+            logger.info("Merged FASTA written to %s", merged_path)
 
     # Generate GIF animations
     if animation_frames:

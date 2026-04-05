@@ -2,12 +2,13 @@
   "description": "Phase 2 pretraining with Pfam dataset. Continues training of 16-block model.",
   "tags": [],
   "notes": [],
+  "_base_configs": ["./models/_base_model_16blocks.json"],
+  "_overwrite_configs": [],
 
-  "swissprot_data_root": "./data/Stage2_MMD_swissprot_embedding_last_ckpt_all.hdf5",
-  "pfam_data_root": "./data/Stage2_MMD_pfam_embedding_last_ckpt_all.hdf5",
+  "primary_data_path": "./data/Stage2_MMD_swissprot_embedding_last_ckpt_all.hdf5",
+  "secondary_data_paths": ["./data/Stage2_MMD_pfam_embedding_last_ckpt_all.hdf5"],
+  "training_strategy": "auto",
   "sequence_keyname": "sequence",
-  "num_classes": 29,
-  "num_y_class_labels": 6,
 
   "wandb": true,
   "wandb_entity": "thenaturalmachine",
@@ -26,10 +27,7 @@
   "enter_eval": 1000,
   "resume_from_checkpoint": null,
   "batch_size": 32,
-  "model_option": "transformer",
-  "diffusion_steps": 1024,
   "warmup_steps": 500,
-  "image_size": 32,
   "ema_inv_gamma": 1.0,
   "ema_power": 0.75,
   "ema_max_value": 0.95,
@@ -46,30 +44,26 @@
   "limit_val_batches": 0.05,
 
   "log_every_n_steps": 100,
-  "start_pfam_trainer": true,
+  "start_secondary": true,
   "num_workers": 1,
-
-  "num_steps": 1,
-  "actnorm": false,
-  "perm_channel": "none",
-  "perm_length": "reverse",
-
-  "input_dp_rate": 0.0,
-
-  "transformer_dim": 512,
-  "transformer_heads": 16,
-  "transformer_depth": 16,
-  "transformer_blocks": 16,
-  "transformer_dropout": 0.1,
-  "transformer_reversible": false,
-  "transformer_local_heads": 8,
-  "transformer_local_size": 128,
-
-  "text_emb_dim": 512,
-  "facilitator": "MMD",
 
   "output_root": "./outputs/Stage3/pretraining",
   "checkpoints_folder": "checkpoints",
+  "runs_folder": "runs",
 
+  "checkpoint_monitors": null,
+  "checkpoint_every_n_steps": null,
+  "checkpoint_every_n_epochs": null,
+
+  "early_stopping_metric": null,
+  "early_stopping_patience": 10,
+  "early_stopping_min_delta": 0.0,
+  "early_stopping_mode": "min",
+
+  "save_metrics_history": true,
+  "metrics_history_every_n_steps": 1,
+  "metrics_history_ranks": [0],
+
+  "finetune_output_layers": true,
   "pretrained_weights": null
 }

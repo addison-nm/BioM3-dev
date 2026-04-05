@@ -57,8 +57,8 @@ Created `configs/training/` with 7 JSON files converted from the shell arglists:
 | `pretrain_scratch_v3.json` | 16 transformer blocks, lr=1e-2 |
 | `pretrain_start_pfam_v1.json` | Phase 2 with Pfam, 1 block |
 | `pretrain_start_pfam_v2.json` | Phase 2 with Pfam, 16 blocks, seed=162 |
-| `finetune_v1.json` | Finetuning, 1 block, with pretrained weights |
-| `finetune_v2.json` | Same as v1, no `finetune_last_n_layers` |
+| `finetune_v1.json` | Finetuning, 1 block, all layers unfrozen (`finetune_last_n_layers: -1`) |
+| `finetune_v2.json` | Finetuning, 1 block, last layer only (`finetune_last_n_layers: 1`) |
 
 Conversion: `"None"` → `null`, `True/False` → `true/false`, proper JSON types,
 `wandb_tags` as arrays, dropped `run_id` and `traindata_len` (runtime values).

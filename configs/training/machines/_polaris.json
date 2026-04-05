@@ -1,0 +1,4 @@
+{
+  "device": "cuda",
+  "gpu_devices": 4
+}

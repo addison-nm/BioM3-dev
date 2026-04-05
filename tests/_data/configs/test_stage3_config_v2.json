@@ -16,7 +16,7 @@
   "unmasking_order": "random",
   "token_strategy": "sample",
   "batch_size_sample": 32,
-  "diffusion_steps": 1024,
+  "diffusion_steps": 128,
   "seed": 42,
   "batch_size": 16,
   "warmup_steps": 500,

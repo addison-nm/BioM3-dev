@@ -17,7 +17,7 @@ from biom3.Stage3.run_ProteoScribe_sample import load_json_config, convert_to_na
 from biom3.Stage3.io import build_model_ProteoScribe
 import biom3.Stage3.sampling_analysis as Stage3_sample_tools
 
-MINI_WEIGHTS = os.path.join(DATDIR, "models/stage3/weights/minimodel1_weights1.pth")
+MINI_WEIGHTS = os.path.join(DATDIR, "models/stage3/weights/minimodel1_ds128_weights1.pth")
 MINI_CONFIG = os.path.join(DATDIR, "configs/test_stage3_config_v2.json")
 
 

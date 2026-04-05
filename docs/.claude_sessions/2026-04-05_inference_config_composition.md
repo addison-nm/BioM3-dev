@@ -1,63 +1,69 @@
-# Session: Inference Config Composition
+# Session: Inference Config Composition + Test Speedup
 
 **Date:** 2026-04-05
 **Branch:** addison-main
 
 ## Summary
 
-Unified inference config loading across Stages 1, 2, and 3 to use the same `_base_configs` / `_overwrite_configs` composition system already in place for training configs. Created factored inference configs that eliminate duplicated model architecture keys.
+Two changes in this session:
+1. Unified inference config loading across Stages 1, 2, and 3 to use `_base_configs` / `_overwrite_configs` composition (matching training configs).
+2. Reduced `diffusion_steps` in Stage 3 sampling test configs from 1024 to 128 for ~40x test speedup.
 
 ## Changes
 
-### 1. Replaced local config loaders with core.helpers imports
+### 1. Unified inference config loading (commit 385f410)
 
-All three inference scripts had identical local `load_json_config()` (plain `json.load`) and `convert_to_namespace()`. Replaced with imports from `biom3.core.helpers`, which supports config composition. This is backward-compatible — flat JSON files with no `_base_configs` key work identically.
+Replaced identical local `load_json_config()` / `convert_to_namespace()` in all three inference scripts with imports from `biom3.core.helpers`. Created factored configs in `configs/inference/`:
 
-**Files modified:**
-- `src/biom3/Stage1/run_PenCL_inference.py` — removed local loaders, added import, cleaned up unused `json` import
-- `src/biom3/Stage2/run_Facilitator_sample.py` — same, also removed unused `Namespace` and `json` imports
-- `src/biom3/Stage3/run_ProteoScribe_sample.py` — same, also removed unused `Namespace` and `json` imports
-
-### 2. Created configs/inference/ directory with factored configs
-
-New directory structure:
 ```
 configs/inference/
 ├── models/
 │   ├── _base_PenCL.json          ← ESM-2 + BioBERT encoder specs (15 keys)
 │   └── _base_Facilitator.json    ← emb_dim, hid_dim, dropout (3 keys)
-├── stage1_PenCL.json             ← _base_configs: [models/_base_PenCL.json] + 3 inference keys
-├── stage2_Facilitator.json       ← _base_configs: [models/_base_Facilitator.json]
-└── stage3_ProteoScribe_sample.json ← _base_configs: [../training/models/_base_model_1block.json] + 6 sampling keys
+├── stage1_PenCL.json             ← 18 keys (was 47)
+├── stage2_Facilitator.json       ← 3 keys (was 14)
+└── stage3_ProteoScribe_sample.json ← 28 keys (was 62, reuses training model base)
 ```
 
-Key reductions:
-- Stage 1: 47 → 18 keys (removed 30 training-only keys: epochs, lr, weight_decay, etc.)
-- Stage 2: 14 → 3 keys (removed 11 unused keys)
-- Stage 3: 62 → 28 keys (model arch inherited from training base, removed 38 training-only keys)
+Before creating factored configs, thoroughly verified which keys are actually accessed during each inference pipeline. Removed 30 unused training-only keys from Stage 1, 11 from Stage 2, and 38 from Stage 3.
 
-### 3. Updated docstrings
+Old flat configs in `configs/` kept for backward compatibility.
 
-Updated module docstrings in all three inference scripts to reference the new config paths.
+### 2. Stage 3 sampling test speedup
 
-### 4. Deleted untracked updated_* configs
+Reduced `diffusion_steps` from 1024 to 128 in `test_stage3_config_v2.json` (sampling test config). This controls both sequence length and number of denoising iterations — the main bottleneck.
 
-Removed `configs/updated_stage1_config_PenCL_inference.json` and `configs/updated_stage2_config_Facilitator_sample.json` — these were copies with specific data/checkpoint paths filled in.
+- Created dedicated `minimodel1_ds128_weights1.pth` for sampling tests (model shape depends on `diffusion_steps`)
+- Training test configs kept at `diffusion_steps=1024` (bound by HDF5 training data sequence length)
+- Updated `stage3_args_v2.txt` and test files to reference the ds128 weights
 
-### 5. Updated CLAUDE.md
+**Result:** Stage 3 sampling tests dropped from ~27 minutes to ~41 seconds. Full Stage 3 suite (sampling + training) passes: 157 passed, 0 failed.
 
-Added `configs/inference/` to repo layout and updated Configuration section.
+### Decisions made
 
-## Key decisions
+- **Inference configs moved to `configs/inference/`** — mirrors `configs/training/`
+- **Unused training keys removed** from inference configs after exhaustive verification
+- **`num_gpus` vs `gpu_devices` naming** deferred — separate refactor
+- **Deleted untracked `updated_*` configs** — replaced by `_overwrite_configs` workflow
 
-- **Old flat configs kept** in `configs/` for backward compatibility. New configs are in `configs/inference/`.
-- **Stage 3 sampling reuses training base configs** via `_base_configs: ["../training/models/_base_model_1block.json"]` — no duplication of model architecture.
-- **`num_gpus` vs `gpu_devices` naming** deferred — separate refactor with its own testing surface.
-- **Unused training keys removed** from inference configs after thorough verification that they are never accessed in the inference code path.
+## Files Modified
+
+| File | Changes |
+|------|---------|
+| `src/biom3/Stage1/run_PenCL_inference.py` | Import from `core.helpers`, remove local loaders, update docstring |
+| `src/biom3/Stage2/run_Facilitator_sample.py` | Same |
+| `src/biom3/Stage3/run_ProteoScribe_sample.py` | Same |
+| `CLAUDE.md` | Add `configs/inference/` to layout and config docs |
+| `configs/inference/` | New directory: 5 JSON config files |
+| `tests/_data/configs/test_stage3_config_v2.json` | `diffusion_steps`: 1024 → 128 |
+| `tests/_data/entrypoint_args/stage3_args_v2.txt` | Point to ds128 weights |
+| `tests/_data/models/stage3/weights/minimodel1_ds128_weights1.pth` | New weight file for 128-step model |
+| `tests/stage3_tests/test_stage3_run_ProteoScribe_sample.py` | Use ds128 weights |
+| `tests/stage3_tests/test_batch_generate_denoised_sampled.py` | Use ds128 weights |
 
 ## Verification
 
 - `pytest tests/test_imports.py` — 5/5 passed
-- Config composition verified: all three new configs resolve correctly via `load_json_config()`
-- Old flat configs still load correctly (backward compat)
-- Tests use their own configs in `tests/_data/configs/`, unaffected by this change
+- `pytest tests/stage3_tests/` — 157 passed, 0 failed (12.5 min total)
+- Sampling tests specifically: 129 passed in 41s (was ~27 min)
+- Config composition verified for all new and old configs

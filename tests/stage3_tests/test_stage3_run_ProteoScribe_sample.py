@@ -34,7 +34,7 @@ REQUIRED_DOWNLOADS = [
 ]
 
 # Test data paths for checkpoint tests
-MINI_WEIGHTS = os.path.join(DATDIR, "models/stage3/weights/minimodel1_weights1.pth")
+MINI_WEIGHTS = os.path.join(DATDIR, "models/stage3/weights/minimodel1_ds128_weights1.pth")
 MINI_CONFIG = os.path.join(DATDIR, "configs/test_stage3_config_v2.json")
 TEST_EMBEDDINGS = os.path.join(DATDIR, "embeddings/test_Facilitator_embeddings.pt")
 

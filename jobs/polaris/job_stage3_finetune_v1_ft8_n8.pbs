@@ -21,7 +21,7 @@ conda activate base
 source ./venvs/biom3-env/bin/activate
 
 # Configurations to edit
-config_path=./configs/training/finetune_v1.json  # JSON config file
+config_path=./configs/stage3_training/finetune_v1.json  # JSON config file
 num_nodes=8                     # Should match num requested nodes in PBS header
 epochs=100                      # Number of epochs to finetune
 resume_from_checkpoint=None     # None to start finetuning fresh

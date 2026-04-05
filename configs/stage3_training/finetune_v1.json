@@ -1,19 +1,26 @@
 {
-  "description": "Phase 2 pretraining with Pfam dataset. Continues training of 16-block model.",
+  "description": "Finetuning ProteoScribe (1 block, original paper architecture). Unfreezes all layers of the last block.",
+  "model_name": "BioM3-v0",
   "tags": [],
   "notes": [],
-  "_base_configs": ["./models/_base_ProteoScribe_16blocks.json"],
+  "_base_configs": ["./models/_base_ProteoScribe_1block.json"],
   "_overwrite_configs": [],
 
-  "primary_data_path": "./data/Stage2_MMD_swissprot_embedding_last_ckpt_all.hdf5",
-  "secondary_data_paths": ["./data/Stage2_MMD_pfam_embedding_last_ckpt_all.hdf5"],
+  "finetune": true,
+  "pretrained_weights": "weights/ProteoScribe/ProteoScribe_epoch200.pth",
+  "finetune_last_n_blocks": 1,
+  "finetune_last_n_layers": -1,
+  "finetune_output_layers": true,
+
+  "primary_data_path": null,
+  "secondary_data_paths": null,
   "training_strategy": "auto",
   "sequence_keyname": "sequence",
 
-  "wandb": true,
+  "wandb": false,
   "wandb_entity": "thenaturalmachine",
-  "wandb_project": "BioM3",
-  "wandb_tags": ["pretrain_start_pfam"],
+  "wandb_project": "BioM3-dev",
+  "wandb_tags": ["finetuning"],
 
   "choose_optim": "AdamW",
   "lr": 1e-4,
@@ -21,7 +28,7 @@
   "weight_decay": 1e-6,
   "scheduler_gamma": "coswarmup",
 
-  "seed": 162,
+  "seed": 0,
   "epochs": 100,
   "valid_size": 0.2,
   "enter_eval": 1000,
@@ -44,10 +51,10 @@
   "limit_val_batches": 0.05,
 
   "log_every_n_steps": 100,
-  "start_secondary": true,
+  "start_secondary": false,
   "num_workers": 1,
 
-  "output_root": "./outputs/Stage3/pretraining",
+  "output_root": "./outputs/Stage3/finetuning",
   "checkpoints_folder": "checkpoints",
   "runs_folder": "runs",
 
@@ -62,8 +69,5 @@
 
   "save_metrics_history": true,
   "metrics_history_every_n_steps": 1,
-  "metrics_history_ranks": [0],
-
-  "finetune_output_layers": true,
-  "pretrained_weights": null
+  "metrics_history_ranks": [0]
 }

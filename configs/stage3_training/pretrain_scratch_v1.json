@@ -1,5 +1,6 @@
 {
   "description": "Pretraining from scratch. Reproduces the original BioM3 paper architecture (1 transformer block).",
+  "model_name": "BioM3-v0",
   "tags": [],
   "notes": [],
   "_base_configs": ["./models/_base_ProteoScribe_1block.json"],
@@ -10,9 +11,9 @@
   "training_strategy": "auto",
   "sequence_keyname": "sequence",
 
-  "wandb": true,
+  "wandb": false,
   "wandb_entity": "thenaturalmachine",
-  "wandb_project": "BioM3",
+  "wandb_project": "BioM3-dev",
   "wandb_tags": ["pretrain_from_scratch"],
 
   "choose_optim": "AdamW",
@@ -64,6 +65,5 @@
   "metrics_history_every_n_steps": 1,
   "metrics_history_ranks": [0],
 
-  "finetune_output_layers": true,
   "pretrained_weights": null
 }

@@ -10,7 +10,7 @@ projdir=$(cd "$(dirname "$0")/../.." && pwd)
 cd ${projdir}
 
 # Configurations to edit
-config_path=./configs/training/pretrain_scratch_v1.json  # JSON config file
+config_path=./configs/stage3_training/pretrain_scratch_v1.json  # JSON config file
 epochs=600                      # Number of epochs to train
 resume_from_checkpoint=None     # None to train from scratch
 

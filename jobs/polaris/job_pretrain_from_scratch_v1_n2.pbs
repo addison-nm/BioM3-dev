@@ -21,7 +21,7 @@ conda activate base
 source ./venvs/biom3-env/bin/activate
 
 # Configurations to edit
-config_path=./configs/training/pretrain_scratch_v1.json  # JSON config file
+config_path=./configs/stage3_training/pretrain_scratch_v1.json  # JSON config file
 num_nodes=2                     # Should match num requested nodes in PBS header
 epochs=3                        # Number of epochs to train
 resume_from_checkpoint=None     # None to train from scratch

@@ -21,7 +21,7 @@ conda activate base
 source ./venvs/biom3-env/bin/activate
 
 # Configurations to edit
-config_path=./configs/training/<CONFIG_NAME>.json  # JSON config file
+config_path=./configs/stage3_training/<CONFIG_NAME>.json  # JSON config file
 num_nodes=<NUM_NODES>           # Should match num requested nodes in PBS header
 epochs=5                        # Ignored for Phase 2 training
 resume_from_checkpoint=None     # None to start Phase 2 training

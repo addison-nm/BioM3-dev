@@ -25,7 +25,7 @@ ARGS_DIR = os.path.join(DATDIR, "entrypoint_args", "training")
 OUTPUTS_DIR = os.path.join(TMPDIR, "outputs")
 
 # JSON training configs (relative to repo root, same as DATDIR)
-CONFIGS_DIR = "configs/training"
+CONFIGS_DIR = "configs/stage3_training"
 
 # Required weights that need to be downloaded to run entrypoint test
 REQUIRED_DOWNLOADS = [

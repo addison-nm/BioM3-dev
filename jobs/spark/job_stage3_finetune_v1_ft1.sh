@@ -9,7 +9,7 @@ projdir=$(cd "$(dirname "$0")/../.." && pwd)
 cd ${projdir}
 
 # Configurations to edit
-config_path=./configs/training/finetune_v1.json  # JSON config file
+config_path=./configs/stage3_training/finetune_v1.json  # JSON config file
 epochs=100                      # Number of epochs to finetune
 resume_from_checkpoint=None     # None to start finetuning fresh
 pretrained_weights="./weights/ProteoScribe/ProteoScribe_epoch200.pth"  # Path to pretrained weights (.bin)

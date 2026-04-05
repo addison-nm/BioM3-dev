@@ -18,7 +18,7 @@ The standard workflow. Uses a single primary HDF5 dataset (typically SwissProt e
 
 ```bash
 biom3_pretrain_stage3 \
-    --config_path configs/training/pretrain_scratch_v2.json \
+    --config_path configs/stage3_training/pretrain_scratch_v2.json \
     --run_id my_run_001 \
     --epochs 100
 ```
@@ -31,7 +31,7 @@ After pretraining on the primary dataset, you can continue training on a combine
 
 ```bash
 biom3_pretrain_stage3 \
-    --config_path configs/training/pretrain_phase2.json \
+    --config_path configs/stage3_training/pretrain_phase2.json \
     --run_id my_run_phase2 \
     --resume_from_checkpoint /path/to/checkpoints/run_id/last.ckpt \
     --start_secondary True \
@@ -47,7 +47,7 @@ To resume a run that was interrupted (same dataset, same optimizer state):
 
 ```bash
 biom3_pretrain_stage3 \
-    --config_path configs/training/pretrain_scratch_v2.json \
+    --config_path configs/stage3_training/pretrain_scratch_v2.json \
     --run_id my_run_001 \
     --resume_from_checkpoint /path/to/checkpoints/my_run_001/last.ckpt
 ```
@@ -62,7 +62,7 @@ Finetuning freezes most of the model and trains only selected layers on a new da
 
 ```bash
 biom3_pretrain_stage3 \
-    --config_path configs/training/finetune_example.json \
+    --config_path configs/stage3_training/finetune_example.json \
     --run_id finetune_001 \
     --finetune True \
     --pretrained_weights /path/to/state_dict.best.pth \
@@ -111,7 +111,7 @@ Paths resolve relative to the directory containing the JSON file. Both keys are 
 #### Base config layout
 
 ```
-configs/training/
+configs/stage3_training/
 ├── models/
 │   ├── _base_ProteoScribe_1block.json      # 1-block transformer (paper architecture)
 │   └── _base_ProteoScribe_16blocks.json    # 16-block transformer
@@ -144,7 +144,7 @@ Here `device` and `gpu_devices` in the file body serve as local-testing defaults
 
 ### Key config parameters
 
-The primary config example is `configs/training/pretrain_scratch_v2.json`. The table below lists the most important parameters.
+The primary config example is `configs/stage3_training/pretrain_scratch_v2.json`. The table below lists the most important parameters.
 
 | Parameter | Default | Description |
 |---|---|---|

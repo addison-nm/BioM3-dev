@@ -242,22 +242,22 @@ The entrypoint `biom3_pretrain_stage3` (script `src/biom3/Stage3/run_PL_training
 Training configuration is specified via a JSON config file passed with `--config_path`, with per-job overrides (device, number of nodes, run ID, etc.) passed as CLI arguments.
 CLI arguments override JSON values, which override argparse defaults.
 
-Example JSON configs are in `configs/training/`.
-Configs support layered composition: `_base_configs` for shared model architectures (`configs/training/models/`) and `_overwrite_configs` for per-machine settings (`configs/training/machines/`). See [docs/stage3_training.md](./docs/stage3_training.md) for details.
+Example JSON configs are in `configs/stage3_training/`.
+Configs support layered composition: `_base_configs` for shared model architectures (`configs/stage3_training/models/`) and `_overwrite_configs` for per-machine settings (`configs/stage3_training/machines/`). See [docs/stage3_training.md](./docs/stage3_training.md) for details.
 Wrapper scripts `scripts/stage3_train_multinode.sh` (multi-node via `mpiexec`) and `scripts/stage3_train_singlenode.sh` (single-node) handle environment setup and launch the entrypoint.
 HPC job templates in `jobs/{polaris,aurora,spark}/` demonstrate how to use these wrappers.
 
 ```bash
 # Direct usage
 biom3_pretrain_stage3 \
-    --config_path configs/training/pretrain_scratch_v2.json \
+    --config_path configs/stage3_training/pretrain_scratch_v2.json \
     --run_id my_run_v1 \
     --device cuda \
     --epochs 10
 
 # Via multinode wrapper (from an HPC job template)
 ./scripts/stage3_train_multinode.sh \
-    configs/training/pretrain_scratch_v2.json \
+    configs/stage3_training/pretrain_scratch_v2.json \
     2 4 cuda $WANDB_API_KEY my_run_v1 \
     --epochs 10
 ```
@@ -266,11 +266,11 @@ biom3_pretrain_stage3 \
 
 Finetuning uses the same entrypoint with `--finetune True` and additional flags for specifying pretrained weights and which transformer blocks/layers to unfreeze.
 The key difference is that we must specify a pretrained model and the number of transformer blocks or layers that we wish to freeze/finetune.
-Example finetuning configs are in `configs/training/finetune_*.json`.
+Example finetuning configs are in `configs/stage3_training/finetune_*.json`.
 
 ```bash
 biom3_pretrain_stage3 \
-    --config_path configs/training/finetune_v1.json \
+    --config_path configs/stage3_training/finetune_v1.json \
     --run_id finetune_v1 \
     --device cuda \
     --pretrained_weights ./weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin \

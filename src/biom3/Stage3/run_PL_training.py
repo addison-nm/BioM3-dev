@@ -903,7 +903,8 @@ def load_model(
     # Ensure diffusion steps are sufficient for data dimensions
     if diffusion_steps < int(w*h):
         logger.warning('Make sure that the number of diffusion steps is equal to or greather than the data cardinality')
-    print_gpu_initialization()
+    if get_rank() == 0:
+        print_gpu_initialization()
     # Compile model architecture
     PL_model = compile_model(
         args=args,
@@ -1339,7 +1340,8 @@ def train_model(
             logger.info('Continue training ProteoScribe from checkpoint ...')
             trainer.fit(PL_model, data_module, ckpt_path=resume_from_checkpoint)
 
-    print_gpu_initialization()
+    if get_rank() == 0:
+        print_gpu_initialization()
 
     # Save trained model in multiple formats
     save_model(

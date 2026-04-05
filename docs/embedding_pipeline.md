@@ -18,8 +18,8 @@ biom3_embedding_pipeline \
     -o outputs/embeddings \
     --pencl_weights weights/PenCL/PenCL_V09152023_last.ckpt \
     --facilitator_weights weights/Facilitator/Facilitator_MMD15.ckpt/last.ckpt \
-    --pencl_config configs/stage1_config_PenCL_inference.json \
-    --facilitator_config configs/stage2_config_Facilitator_sample.json \
+    --pencl_config configs/inference/stage1_PenCL.json \
+    --facilitator_config configs/inference/stage2_Facilitator.json \
     --prefix my_dataset
 ```
 

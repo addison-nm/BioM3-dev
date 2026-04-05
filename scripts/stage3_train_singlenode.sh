@@ -28,8 +28,15 @@ shift 5
 
 echo "Single-node: NGPU=${NGPU} ($device)"
 
-export WANDB_API_KEY=$wandb_api_key
 export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=true
+
+if [ -z "$wandb_api_key" ]; then
+    echo "WARNING: WANDB_API_KEY is empty — disabling wandb logging"
+    wandb_override="--wandb False"
+else
+    export WANDB_API_KEY=$wandb_api_key
+    wandb_override=""
+fi
 
 biom3_pretrain_stage3 \
     --config_path ${config_path} \
@@ -37,4 +44,5 @@ biom3_pretrain_stage3 \
     --device ${device} \
     --num_nodes 1 \
     --gpu_devices ${NGPU} \
+    ${wandb_override} \
     "$@"

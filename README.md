@@ -133,7 +133,7 @@ biom3_ProteoScribe_sample     → outputs/generated_sequences.pt
 
 ### Configuration files
 
-Each inference entrypoint takes a JSON config file from `configs/` (e.g. `configs/stage1_config_PenCL_inference.json`) that controls model hyperparameters and paths to backbone LLM weights.
+Each inference entrypoint takes a JSON config file from `configs/` (e.g. `configs/inference/stage1_PenCL.json`) that controls model hyperparameters and paths to backbone LLM weights.
 Training uses a separate set of shell-based config files in `arglists/` (e.g. `arglists/config_pretrain_scratch_v1.sh`), which are sourced by the wrapper scripts in `scripts/`.
 
 ### Stage 1 (inference)
@@ -141,7 +141,7 @@ Training uses a separate set of shell-based config files in `arglists/` (e.g. `a
 Run PenCL inference from the entrypoint `biom3_PenCL_inference`, which accesses the script `src/biom3/Stage1/run_PenCL_inference.py`.
 This stage encodes protein sequences and text descriptions into a shared latent space using ESM2 (protein) and BiomedBERT (text) encoders.
 
-**Preparation:** Edit `configs/stage1_config_PenCL_inference.json` and set `seq_model_path` and `text_model_path` to the paths of the downloaded LLM weights.
+**Preparation:** Edit `configs/inference/stage1_PenCL.json` and set `seq_model_path` and `text_model_path` to the paths of the downloaded LLM weights.
 
 ```json
 "seq_model_path": "/path/to/weights/LLMs/esm2_t33_650M_UR50D.pt",
@@ -166,7 +166,7 @@ This stage encodes protein sequences and text descriptions into a shared latent 
 ```bash
 biom3_PenCL_inference \
     --input_data_path None \
-    --config_path configs/stage1_config_PenCL_inference.json \
+    --config_path configs/inference/stage1_PenCL.json \
     --model_path ./weights/PenCL/BioM3_PenCL_epoch20.bin \
     --output_path outputs/pencl_embeddings.pt
 ```
@@ -176,7 +176,7 @@ biom3_PenCL_inference \
 ```bash
 biom3_PenCL_inference \
     --input_data_path data/my_proteins.csv \
-    --config_path configs/stage1_config_PenCL_inference.json \
+    --config_path configs/inference/stage1_PenCL.json \
     --model_path ./weights/PenCL/BioM3_PenCL_epoch20.bin \
     --output_path outputs/pencl_embeddings.pt \
     --device cpu \
@@ -189,7 +189,7 @@ biom3_PenCL_inference \
 ```bash
 biom3_PenCL_inference \
     --input_data_path None \
-    --config_path configs/stage1_config_PenCL_inference.json \
+    --config_path configs/inference/stage1_PenCL.json \
     --model_path ./weights/PenCL/BioM3_PenCL_epoch20.ckpt \
     --output_path outputs/pencl_embeddings.pt
 ```
@@ -217,7 +217,7 @@ This stage maps text embeddings (`z_t`) into the protein embedding distribution 
 ```bash
 biom3_Facilitator_sample \
     --input_data_path outputs/pencl_embeddings.pt \
-    --config_path configs/stage2_config_Facilitator_sample.json \
+    --config_path configs/inference/stage2_Facilitator.json \
     --model_path ./weights/Facilitator/BioM3_Facilitator_epoch20.bin \
     --output_data_path outputs/facilitator_embeddings.pt
 ```
@@ -227,7 +227,7 @@ biom3_Facilitator_sample \
 ```bash
 biom3_Facilitator_sample \
     --input_data_path outputs/pencl_embeddings.pt \
-    --config_path configs/stage2_config_Facilitator_sample.json \
+    --config_path configs/inference/stage2_Facilitator.json \
     --model_path ./weights/Facilitator/BioM3_Facilitator_epoch20.bin \
     --output_data_path outputs/facilitator_embeddings.pt \
     --device cpu \
@@ -307,7 +307,7 @@ This stage generates protein sequences from the facilitated text embeddings (`z_
 ```bash
 biom3_ProteoScribe_sample \
     --input_path outputs/facilitator_embeddings.pt \
-    --config_path configs/stage3_config_ProteoScribe_sample.json \
+    --config_path configs/inference/stage3_ProteoScribe_sample.json \
     --model_path ./weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin \
     --output_path outputs/generated_sequences.pt
 ```
@@ -317,7 +317,7 @@ biom3_ProteoScribe_sample \
 ```bash
 biom3_ProteoScribe_sample \
     --input_path outputs/facilitator_embeddings.pt \
-    --config_path configs/stage3_config_ProteoScribe_sample.json \
+    --config_path configs/inference/stage3_ProteoScribe_sample.json \
     --model_path ./weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin \
     --output_path outputs/generated_sequences.pt \
     --seed 42
@@ -328,7 +328,7 @@ biom3_ProteoScribe_sample \
 ```bash
 biom3_ProteoScribe_sample \
     --input_path outputs/facilitator_embeddings.pt \
-    --config_path configs/stage3_config_ProteoScribe_sample.json \
+    --config_path configs/inference/stage3_ProteoScribe_sample.json \
     --model_path ./weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin \
     --output_path outputs/generated_sequences.pt \
     --animate_prompts 0 1 2 \

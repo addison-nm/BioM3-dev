@@ -48,7 +48,7 @@ sequences across all replicas.
 - Both parameters logged and included in manifest
 
 ### Config files updated
-- `configs/stage3_config_ProteoScribe_sample.json`
+- `configs/inference/stage3_ProteoScribe_sample.json`
 - `tests/_data/configs/test_stage3_config_v1.json`
 - `tests/_data/configs/test_stage3_config_v2.json`
 

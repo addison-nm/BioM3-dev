@@ -68,7 +68,7 @@ The Stage 3 sampling config has the most duplication — its model architecture 
 **Create `configs/inference/stage3_sample.json`:**
 ```json
 {
-  "_base_configs": ["../training/models/_base_model_1block.json"],
+  "_base_configs": ["../training/models/_base_ProteoScribe_1block.json"],
   "_overwrite_configs": [],
 
   "num_replicas": 5,
@@ -80,9 +80,9 @@ The Stage 3 sampling config has the most duplication — its model architecture 
 }
 ```
 
-This eliminates ~20 duplicated model architecture keys. The existing `configs/stage3_config_ProteoScribe_sample.json` can be kept as-is for backward compatibility or replaced with a symlink/redirect.
+This eliminates ~20 duplicated model architecture keys. The old flat configs (`configs/stage*_config_*.json`) have been removed; all references now point to `configs/inference/`.
 
-**Decision needed:** should inference configs move to `configs/inference/` or stay flat in `configs/`? Moving them would be cleaner:
+Inference configs live in `configs/inference/`:
 ```
 configs/
 ├── inference/

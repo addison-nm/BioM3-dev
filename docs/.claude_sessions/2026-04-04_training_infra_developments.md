@@ -36,8 +36,8 @@ Major development session implementing planned improvements across Stage 3 train
   - Paths resolve relative to the JSON file's directory. Circular references detected.
 
 - **Base config directory structure:**
-  - `configs/training/models/_base_model_1block.json` — 1-block transformer architecture
-  - `configs/training/models/_base_model_16blocks.json` — 16-block transformer architecture
+  - `configs/training/models/_base_ProteoScribe_1block.json` — 1-block transformer architecture
+  - `configs/training/models/_base_ProteoScribe_16blocks.json` — 16-block transformer architecture
   - `configs/training/machines/_aurora.json` — xpu, 12 devices
   - `configs/training/machines/_polaris.json` — cuda, 4 devices
   - `configs/training/machines/_spark.json` — cuda, 1 device

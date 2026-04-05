@@ -1,6 +1,7 @@
 #!/bin/bash
 #=============================================================================
-# Template: Resume Stage 3 pretraining from a Lightning checkpoint (DGX Spark)
+# Job: Stage 3 pretrain from scratch — production (DGX Spark)
+# Equivalent to Aurora n512 production job (600 epochs, single node)
 #=============================================================================
 
 set -euo pipefail
@@ -9,12 +10,9 @@ projdir=$(cd "$(dirname "$0")/../.." && pwd)
 cd ${projdir}
 
 # Configurations to edit
-config_path=./configs/training/<CONFIG_NAME>.json  # JSON config file
-epochs=5                        # Number of epochs to train. Note: Should be greater than num already trained.
-
-# Path to Lightning checkpoint directory
-# Typically logs/history/Stage3_history/checkpoints/<NAME>/last.ckpt
-resume_from_checkpoint=<CHECKPOINT_PATH>
+config_path=./configs/training/pretrain_scratch_v1.json  # JSON config file
+epochs=600                      # Number of epochs to train
+resume_from_checkpoint=None     # None to train from scratch
 
 # Constant configurations
 num_nodes=1                     # single node
@@ -25,7 +23,7 @@ device=cuda                     # device available (cuda)
 # Construct the run ID
 datetime=$(date +%Y%m%d_%H%M%S)
 config_name=$(basename "${config_path}" .json)
-run_id=${config_name}_n${num_nodes}_d${num_devices}_e${epochs}_resume_V${datetime}
+run_id=${config_name}_n${num_nodes}_d${num_devices}_e${epochs}_V${datetime}
 
 # Direct output to log file
 mkdir -p logs

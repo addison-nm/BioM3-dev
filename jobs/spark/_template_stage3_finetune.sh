@@ -8,8 +8,6 @@ set -euo pipefail
 projdir=$(cd "$(dirname "$0")/../.." && pwd)
 cd ${projdir}
 
-source environment.sh
-
 # Configurations to edit
 config_path=./configs/training/<CONFIG_NAME>.json  # JSON config file
 epochs=5                        # Number of epochs to finetune
@@ -17,28 +15,29 @@ resume_from_checkpoint=None     # None to start finetuning fresh
 pretrained_weights=<WEIGHTS_PATH>  # Path to pretrained weights (.bin)
 finetune_last_n_blocks=1        # Number of last transformer blocks to unfreeze
 finetune_last_n_layers=1        # Number of last layers per block to unfreeze
+primary_data_path=<DATA_PATH>   # Path to finetuning data (.hdf5)
 
 # Constant configurations
 num_nodes=1                     # single node
 num_devices=1                   # single GPU on Spark
-wandb=True                      # enable Weights&Biases logging
-wandb_api_key=$WANDB_API_KEY    # define W&B key prior to run, e.g. via .bashrc
+wandb_api_key=${WANDB_API_KEY:-}    # define W&B key prior to run, e.g. via .bashrc
 device=cuda                     # device available (cuda)
 
 # Construct the run ID
 datetime=$(date +%Y%m%d_%H%M%S)
 config_name=$(basename "${config_path}" .json)
-run_id=${config_name}_n${num_nodes}_d${num_devices}_e${epochs}_V${datetime}
+run_id=${config_name}_ft${finetune_last_n_blocks}-${finetune_last_n_layers}_n${num_nodes}_d${num_devices}_e${epochs}_V${datetime}
 
 # Direct output to log file
-mkdir -p logs/run_logs/finetuning
-log_fpath=logs/run_logs/finetuning/${run_id}.o
+mkdir -p logs
+log_fpath=logs/${run_id}.o
 
+source environment.sh
 ./scripts/stage3_train_singlenode.sh \
     ${config_path} \
     ${num_devices} \
     ${device} \
-    ${wandb_api_key} \
+    "${wandb_api_key}" \
     ${run_id} \
     --epochs ${epochs} \
     --resume_from_checkpoint ${resume_from_checkpoint} \
@@ -46,4 +45,6 @@ log_fpath=logs/run_logs/finetuning/${run_id}.o
     --pretrained_weights ${pretrained_weights} \
     --finetune_last_n_blocks ${finetune_last_n_blocks} \
     --finetune_last_n_layers ${finetune_last_n_layers} \
+    --primary_data_path ${primary_data_path} \
+    --wandb True \
 > ${log_fpath} 2>&1

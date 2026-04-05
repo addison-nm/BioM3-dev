@@ -113,8 +113,8 @@ Paths resolve relative to the directory containing the JSON file. Both keys are 
 ```
 configs/training/
 ├── models/
-│   ├── _base_model_1block.json      # 1-block transformer (paper architecture)
-│   └── _base_model_16blocks.json    # 16-block transformer
+│   ├── _base_ProteoScribe_1block.json      # 1-block transformer (paper architecture)
+│   └── _base_ProteoScribe_16blocks.json    # 16-block transformer
 ├── machines/
 │   ├── _aurora.json                  # xpu, 12 devices
 │   ├── _polaris.json                 # cuda, 4 devices
@@ -130,7 +130,7 @@ configs/training/
   "description": "Pretrain 16-block on Polaris",
   "tags": [],
   "notes": [],
-  "_base_configs": ["./models/_base_model_16blocks.json"],
+  "_base_configs": ["./models/_base_ProteoScribe_16blocks.json"],
   "_overwrite_configs": ["./machines/_polaris.json"],
 
   "device": "cpu",

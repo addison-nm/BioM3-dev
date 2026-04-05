@@ -2,7 +2,7 @@
   "description": "Pretraining from scratch. 16 transformer blocks, learning rate 1e-2.",
   "tags": [],
   "notes": [],
-  "_base_configs": ["./models/_base_model_16blocks.json"],
+  "_base_configs": ["./models/_base_ProteoScribe_16blocks.json"],
   "_overwrite_configs": [],
 
   "primary_data_path": "./data/Stage2_MMD_swissprot_embedding_last_ckpt_all.hdf5",

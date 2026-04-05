@@ -31,8 +31,15 @@ NGPUS="$((NRANKS * NGPU_PER_RANK))"
 
 echo "NRANKS: ${NRANKS}, NGPU_PER_RANK: ${NGPU_PER_RANK}, NGPUS: ${NGPUS} ($device)"
 
-export WANDB_API_KEY=$wandb_api_key
 export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=true
+
+if [ -z "$wandb_api_key" ]; then
+    echo "WARNING: WANDB_API_KEY is empty — disabling wandb logging"
+    wandb_override="--wandb False"
+else
+    export WANDB_API_KEY=$wandb_api_key
+    wandb_override=""
+fi
 
 mpiexec \
     --verbose \
@@ -46,4 +53,5 @@ mpiexec \
         --device ${device} \
         --num_nodes ${NRANKS} \
         --gpu_devices ${NGPU_PER_RANK} \
+        ${wandb_override} \
         "$@"

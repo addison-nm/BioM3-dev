@@ -2,7 +2,7 @@
   "description": "Phase 2 pretraining with Pfam dataset. Continues training of 1-block model.",
   "tags": [],
   "notes": [],
-  "_base_configs": ["./models/_base_model_1block.json"],
+  "_base_configs": ["./models/_base_ProteoScribe_1block.json"],
   "_overwrite_configs": [],
 
   "primary_data_path": "./data/Stage2_MMD_swissprot_embedding_last_ckpt_all.hdf5",

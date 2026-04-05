@@ -10,6 +10,8 @@
 # PBS -M <emailaddress>
 # PBS -m be
 
+set -euo pipefail
+
 projdir=${PBS_O_WORKDIR}  # Should submit job from the BioM3-dev directory
 cd ${projdir}
 
@@ -30,8 +32,7 @@ pretrained_weights=<STATE_DICT_PATH>
 
 # Constant configurations
 num_devices=4                   # number of devices per node
-wandb=True                      # enable Weights&Biases logging
-wandb_api_key=$WANDB_API_KEY    # define W&B key prior to run, e.g. via .bashrc
+wandb_api_key=${WANDB_API_KEY:-}    # define W&B key prior to run, e.g. via .bashrc
 device=cuda                     # device available (cuda, xpu)
 
 # Construct the run ID
@@ -40,16 +41,19 @@ config_name=$(basename "${config_path}" .json)
 run_id=${config_name}_n${num_nodes}_d${num_devices}_e${epochs}_V${datetime}
 
 # Direct output to log file
-log_fpath=logs/run_logs/pretraining/${run_id}.${PBS_JOBID}.o
+mkdir -p logs
+log_fpath=logs/${run_id}.${PBS_JOBID}.o
 
+source environment.sh
 ./scripts/stage3_train_multinode.sh \
     ${config_path} \
     ${num_nodes} \
     ${num_devices} \
     ${device} \
-    ${wandb_api_key} \
+    "${wandb_api_key}" \
     ${run_id} \
     --epochs ${epochs} \
     --resume_from_checkpoint ${resume_from_checkpoint} \
     --pretrained_weights ${pretrained_weights} \
+    --wandb True \
 > ${log_fpath} 2>&1

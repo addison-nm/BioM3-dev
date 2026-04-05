@@ -7,7 +7,7 @@ Two independent axes control how generation proceeds:
 1. **Unmasking order** — which position to reveal next
 2. **Token strategy** — how to pick the token for that position
 
-These can be set via CLI flags or in the JSON config (`configs/stage3_config_ProteoScribe_sample.json`). CLI flags override config values when both are present.
+These can be set via CLI flags or in the JSON config (`configs/inference/stage3_ProteoScribe_sample.json`). CLI flags override config values when both are present.
 
 ## Unmasking order (`--unmasking_order`)
 

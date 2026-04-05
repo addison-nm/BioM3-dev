@@ -11,6 +11,10 @@
     {
       "label": "Test Data",
       "path": "tests/_data/"
+    },
+    {
+      "label": "Data",
+      "path": "data/"
     }
   ]
 }

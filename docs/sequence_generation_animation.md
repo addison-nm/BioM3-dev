@@ -86,7 +86,7 @@ literally at the sequence boundaries.
 ```bash
 biom3_ProteoScribe_sample \
     --input_path  outputs/facilitator_embeddings.pt \
-    --config_path   configs/stage3_config_ProteoScribe_sample.json \
+    --config_path   configs/inference/stage3_ProteoScribe_sample.json \
     --model_path  weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin \
     --output_path outputs/generated_sequences.pt \
     --animate_prompts 0
@@ -99,7 +99,7 @@ Produces `outputs/animations/prompt_0_replica_0.gif`.
 ```bash
 biom3_ProteoScribe_sample \
     --input_path  outputs/facilitator_embeddings.pt \
-    --config_path   configs/stage3_config_ProteoScribe_sample.json \
+    --config_path   configs/inference/stage3_ProteoScribe_sample.json \
     --model_path  weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin \
     --output_path outputs/generated_sequences.pt \
     --animate_prompts 0 1 2 \
@@ -113,7 +113,7 @@ Produces nine GIFs: `prompt_{0,1,2}_replica_{0,1,2}.gif`.
 ```bash
 biom3_ProteoScribe_sample \
     --input_path    outputs/facilitator_embeddings.pt \
-    --config_path     configs/stage3_config_ProteoScribe_sample.json \
+    --config_path     configs/inference/stage3_ProteoScribe_sample.json \
     --model_path    weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin \
     --output_path   outputs/generated_sequences.pt \
     --animate_prompts all \

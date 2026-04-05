@@ -8,8 +8,6 @@ set -euo pipefail
 projdir=$(cd "$(dirname "$0")/../.." && pwd)
 cd ${projdir}
 
-source environment.sh
-
 # Configurations to edit
 config_path=./configs/training/<CONFIG_NAME>.json  # JSON config file
 epochs=5                        # Ignored for Phase 2 training (uses max_steps)
@@ -22,8 +20,7 @@ pretrained_weights=<STATE_DICT_PATH>
 # Constant configurations
 num_nodes=1                     # single node
 num_devices=1                   # single GPU on Spark
-wandb=True                      # enable Weights&Biases logging
-wandb_api_key=$WANDB_API_KEY    # define W&B key prior to run, e.g. via .bashrc
+wandb_api_key=${WANDB_API_KEY:-}    # define W&B key prior to run, e.g. via .bashrc
 device=cuda                     # device available (cuda)
 
 # Construct the run ID
@@ -32,16 +29,18 @@ config_name=$(basename "${config_path}" .json)
 run_id=${config_name}_n${num_nodes}_d${num_devices}_e${epochs}_V${datetime}
 
 # Direct output to log file
-mkdir -p logs/run_logs/pretraining
-log_fpath=logs/run_logs/pretraining/${run_id}.o
+mkdir -p logs
+log_fpath=logs/${run_id}.o
 
+source environment.sh
 ./scripts/stage3_train_singlenode.sh \
     ${config_path} \
     ${num_devices} \
     ${device} \
-    ${wandb_api_key} \
+    "${wandb_api_key}" \
     ${run_id} \
     --epochs ${epochs} \
     --resume_from_checkpoint ${resume_from_checkpoint} \
     --pretrained_weights ${pretrained_weights} \
+    --wandb True \
 > ${log_fpath} 2>&1

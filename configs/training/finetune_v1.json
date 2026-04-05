@@ -2,7 +2,7 @@
   "description": "Finetuning ProteoScribe (1 block, original paper architecture). Unfreezes all layers of the last block.",
   "tags": [],
   "notes": [],
-  "_base_configs": ["./models/_base_model_1block.json"],
+  "_base_configs": ["./models/_base_ProteoScribe_1block.json"],
   "_overwrite_configs": [],
 
   "finetune": true,

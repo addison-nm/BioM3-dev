@@ -1,5 +1,5 @@
 {
-  "_base_configs": ["../training/models/_base_model_1block.json"],
+  "_base_configs": ["../training/models/_base_ProteoScribe_1block.json"],
   "_overwrite_configs": [],
 
   "device": "cuda",

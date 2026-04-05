@@ -22,7 +22,7 @@ set -euo pipefail
 
 FACILITATOR_EMB="outputs/finetuning/SH3/SH3.Facilitator_emb.pt"
 WEIGHTS="weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.renamed.bin"
-CONFIG="configs/stage3_config_ProteoScribe_sample.json"
+CONFIG="configs/inference/stage3_ProteoScribe_sample.json"
 OUTDIR="demos/outputs/animate_generation"
 
 echo "============================================================"

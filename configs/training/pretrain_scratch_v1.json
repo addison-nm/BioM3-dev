@@ -2,7 +2,7 @@
   "description": "Pretraining from scratch. Reproduces the original BioM3 paper architecture (1 transformer block).",
   "tags": [],
   "notes": [],
-  "_base_configs": ["./models/_base_model_1block.json"],
+  "_base_configs": ["./models/_base_ProteoScribe_1block.json"],
   "_overwrite_configs": [],
 
   "primary_data_path": "./data/Stage2_MMD_swissprot_embedding_last_ckpt_all.hdf5",

@@ -13,8 +13,8 @@
 #   outputs/embeddings \
 #   weights/PenCL/PenCL_V09152023_last.ckpt \
 #   weights/Facilitator/Facilitator_MMD15.ckpt/last.ckpt \
-#   configs/stage1_config_PenCL_inference.json \
-#   configs/stage2_config_Facilitator_sample.json \
+#   configs/inference/stage1_PenCL.json \
+#   configs/inference/stage2_Facilitator.json \
 #   <dataset_name>
 #=============================================================================
 
@@ -24,8 +24,8 @@ infpath=$1
 outdir=$2
 PENCL_WEIGHTS=$3
 FACILITATOR_WEIGHTS=$4
-config1=$5  # configs/stage1_config_PenCL_inference.json
-config2=$6  # configs/stage2_config_Facilitator_sample.json
+config1=$5  # configs/inference/stage1_PenCL.json
+config2=$6  # configs/inference/stage2_Facilitator.json
 prefix=$7
 
 dataset_key=MMD_data

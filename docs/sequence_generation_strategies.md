@@ -124,28 +124,38 @@ The metric annotation system (`MetricAnnotation` in `animation_tools.py`) is ext
 
 ```bash
 # Default: random unmasking + stochastic sampling
-biom3_ProteoScribe_sample -i embeddings.pt -c config.json -m weights.bin -o output.pt
+biom3_ProteoScribe_sample \
+    --input_path embeddings.pt --config_path config.json \
+    --model_path weights.bin --output_path output.pt
 
 # Confidence-based, content-first, with animation
-biom3_ProteoScribe_sample -i embeddings.pt -c config.json -m weights.bin -o output.pt \
+biom3_ProteoScribe_sample \
+    --input_path embeddings.pt --config_path config.json \
+    --model_path weights.bin --output_path output.pt \
     --unmasking_order confidence_no_pad \
     --animate_prompts all
 
 # Fully deterministic greedy generation with probability logging
-biom3_ProteoScribe_sample -i embeddings.pt -c config.json -m weights.bin -o output.pt \
+biom3_ProteoScribe_sample \
+    --input_path embeddings.pt --config_path config.json \
+    --model_path weights.bin --output_path output.pt \
     --unmasking_order confidence \
     --token_strategy argmax \
     --store_probabilities
 
 # Animated sequence logo with confidence metric boxes
-biom3_ProteoScribe_sample -i embeddings.pt -c config.json -m weights.bin -o output.pt \
+biom3_ProteoScribe_sample \
+    --input_path embeddings.pt --config_path config.json \
+    --model_path weights.bin --output_path output.pt \
     --animate_prompts all \
     --store_probabilities \
     --animation_style logo \
     --animation_metrics confidence
 
 # Override config defaults via CLI
-biom3_ProteoScribe_sample -i embeddings.pt -c config.json -m weights.bin -o output.pt \
+biom3_ProteoScribe_sample \
+    --input_path embeddings.pt --config_path config.json \
+    --model_path weights.bin --output_path output.pt \
     --unmasking_order random \
     --token_strategy argmax \
     --seed 7

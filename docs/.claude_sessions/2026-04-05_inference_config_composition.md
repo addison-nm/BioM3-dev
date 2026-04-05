@@ -1,13 +1,14 @@
-# Session: Inference Config Composition + Test Speedup
+# Session: Inference Config Composition, Test Speedup, Warning Cleanup
 
 **Date:** 2026-04-05
 **Branch:** addison-main
 
 ## Summary
 
-Two changes in this session:
+Three changes in this session:
 1. Unified inference config loading across Stages 1, 2, and 3 to use `_base_configs` / `_overwrite_configs` composition (matching training configs).
 2. Reduced `diffusion_steps` in Stage 3 sampling test configs from 1024 to 128 for ~40x test speedup.
+3. Suppressed noisy third-party warnings in both pytest and inference entrypoints.
 
 ## Changes
 
@@ -61,9 +62,42 @@ Reduced `diffusion_steps` from 1024 to 128 in `test_stage3_config_v2.json` (samp
 | `tests/stage3_tests/test_stage3_run_ProteoScribe_sample.py` | Use ds128 weights |
 | `tests/stage3_tests/test_batch_generate_denoised_sampled.py` | Use ds128 weights |
 
+### 3. Warning suppression
+
+Added `filterwarnings` to `pyproject.toml [tool.pytest.ini_options]` to suppress known harmless warnings from third-party libraries during tests. Reduced test warnings from ~180 to 1 (a multiline CUDA capability message from torch that resists regex matching).
+
+Warnings suppressed:
+- `TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD` env-var override (torch)
+- GPU compute-capability mismatch (torch, DGX Spark sm_121a)
+- pyparsing deprecations (matplotlib internals)
+- `model_fields` deprecation (deepspeed/pydantic)
+- `num_workers` and `sync_dist` suggestions (pytorch_lightning)
+- `fork()` deprecation in multi-threaded process
+- `BertForMaskedLM` GenerationMixin inheritance (transformers)
+- `LeafSpec` / `treespec` deprecations (pytree)
+
+Added matching runtime `warnings.filterwarnings()` calls in Stage 1/2/3 inference `main()` functions for `TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD`, `LeafSpec`, and `BertForMaskedLM` warnings (following the pattern already used in `run_PL_training.py`).
+
+## Files Modified
+
+| File | Changes |
+|------|---------|
+| `src/biom3/Stage1/run_PenCL_inference.py` | Import from `core.helpers`, remove local loaders, update docstring, add warning filters |
+| `src/biom3/Stage2/run_Facilitator_sample.py` | Same |
+| `src/biom3/Stage3/run_ProteoScribe_sample.py` | Same |
+| `CLAUDE.md` | Add `configs/inference/` to layout and config docs |
+| `configs/inference/` | New directory: 5 JSON config files |
+| `pyproject.toml` | Add `[tool.pytest.ini_options] filterwarnings` |
+| `tests/_data/configs/test_stage3_config_v2.json` | `diffusion_steps`: 1024 → 128 |
+| `tests/_data/entrypoint_args/stage3_args_v2.txt` | Point to ds128 weights |
+| `tests/_data/models/stage3/weights/minimodel1_ds128_weights1.pth` | New weight file for 128-step model |
+| `tests/stage3_tests/test_stage3_run_ProteoScribe_sample.py` | Use ds128 weights |
+| `tests/stage3_tests/test_batch_generate_denoised_sampled.py` | Use ds128 weights |
+
 ## Verification
 
 - `pytest tests/test_imports.py` — 5/5 passed
 - `pytest tests/stage3_tests/` — 157 passed, 0 failed (12.5 min total)
 - Sampling tests specifically: 129 passed in 41s (was ~27 min)
 - Config composition verified for all new and old configs
+- Test warnings reduced from ~180 to 1

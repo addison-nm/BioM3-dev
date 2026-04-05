@@ -18,7 +18,7 @@ python -m pip install git+https://github.com/addison-nm/lightning.git --no-build
 # Install BioM3
 python -m pip install -e .
 # Install additional dependencies
-python -m pip install -r requirements_aurora.txt
+python -m pip install -r requirements/aurora.txt
 ```
 
 Note that presently an error message may be raised due to package conflicts, but the installation should still work.

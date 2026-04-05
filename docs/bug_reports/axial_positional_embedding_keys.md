@@ -46,7 +46,7 @@ self.weights = nn.ParameterList([])
 ## Impact
 
 The original BioM3 weights released on HuggingFace were trained with v0.2.1
-(per `requirements_orig.txt`). The current project pins v0.3.12. Loading the
+(per the original `requirements_orig.txt`, now removed). The current project pins v0.3.12. Loading the
 original weights into a v0.3 model without correction raises:
 
 ```
@@ -60,8 +60,8 @@ RuntimeError: Unexpected key(s) in state_dict: "transformer.axial_pos_emb.weight
 - `src/biom3/Stage3/io.py` — `_DEFAULT_SUBS` dict handles the bidirectional
   mapping and `prepare_model_ProteoScribe()` applies it when
   `attempt_correction=True`
-- `requirements_orig.txt` — pins `axial-positional-embedding==0.2.1`
-- `requirements.txt`, `requirements_polaris.txt`, `requirements_spark_py312.txt`
+- The original `requirements_orig.txt` (now removed) pinned `axial-positional-embedding==0.2.1`
+- `requirements/base.txt`, `requirements/polaris.txt`, `requirements/spark.txt`
   — pin `axial-positional-embedding==0.3.12`
 
 ---

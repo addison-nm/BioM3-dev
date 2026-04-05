@@ -9,7 +9,7 @@ mkdir -p venvs
 conda create -p venvs/${env_name} python=3.12
 conda activate venvs/${env_name}
 python -m pip install torch==2.8 torchvision --index-url https://download.pytorch.org/whl/cu129
-python -m pip install -r requirements_spark_py312.txt
+python -m pip install -r requirements/spark.txt
 python -m pip install -e .
 ```
 

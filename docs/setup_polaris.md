@@ -10,7 +10,7 @@ mkdir -p venvs
 # Create environment, using packages from prebuilt one
 python -m venv venvs/${env_name} --system-site-packages
 source "venvs/${env_name}/bin/activate"
-python -m pip install -r requirements_polaris.txt --ignore-installed
+python -m pip install -r requirements/polaris.txt --ignore-installed
 python -m pip install -e .
 ```
 

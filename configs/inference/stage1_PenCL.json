@@ -1,0 +1,9 @@
+{
+  "_base_configs": ["models/_base_PenCL.json"],
+  "_overwrite_configs": [],
+
+  "model_type": "pfam",
+
+  "sequence_keyword": "protein_sequence",
+  "id_keyword": "primary_Accession"
+}

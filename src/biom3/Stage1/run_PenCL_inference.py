@@ -3,23 +3,14 @@
 Mimics the workflow described at
     https://huggingface.co/niksapraljak1/BioM3#stage-1-pencl-inference
 
-Preparation:
-
-    Edit the corresponding config file:
-
-    ```
-    vim configs/stage1_config_PenCL_inference.json
-
-    # replace <working_directory> with your path
-    "seq_model_path": "<working_directory>/weights/LLMs/esm2_t33_650M_UR50D.pt"
-    "text_model_path": "<working_directory>/weights/LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext"
-    ```
+Config file:
+    configs/inference/stage1_PenCL.json  (uses _base_configs composition)
 
 Example usage (raw weights, built-in test dataset):
 
 biom3_PenCL_inference \
     --input_data_path None \
-    --config_path "configs/stage1_config_PenCL_inference.json" \
+    --config_path "configs/inference/stage1_PenCL.json" \
     --model_path "./weights/PenCL/BioM3_PenCL_epoch20.bin" \
     --output_path "outputs/pencl_embeddings.pt"
 
@@ -27,7 +18,7 @@ Example usage (custom CSV input, CPU):
 
 biom3_PenCL_inference \
     --input_data_path "data/my_proteins.csv" \
-    --config_path "configs/stage1_config_PenCL_inference.json" \
+    --config_path "configs/inference/stage1_PenCL.json" \
     --model_path "./weights/PenCL/BioM3_PenCL_epoch20.bin" \
     --output_path "outputs/pencl_embeddings.pt" \
     --device cpu \
@@ -38,7 +29,7 @@ Example usage (PyTorch Lightning checkpoint):
 
 biom3_PenCL_inference \
     --input_data_path None \
-    --config_path "configs/stage1_config_PenCL_inference.json" \
+    --config_path "configs/inference/stage1_PenCL.json" \
     --model_path "./weights/PenCL/BioM3_PenCL_epoch20.ckpt" \
     --output_path "outputs/pencl_embeddings.pt"
 
@@ -50,7 +41,6 @@ import sys
 import argparse
 import yaml
 from argparse import Namespace
-import json
 from datetime import datetime
 import numpy as np
 import pandas as pd
@@ -65,6 +55,7 @@ import biom3.Stage1.preprocess as prep
 import biom3.Stage1.model as mod
 import biom3.Stage1.PL_wrapper as PL_wrap
 from biom3.core.io import load_and_prepare_model
+from biom3.core.helpers import load_json_config, convert_to_namespace
 from biom3.core.run_utils import (
     get_biom3_version,
     get_git_hash,
@@ -100,23 +91,6 @@ def parse_arguments(args):
                         "this action is inferred from a .ckpt extension of model_path")
     
     return parser.parse_args(args)
-
-
-# Step 1: Load JSON Configuration
-def load_json_config(json_path):
-    """Load JSON configuration file."""
-    with open(json_path, "r") as f:
-        config = json.load(f)
-    return config
-
-
-# Step 2: Convert JSON dictionary to Namespace
-def convert_to_namespace(config_dict):
-    """Recursively convert a dictionary to an argparse Namespace."""
-    for key, value in config_dict.items():
-        if isinstance(value, dict):
-            config_dict[key] = convert_to_namespace(value)
-    return Namespace(**config_dict)
 
 
 # Step 3: Load Pre-trained Model

@@ -3,18 +3,16 @@
 Mimics the workflow described at
     https://huggingface.co/niksapraljak1/BioM3#stage-2-facilitator-sampling
 
-Preparation:
+Follows execution of Stage 1: run_PenCL_inference
 
-    Follows execution of Stage 1: run_PenCL_inference
-
-    Corresponding config file:
-        configs/stage2_config_Facilitator_sample.json
+Config file:
+    configs/inference/stage2_Facilitator.json  (uses _base_configs composition)
 
 Example usage:
 
 biom3_Facilitator_sample \
     --input_data_path "outputs/pencl_embeddings.pt" \
-    --config_path "configs/stage2_config_Facilitator_sample.json" \
+    --config_path "configs/inference/stage2_Facilitator.json" \
     --model_path "./weights/Facilitator/BioM3_Facilitator_epoch20.bin" \
     --output_data_path "outputs/facilitator_embeddings.pt"
 
@@ -22,7 +20,7 @@ Example usage (CPU, limited MMD computation):
 
 biom3_Facilitator_sample \
     --input_data_path "outputs/pencl_embeddings.pt" \
-    --config_path "configs/stage2_config_Facilitator_sample.json" \
+    --config_path "configs/inference/stage2_Facilitator.json" \
     --model_path "./weights/Facilitator/BioM3_Facilitator_epoch20.bin" \
     --output_data_path "outputs/facilitator_embeddings.pt" \
     --device cpu \
@@ -35,8 +33,6 @@ import os
 import sys
 import argparse
 import yaml
-from argparse import Namespace
-import json
 from datetime import datetime
 import pandas as pd
 import torch
@@ -46,6 +42,7 @@ import warnings
 
 import biom3.Stage1.model as mod
 from biom3.core.io import load_and_prepare_model
+from biom3.core.helpers import load_json_config, convert_to_namespace
 from biom3.core.run_utils import (
     get_biom3_version,
     get_git_hash,
@@ -74,23 +71,6 @@ def parse_arguments(args):
     parser.add_argument("--mmd_sample_limit", type=int, default=-1,
                         help="limit on the number of samples used to compute MMD. If -1, use all")
     return parser.parse_args(args)
-
-
-# Step 1: Load JSON Configuration
-def load_json_config(json_path):
-    """Load JSON configuration file."""
-    with open(json_path, "r") as f:
-        config = json.load(f)
-    return config
-
-
-# Step 2: Convert JSON dictionary to Namespace
-def convert_to_namespace(config_dict):
-    """Recursively convert a dictionary to an argparse Namespace."""
-    for key, value in config_dict.items():
-        if isinstance(value, dict):
-            config_dict[key] = convert_to_namespace(value)
-    return Namespace(**config_dict)
 
 
 # Step 3: Load Pre-trained Model

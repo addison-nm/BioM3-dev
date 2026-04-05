@@ -1,0 +1,12 @@
+{
+  "_base_configs": ["../training/models/_base_model_1block.json"],
+  "_overwrite_configs": [],
+
+  "device": "cuda",
+
+  "num_replicas": 5,
+  "unmasking_order": "random",
+  "token_strategy": "sample",
+  "batch_size_sample": 32,
+  "seed": 42
+}

@@ -3,16 +3,14 @@
 Mimics the workflow described at
     https://huggingface.co/niksapraljak1/BioM3#stage-3-proteoscribe
 
-Preparation:
-
-    Corresponding config file:
-        configs/stage3_config_ProteoScribe_sample.json
+Config file:
+    configs/inference/stage3_ProteoScribe_sample.json  (uses _base_configs composition)
 
 Example usage:
 
 biom3_ProteoScribe_sample \
     --input_path "outputs/facilitator_embeddings.pt" \
-    --config_path "configs/stage3_config_ProteoScribe_sample.json" \
+    --config_path "configs/inference/stage3_ProteoScribe_sample.json" \
     --model_path "./weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin" \
     --output_path "outputs/generated_sequences.pt"
 
@@ -20,7 +18,7 @@ Example usage (reproducible run with fixed seed, CPU):
 
 biom3_ProteoScribe_sample \
     --input_path "outputs/facilitator_embeddings.pt" \
-    --config_path "configs/stage3_config_ProteoScribe_sample.json" \
+    --config_path "configs/inference/stage3_ProteoScribe_sample.json" \
     --model_path "./weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin" \
     --output_path "outputs/generated_sequences.pt" \
     --seed 42 \
@@ -31,10 +29,8 @@ biom3_ProteoScribe_sample \
 import copy
 import os
 import sys
-from argparse import Namespace
 from datetime import datetime
 import random
-import json
 import numpy as np
 import pandas as pd
 import argparse
@@ -46,6 +42,7 @@ import torch.nn as nn
 import biom3.Stage3.sampling_analysis as Stage3_sample_tools
 import biom3.Stage3.animation_tools as Stage3_ani_tools
 from biom3.Stage3.io import prepare_model_ProteoScribe
+from biom3.core.helpers import load_json_config, convert_to_namespace
 from biom3.core.run_utils import (
     get_biom3_version,
     get_git_hash,
@@ -119,23 +116,6 @@ def parse_arguments(args):
                         help="Output directory for FASTA files. "
                              "Default: <output_dir>/fasta/")
     return parser.parse_args(args)
-
-
-# Step 1: Load JSON configuration
-def load_json_config(json_path):
-    """Load JSON configuration file."""
-    with open(json_path, "r") as f:
-        config = json.load(f)
-    return config
-
-
-# Step 2: Convert JSON dictionary to Namespace
-def convert_to_namespace(config_dict):
-    """Recursively convert a dictionary to an argparse Namespace."""
-    for key, value in config_dict.items():
-        if isinstance(value, dict):  # Recursively handle nested dictionaries
-            config_dict[key] = convert_to_namespace(value)
-    return Namespace(**config_dict)
 
 
 # Step 3: load model with pretrained weights

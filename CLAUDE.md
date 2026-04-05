@@ -38,6 +38,7 @@ src/biom3/
   Stage2/           # Facilitator: run_Facilitator_sample.py
   Stage3/           # ProteoScribe: diffusion model, PL training, sampling
 configs/            # JSON configs for each stage's inference, training, and dbio
+  inference/        #   Inference configs with models/ base configs (uses _base_configs composition)
   training/         #   Training configs with models/ and machines/ base configs
 scripts/            # Bash wrappers (embedding_pipeline, training, generation, sync)
 demos/              # End-to-end demos (dbio dataset building, SH3 embedding pipeline)
@@ -139,14 +140,14 @@ The codebase handles three weight formats:
 When loading models, use `core.io.load_and_prepare_model` for raw weights. For Lightning checkpoints, use the stage-specific `prepare_model_from_checkpoint` functions which handle PL wrapper construction and unwrapping.
 
 ### Configuration
-- **Inference**: JSON files in `configs/` → loaded via `--config_path` with `load_json_config()` → converted to `argparse.Namespace`
+- **Inference**: JSON files in `configs/inference/` → loaded via `--config_path` with `load_json_config()` → converted to `argparse.Namespace`. Old flat configs in `configs/` still work for backward compatibility.
 - **Training**: JSON files in `configs/training/` → loaded via `--config_path` into argparse defaults. CLI args override JSON values; JSON overrides argparse defaults.
-- **Config composition**: `load_json_config()` supports two special keys:
+- **Config composition**: All stages (inference and training) use `core.helpers.load_json_config()`, which supports two special keys:
   - `_base_configs`: list of paths loaded *before* the current file (current file overrides them)
   - `_overwrite_configs`: list of paths loaded *after* the current file (they override it)
   - Priority (low → high): `_base_configs` < current file < `_overwrite_configs` < CLI
   - Paths resolve relative to the JSON file's directory. Both keys are stripped from the result.
-- **Base configs**: `configs/training/models/` has shared model architecture configs (`_base_model_1block.json`, `_base_model_16blocks.json`). `configs/training/machines/` has per-machine device configs (`_aurora.json`, `_polaris.json`, `_spark.json`).
+- **Base configs**: `configs/inference/models/` has shared encoder/model configs (`_base_PenCL.json`, `_base_Facilitator.json`). `configs/training/models/` has shared model architecture configs (`_base_model_1block.json`, `_base_model_16blocks.json`). `configs/training/machines/` has per-machine device configs (`_aurora.json`, `_polaris.json`, `_spark.json`). Stage 3 inference reuses the training model base configs via `_base_configs`.
 
 ### Training output structure
 Stage 3 training (`biom3_pretrain_stage3`) organizes outputs under `--output_root` with three key CLI args: `--checkpoints_folder` (default `checkpoints`), `--runs_folder` (default `runs`), and `--run_id` (unique per run, constructed automatically by HPC job templates).

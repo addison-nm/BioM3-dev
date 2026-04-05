@@ -43,3 +43,29 @@ biom3_build_source_swissprot = "biom3.dbio.__main__:run_build_source_swissprot"
 biom3_build_source_pfam = "biom3.dbio.__main__:run_build_source_pfam"
 biom3_build_annotation_cache = "biom3.dbio.__main__:run_build_annotation_cache"
 biom3_app = "biom3.app:main"
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    # torch: env-var override for weights_only (we set TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD)
+    "ignore:Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD:UserWarning",
+    # torch: GPU compute-capability mismatch on DGX Spark (sm_121a / CUDA 12.1)
+    "ignore:.*Found GPU:UserWarning",
+    # matplotlib internals (pyparsing deprecations)
+    "ignore:.*oneOf.*deprecated:DeprecationWarning",
+    "ignore:.*parseString.*deprecated:DeprecationWarning",
+    "ignore:.*resetCache.*deprecated:DeprecationWarning",
+    "ignore:.*enablePackrat.*deprecated:DeprecationWarning",
+    # deepspeed pydantic deprecation
+    "ignore:.*model_fields.*deprecated:DeprecationWarning",
+    # pytorch_lightning: num_workers suggestion (test data is tiny)
+    "ignore:.*does not have many workers.*:UserWarning",
+    # pytorch_lightning: sync_dist suggestion (single-GPU tests)
+    "ignore:.*sync_dist=True.*:UserWarning",
+    # multiprocessing fork() deprecation in multi-threaded process
+    "ignore:.*multi-threaded.*use of fork:DeprecationWarning",
+    # transformers: BertForMaskedLM GenerationMixin inheritance
+    "ignore:.*has generative capabilities.*:UserWarning",
+    # pytree LeafSpec / treespec deprecations
+    "ignore:.*LeafSpec.*is deprecated:FutureWarning",
+    "ignore:.*isinstance.*treespec:FutureWarning",
+]

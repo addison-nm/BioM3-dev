@@ -39,6 +39,7 @@ import copy
 import os
 import sys
 import argparse
+import warnings
 import yaml
 from argparse import Namespace
 from datetime import datetime
@@ -243,6 +244,11 @@ def compute_homology_matrix(z_p_tensor):
 
 
 def main(args, _setup_logging=True):
+    # ----- Suppress noisy library warnings -----
+    warnings.filterwarnings("ignore", message=".*TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD.*")
+    warnings.filterwarnings("ignore", message=".*has generative capabilities.*")
+    warnings.filterwarnings("ignore", message=".*LeafSpec.*is deprecated.*")
+
     config_args_parser = args
     model_path = config_args_parser.model_path
     batch_size = config_args_parser.batch_size

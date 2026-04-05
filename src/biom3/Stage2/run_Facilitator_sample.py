@@ -111,6 +111,10 @@ def compute_mmd_loss(x, y, kernel="rbf", sigma=1.0):
 
 def main(args, _setup_logging=True):
 
+    # ----- Suppress noisy library warnings -----
+    warnings.filterwarnings("ignore", message=".*TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD.*")
+    warnings.filterwarnings("ignore", message=".*LeafSpec.*is deprecated.*")
+
     # Set up dual logging (console + file)
     outdir = os.path.dirname(os.path.abspath(args.output_data_path))
     os.makedirs(outdir, exist_ok=True)

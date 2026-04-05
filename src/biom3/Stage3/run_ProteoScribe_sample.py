@@ -31,6 +31,7 @@ import os
 import sys
 from datetime import datetime
 import random
+import warnings
 import numpy as np
 import pandas as pd
 import argparse
@@ -345,6 +346,10 @@ def set_seed(seed):
 def main(args, _setup_logging=True):
     # Parse arguments
     config_args_parser = args
+
+    # ----- Suppress noisy library warnings -----
+    warnings.filterwarnings("ignore", message=".*TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD.*")
+    warnings.filterwarnings("ignore", message=".*LeafSpec.*is deprecated.*")
 
     # Set up dual logging (console + file)
     outdir = os.path.dirname(os.path.abspath(args.output_path))

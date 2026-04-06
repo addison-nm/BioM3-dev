@@ -535,7 +535,7 @@ def test_parse_from_json_config(json_filename):
     assert args.run_id == "test"
     assert args.model_option == "transformer"
     assert args.num_classes == 29
-    assert isinstance(args.wandb, bool) and args.wandb is True
+    assert isinstance(args.wandb, bool) and args.wandb is False
     assert isinstance(args.start_pfam_trainer, bool)
     assert isinstance(args.scale_learning_rate, bool)
 

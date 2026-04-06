@@ -100,7 +100,7 @@ def get_args(parser):
     parser.add_argument('--notes', type=str, nargs='+', default=[],
                         help='free-form notes about this run (stored in args.json)')
 
-    parser.add_argument('--data-root', default="./data/ARDM_temp_homolog_family_dataset.csv", type=Path,
+    parser.add_argument('--data_root', default="./data/ARDM_temp_homolog_family_dataset.csv", type=Path,
                         help='path to dataset root directory')
 
     parser.add_argument('--output_root', default=None, type=str,
@@ -116,13 +116,13 @@ def get_args(parser):
                         help='which dataset to train on')
     parser.add_argument('--workers', default=0, type=int,
                         help='number of data loader workers')
-    parser.add_argument('--warmup-steps', default=500, type=int,
+    parser.add_argument('--warmup_steps', default=500, type=int,
                         help='number of learning rate warmup steps')
-    parser.add_argument('--total-steps', default=1000, type=int,
+    parser.add_argument('--total_steps', default=1000, type=int,
                         help='total number of steps of minibatch gradient descent')
-    parser.add_argument('--batch-size', default=16, type=int,
+    parser.add_argument('--batch_size', default=16, type=int,
                         help='mini-batch size')
-    parser.add_argument('--weight-decay', default=1e-6, type=float,
+    parser.add_argument('--weight_decay', default=1e-6, type=float,
                         help='weight decay')
     parser.add_argument('--lr', default=3e-4, type=float,
                         help='learning rate')
@@ -136,9 +136,9 @@ def get_args(parser):
                         help='whether to use 16-bit or 32-bit training')
     parser.add_argument('--seed', default=0, type=int,
                         help='random number seed')
-    parser.add_argument('--checkpoint-dir', default='./checkpoint/', type=Path,
+    parser.add_argument('--checkpoint_dir', default='./checkpoint/', type=Path,
                         help='path to checkpoint directory')
-    parser.add_argument('--checkpoint-prefix', default='channels',
+    parser.add_argument('--checkpoint_prefix', default='channels',
                         help='prefix for local checkpoint')
     parser.add_argument('--device', default='cuda', type=str, 
                         choices=["cpu", "cuda", "xpu"],
@@ -261,7 +261,7 @@ def get_model_args(parser):
     Returns:
         The parser with added model-specific arguments
     """
-    parser.add_argument('--image-size', default=16, type=int,
+    parser.add_argument('--image_size', default=16, type=int,
                         help='size of training images, for rescaling')
     parser.add_argument('--num_classes', default=3, type=int,
                         help='No. of classes for transformer')

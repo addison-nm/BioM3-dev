@@ -4,8 +4,8 @@ One-time build:
     biom3_build_annotation_cache --dat uniprot_trembl.dat.gz -o trembl_annotations.parquet
 
 Per-build lookup:
-    biom3_build_dataset -p PF00018 --enrich-pfam \
-        --annotation-cache trembl_annotations.parquet -o outputs/SH3
+    biom3_build_dataset -p PF00018 --enrich_pfam \
+        --annotation_cache trembl_annotations.parquet -o outputs/SH3
 """
 
 import argparse
@@ -182,11 +182,11 @@ def parse_arguments(args):
         help="Output .parquet file path",
     )
     parser.add_argument(
-        "--chunk-size", type=int, default=100_000,
+        "--chunk_size", type=int, default=100_000,
         help="Rows to buffer before writing a row group (default: 100000)",
     )
     parser.add_argument(
-        "--no-require-annotation", action="store_true",
+        "--no_require_annotation", action="store_true",
         help="Include entries with zero annotation fields",
     )
     return parser.parse_args(args)

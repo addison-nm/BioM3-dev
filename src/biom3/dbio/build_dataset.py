@@ -97,7 +97,7 @@ def parse_arguments(args):
         description="Build a fine-tuning dataset for specified Pfam families."
     )
     parser.add_argument(
-        "-p", "--pfam-ids", type=str, nargs="+", required=True,
+        "-p", "--pfam_ids", type=str, nargs="+", required=True,
         help="One or more Pfam IDs to extract (e.g. PF00018 PF00169)",
     )
     parser.add_argument(
@@ -113,7 +113,7 @@ def parse_arguments(args):
         help="Path to Pfam_protein_text_dataset.csv (default: from config)",
     )
     parser.add_argument(
-        "--databases-root", type=str, default=None,
+        "--databases_root", type=str, default=None,
         help="Override database root path",
     )
     parser.add_argument(
@@ -121,46 +121,51 @@ def parse_arguments(args):
         help="Path to dbio config JSON (default: configs/dbio_config.json)",
     )
     parser.add_argument(
-        "--chunk-size", type=int, default=500_000,
+        "--chunk_size", type=int, default=500_000,
         help="Chunk size for reading the Pfam CSV (default: 500000)",
     )
     parser.add_argument(
-        "--enrich-pfam", action="store_true", default=False,
+        "--enrich_pfam", action="store_true", default=False,
         help="Enrich Pfam captions with UniProt annotations (API by default)",
     )
     parser.add_argument(
-        "--uniprot-dat", type=str, nargs="+", default=None,
+        "--uniprot_dat", type=str, nargs="+", default=None,
         metavar="PATH",
         help="Use local UniProt .dat.gz file(s) instead of API for enrichment. "
              "Accepts one or more paths (e.g. uniprot_sprot.dat.gz uniprot_trembl.dat.gz). "
              "For full Pfam coverage, include the TrEMBL file.",
     )
     parser.add_argument(
-        "--annotation-cache", type=str, nargs="+", default=None,
+        "--annotation_cache", type=str, nargs="+", default=None,
         metavar="PATH",
         help="Pre-built annotation Parquet cache(s) for fast enrichment "
              "(built via biom3_build_annotation_cache). Checked before "
-             "--uniprot-dat; .dat files are only parsed for accessions "
+             "--uniprot_dat; .dat files are only parsed for accessions "
              "not found in the cache.",
     )
     parser.add_argument(
-        "--add-taxonomy", action="store_true", default=False,
+        "--add_taxonomy", action="store_true", default=False,
         help="Add NCBI taxonomy lineage (local, no API needed)",
     )
     parser.add_argument(
-        "--taxonomy-filter", type=str, nargs="*", default=None,
+        "--taxonomy_filter", type=str, nargs="*", default=None,
         help='Filter by taxonomy rank (e.g. "superkingdom=Bacteria")',
     )
     parser.add_argument(
-        "--taxid-index", type=str, default=None,
+        "--taxid_index", type=str, default=None,
         help="Path to pre-built SQLite accession2taxid index (built via biom3_build_taxid_index)",
     )
     parser.add_argument(
-        "--uniprot-cache-dir", type=str, default=".uniprot_cache",
+        "--output_filename", type=str, default="dataset.csv",
+        help="Filename for the output dataset CSV (default: dataset.csv). "
+             "The annotations file will be named with an '_annotations' suffix.",
+    )
+    parser.add_argument(
+        "--uniprot_cache_dir", type=str, default=".uniprot_cache",
         help="Directory for caching UniProt API responses",
     )
     parser.add_argument(
-        "--uniprot-batch-size", type=int, default=100,
+        "--uniprot_batch_size", type=int, default=100,
         help="Batch size for UniProt API requests",
     )
     return parser.parse_args(args)
@@ -314,13 +319,17 @@ def main(args):
             df_combined, args,
         )
 
+    # Derive annotations filename from output filename
+    stem, ext = os.path.splitext(args.output_filename)
+    annotations_filename = f"{stem}_annotations{ext}"
+
     # Save intermediate CSV with annotation columns (all columns preserved)
-    annotations_path = os.path.join(args.outdir, "dataset_annotations.csv")
+    annotations_path = os.path.join(args.outdir, annotations_filename)
     df_combined.to_csv(annotations_path, index=False, quoting=csv.QUOTE_NONNUMERIC)
     logger.info("Saved annotated dataset to %s", annotations_path)
 
     # Save final dataset (standard output columns only)
-    out_path = os.path.join(args.outdir, "dataset.csv")
+    out_path = os.path.join(args.outdir, args.output_filename)
     df_combined[OUTPUT_COLS].to_csv(out_path, index=False, quoting=csv.QUOTE_NONNUMERIC)
     logger.info("Saved dataset to %s", out_path)
 

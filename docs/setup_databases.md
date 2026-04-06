@@ -49,9 +49,9 @@ The `biom3.dbio` package resolves database paths in the following order:
 
 1. **Environment variable**: set `BIOM3_DATABASES_ROOT` to point to any directory containing the database subdirectories.
 2. **Config file**: the default config at `configs/dbio_config.json` sets `databases_root` to `data/databases` (relative to the repo root).
-3. **CLI flags**: the `biom3_build_dataset` command accepts `--databases-root` and per-database path overrides (`--swissprot`, `--pfam`).
+3. **CLI flags**: the `biom3_build_dataset` command accepts `--databases_root` and per-database path overrides (`--swissprot`, `--pfam`).
 
-**Read vs. write paths**: The shared database directory is typically read-only. The `sync_databases.sh` script creates a local `data/databases/` directory with symlinks to individual shared files, so the local directory itself is writable. Derived files like the SQLite taxonomy index should be written to this local directory (or any user-specified path via `-o` / `--taxid-index`), not to the shared source.
+**Read vs. write paths**: The shared database directory is typically read-only. The `sync_databases.sh` script creates a local `data/databases/` directory with symlinks to individual shared files, so the local directory itself is writable. Derived files like the SQLite taxonomy index should be written to this local directory (or any user-specified path via `-o` / `--taxid_index`), not to the shared source.
 
 ## Available databases
 
@@ -93,7 +93,7 @@ UniProt/Swiss-Prot release 2026_01 (January 2026). Manually curated protein sequ
 | `uniprot_sprot.fasta.gz` | 90 MB | Swiss-Prot FASTA sequences (~568K entries) |
 | `uniprot_sprot.dat.gz` | 661 MB | Full flat-file with annotations, GO terms, cross-references |
 
-The `uniprot_sprot.dat.gz` file is used by `--enrich-pfam` to extract protein annotations (protein name, function, catalytic activity, GO terms, lineage, etc.) locally, without requiring UniProt API access.
+The `uniprot_sprot.dat.gz` file is used by `--enrich_pfam` to extract protein annotations (protein name, function, catalytic activity, GO terms, lineage, etc.) locally, without requiring UniProt API access.
 
 ### SMART (`smart/`)
 
@@ -131,17 +131,17 @@ Optional flags require additional database files to be synced in `data/databases
 
 | Flag | Required files |
 |------|----------------|
-| `--enrich-pfam` | None (uses UniProt REST API; results are cached in `--uniprot-cache-dir`) |
-| `--enrich-pfam --annotation-cache <paths>` | Pre-built annotation Parquet cache(s) — fastest option |
-| `--enrich-pfam --uniprot-dat <paths>` | One or more local `.dat.gz` files (no API needed) |
-| `--add-taxonomy` | `ncbi_taxonomy/rankedlineage.dmp`, `ncbi_taxonomy/prot.accession2taxid.gz` |
-| `--taxonomy-filter` | Same as `--add-taxonomy` |
+| `--enrich_pfam` | None (uses UniProt REST API; results are cached in `--uniprot_cache_dir`) |
+| `--enrich_pfam --annotation_cache <paths>` | Pre-built annotation Parquet cache(s) — fastest option |
+| `--enrich_pfam --uniprot_dat <paths>` | One or more local `.dat.gz` files (no API needed) |
+| `--add_taxonomy` | `ncbi_taxonomy/rankedlineage.dmp`, `ncbi_taxonomy/prot.accession2taxid.gz` |
+| `--taxonomy_filter` | Same as `--add_taxonomy` |
 
-**Note on local enrichment**: Pfam domain accessions are overwhelmingly from TrEMBL (unreviewed UniProt), not Swiss-Prot (reviewed). Using `--uniprot-dat` with only `uniprot_sprot.dat.gz` will match very few Pfam accessions. For full local coverage, also include the TrEMBL flat file:
+**Note on local enrichment**: Pfam domain accessions are overwhelmingly from TrEMBL (unreviewed UniProt), not Swiss-Prot (reviewed). Using `--uniprot_dat` with only `uniprot_sprot.dat.gz` will match very few Pfam accessions. For full local coverage, also include the TrEMBL flat file:
 
 ```bash
-biom3_build_dataset -p PF00018 --enrich-pfam \
-    --uniprot-dat data/databases/swissprot/uniprot_sprot.dat.gz \
+biom3_build_dataset -p PF00018 --enrich_pfam \
+    --uniprot_dat data/databases/swissprot/uniprot_sprot.dat.gz \
                   data/databases/swissprot/uniprot_trembl.dat.gz \
     -o outputs/SH3_dataset
 ```
@@ -156,7 +156,7 @@ biom3_build_annotation_cache \
     -o data/databases/trembl/trembl_annotations.parquet
 ```
 
-Then use `--annotation-cache` instead of `--uniprot-dat` for instant enrichment. See [building_datasets_with_dbio.md](building_datasets_with_dbio.md) for details.
+Then use `--annotation_cache` instead of `--uniprot_dat` for instant enrichment. See [building_datasets_with_dbio.md](building_datasets_with_dbio.md) for details.
 
 ## Provenance tracking
 

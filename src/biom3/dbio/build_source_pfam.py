@@ -6,7 +6,7 @@ Pfam_protein_text_dataset.csv used by build_dataset.py and PfamReader.
 Usage:
     biom3_build_source_pfam \\
         --fasta data/databases/pfam/Pfam-A.fasta.gz \\
-        --pfam-metadata data/databases/pfam/Pfam-A.full.gz \\
+        --pfam_metadata data/databases/pfam/Pfam-A.full.gz \\
         -o data/datasets/Pfam_protein_text_dataset.csv
 """
 
@@ -179,7 +179,7 @@ def parse_arguments(args):
         help="Path to Pfam-A.fasta.gz",
     )
     parser.add_argument(
-        "--pfam-metadata", type=str, required=True,
+        "--pfam_metadata", type=str, required=True,
         help="Path to Pfam-A.full.gz or Pfam-A.hmm.gz for family metadata",
     )
     parser.add_argument(
@@ -187,7 +187,7 @@ def parse_arguments(args):
         help="Output CSV path",
     )
     parser.add_argument(
-        "--chunk-size", type=int, default=100_000,
+        "--chunk_size", type=int, default=100_000,
         help="Rows to buffer before writing (default: 100000)",
     )
     return parser.parse_args(args)

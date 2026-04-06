@@ -13,7 +13,7 @@ BioM3 is a multi-stage framework for text-guided protein sequence generation ([N
 | [BioM3-dev](https://github.com/addison-nm/BioM3-dev) | Core library | Python package implementing the 3-stage pipeline (PenCL, Facilitator, ProteoScribe), dataset construction (`biom3.dbio`), visualization (`biom3.viz`), and training infrastructure. |
 | [BioM3-data-share](https://github.com/natural-machine/BioM3-data-share) | Shared data | Model weights, training datasets, and reference databases. Synced across compute clusters via rsync. Contains download scripts for bioinformatics databases. |
 | [BioM3-workflow-demo](https://github.com/natural-machine/BioM3-workflow-demo) | Demo workflows | End-to-end 8-step pipeline demonstrating finetuning and sequence generation on a protein family, with structure prediction and evaluation. |
-| BioM3-workspace-template | Workspace setup | *(Planned)* GitHub template repository for setting up new BioM3 workspaces with standardized directory structure and configuration. |
+| [BioM3-workspace-template](https://github.com/natural-machine/BioM3-workspace-template) | Workspace setup | GitHub template repository for setting up new BioM3 workspaces with standardized directory structure and configuration. |
 
 ## How the repos relate
 
@@ -37,7 +37,7 @@ BioM3 is a multi-stage framework for text-guided protein sequence generation ([N
                              ▼
                   ┌──────────────────────┐
                   │ BioM3-workspace-     │
-                  │ template (planned)   │
+                  │ template             │
                   │ Same structure as    │
                   │ workflow-demo        │
                   └──────────────────────┘
@@ -46,7 +46,7 @@ BioM3 is a multi-stage framework for text-guided protein sequence generation ([N
 - **BioM3-dev** is the core dependency. It provides the `biom3` Python package that all other repos install.
 - **BioM3-data-share** is standalone (no code dependencies). It holds canonical model weights and databases that are synced to each compute cluster.
 - **BioM3-workflow-demo** depends on BioM3-dev (installed via pip) and BioM3-data-share (weights and databases symlinked via sync scripts).
-- **BioM3-workspace-template** will mirror the structure of BioM3-workflow-demo as a GitHub template for new research workspaces.
+- **BioM3-workspace-template** mirrors the structure of BioM3-workflow-demo as a GitHub template for new research workspaces.
 
 ## Shared data architecture
 
@@ -64,7 +64,7 @@ Databases (NR, Pfam, SwissProt, etc.) are downloaded per-machine via scripts in 
 
 ## Version compatibility
 
-The project is in active development (BioM3-dev v0.0.1). Formal semantic versioning will be introduced once BioM3-dev reaches a stable release.
+The project is in active development (BioM3-dev v0.1.0a1). Formal semantic versioning will be introduced once BioM3-dev reaches a stable release.
 
 ### Current approach
 

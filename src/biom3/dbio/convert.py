@@ -79,11 +79,11 @@ def parse_arguments(args):
         help="Output Parquet path (default: replaces .csv with .parquet)",
     )
     parser.add_argument(
-        "--chunk-size", type=int, default=500_000,
+        "--chunk_size", type=int, default=500_000,
         help="Rows per chunk when reading CSV (default: 500000)",
     )
     parser.add_argument(
-        "--row-group-size", type=int, default=500_000,
+        "--row_group_size", type=int, default=500_000,
         help="Rows per row group in Parquet file (default: 500000)",
     )
     return parser.parse_args(args)

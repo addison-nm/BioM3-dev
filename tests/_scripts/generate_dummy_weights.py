@@ -13,7 +13,7 @@ See docs/bug_reports/axial_positional_embedding_keys.md for background.
 Usage:
     python tests/_scripts/generate_dummy_weights.py \
         --config tests/_data/models/stage3/configs/origkeys_mini.json \
-        --output-dir tests/_data/models/stage3/weights
+        --output_dir tests/_data/models/stage3/weights
 
 This produces:
     origkeys_mini_v2.bin  (v0.2.x keys: weights_0, weights_1)
@@ -83,7 +83,7 @@ def main():
         help="Path to a model config JSON file."
     )
     parser.add_argument(
-        "--output-dir", required=True,
+        "--output_dir", required=True,
         help="Directory to write the dummy weight files."
     )
     parser.add_argument(

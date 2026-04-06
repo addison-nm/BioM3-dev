@@ -41,15 +41,15 @@ def main():
     ]
 
     if ENRICH:
-        cmd.append("--enrich-pfam")
-        cmd.extend(["--uniprot-dat", UNIPROT_DAT])
+        cmd.append("--enrich_pfam")
+        cmd.extend(["--uniprot_dat", UNIPROT_DAT])
 
     if ADD_TAXONOMY:
-        cmd.append("--add-taxonomy")
-        cmd.extend(["--taxid-index", TAXID_INDEX])
+        cmd.append("--add_taxonomy")
+        cmd.extend(["--taxid_index", TAXID_INDEX])
 
     if TAXONOMY_FILTER:
-        cmd.extend(["--taxonomy-filter", TAXONOMY_FILTER])
+        cmd.extend(["--taxonomy_filter", TAXONOMY_FILTER])
 
     print(f"Running: {' '.join(cmd)}")
     subprocess.run(cmd, check=True)

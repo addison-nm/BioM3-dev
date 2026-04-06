@@ -63,7 +63,7 @@ echo ""
 
 biom3_build_source_swissprot \
     --dat "$DAT_FILE" \
-    --pfam-metadata "$PFAM_STOCKHOLM" \
+    --pfam_metadata "$PFAM_STOCKHOLM" \
     -o "$SWISSPROT_OUT"
 
 echo ""
@@ -97,7 +97,7 @@ echo "      Building Pfam CSV from subset..."
 
 biom3_build_source_pfam \
     --fasta "$PFAM_SUBSET" \
-    --pfam-metadata "$PFAM_STOCKHOLM" \
+    --pfam_metadata "$PFAM_STOCKHOLM" \
     -o "$PFAM_OUT"
 
 echo ""

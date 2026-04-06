@@ -102,10 +102,10 @@ Once synced, you can use `biom3_build_dataset` to construct fine-tuning datasets
 biom3_build_dataset -p PF00018 -o outputs/SH3_dataset
 
 # With UniProt-enriched captions (PROTEIN NAME, FUNCTION, GENE ONTOLOGY, etc.)
-biom3_build_dataset -p PF00018 --enrich-pfam -o outputs/SH3_dataset
+biom3_build_dataset -p PF00018 --enrich_pfam -o outputs/SH3_dataset
 
 # With enrichment + NCBI taxonomy lineage and filtering
-biom3_build_dataset -p PF00018 --enrich-pfam --add-taxonomy --taxonomy-filter "superkingdom=Bacteria" -o outputs/SH3_bacteria
+biom3_build_dataset -p PF00018 --enrich_pfam --add_taxonomy --taxonomy_filter "superkingdom=Bacteria" -o outputs/SH3_bacteria
 ```
 
 See [docs/setup_databases.md](./docs/setup_databases.md) for machine-specific shared paths, the full list of databases, and configuration details.
@@ -345,15 +345,15 @@ The `biom3.dbio` subpackage provides tools for constructing fine-tuning datasets
 
 | Flag | Long form | Required | Description |
 | ---- | --------- | -------- | ----------- |
-| `-p` | `--pfam-ids` | Yes | One or more Pfam IDs to extract (e.g. `PF00018 PF00169`) |
+| `-p` | `--pfam_ids` | Yes | One or more Pfam IDs to extract (e.g. `PF00018 PF00169`) |
 | `-o` | `--outdir` | Yes | Output directory (created if it doesn't exist) |
 | | `--swissprot` | No | Path to Swiss-Prot CSV (default: from `configs/dbio_config.json`) |
 | | `--pfam` | No | Path to Pfam CSV (default: from config) |
-| | `--enrich-pfam` | No | Enrich Pfam captions with UniProt annotations (API by default) |
-| | `--uniprot-dat` | No | Use local `.dat.gz` file(s) instead of API. Accepts multiple paths for full coverage (e.g. Swiss-Prot + TrEMBL) |
-| | `--add-taxonomy` | No | Add NCBI taxonomy lineage to Pfam captions (local, no API) |
-| | `--taxonomy-filter` | No | Filter by taxonomy rank (e.g. `"superkingdom=Bacteria"`) |
-| | `--chunk-size` | No | Pfam CSV chunk size (default: 500000) |
+| | `--enrich_pfam` | No | Enrich Pfam captions with UniProt annotations (API by default) |
+| | `--uniprot_dat` | No | Use local `.dat.gz` file(s) instead of API. Accepts multiple paths for full coverage (e.g. Swiss-Prot + TrEMBL) |
+| | `--add_taxonomy` | No | Add NCBI taxonomy lineage to Pfam captions (local, no API) |
+| | `--taxonomy_filter` | No | Filter by taxonomy rank (e.g. `"superkingdom=Bacteria"`) |
+| | `--chunk_size` | No | Pfam CSV chunk size (default: 500000) |
 
 #### Example: build an SH3 domain dataset
 
@@ -368,8 +368,8 @@ biom3_build_dataset \
 ```bash
 biom3_build_dataset \
     -p PF00018 \
-    --add-taxonomy \
-    --taxonomy-filter "superkingdom=Bacteria" \
+    --add_taxonomy \
+    --taxonomy_filter "superkingdom=Bacteria" \
     -o outputs/SH3_bacteria
 ```
 
@@ -378,8 +378,8 @@ biom3_build_dataset \
 ```bash
 biom3_build_dataset \
     -p PF00018 PF07714 \
-    --enrich-pfam \
-    --add-taxonomy \
+    --enrich_pfam \
+    --add_taxonomy \
     -o outputs/SH3_Pkinase
 ```
 
@@ -388,8 +388,8 @@ biom3_build_dataset \
 ```bash
 biom3_build_dataset \
     -p PF00018 \
-    --enrich-pfam \
-    --uniprot-dat data/databases/swissprot/uniprot_sprot.dat.gz \
+    --enrich_pfam \
+    --uniprot_dat data/databases/swissprot/uniprot_sprot.dat.gz \
                   data/databases/swissprot/uniprot_trembl.dat.gz \
     -o outputs/SH3_dataset
 ```

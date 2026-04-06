@@ -314,7 +314,7 @@ def main():
         help="Short name for the family (e.g., CM, SH3)",
     )
     parser.add_argument(
-        "-o", "--output-dir", type=str, required=True,
+        "-o", "--output_dir", type=str, required=True,
         help="Output directory for all variants",
     )
     parser.add_argument(
@@ -323,22 +323,22 @@ def main():
         help="Path to uniprot_sprot.dat.gz",
     )
     parser.add_argument(
-        "--pfam-fasta", type=str,
+        "--pfam_fasta", type=str,
         default="data/databases/pfam/Pfam-A.fasta.gz",
         help="Path to Pfam-A.fasta.gz",
     )
     parser.add_argument(
-        "--pfam-metadata", type=str,
+        "--pfam_metadata", type=str,
         default="data/databases/pfam/Pfam-A.full.gz",
         help="Path to Pfam-A.full.gz for family metadata",
     )
     parser.add_argument(
-        "--taxonomy-dir", type=str,
+        "--taxonomy_dir", type=str,
         default="data/databases/ncbi_taxonomy",
         help="Path to NCBI taxonomy directory",
     )
     parser.add_argument(
-        "--taxid-index", type=str, default=None,
+        "--taxid_index", type=str, default=None,
         help="Path to accession2taxid.sqlite (for Pfam row lineage)",
     )
     parser.add_argument(

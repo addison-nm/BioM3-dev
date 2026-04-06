@@ -70,7 +70,7 @@ echo ""
 echo "[2] With UniProt API enrichment..."
 biom3_build_dataset \
     -p PF00018 \
-    --enrich-pfam \
+    --enrich_pfam \
     -o "${OUTDIR}/enriched_api"
 
 echo ""
@@ -82,8 +82,8 @@ echo ""
 echo "[3] With local .dat enrichment..."
 biom3_build_dataset \
     -p PF00018 \
-    --enrich-pfam \
-    --uniprot-dat data/databases/swissprot/uniprot_sprot.dat.gz \
+    --enrich_pfam \
+    --uniprot_dat data/databases/swissprot/uniprot_sprot.dat.gz \
     -o "${OUTDIR}/enriched_local"
 
 echo ""
@@ -94,10 +94,10 @@ echo ""
 echo "[4] With enrichment + taxonomy (bacteria only)..."
 biom3_build_dataset \
     -p PF00018 \
-    --enrich-pfam \
-    --add-taxonomy \
-    --taxid-index "$TAXID_INDEX" \
-    --taxonomy-filter "superkingdom=Bacteria" \
+    --enrich_pfam \
+    --add_taxonomy \
+    --taxid_index "$TAXID_INDEX" \
+    --taxonomy_filter "superkingdom=Bacteria" \
     -o "${OUTDIR}/enriched_bacteria"
 
 echo ""

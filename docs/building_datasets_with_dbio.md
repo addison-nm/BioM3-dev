@@ -221,7 +221,7 @@ biom3_build_annotation_cache \
 
 This produces a Parquet file with one row per UniProt entry that has at least
 one annotation (protein name, function, lineage, etc.). Entries with no
-annotations are skipped by default (pass `--no-require-annotation` to include
+annotations are skipped by default (pass `--no_require_annotation` to include
 them). The output is typically a few GB for TrEMBL.
 
 You can also build a cache from Swiss-Prot:
@@ -235,19 +235,19 @@ biom3_build_annotation_cache \
 **Per-build: use the cache**
 
 ```bash
-biom3_build_dataset -p PF00018 -o output/sh3_enriched --enrich-pfam \
-    --annotation-cache data/databases/trembl/trembl_annotations.parquet
+biom3_build_dataset -p PF00018 -o output/sh3_enriched --enrich_pfam \
+    --annotation_cache data/databases/trembl/trembl_annotations.parquet
 ```
 
 Multiple cache files can be passed (e.g. Swiss-Prot + TrEMBL):
 
 ```bash
-biom3_build_dataset -p PF00018 -o output/sh3_enriched --enrich-pfam \
-    --annotation-cache data/databases/swissprot/swissprot_annotations.parquet \
+biom3_build_dataset -p PF00018 -o output/sh3_enriched --enrich_pfam \
+    --annotation_cache data/databases/swissprot/swissprot_annotations.parquet \
                        data/databases/trembl/trembl_annotations.parquet
 ```
 
-The cache is checked first. If `--uniprot-dat` is also provided, it serves
+The cache is checked first. If `--uniprot_dat` is also provided, it serves
 as a fallback — only accessions not found in the cache are looked up via the
 raw `.dat` file. This lets you combine a pre-built cache with a freshly
 downloaded `.dat` for maximum coverage.
@@ -332,23 +332,23 @@ biom3_build_dataset -p PF00018 -o output/sh3_dataset
 biom3_build_dataset -p PF00018 PF07714 -o output/sh3_kinase_dataset
 
 # With UniProt enrichment (via REST API)
-biom3_build_dataset -p PF00018 -o output/sh3_enriched --enrich-pfam
+biom3_build_dataset -p PF00018 -o output/sh3_enriched --enrich_pfam
 
 # With offline enrichment from local .dat files
-biom3_build_dataset -p PF00018 -o output/sh3_enriched --enrich-pfam \
-    --uniprot-dat data/databases/swissprot/uniprot_sprot.dat.gz \
+biom3_build_dataset -p PF00018 -o output/sh3_enriched --enrich_pfam \
+    --uniprot_dat data/databases/swissprot/uniprot_sprot.dat.gz \
                   data/databases/trembl/uniprot_trembl.dat.gz
 
 # With pre-built annotation cache (fastest — see "Annotation cache" section)
-biom3_build_dataset -p PF00018 -o output/sh3_enriched --enrich-pfam \
-    --annotation-cache data/databases/trembl/trembl_annotations.parquet
+biom3_build_dataset -p PF00018 -o output/sh3_enriched --enrich_pfam \
+    --annotation_cache data/databases/trembl/trembl_annotations.parquet
 
 # With taxonomy lineage
-biom3_build_dataset -p PF00018 -o output/sh3_taxonomy --add-taxonomy
+biom3_build_dataset -p PF00018 -o output/sh3_taxonomy --add_taxonomy
 
 # With taxonomy filtering (Bacteria only)
 biom3_build_dataset -p PF00018 -o output/sh3_bacteria \
-    --add-taxonomy --taxonomy-filter "superkingdom=Bacteria"
+    --add_taxonomy --taxonomy_filter "superkingdom=Bacteria"
 
 # Explicit paths (skip config resolution)
 biom3_build_dataset -p PF00018 -o output/sh3_dataset \
@@ -360,20 +360,20 @@ biom3_build_dataset -p PF00018 -o output/sh3_dataset \
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `-p`, `--pfam-ids` | *(required)* | One or more Pfam IDs (e.g., `PF00018 PF07714`) |
+| `-p`, `--pfam_ids` | *(required)* | One or more Pfam IDs (e.g., `PF00018 PF07714`) |
 | `-o`, `--outdir` | *(required)* | Output directory |
 | `--swissprot` | from config | Path to SwissProt CSV |
 | `--pfam` | from config | Path to Pfam CSV |
-| `--databases-root` | from config | Override database root path |
+| `--databases_root` | from config | Override database root path |
 | `--config` | `configs/dbio_config.json` | Path to config JSON |
-| `--chunk-size` | `500000` | Chunk size for Pfam CSV reading |
-| `--enrich-pfam` | off | Enrich captions with UniProt annotations (API by default) |
-| `--annotation-cache` | none | Pre-built annotation Parquet cache(s) for fast enrichment (see above) |
-| `--uniprot-dat` | none | Use local `.dat.gz` file(s) instead of API (accepts multiple paths) |
-| `--add-taxonomy` | off | Add NCBI taxonomy lineage |
-| `--taxonomy-filter` | none | Filter by rank (e.g., `"superkingdom=Bacteria"`) |
-| `--uniprot-cache-dir` | `.uniprot_cache` | Cache directory for API responses |
-| `--uniprot-batch-size` | `25` | Batch size for UniProt API requests |
+| `--chunk_size` | `500000` | Chunk size for Pfam CSV reading |
+| `--enrich_pfam` | off | Enrich captions with UniProt annotations (API by default) |
+| `--annotation_cache` | none | Pre-built annotation Parquet cache(s) for fast enrichment (see above) |
+| `--uniprot_dat` | none | Use local `.dat.gz` file(s) instead of API (accepts multiple paths) |
+| `--add_taxonomy` | off | Add NCBI taxonomy lineage |
+| `--taxonomy_filter` | none | Filter by rank (e.g., `"superkingdom=Bacteria"`) |
+| `--uniprot_cache_dir` | `.uniprot_cache` | Cache directory for API responses |
+| `--uniprot_batch_size` | `25` | Batch size for UniProt API requests |
 
 ### Output files
 

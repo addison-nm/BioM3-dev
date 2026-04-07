@@ -92,12 +92,13 @@ def parse_arguments(args):
                         help="Output directory for GIF animations. "
                              "Default: <output_dir>/animations/")
     parser.add_argument('--animation_style', type=str, default='brightness',
-                        choices=['brightness', 'colorbar', 'logo'],
+                        choices=['brightness', 'colorbar', 'logo', 'gauge'],
                         help="Probability distribution visualization: "
                              "'brightness' (dim/vivid cells), "
                              "'colorbar' (stacked AA bars above cells), "
-                             "'logo' (stacked AA bars with letters). "
-                             "Requires --store_probabilities for colorbar/logo.")
+                             "'logo' (stacked AA bars with letters), "
+                             "'gauge' (bottom-up fill meter showing confidence). "
+                             "Requires --store_probabilities for colorbar/logo/gauge.")
     parser.add_argument('--animation_metrics', type=str, nargs='*', default=None,
                         metavar='NAME',
                         help="Per-position metric boxes to add to the animation. "

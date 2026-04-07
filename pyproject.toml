@@ -18,6 +18,7 @@ app = [
   "py3Dmol",
   "biopython",
   "matplotlib",
+  "imageio-ffmpeg",
 ]
 
 [tool.setuptools.dynamic]

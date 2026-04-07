@@ -34,7 +34,9 @@ AA_COLORS = {
 _MASK_IDX = 0
 _MASK_COLOR = (50, 50, 60)
 _SPECIAL_TOKENS = {'<START>', '<END>', '<PAD>'}
-_SPECIAL_COLOR = (40, 40, 48)
+_START_COLOR = (60, 190, 190)
+_END_COLOR = (210, 120, 100)
+_PAD_COLOR = (0, 0, 0)
 _BG_COLOR = (28, 28, 32)
 _HIGHLIGHT_COLOR = (255, 215, 50)
 _TEXT_COLOR = (235, 235, 235)
@@ -51,6 +53,77 @@ _BAR_H = 6
 _LOGO_H = 28
 _EXTRA_PAD = 2
 _LOGO_TOP_K = 4
+
+# ── Legend ────────────────────────────────────────────────────────────────
+
+_LEGEND_LABELS = {
+    "gauge": "Fill height = model confidence",
+    "brightness": "Brightness = model confidence",
+    "colorbar": "Bars = predicted AA probabilities",
+    "logo": "Logo = predicted AA probabilities",
+}
+
+_LEGEND_SWATCHES = [
+    ("Hydrophobic", (100, 130, 200)),
+    ("Aromatic", (80, 110, 190)),
+    ("Positive", (200, 80, 80)),
+    ("Negative", (160, 80, 180)),
+    ("Polar", (80, 180, 80)),
+    ("Gly", (200, 160, 60)),
+    ("Cys", (200, 200, 60)),
+    ("Pro", (80, 160, 160)),
+    ("Mask", _MASK_COLOR),
+    ("START", _START_COLOR),
+    ("END", _END_COLOR),
+    ("PAD", _PAD_COLOR),
+]
+
+_SWATCH_SIZE = 10
+_LEGEND_LINE_H = 14
+
+
+def _draw_legend(draw, x0, y0, max_width, prob_style, font_sm):
+    """Draw a legend strip with style description and color key swatches.
+
+    Returns the total height consumed.
+    """
+    cy = y0
+
+    label = _LEGEND_LABELS.get(prob_style, "")
+    if label:
+        draw.text((x0, cy), label, fill=_HEADER_COLOR, font=font_sm)
+        cy += _LEGEND_LINE_H + 2
+
+    cx = x0
+    for name, color in _LEGEND_SWATCHES:
+        text_w = int(font_sm.getlength(name))
+        entry_w = _SWATCH_SIZE + 3 + text_w + 10
+        if cx + entry_w > x0 + max_width and cx > x0:
+            cx = x0
+            cy += _LEGEND_LINE_H
+        draw.rectangle([cx, cy, cx + _SWATCH_SIZE, cy + _SWATCH_SIZE],
+                       fill=color, outline=_DIM_TEXT_COLOR)
+        draw.text((cx + _SWATCH_SIZE + 3, cy - 1), name,
+                  fill=_DIM_TEXT_COLOR, font=font_sm)
+        cx += entry_w
+
+    return cy + _LEGEND_LINE_H - y0
+
+
+def _legend_height(max_width, font_sm, prob_style):
+    """Pre-compute the pixel height the legend will occupy."""
+    has_label = prob_style in _LEGEND_LABELS
+    cy = (_LEGEND_LINE_H + 2) if has_label else 0
+    cx = 0
+    for name, _ in _LEGEND_SWATCHES:
+        text_w = int(font_sm.getlength(name))
+        entry_w = _SWATCH_SIZE + 3 + text_w + 10
+        if cx + entry_w > max_width and cx > 0:
+            cx = 0
+            cy += _LEGEND_LINE_H
+        cx += entry_w
+    return cy + _LEGEND_LINE_H
+
 
 # ── Metric annotation system ──────────────────────────────────────────────
 
@@ -157,8 +230,12 @@ def _get_font(size):
 def _cell_color(token_str):
     if token_str == '-':
         return _MASK_COLOR
-    if token_str in _SPECIAL_TOKENS:
-        return _SPECIAL_COLOR
+    if token_str == '<START>':
+        return _START_COLOR
+    if token_str == '<END>':
+        return _END_COLOR
+    if token_str == '<PAD>':
+        return _PAD_COLOR
     return AA_COLORS.get(token_str, (140, 140, 140))
 
 
@@ -166,6 +243,11 @@ def _confidence_modulate(color, confidence, floor=0.25):
     """Scale RGB brightness by model confidence (0 → dim, 1 → full color)."""
     scale = floor + (1.0 - floor) * confidence
     return tuple(int(c * scale) for c in color)
+
+
+def _alpha_blend(fg, bg, alpha):
+    """Blend fg color onto bg at given alpha (0 = fully bg, 1 = fully fg)."""
+    return tuple(int(f * alpha + b * (1 - alpha)) for f, b in zip(fg, bg))
 
 
 def _draw_logo(draw, x, y, width, height, probs_vec, tokens,
@@ -233,7 +315,8 @@ def _render_frame(token_indices, prev_indices, tokens, step, total_steps,
     grid_h = num_rows * row_stride
 
     img_w = grid_x0 + grid_w + margin
-    img_h = grid_y0 + grid_h + margin
+    legend_h = _legend_height(img_w - 2 * margin, font_sm, prob_style) + 8
+    img_h = grid_y0 + grid_h + legend_h + margin
 
     img = Image.new('RGB', (img_w, img_h), _BG_COLOR)
     draw = ImageDraw.Draw(img)
@@ -276,6 +359,7 @@ def _render_frame(token_indices, prev_indices, tokens, step, total_steps,
 
         tok_str = tokens[token_indices[j]]
         is_aa = tok_str != '-' and tok_str not in _SPECIAL_TOKENS
+        show_confidence = is_aa or tok_str == '<PAD>'
 
         # -- Above-cell annotations (metrics, then logo/colorbar) --
         cursor_y = row_y
@@ -300,10 +384,20 @@ def _render_frame(token_indices, prev_indices, tokens, step, total_steps,
         # -- Residue cell --
         cy = cursor_y
         bg = _cell_color(tok_str)
-        if step_probs is not None and is_aa and prob_style in (None, "brightness"):
+        if step_probs is not None and show_confidence and prob_style == "gauge":
+            confidence = float(step_probs[j].max())
+            faint_bg = _alpha_blend(bg, _BG_COLOR, 0.1)
+            draw.rectangle([x, cy, x + _CELL, cy + _CELL], fill=faint_bg)
+            fill_h = int(_CELL * confidence)
+            if fill_h > 0:
+                fill_top = cy + _CELL - fill_h
+                draw.rectangle([x, fill_top, x + _CELL, cy + _CELL], fill=bg)
+        elif step_probs is not None and show_confidence and prob_style in (None, "brightness"):
             confidence = float(step_probs[j].max())
             bg = _confidence_modulate(bg, confidence)
-        draw.rectangle([x, cy, x + _CELL, cy + _CELL], fill=bg)
+            draw.rectangle([x, cy, x + _CELL, cy + _CELL], fill=bg)
+        else:
+            draw.rectangle([x, cy, x + _CELL, cy + _CELL], fill=bg)
 
         if j in newly_unmasked:
             draw.rectangle([x, cy, x + _CELL, cy + _CELL],
@@ -311,8 +405,10 @@ def _render_frame(token_indices, prev_indices, tokens, step, total_steps,
 
         if tok_str == '-':
             char, color = '\u00b7', _DIM_TEXT_COLOR
+        elif tok_str == '<PAD>':
+            char, color = '\u00b7', _TEXT_COLOR
         elif tok_str in _SPECIAL_TOKENS:
-            char, color = tok_str[1], _DIM_TEXT_COLOR   # S, E, P
+            char, color = tok_str[1], _DIM_TEXT_COLOR   # S for START, E for END
         else:
             char, color = tok_str, _TEXT_COLOR
 
@@ -336,6 +432,11 @@ def _render_frame(token_indices, prev_indices, tokens, step, total_steps,
         label = str(row * cols_per_row)
         ly = grid_y0 + row * row_stride + above_total + 3
         draw.text((margin, ly), label, fill=_DIM_TEXT_COLOR, font=font_sm)
+
+    # -- Legend --
+    legend_y0 = grid_y0 + grid_h + 4
+    _draw_legend(draw, margin, legend_y0, img_w - 2 * margin,
+                 prob_style, font_sm)
 
     return img
 
@@ -419,6 +520,61 @@ def generate_sequence_animation(frames, tokens, output_path,
 
     os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
     imageio.mimsave(output_path, images, format='GIF', duration=duration, loop=loop)
+
+
+# ── GIF-to-MP4 conversion ────────────────────────────────────────────────
+
+
+def gif_to_mp4(gif_path, mp4_path=None, fps=None, codec="libx264",
+               pixel_format="yuv420p"):
+    """Convert a GIF file to MP4.
+
+    Parameters
+    ----------
+    gif_path : str
+        Path to the input GIF.
+    mp4_path : str, optional
+        Output path. Defaults to *gif_path* with ``.mp4`` extension.
+    fps : float, optional
+        Frames per second. If ``None``, inferred from GIF metadata
+        (falls back to 10).
+    codec : str
+        FFmpeg video codec.
+    pixel_format : str
+        Pixel format for broad compatibility.
+
+    Returns
+    -------
+    str
+        The output MP4 path.
+    """
+    if mp4_path is None:
+        mp4_path = os.path.splitext(gif_path)[0] + ".mp4"
+
+    reader = imageio.get_reader(gif_path)
+    meta = reader.get_meta_data()
+    if fps is None:
+        duration_ms = meta.get("duration", 100)
+        fps = 1000.0 / max(duration_ms, 1)
+
+    os.makedirs(os.path.dirname(mp4_path) or '.', exist_ok=True)
+    try:
+        writer = imageio.get_writer(mp4_path, fps=fps, codec=codec,
+                                    pixelformat=pixel_format)
+    except (ImportError, IOError) as exc:
+        raise RuntimeError(
+            "MP4 conversion requires ffmpeg. Install via: "
+            "pip install imageio-ffmpeg"
+        ) from exc
+
+    for frame in reader:
+        h, w = frame.shape[:2]
+        frame = frame[:h - h % 2, :w - w % 2]
+        writer.append_data(frame)
+
+    writer.close()
+    reader.close()
+    return mp4_path
 
 
 # ── Legacy text-based animation (kept for backwards compatibility) ───────

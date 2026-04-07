@@ -33,7 +33,7 @@ pip install -e .
 
 # From GitHub (specific branch or tag)
 pip install 'biom3 @ git+https://github.com/addison-nm/BioM3-dev.git'
-pip install 'biom3 @ git+https://github.com/addison-nm/BioM3-dev.git@v0.1.0a1'
+pip install 'biom3 @ git+https://github.com/addison-nm/BioM3-dev.git@v0.1.0a2'
 ```
 
 To include the Streamlit web app and visualization tools, install with the `app` extra:

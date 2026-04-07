@@ -64,7 +64,7 @@ Databases (NR, Pfam, SwissProt, etc.) are downloaded per-machine via scripts in 
 
 ## Version compatibility
 
-The project is in active development (BioM3-dev v0.1.0a1). Formal semantic versioning will be introduced once BioM3-dev reaches a stable release.
+The project is in active development (BioM3-dev v0.1.0a2). Formal semantic versioning will be introduced once BioM3-dev reaches a stable release.
 
 ### Current approach
 

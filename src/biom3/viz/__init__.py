@@ -19,6 +19,10 @@ from biom3.viz.unmasking import (
     extract_unmasking_order_from_sampling_path,
     unmasking_order_to_normalized,
 )
+from biom3.viz.dynamics import (
+    plot_probability_dynamics,
+    plot_probability_dynamics_from_file,
+)
 
 try:
     from biom3.viz.folding import fold_sequence, fold_sequences

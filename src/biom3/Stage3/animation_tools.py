@@ -32,6 +32,7 @@ AA_COLORS = {
 }
 
 _MASK_IDX = 0
+_PAD_IDX = 23
 _MASK_COLOR = (50, 50, 60)
 _SPECIAL_TOKENS = {'<START>', '<END>', '<PAD>'}
 _SPECIAL_COLOR = (40, 40, 48)
@@ -276,6 +277,7 @@ def _render_frame(token_indices, prev_indices, tokens, step, total_steps,
 
         tok_str = tokens[token_indices[j]]
         is_aa = tok_str != '-' and tok_str not in _SPECIAL_TOKENS
+        is_pad = tok_str == '<PAD>'
 
         # -- Above-cell annotations (metrics, then logo/colorbar) --
         cursor_y = row_y
@@ -304,6 +306,15 @@ def _render_frame(token_indices, prev_indices, tokens, step, total_steps,
             confidence = float(step_probs[j].max())
             bg = _confidence_modulate(bg, confidence)
         draw.rectangle([x, cy, x + _CELL, cy + _CELL], fill=bg)
+        if step_probs is not None and is_pad:
+            draw.rectangle([x, cy, x + _CELL, cy + _CELL], fill=_MASK_COLOR)
+            pad_prob = float(step_probs[j][_PAD_IDX])
+            fill_h = int(pad_prob * _CELL)
+            if fill_h > 0:
+                draw.rectangle(
+                    [x, cy + _CELL - fill_h, x + _CELL, cy + _CELL],
+                    fill=_SPECIAL_COLOR,
+                )
 
         if j in newly_unmasked:
             draw.rectangle([x, cy, x + _CELL, cy + _CELL],

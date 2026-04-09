@@ -26,6 +26,17 @@ This means:
 - `python -c "import biom3; print(biom3.__version__)"` returns the same value.
 - There is no separate `VERSION` file. Do not add one — it would create two sources of truth.
 
+## Branch policy
+
+The `main` branch is the **release branch**. The README recommends users install directly from `main` (`pip install 'biom3 @ git+...BioM3-dev.git'` with no `@ref`), so the tip of `main` must always be a release-quality, version-bumped commit.
+
+Concretely:
+- **Day-to-day development happens on `addison-main`** (and topic branches that merge into it). `main` does not receive WIP commits.
+- **`main` advances by fast-forward only**, from `addison-main`, at release boundaries. The commit fast-forwarded onto `main` must be the `chore(release): bump to v0.1.0aN` commit (or have one as the tip).
+- **The `vX.Y.Z` tag and the tip of `main` should agree** at every release boundary. Between releases, `addison-main` will be ahead of `main` — that's normal — but `main` itself never points at an unreleased state.
+
+If you need to deviate (e.g., a hotfix that lands on `main` without a bump), bump immediately afterward so `main` doesn't sit on an untagged commit.
+
 ## When to bump
 
 While in the `0.x` alpha series:
@@ -39,31 +50,38 @@ The `0.x` line is unstable by design. Once interfaces stabilize, we will move to
 Run through this list every time you bump:
 
 1. **Edit `src/biom3/__init__.py`** — set `__version__` to the new value.
-2. **Reinstall and verify:**
+2. **Audit user-facing docs for stale version references.** No file outside `src/biom3/__init__.py` should hardcode a specific version — we removed those after the v0.1.0a3 bump for exactly this reason. Confirm with:
+   ```bash
+   grep -rn "v0\.1\.0a[0-9]" README.md docs/ \
+     | grep -v versioning.md \
+     | grep -v .claude_sessions
+   ```
+   This should return no results. If anything turns up, either update it or — better — rewrite it to not reference a specific version. The goal is for the bump checklist to stay a one-file edit and never grow back into a maintenance burden.
+3. **Reinstall and verify:**
    ```bash
    pip install -e .
    python -c "import biom3; print(biom3.__version__)"
    ```
    Confirm the printed version matches what you just set.
-3. **Commit** with a release-style message:
+4. **Commit** with a release-style message:
    ```bash
    git add src/biom3/__init__.py
    git commit -m "chore(release): bump to v0.1.0aN"
    ```
-4. **Tag the commit:**
+5. **Tag the commit:**
    ```bash
    git tag v0.1.0aN
    ```
    The tag must point at the commit that contains the matching `__version__`.
-5. **Push (after review):**
+6. **Push (after review):**
    ```bash
    git push origin main
    git push origin v0.1.0aN
    ```
-6. **Refresh dependent repos' SYNC_LOG files.** BioM3-dev itself does not have a SYNC_LOG, but every dependent repo does. After the new tag is pushed:
+7. **Refresh dependent repos' SYNC_LOG files.** BioM3-dev itself does not have a SYNC_LOG, but every dependent repo does. After the new tag is pushed:
    - In `BioM3-workflow-demo`, `BioM3-workspace-template`, and `BioM3-data-share`, pull the latest BioM3-dev, run a smoke test, then add a new row to that repo's `SYNC_LOG.md` pairing the new BioM3-dev hash with the dependent repo's commit hash.
    - See [BioM3-ecosystem/docs/version_tracking.md §How to keep things in sync](../../docs/version_tracking.md#how-to-keep-things-in-sync) for the full ritual.
-7. **Verify with `/version-check`** (from the ecosystem root). All rows should report `OK` after the dust settles.
+8. **Verify with `/version-check`** (from the ecosystem root). All rows should report `OK` after the dust settles.
 
 ## Recovering from drift
 

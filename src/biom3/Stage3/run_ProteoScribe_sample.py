@@ -200,16 +200,50 @@ def batch_stage3_generate_sequences(
         animate_replicas: set = None,
         store_probabilities: bool = False,
     ) -> tuple:
-    """
-    Generates protein sequences in batches using a denoising model.
+    """Generate protein sequences in batches using a denoising model.
+
+    All ``(prompt_idx, replica_idx)`` pairs are flattened into a single work
+    list and processed in batches of ``args.batch_size_sample`` so that GPU
+    capacity is shared across both prompts and replicas.
 
     Args:
-        args (any): Configuration object containing model and sampling parameters.
-        model (nn.Module): The pre-trained model used for denoising and generation.
-        z_t (torch.Tensor): Input tensor representing initial samples for sequence generation.
+        args: Configuration object containing model and sampling parameters
+            (``num_replicas``, ``batch_size_sample``, ``diffusion_steps``,
+            ``unmasking_order``, ``device``, ...).
+        model: Pre-trained denoising model.
+        z_t: Conditioning embeddings of shape ``[num_prompts, dim]``.  May
+            also be passed as a list of tensors, in which case they are
+            stacked.
+        animate_prompts: Set of prompt indices to capture per-step frames
+            for.  When combined with ``animate_replicas``, the intersection
+            determines which (prompt, replica) pairs are recorded for GIF
+            rendering.  ``None`` disables animation capture.
+        animate_replicas: Set of replica indices to capture per-step frames
+            for.  See ``animate_prompts``.
+        store_probabilities: When True, the per-step conditional
+            distributions and final frames are captured for every
+            (prompt, replica) pair and returned in ``results``.
 
     Returns:
-        pd.Series: A dictionary containing generated sequences for each replica.
+        tuple: ``(design_sequence_dict, results)`` where
+
+        - ``design_sequence_dict``: dict mapping ``prompt_{p_idx}`` to a list
+          of generated sequences (one per replica), plus a ``_metadata`` key
+          with ``format_version``, ``num_prompts``, ``num_replicas``.
+        - ``results``: dict with auxiliary outputs:
+
+          * ``animation_frames``: ``{(p_idx, r_idx): [per-step token arrays]}``
+            for the (prompt, replica) pairs selected via
+            ``animate_prompts`` × ``animate_replicas``.  Empty when
+            animation is disabled.
+          * ``tokens``: token vocabulary list (index → string).
+          * ``stored_probs``: ``{(p_idx, r_idx): np.ndarray [steps, seq_len, num_classes]}``
+            of per-step conditional distributions, populated when
+            ``store_probabilities=True``.  Empty otherwise.
+          * ``stored_final_frames``: ``{(p_idx, r_idx): np.ndarray [seq_len]}``
+            of final-step token indices, populated alongside
+            ``stored_probs``.  Used downstream by the dynamics plot to
+            compute chosen-token probabilities.
     """
 
     # Handle z_t if passed as a list of tensors
@@ -247,6 +281,7 @@ def batch_stage3_generate_sequences(
     animate = animate_prompts is not None and animate_replicas is not None
     animation_frames = {}  # (p_idx, r_idx) -> list of numpy arrays, one per diffusion step
     stored_probs = {}      # (p_idx, r_idx) -> np.ndarray [steps, seq_len, num_classes]
+    stored_final_frames = {}  # (p_idx, r_idx) -> np.ndarray [seq_len], final token indices
 
     # Process all (prompt, replica) pairs in batches
     num_batches = (len(work_items) + args.batch_size_sample - 1) // args.batch_size_sample
@@ -303,6 +338,9 @@ def batch_stage3_generate_sequences(
             if batch_probs is not None:
                 # batch_probs shape: [steps, batch, seq_len, num_classes]
                 stored_probs[(p_idx, r_idx)] = batch_probs[:, i]
+                stored_final_frames[(p_idx, r_idx)] = np.asarray(
+                    mask_realization[0], dtype=np.int64,
+                )
 
     assert all(seq is not None for row in design_sequences for seq in row), \
         "Not all (prompt, replica) pairs were generated"
@@ -321,7 +359,13 @@ def batch_stage3_generate_sequences(
         'num_replicas': args.num_replicas,
     }
 
-    return design_sequence_dict, animation_frames, tokens, stored_probs
+    results = {
+        "animation_frames": animation_frames,
+        "tokens": tokens,
+        "stored_probs": stored_probs,
+        "stored_final_frames": stored_final_frames,
+    }
+    return design_sequence_dict, results
 
 
 def set_seed(seed):
@@ -417,7 +461,7 @@ def main(args, _setup_logging=True):
 
     # sample sequences
     store_probs = getattr(config_args_parser, 'store_probabilities', False)
-    design_sequence_dict, animation_frames, tokens, stored_probs = batch_stage3_generate_sequences(
+    design_sequence_dict, results = batch_stage3_generate_sequences(
             args=config_args,
             model=model,
             z_t=z_c,
@@ -425,6 +469,10 @@ def main(args, _setup_logging=True):
             animate_replicas=animate_replicas_set,
             store_probabilities=store_probs,
     )
+    animation_frames = results["animation_frames"]
+    tokens = results["tokens"]
+    stored_probs = results["stored_probs"]
+    stored_final_frames = results["stored_final_frames"]
 
     logger.info("design_sequence_dict=%s", design_sequence_dict)
 
@@ -497,7 +545,12 @@ def main(args, _setup_logging=True):
         for (p_idx, r_idx), probs_array in stored_probs.items():
             # probs_array shape: [steps, seq_len, num_classes]
             npz_path = os.path.join(probs_dir, f"prompt_{p_idx}_replica_{r_idx}.npz")
-            np.savez_compressed(npz_path, probs=probs_array, tokens=tokens)
+            np.savez_compressed(
+                npz_path,
+                probs=probs_array,
+                tokens=tokens,
+                final_frame=stored_final_frames[(p_idx, r_idx)],
+            )
             logger.info("Probabilities saved: %s (shape=%s)", npz_path, probs_array.shape)
 
     # Write manifest and clean up logging

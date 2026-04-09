@@ -69,9 +69,14 @@ Run through this list every time you bump:
 
 **Symptom:** the highest git tag does not match `__version__`, or a tag exists at a commit that does not contain the matching `__version__`.
 
-**Real example (April 2026):** the `v0.1.0a2` tag existed at commit `5d05460`, but `src/biom3/__init__.py` still said `0.1.0a1` for two further commits. The fix was to bump `__version__` to `0.1.0a2` (without retagging), accept the temporary HEAD-vs-tag drift, and address the drift at the next natural bump.
+**Real example (April 2026):** the bump to `0.1.0a2` landed on `addison-main` at commit `5d05460` and the `v0.1.0a2` tag was placed there — `__version__` and tag were consistent on that branch. But a parallel in-flight branch (`addison-spark`) had branched earlier and still carried `__version__ = "0.1.0a1"` in its new work. When preparing the merge, this was misread as "tag drift" and a redundant bump commit was applied on `addison-spark` (`6654aec`). Since `addison-spark` had never touched `__init__.py`, the merge would have picked up the bump cleanly from the `addison-main` side on its own — the duplicate bump was historical noise, not a real recovery.
 
-**Lesson:** the `__version__` bump and the `git tag` must happen on the same commit. If you tag without bumping (or bump without tagging), `/version-check` will flag the inconsistency on the next audit, and you will have to choose one of these recoveries:
+**Lesson:** two rules, not one.
+
+1. **On a single branch**, the `__version__` bump and the `git tag` must happen on the same commit. If they don't, `/version-check` will flag the inconsistency on the next audit.
+2. **With parallel branches in flight**, do the bump + tag *after* the merges have settled, not on one branch while a sibling is still developing. Otherwise the sibling's in-flight work will inherit the old `__version__` until it lands, which is easy to misread as drift. Preferred pattern: finish outstanding merges, then make a single `chore(release):` commit on `main` that bumps `__version__` and tag *that* commit.
+
+If a real drift is flagged, choose one of these recoveries:
 
 | Drift type | Recovery |
 |---|---|

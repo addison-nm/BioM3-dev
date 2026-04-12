@@ -14,6 +14,9 @@ demos/outputs/*
 # Claude Code
 .claude/
 
+# VSCode
+.vscode/
+
 # Misc
 **/.DS_Store
 venvs/

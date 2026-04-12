@@ -1276,7 +1276,8 @@ def train_model(
             from biom3.Stage3.callbacks import SyncSafeModelCheckpoint
             checkpoint_callbacks.append(SyncSafeModelCheckpoint(**ckpt_kwargs))
         else:
-            checkpoint_callbacks.append(ModelCheckpoint(**ckpt_kwargs))
+            from biom3.Stage3.callbacks import LoggingModelCheckpoint
+            checkpoint_callbacks.append(LoggingModelCheckpoint(**ckpt_kwargs))
 
     # ---- Metrics history ----
     if getattr(args, 'save_metrics_history', True):

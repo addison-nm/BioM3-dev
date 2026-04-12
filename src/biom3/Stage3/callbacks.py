@@ -96,6 +96,29 @@ class MetricsHistoryCallback(pl.Callback):
             record["loss_gap"] = val_loss - train_loss
         self.val_epoch_metrics.append(record)
 
+        # Log epoch summary to file logger (rank 0 only)
+        if trainer.global_rank == 0:
+            epoch = trainer.current_epoch
+            step = trainer.global_step
+            parts = [f"Epoch {epoch} (step {step})"]
+            if train_loss is not None:
+                parts.append(f"train_loss={train_loss:.4f}")
+            if val_loss is not None:
+                parts.append(f"val_loss={val_loss:.4f}")
+            if val_loss is not None and train_loss is not None:
+                parts.append(f"gap={val_loss - train_loss:+.4f}")
+            for key in ("val_prev_hard_acc_epoch", "val_fut_hard_acc_epoch",
+                        "val_current_hard_acc_epoch"):
+                v = record.get(key)
+                if v is not None:
+                    short = key.replace("val_", "").replace("_epoch", "")
+                    parts.append(f"{short}={v:.3f}")
+            lr = logged.get("lr-AdamW")
+            if lr is not None:
+                lr_val = lr.item() if hasattr(lr, "item") else lr
+                parts.append(f"lr={lr_val:.2e}")
+            logger.info("  ".join(parts))
+
     def on_train_end(self, trainer, pl_module):
         if self.all_ranks_val_loss:
             self._save_per_rank_val_loss(trainer.global_rank)
@@ -147,7 +170,31 @@ class MetricsHistoryCallback(pl.Callback):
         )
 
 
-class SyncSafeModelCheckpoint(_ModelCheckpoint):
+class _CheckpointLogMixin:
+    """Mixin that logs checkpoint saves and best-score updates to the file logger."""
+
+    def _save_checkpoint(self, trainer, filepath):
+        super()._save_checkpoint(trainer, filepath)
+        if trainer.global_rank != 0:
+            return
+        score = self.current_score
+        score_str = f"{float(score):.5f}" if score is not None else "n/a"
+        best = self.best_model_score
+        best_str = f"{float(best):.5f}" if best is not None else "n/a"
+        logger.info(
+            "Checkpoint saved  epoch=%d  step=%d  %s=%s  best=%s  path=%s",
+            trainer.current_epoch, trainer.global_step,
+            self.monitor or "none", score_str, best_str,
+            os.path.basename(filepath),
+        )
+
+
+class LoggingModelCheckpoint(_CheckpointLogMixin, _ModelCheckpoint):
+    """Standard ModelCheckpoint with file-logger output on each save."""
+    pass
+
+
+class SyncSafeModelCheckpoint(_CheckpointLogMixin, _ModelCheckpoint):
     """ModelCheckpoint that bypasses ``reduce_boolean_decision``.
 
     Lightning's ``check_monitor_top_k`` calls
@@ -175,18 +222,6 @@ class SyncSafeModelCheckpoint(_ModelCheckpoint):
             return True
 
         monitor_op = {"min": torch.lt, "max": torch.gt}[self.mode]
-        should_update = bool(monitor_op(
+        return bool(monitor_op(
             current, self.best_k_models[self.kth_best_model_path]
         ))
-
-        if trainer.global_rank == 0:
-            logger.info(
-                "[SyncSafeCkpt] epoch=%d step=%d: current=%.6f  "
-                "kth_best=%.6f  improved=%s",
-                trainer.current_epoch, trainer.global_step,
-                float(current),
-                float(self.best_k_models[self.kth_best_model_path]),
-                should_update,
-            )
-
-        return should_update

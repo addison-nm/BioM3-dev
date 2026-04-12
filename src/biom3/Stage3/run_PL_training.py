@@ -252,6 +252,15 @@ def get_args(parser):
                         help='Use SyncSafeModelCheckpoint to bypass reduce_boolean_decision '
                              '(workaround for XPU/CCL integer all-reduce bug)')
 
+    # Benchmark
+    parser.add_argument('--save_benchmark', default='False', type=str,
+                        help='Save per-epoch training benchmark to artifacts dir')
+    parser.add_argument('--benchmark_skip_first_epoch', default='True', type=str,
+                        help='Exclude first epoch from benchmark summary stats (warmup)')
+    parser.add_argument('--benchmark_all_ranks_memory', default='False', type=str,
+                        help='All-gather peak memory from every rank and save '
+                             'per-rank lists in benchmark_history.json')
+
     return parser
 
 
@@ -829,6 +838,9 @@ def retrieve_all_args(args):
         args.metrics_history_all_ranks_val_loss
     )
     args.use_sync_safe_checkpoint = str_to_bool(args.use_sync_safe_checkpoint)
+    args.save_benchmark = str_to_bool(args.save_benchmark)
+    args.benchmark_skip_first_epoch = str_to_bool(args.benchmark_skip_first_epoch)
+    args.benchmark_all_ranks_memory = str_to_bool(args.benchmark_all_ranks_memory)
     args.early_stopping_metric = nonestr_to_none(args.early_stopping_metric)
     args.checkpoint_every_n_steps = nonestr_to_none(args.checkpoint_every_n_steps)
     args.checkpoint_every_n_epochs = nonestr_to_none(args.checkpoint_every_n_epochs)
@@ -1298,6 +1310,24 @@ def train_model(
     else:
         metrics_cb = None
 
+    # ---- Training benchmark ----
+    if getattr(args, 'save_benchmark', False):
+        from biom3.Stage3.callbacks import TrainingBenchmarkCallback
+        benchmark_cb = TrainingBenchmarkCallback(
+            output_dir=artifacts_dir,
+            batch_size=args.batch_size,
+            acc_grad_batches=acc_grad_batches,
+            gpu_devices=gpu_devices,
+            num_nodes=num_nodes,
+            precision=precision,
+            training_strategy=training_strategy,
+            num_workers=args.num_workers,
+            skip_first_epoch=getattr(args, 'benchmark_skip_first_epoch', True),
+            all_ranks_memory=getattr(args, 'benchmark_all_ranks_memory', False),
+        )
+    else:
+        benchmark_cb = None
+
     # ---- Early stopping ----
     early_stopping_metric = getattr(args, 'early_stopping_metric', None)
     if isinstance(early_stopping_metric, str) and early_stopping_metric.lower() == 'none':
@@ -1306,6 +1336,8 @@ def train_model(
     callbacks = checkpoint_callbacks + [lr_monitor, gpu_logger]
     if metrics_cb is not None:
         callbacks.append(metrics_cb)
+    if benchmark_cb is not None:
+        callbacks.append(benchmark_cb)
     if early_stopping_metric is not None:
         logger.info("Enabling early stopping on %s (patience=%d)",
                      early_stopping_metric, args.early_stopping_patience)

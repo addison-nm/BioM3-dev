@@ -1,11 +1,15 @@
 """Custom PyTorch Lightning callbacks for Stage 3 training."""
 
+import json
 import os
+import socket
+import time
+from datetime import datetime
 
 import numpy as np
 import torch
 
-from biom3.backend.device import BACKEND_NAME, _XPU, setup_logger
+from biom3.backend.device import BACKEND_NAME, _CUDA, _XPU, setup_logger
 
 if BACKEND_NAME == _XPU:
     import lightning as pl
@@ -168,6 +172,320 @@ class MetricsHistoryCallback(pl.Callback):
             len(self.per_rank_val_loss),
             out_path,
         )
+
+
+def _reset_peak_memory_stats():
+    """Reset peak memory counters for the active device backend.
+
+    No-op on CPU.  CUDA and XPU expose the same-named function.
+    """
+    if BACKEND_NAME == _CUDA:
+        torch.cuda.reset_peak_memory_stats()
+    elif BACKEND_NAME == _XPU:
+        torch.xpu.reset_peak_memory_stats()
+
+
+def _get_peak_memory_stats():
+    """Return ``(peak_allocated_bytes, peak_reserved_bytes)`` for the local device.
+
+    Returns ``(None, None)`` on CPU or if the backend does not expose the
+    relevant APIs.  CUDA and XPU expose identical function names.
+    """
+    if BACKEND_NAME == _CUDA:
+        return (torch.cuda.max_memory_allocated(),
+                torch.cuda.max_memory_reserved())
+    if BACKEND_NAME == _XPU:
+        try:
+            return (torch.xpu.max_memory_allocated(),
+                    torch.xpu.max_memory_reserved())
+        except AttributeError:
+            return (None, None)
+    return (None, None)
+
+
+class TrainingBenchmarkCallback(pl.Callback):
+    """Records per-epoch training wall-clock time, throughput, and peak memory.
+
+    Saves ``benchmark_history.json`` in the artifacts directory.  Opt-in via
+    ``--save_benchmark True``.
+
+    Per-epoch peak memory is captured by resetting the device peak memory
+    counters at epoch start and reading ``max_memory_allocated`` /
+    ``max_memory_reserved`` at epoch end.  By default only rank 0's local
+    device is sampled.  Set ``all_ranks_memory=True`` to all-gather peak
+    memory from every rank and save ``peak_memory_{allocated,reserved}_gb_per_rank``
+    lists in each record.
+
+    Parameters
+    ----------
+    output_dir : str
+        Directory where ``benchmark_history.json`` is written.
+    batch_size : int
+        Per-device micro-batch size.
+    acc_grad_batches : int
+        Gradient accumulation steps.
+    gpu_devices : int
+        Number of GPU devices per node.
+    num_nodes : int
+        Number of nodes.
+    precision : str
+        Training precision string (e.g. ``'bf16'``).
+    training_strategy : str
+        ``'primary_only'`` or ``'combine'``.
+    num_workers : int
+        DataLoader workers.
+    skip_first_epoch : bool
+        Exclude the first epoch from summary statistics (warmup effects).
+    all_ranks_memory : bool
+        All-gather peak memory from every rank and report per-rank lists.
+        Default: False (only rank 0's local device is reported).
+    """
+
+    def __init__(self, output_dir, *, batch_size, acc_grad_batches,
+                 gpu_devices, num_nodes, precision="32",
+                 training_strategy="primary_only", num_workers=0,
+                 skip_first_epoch=True, all_ranks_memory=False):
+        super().__init__()
+        self.output_dir = output_dir
+        self.batch_size = batch_size
+        self.acc_grad_batches = acc_grad_batches
+        self.gpu_devices = gpu_devices
+        self.num_nodes = num_nodes
+        self.effective_batch_size = (
+            batch_size * acc_grad_batches * gpu_devices * num_nodes
+        )
+        self.precision = precision
+        self.training_strategy = training_strategy
+        self.num_workers = num_workers
+        self.skip_first_epoch = skip_first_epoch
+        self.all_ranks_memory = all_ranks_memory
+        self.backend = BACKEND_NAME
+
+        self._epoch_start_time = None
+        self._epoch_start_step = None
+        self._interval_start_time = None
+        self._interval_start_step = None
+        self._epoch_records: list[dict] = []
+        self._train_start_timestamp = None
+
+    def on_train_start(self, trainer, pl_module):
+        self._train_start_timestamp = datetime.now().isoformat()
+        self._interval_start_time = time.perf_counter()
+        self._interval_start_step = trainer.global_step
+        _reset_peak_memory_stats()
+
+    def on_train_epoch_start(self, trainer, pl_module):
+        self._epoch_start_time = time.perf_counter()
+        self._epoch_start_step = trainer.global_step
+        _reset_peak_memory_stats()
+
+    def on_train_epoch_end(self, trainer, pl_module):
+        if self._epoch_start_time is None:
+            return
+        elapsed = time.perf_counter() - self._epoch_start_time
+        steps = trainer.global_step - self._epoch_start_step
+        peak_alloc, peak_reserved = _get_peak_memory_stats()
+        per_rank_alloc, per_rank_reserved = self._gather_across_ranks(
+            pl_module, peak_alloc, peak_reserved,
+        )
+        record = self._build_record(
+            trainer.current_epoch, trainer.global_step, steps, elapsed,
+            peak_alloc=peak_alloc, peak_reserved=peak_reserved,
+            per_rank_alloc=per_rank_alloc, per_rank_reserved=per_rank_reserved,
+        )
+        self._epoch_records.append(record)
+        self._log_record(trainer, pl_module, record)
+
+    def on_validation_epoch_end(self, trainer, pl_module):
+        if self.training_strategy != "combine":
+            return
+        if self._interval_start_time is None:
+            return
+        elapsed = time.perf_counter() - self._interval_start_time
+        steps = trainer.global_step - self._interval_start_step
+        if steps <= 0:
+            return
+        peak_alloc, peak_reserved = _get_peak_memory_stats()
+        per_rank_alloc, per_rank_reserved = self._gather_across_ranks(
+            pl_module, peak_alloc, peak_reserved,
+        )
+        record = self._build_record(
+            trainer.current_epoch, trainer.global_step, steps, elapsed,
+            peak_alloc=peak_alloc, peak_reserved=peak_reserved,
+            per_rank_alloc=per_rank_alloc, per_rank_reserved=per_rank_reserved,
+            interval_step_range=[self._interval_start_step,
+                                 trainer.global_step],
+        )
+        self._epoch_records.append(record)
+        self._log_record(trainer, pl_module, record)
+        self._interval_start_time = time.perf_counter()
+        self._interval_start_step = trainer.global_step
+        _reset_peak_memory_stats()
+
+    def _gather_across_ranks(self, pl_module, peak_alloc, peak_reserved):
+        """All-gather peak memory from every rank.
+
+        Runs on ALL ranks (collective op) but the result is only used on rank 0.
+        Returns ``(alloc_list_gb, reserved_list_gb)`` or ``(None, None)`` when
+        the flag is off, peak stats are unavailable, or the gather fails.
+        """
+        if not self.all_ranks_memory:
+            return None, None
+        if peak_alloc is None:
+            return None, None
+        local = torch.tensor(
+            [float(peak_alloc), float(peak_reserved)],
+            device=pl_module.device, dtype=torch.float64,
+        )
+        try:
+            gathered = pl_module.all_gather(local)
+        except Exception as e:
+            logger.warning("Memory all_gather failed: %s", e)
+            return None, None
+        if gathered.ndim == 1:
+            # Single process: shape (2,)
+            alloc_bytes = [float(gathered[0].item())]
+            reserved_bytes = [float(gathered[1].item())]
+        else:
+            # Distributed: shape (world_size, 2)
+            alloc_bytes = [float(x.item()) for x in gathered[:, 0]]
+            reserved_bytes = [float(x.item()) for x in gathered[:, 1]]
+        one_gb = 1024 ** 3
+        return (
+            [round(a / one_gb, 3) for a in alloc_bytes],
+            [round(r / one_gb, 3) for r in reserved_bytes],
+        )
+
+    def on_train_end(self, trainer, pl_module):
+        if trainer.global_rank != 0:
+            return
+        self._save()
+        records = self._epoch_records
+        if self.skip_first_epoch and len(records) > 1:
+            records = records[1:]
+        if records:
+            avg_sps = sum(r["samples_per_sec"] for r in records) / len(records)
+            avg_time = (
+                sum(r["epoch_wall_time_sec"] for r in records) / len(records)
+            )
+            mem_parts = []
+            peak_allocs = [r["peak_memory_allocated_gb"] for r in records
+                           if r.get("peak_memory_allocated_gb") is not None]
+            peak_reserveds = [r["peak_memory_reserved_gb"] for r in records
+                              if r.get("peak_memory_reserved_gb") is not None]
+            if peak_allocs:
+                mem_parts.append(
+                    f"max {max(peak_allocs):.2f} GB allocated"
+                )
+            if peak_reserveds:
+                mem_parts.append(
+                    f"max {max(peak_reserveds):.2f} GB reserved"
+                )
+            mem_summary = f", {', '.join(mem_parts)}" if mem_parts else ""
+            logger.info(
+                "Benchmark summary (%d epochs%s): "
+                "avg %.1f samples/sec, avg %.1f sec/epoch%s",
+                len(records),
+                ", first skipped" if self.skip_first_epoch else "",
+                avg_sps, avg_time, mem_summary,
+            )
+
+    def _build_record(self, epoch, global_step, steps, elapsed,
+                      peak_alloc=None, peak_reserved=None,
+                      per_rank_alloc=None, per_rank_reserved=None,
+                      interval_step_range=None):
+        samples = steps * self.effective_batch_size
+        record = {
+            "epoch": epoch,
+            "global_step": global_step,
+            "steps_in_epoch": steps,
+            "samples_in_epoch": samples,
+            "epoch_wall_time_sec": round(elapsed, 3),
+            "samples_per_sec": round(samples / elapsed, 1) if elapsed > 0 else 0.0,
+            "steps_per_sec": round(steps / elapsed, 3) if elapsed > 0 else 0.0,
+            "peak_memory_allocated_gb": (
+                round(peak_alloc / (1024 ** 3), 3)
+                if peak_alloc is not None else None
+            ),
+            "peak_memory_reserved_gb": (
+                round(peak_reserved / (1024 ** 3), 3)
+                if peak_reserved is not None else None
+            ),
+        }
+        if per_rank_alloc is not None:
+            record["peak_memory_allocated_gb_per_rank"] = per_rank_alloc
+        if per_rank_reserved is not None:
+            record["peak_memory_reserved_gb_per_rank"] = per_rank_reserved
+        if interval_step_range is not None:
+            record["interval_step_range"] = interval_step_range
+        return record
+
+    def _log_record(self, trainer, pl_module, record):
+        if trainer.global_rank != 0:
+            return
+        pl_module.log("benchmark/epoch_wall_time_sec",
+                      float(record["epoch_wall_time_sec"]),
+                      on_step=False, on_epoch=True, rank_zero_only=True)
+        pl_module.log("benchmark/samples_per_sec",
+                      float(record["samples_per_sec"]),
+                      on_step=False, on_epoch=True, rank_zero_only=True)
+        pl_module.log("benchmark/steps_per_sec",
+                      float(record["steps_per_sec"]),
+                      on_step=False, on_epoch=True, rank_zero_only=True)
+        if record.get("peak_memory_allocated_gb") is not None:
+            pl_module.log("benchmark/peak_memory_allocated_gb",
+                          float(record["peak_memory_allocated_gb"]),
+                          on_step=False, on_epoch=True, rank_zero_only=True)
+        if record.get("peak_memory_reserved_gb") is not None:
+            pl_module.log("benchmark/peak_memory_reserved_gb",
+                          float(record["peak_memory_reserved_gb"]),
+                          on_step=False, on_epoch=True, rank_zero_only=True)
+        mem_str = ""
+        per_rank_alloc = record.get("peak_memory_allocated_gb_per_rank")
+        per_rank_reserved = record.get("peak_memory_reserved_gb_per_rank")
+        if per_rank_alloc is not None:
+            alloc_fmt = ",".join(f"{v:.2f}" for v in per_rank_alloc)
+            mem_str += f"  peak_alloc_per_rank=[{alloc_fmt}]GB"
+        elif record.get("peak_memory_allocated_gb") is not None:
+            mem_str += f"  peak_alloc={record['peak_memory_allocated_gb']:.2f}GB"
+        if per_rank_reserved is not None:
+            reserved_fmt = ",".join(f"{v:.2f}" for v in per_rank_reserved)
+            mem_str += f"  peak_reserved_per_rank=[{reserved_fmt}]GB"
+        elif record.get("peak_memory_reserved_gb") is not None:
+            mem_str += f"  peak_reserved={record['peak_memory_reserved_gb']:.2f}GB"
+        logger.info(
+            "Benchmark  epoch=%d  step=%d  time=%.1fs  "
+            "samples/sec=%.1f  steps/sec=%.3f  "
+            "effective_batch=%d%s",
+            record["epoch"], record["global_step"],
+            record["epoch_wall_time_sec"],
+            record["samples_per_sec"], record["steps_per_sec"],
+            self.effective_batch_size, mem_str,
+        )
+
+    def _save(self):
+        os.makedirs(self.output_dir, exist_ok=True)
+        payload = {
+            "config": {
+                "batch_size": self.batch_size,
+                "acc_grad_batches": self.acc_grad_batches,
+                "gpu_devices": self.gpu_devices,
+                "num_nodes": self.num_nodes,
+                "effective_batch_size": self.effective_batch_size,
+                "num_workers": self.num_workers,
+                "precision": self.precision,
+                "training_strategy": self.training_strategy,
+                "backend": self.backend,
+                "hostname": socket.gethostname(),
+                "train_start_timestamp": self._train_start_timestamp,
+            },
+            "epochs": self._epoch_records,
+        }
+        out_path = os.path.join(self.output_dir, "benchmark_history.json")
+        with open(out_path, "w") as f:
+            json.dump(payload, f, indent=2)
+        logger.info("Saved benchmark history (%d records) to %s",
+                     len(self._epoch_records), out_path)
 
 
 class _CheckpointLogMixin:

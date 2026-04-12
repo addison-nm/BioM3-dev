@@ -842,6 +842,7 @@ class HDF5DataModule(pl.LightningDataModule):
             all_paths.append(self.primary_path)
         all_paths.extend(self.secondary_paths)
 
+        self.split_info = []
         for path in all_paths:
             dataset = HDF5Dataset(
                 args=self.args,
@@ -853,6 +854,11 @@ class HDF5DataModule(pl.LightningDataModule):
             val_idx = self.filter_by_sequence_length(dataset, val_idx)
             train_datasets.append(Subset(dataset, train_idx))
             val_datasets.append(Subset(dataset, val_idx))
+            self.split_info.append({
+                "path": path,
+                "train_indices": train_idx,
+                "val_indices": val_idx,
+            })
             logger.info("Loaded dataset from %s (%d train, %d val)",
                         path, len(train_idx), len(val_idx))
 

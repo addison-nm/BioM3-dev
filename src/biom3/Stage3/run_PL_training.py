@@ -1139,6 +1139,11 @@ def train_model(
     runs_folder = args.runs_folder
     run_id = args.run_id
     log_every_n_steps = args.log_every_n_steps
+    num_training_batches = getattr(args, 'traindata_len', None)
+    if num_training_batches and log_every_n_steps > num_training_batches:
+        log_every_n_steps = max(1, int(num_training_batches))
+        logger.info("Clamped log_every_n_steps to %d (number of training batches)",
+                     log_every_n_steps)
     training_strategy = args.training_strategy
     gpu_devices = args.gpu_devices
     num_nodes = args.num_nodes
@@ -1362,6 +1367,12 @@ def train_model(
 
     if get_rank() == 0:
         print_gpu_initialization()
+
+    # Save dataset split indices
+    if get_rank() == 0 and hasattr(data_module, 'split_info'):
+        splits_path = os.path.join(artifacts_dir, "dataset_splits.pt")
+        torch.save(data_module.split_info, splits_path)
+        logger.info("Saved dataset splits to %s", splits_path)
 
     # Save trained model in multiple formats
     save_model(

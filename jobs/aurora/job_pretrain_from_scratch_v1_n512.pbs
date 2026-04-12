@@ -10,7 +10,6 @@
 # PBS -M <emailaddress>
 # PBS -m be
 
-set -euo pipefail
 
 projdir=${PBS_O_WORKDIR}  # Should submit job from the BioM3-dev directory
 cd ${projdir}

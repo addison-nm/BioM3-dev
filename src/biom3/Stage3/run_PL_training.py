@@ -222,6 +222,10 @@ def get_args(parser):
                         help='Rank indices on which to save metrics history')
     parser.add_argument('--metrics_history_every_n_steps', default=1, type=int,
                         help='Record training metrics every N global steps')
+    parser.add_argument('--metrics_history_all_ranks_val_loss', default='False',
+                        type=str,
+                        help='Diagnostic: dump val_loss per rank at epoch end '
+                             '(one file per rank) to check sync_dist consistency')
 
     # Early stopping
     parser.add_argument('--early_stopping_metric', default=None, type=str,
@@ -243,6 +247,10 @@ def get_args(parser):
     # Multi-metric checkpoint monitors (JSON config only)
     parser.add_argument('--checkpoint_monitors', default=None, type=str,
                         help='JSON list of {metric, mode} dicts for checkpoint saving (set via config)')
+
+    parser.add_argument('--use_sync_safe_checkpoint', default='False', type=str,
+                        help='Use SyncSafeModelCheckpoint to bypass reduce_boolean_decision '
+                             '(workaround for XPU/CCL integer all-reduce bug)')
 
     return parser
 
@@ -817,6 +825,10 @@ def retrieve_all_args(args):
     args.wandb = str_to_bool(args.wandb)
     args.scale_learning_rate = str_to_bool(args.scale_learning_rate)
     args.save_metrics_history = str_to_bool(args.save_metrics_history)
+    args.metrics_history_all_ranks_val_loss = str_to_bool(
+        args.metrics_history_all_ranks_val_loss
+    )
+    args.use_sync_safe_checkpoint = str_to_bool(args.use_sync_safe_checkpoint)
     args.early_stopping_metric = nonestr_to_none(args.early_stopping_metric)
     args.checkpoint_every_n_steps = nonestr_to_none(args.checkpoint_every_n_steps)
     args.checkpoint_every_n_epochs = nonestr_to_none(args.checkpoint_every_n_epochs)
@@ -1260,7 +1272,11 @@ def train_model(
             ckpt_kwargs["save_top_k"] = 1
             ckpt_kwargs["save_last"] = False
             ckpt_kwargs["filename"] = f"best-{metric_slug}-{{epoch}}"
-        checkpoint_callbacks.append(ModelCheckpoint(**ckpt_kwargs))
+        if getattr(args, 'use_sync_safe_checkpoint', False):
+            from biom3.Stage3.callbacks import SyncSafeModelCheckpoint
+            checkpoint_callbacks.append(SyncSafeModelCheckpoint(**ckpt_kwargs))
+        else:
+            checkpoint_callbacks.append(ModelCheckpoint(**ckpt_kwargs))
 
     # ---- Metrics history ----
     if getattr(args, 'save_metrics_history', True):
@@ -1269,6 +1285,9 @@ def train_model(
             output_dir=artifacts_dir,
             save_ranks=getattr(args, 'metrics_history_ranks', [0]),
             every_n_steps=getattr(args, 'metrics_history_every_n_steps', 1),
+            all_ranks_val_loss=getattr(
+                args, 'metrics_history_all_ranks_val_loss', False
+            ),
         )
     else:
         metrics_cb = None

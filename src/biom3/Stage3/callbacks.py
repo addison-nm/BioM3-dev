@@ -9,8 +9,10 @@ from biom3.backend.device import BACKEND_NAME, _XPU, setup_logger
 
 if BACKEND_NAME == _XPU:
     import lightning as pl
+    from lightning.pytorch.callbacks import ModelCheckpoint as _ModelCheckpoint
 else:
     import pytorch_lightning as pl
+    from pytorch_lightning.callbacks import ModelCheckpoint as _ModelCheckpoint
 
 logger = setup_logger(__name__)
 
@@ -29,18 +31,28 @@ class MetricsHistoryCallback(pl.Callback):
     output_dir : str
         Directory where ``metrics_history.pt`` is written.
     save_ranks : list[int]
-        Rank indices on which to record and save metrics (default: ``[0]``).
+        Rank indices on which to record and save train/val metrics
+        (default: ``[0]``).
     every_n_steps : int
         Record training metrics every *n* global steps (default: ``1``).
+    all_ranks_val_loss : bool
+        When True, record ``val_loss`` and ``val_loss_epoch`` on **every** rank
+        at validation epoch end and dump one ``metrics_history.rank{N}.pt`` per
+        rank under ``output_dir``. Used to diagnose cross-rank sync_dist issues
+        in ``ModelCheckpoint`` (the consensus ``reduce_boolean_decision`` call
+        requires all ranks to agree that val_loss improved). Default: False.
     """
 
-    def __init__(self, output_dir, save_ranks=None, every_n_steps=1):
+    def __init__(self, output_dir, save_ranks=None, every_n_steps=1,
+                 all_ranks_val_loss=False):
         super().__init__()
         self.output_dir = output_dir
         self.save_ranks = save_ranks or [0]
         self.every_n_steps = max(1, every_n_steps)
+        self.all_ranks_val_loss = all_ranks_val_loss
         self.train_step_metrics: list[dict] = []
         self.val_epoch_metrics: list[dict] = []
+        self.per_rank_val_loss: list[dict] = []
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
         if trainer.global_rank not in self.save_ranks:
@@ -55,6 +67,19 @@ class MetricsHistoryCallback(pl.Callback):
         self.train_step_metrics.append(record)
 
     def on_validation_epoch_end(self, trainer, pl_module):
+        if self.all_ranks_val_loss:
+            logged = trainer.callback_metrics
+            rec = {
+                "global_step": trainer.global_step,
+                "epoch": trainer.current_epoch,
+                "rank": trainer.global_rank,
+            }
+            for key in ("val_loss", "val_loss_epoch", "val_loss_step"):
+                v = logged.get(key)
+                if v is not None:
+                    rec[key] = v.item() if hasattr(v, "item") else v
+            self.per_rank_val_loss.append(rec)
+
         if trainer.global_rank not in self.save_ranks:
             return
         logged = trainer.callback_metrics
@@ -72,6 +97,8 @@ class MetricsHistoryCallback(pl.Callback):
         self.val_epoch_metrics.append(record)
 
     def on_train_end(self, trainer, pl_module):
+        if self.all_ranks_val_loss:
+            self._save_per_rank_val_loss(trainer.global_rank)
         if trainer.global_rank not in self.save_ranks:
             return
         self._save()
@@ -105,3 +132,61 @@ class MetricsHistoryCallback(pl.Callback):
             len(self.val_epoch_metrics),
             out_path,
         )
+
+    def _save_per_rank_val_loss(self, rank):
+        os.makedirs(self.output_dir, exist_ok=True)
+        payload = {"val": self._records_to_arrays(self.per_rank_val_loss)}
+        out_path = os.path.join(
+            self.output_dir, f"metrics_history.rank{rank:03d}.pt"
+        )
+        torch.save(payload, out_path)
+        logger.info(
+            "Saved per-rank val_loss history (%d records) to %s",
+            len(self.per_rank_val_loss),
+            out_path,
+        )
+
+
+class SyncSafeModelCheckpoint(_ModelCheckpoint):
+    """ModelCheckpoint that bypasses ``reduce_boolean_decision``.
+
+    Lightning's ``check_monitor_top_k`` calls
+    ``strategy.reduce_boolean_decision(decision, all=True)`` which does a
+    ``ReduceOp.SUM`` all-reduce on an **integer** tensor and checks
+    ``sum == world_size``.  On Intel XPU with the CCL backend this
+    all-reduce silently returns an incorrect value, causing the
+    checkpoint callback to reject every improvement after the first
+    ``save_top_k`` saves (those bypass the consensus entirely).
+
+    Since ``sync_dist=True`` on the logged metric already ensures all
+    ranks see an identical ``val_loss`` value (verified empirically), the
+    per-rank comparison is deterministic and consensus is redundant.
+    This subclass simply removes the ``reduce_boolean_decision`` call.
+    """
+
+    def check_monitor_top_k(self, trainer, current=None):
+        if current is None:
+            return False
+        if self.save_top_k == -1:
+            return True
+
+        less_than_k_models = len(self.best_k_models) < self.save_top_k
+        if less_than_k_models:
+            return True
+
+        monitor_op = {"min": torch.lt, "max": torch.gt}[self.mode]
+        should_update = bool(monitor_op(
+            current, self.best_k_models[self.kth_best_model_path]
+        ))
+
+        if trainer.global_rank == 0:
+            logger.info(
+                "[SyncSafeCkpt] epoch=%d step=%d: current=%.6f  "
+                "kth_best=%.6f  improved=%s",
+                trainer.current_epoch, trainer.global_step,
+                float(current),
+                float(self.best_k_models[self.kth_best_model_path]),
+                should_update,
+            )
+
+        return should_update

@@ -281,12 +281,12 @@ class PL_ProtARDM(pl.LightningModule):
             loss = train_tuple[0]
             metrics = train_tuple[1]
 
-        if realization_idx == 0:
-            if self.global_rank == 0:
-                gpu_memory_usage = print_gpu_initialization()
-            else:
-                gpu_memory_usage = 0.0
-            self.log(f"{stage}_gpu_memory_usage", gpu_memory_usage, sync_dist=True)
+        # if realization_idx == 0:
+        #     if self.global_rank == 0:
+        #         gpu_memory_usage = print_gpu_initialization()
+        #     else:
+        #         gpu_memory_usage = 0.0
+        #     self.log(f"{stage}_gpu_memory_usage", gpu_memory_usage, sync_dist=True)
 
         sync_dist = True if 'val' in stage else False
         # track loss

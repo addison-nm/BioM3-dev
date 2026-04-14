@@ -21,6 +21,20 @@ import biom3.Stage3.cond_diff_transformer_layer as mod
 import biom3.Stage3.transformer_training_helper as train_helper
 
 
+def _inference_autocast(device):
+    """bf16 autocast on CUDA/XPU; disabled (no-op) on CPU.
+
+    On Blackwell (sm_121a) PyTorch's fp32 GEMM falls back to non-tensor-core
+    kernels (magma_sgemmEx / cutlass SIMT), so eager sampling is several
+    times slower than it should be. Routing matmul through the bf16 path
+    reaches tuned tensor-core kernels and delivers ~3x on the real model.
+    Autocast's built-in promotion rules keep softmax/log in fp32 internally.
+    """
+    device_type = torch.device(device).type
+    enabled = device_type in ("cuda", "xpu")
+    return torch.autocast(device_type=device_type, dtype=torch.bfloat16, enabled=enabled)
+
+
 
 # generate missing pixels with one shot
 @torch.no_grad()
@@ -257,41 +271,39 @@ def batch_generate_denoised_sampled(
             dtype=temp_y_c.dtype, device=args.device
         )
 
-    for ii in tqdm(range(max_diffusion_step)):
+    with _inference_autocast(args.device):
+        for ii in tqdm(range(max_diffusion_step)):
 
-        # Make position prediction
-        conditional_prob, prob = predict_next_index(
-                model=model,
-                args=args,
-                mask_realization=temp_mask_realization,
+            # Model forward returns logits as [batch, num_classes, seq_len];
+            # transpose once so downstream ops work on [batch, seq_len, num_classes].
+            # Promote to fp32 so softmax/Gumbel math stays stable under autocast.
+            logits = model(
+                x=temp_mask_realization.squeeze(1),
+                t=temp_idx.view(-1),
                 y_c=temp_y_c,
-                idx=temp_idx
-        )
+            ).transpose(1, 2).float()
 
-        if store_probabilities:
-            all_probs[ii] = conditional_prob.probs
+            if store_probabilities:
+                all_probs[ii] = F.softmax(logits, dim=-1)
 
-        # Token selection
-        if token_strategy == 'argmax':
-            next_temp_realization = conditional_prob.probs.argmax(dim=-1)
-        else:
-            # Gumbel-max trick (equivalent to Categorical sampling).
-            # See docs/gumbel_max_sampling.md for derivation.
-            gumbel_buffer.exponential_()
-            next_temp_realization = (
-                conditional_prob.probs.log() - gumbel_buffer.log()
-            ).argmax(dim=-1)
+            # Token selection — softmax is monotonic so argmax(log_softmax + G)
+            # == argmax(logits + G). See docs/gumbel_max_sampling.md.
+            if token_strategy == 'argmax':
+                next_temp_realization = logits.argmax(dim=-1)
+            else:
+                gumbel_buffer.exponential_()
+                next_temp_realization = (logits - gumbel_buffer.log()).argmax(dim=-1)
 
-        # Update temp_mask_realization per sample (advanced indexing)
-        current_location = (temp_sampling_path == temp_idx).long().argmax(dim=-1)
-        temp_mask_realization[batch_idx, 0, current_location] = next_temp_realization[batch_idx, current_location]
+            # Update temp_mask_realization per sample (advanced indexing)
+            current_location = (temp_sampling_path == temp_idx).long().argmax(dim=-1)
+            temp_mask_realization[batch_idx, 0, current_location] = next_temp_realization[batch_idx, current_location]
 
-        # Store on GPU
-        all_realizations[ii] = temp_mask_realization
-        all_time_idx[ii] = temp_idx
+            # Store on GPU
+            all_realizations[ii] = temp_mask_realization
+            all_time_idx[ii] = temp_idx
 
-        # Increment temp_idx for the next iteration
-        temp_idx += 1
+            # Increment temp_idx for the next iteration
+            temp_idx += 1
 
     # Single GPU→CPU transfer at the end
     all_realizations_np = all_realizations.cpu().numpy()
@@ -362,56 +374,56 @@ def batch_generate_denoised_sampled_confidence(
             dtype=temp_y_c.dtype, device=args.device
         )
 
-    for ii in tqdm(range(max_diffusion_step)):
+    with _inference_autocast(args.device):
+        for ii in tqdm(range(max_diffusion_step)):
 
-        # Model prediction
-        conditional_prob, prob = predict_next_index(
-                model=model,
-                args=args,
-                mask_realization=temp_mask_realization,
+            # Model forward returns logits as [batch, num_classes, seq_len];
+            # transpose once so downstream ops work on [batch, seq_len, num_classes].
+            # Promote to fp32 so softmax/Gumbel math stays stable under autocast.
+            logits = model(
+                x=temp_mask_realization.squeeze(1),
+                t=temp_idx.view(-1),
                 y_c=temp_y_c,
-                idx=temp_idx
-        )
+            ).transpose(1, 2).float()
 
-        if store_probabilities:
-            all_probs[ii] = conditional_prob.probs
+            # Confidence path needs normalised probs so max-prob values are
+            # comparable across positions (raw logits aren't).
+            probs = F.softmax(logits, dim=-1)
+            if store_probabilities:
+                all_probs[ii] = probs
 
-        # Per-position confidence: max class probability
-        # conditional_prob.probs shape: [batch, seq_len, num_classes]
-        max_probs, max_classes = conditional_prob.probs.max(dim=-1)
+            max_probs, max_classes = probs.max(dim=-1)
 
-        # Mask out already-unmasked positions so they are never selected
-        is_masked = (temp_mask_realization.squeeze(1) == 0)
-        max_probs[~is_masked] = -float('inf')
+            # Mask out already-unmasked positions so they are never selected
+            is_masked = (temp_mask_realization.squeeze(1) == 0)
+            max_probs[~is_masked] = -float('inf')
 
-        # Deprioritise positions whose top prediction is <PAD>
-        if skip_pad:
-            pad_idx = getattr(args, 'pad_token_id', 23)
-            is_pad_top = (max_classes == pad_idx) & is_masked
-            # Only suppress if there are non-PAD masked positions remaining
-            has_non_pad = (is_masked & ~is_pad_top).any(dim=-1, keepdim=True)
-            max_probs[is_pad_top & has_non_pad.expand_as(is_pad_top)] = -float('inf')
+            # Deprioritise positions whose top prediction is <PAD>
+            if skip_pad:
+                pad_idx = getattr(args, 'pad_token_id', 23)
+                is_pad_top = (max_classes == pad_idx) & is_masked
+                # Only suppress if there are non-PAD masked positions remaining
+                has_non_pad = (is_masked & ~is_pad_top).any(dim=-1, keepdim=True)
+                max_probs[is_pad_top & has_non_pad.expand_as(is_pad_top)] = -float('inf')
 
-        # Greedy position selection
-        current_location = max_probs.argmax(dim=-1)
+            # Greedy position selection
+            current_location = max_probs.argmax(dim=-1)
 
-        # Token selection
-        if token_strategy == 'argmax':
-            chosen_tokens = max_classes[batch_idx, current_location]
-        else:
-            gumbel_buffer.exponential_()
-            sampled = (
-                conditional_prob.probs.log() - gumbel_buffer.log()
-            ).argmax(dim=-1)
-            chosen_tokens = sampled[batch_idx, current_location]
+            # Token selection — Gumbel-max on raw logits (see random-path comment).
+            if token_strategy == 'argmax':
+                chosen_tokens = max_classes[batch_idx, current_location]
+            else:
+                gumbel_buffer.exponential_()
+                sampled = (logits - gumbel_buffer.log()).argmax(dim=-1)
+                chosen_tokens = sampled[batch_idx, current_location]
 
-        temp_mask_realization[batch_idx, 0, current_location] = chosen_tokens
+            temp_mask_realization[batch_idx, 0, current_location] = chosen_tokens
 
-        # Store on GPU
-        all_realizations[ii] = temp_mask_realization
-        all_time_idx[ii] = temp_idx
+            # Store on GPU
+            all_realizations[ii] = temp_mask_realization
+            all_time_idx[ii] = temp_idx
 
-        temp_idx += 1
+            temp_idx += 1
 
     # Single GPU→CPU transfer at the end
     all_realizations_np = all_realizations.cpu().numpy()

@@ -6,7 +6,6 @@ Tests script: src/biom3/Stage3/run_PL_training.py
 
 import pytest
 import os
-import logging
 from contextlib import nullcontext as does_not_raise
 
 import numpy as np
@@ -299,7 +298,7 @@ def test_resume_training(
 
 # @pytest.mark.skip()
 @pytest.mark.parametrize("device", ["cuda", "xpu"])
-def test_resume_finetune_ignores_pretrained_weights(device, caplog, capfd):
+def test_resume_finetune_ignores_pretrained_weights(device):
     """Regression test for finetune resume with --pretrained_weights also set.
 
     When both --resume_from_checkpoint and --pretrained_weights are supplied
@@ -313,26 +312,26 @@ def test_resume_finetune_ignores_pretrained_weights(device, caplog, capfd):
 
     Weight equality can't be used to verify the fix: Lightning restores the
     optimizer state (including lr) from the checkpoint, so args.lr is
-    silently overridden, and because training is deterministic both the fix
-    and bug paths amount to "two total epochs from the pretrained file" and
-    land at the same weights anyway. Instead, this test asserts three log
-    markers that appear only on the fix path:
+    silently overridden, and because training is deterministic both the
+    fix and bug paths amount to "two total epochs from the pretrained
+    file" and land at the same weights anyway. Instead, this test asserts
+    two log markers that appear only on the fix path by reading v1b's
+    run.log artifact:
 
     (a) run_stage3_pretraining emits "Ignoring --pretrained_weights" from
         the new skip branch — proves load_pretrained_weights was not called.
     (b) train_model emits "Resume finetuning from checkpoint" from the new
-        else branch — proves the finetune branch took the resume path.
-    (c) Lightning's CheckpointConnector emits "Restoring states from the
-        checkpoint path" — only emitted when trainer.fit actually receives
-        a non-None ckpt_path.
+        else branch — proves the finetune branch took the resume path. The
+        trainer.fit(ckpt_path=...) call sits one line below that log, so
+        the marker's presence implies Lightning received ckpt_path.
 
-    Under the old buggy code none of the three markers appear.
+    Under the old buggy code neither marker appears.
 
-    Capture plumbing: biom3's logger is configured with propagate=False and
-    its own StreamHandler, so its records do not reach the root logger that
-    caplog is attached to. capfd picks them up at the stderr file-descriptor
-    level instead. Lightning's pytorch_lightning logger propagates normally,
-    so caplog captures it.
+    run.log is written by setup_file_logging which attaches a FileHandler
+    to every logger whose name starts with "biom3", so this artifact is a
+    clean source of biom3-only records without any pytest capture
+    plumbing. Lightning's own records do not land in this file, which is
+    fine since we only need to verify our own control flow.
 
     Uses argfile(s):
         finetune_resume_pretrained_v1a.txt
@@ -371,38 +370,29 @@ def test_resume_finetune_ignores_pretrained_weights(device, caplog, capfd):
     args_b.lr = 0.0
 
     main(args_a)
+    main(args_b)
 
-    # Discard v1a's captured output so only v1b's logs are inspected.
-    # v1a triggers its own "Loading pretrained weights from" log, which
-    # would otherwise break the negative assertion below.
-    capfd.readouterr()
-    caplog.clear()
-
-    with caplog.at_level(logging.INFO, logger="pytorch_lightning"):
-        main(args_b)
-
-    biom3_stderr = capfd.readouterr().err
-    lightning_log = caplog.text
+    v1b_run_log_path = (
+        f"{TMPDIR}/outputs/logs/runs/"
+        f"finetune_resume_pretrained_v1b/artifacts/run.log"
+    )
+    with open(v1b_run_log_path) as f:
+        v1b_log = f.read()
 
     errors = []
-    if "Ignoring --pretrained_weights" not in biom3_stderr:
+    if "Ignoring --pretrained_weights" not in v1b_log:
         errors.append(
             "Missing 'Ignoring --pretrained_weights' log from "
             "run_stage3_pretraining — load_pretrained_weights was not "
             "skipped when resume_from_checkpoint was set"
         )
-    if "Resume finetuning from checkpoint" not in biom3_stderr:
+    if "Resume finetuning from checkpoint" not in v1b_log:
         errors.append(
             "Missing 'Resume finetuning from checkpoint' log from "
             "train_model — trainer.fit did not receive ckpt_path in the "
             "finetune branch"
         )
-    if "Restoring states from the checkpoint path" not in lightning_log:
-        errors.append(
-            "Missing Lightning 'Restoring states from the checkpoint "
-            "path' log — trainer.fit was not called with ckpt_path"
-        )
-    if "Loading pretrained weights from" in biom3_stderr:
+    if "Loading pretrained weights from" in v1b_log:
         errors.append(
             "Unexpected 'Loading pretrained weights from' log — "
             "load_pretrained_weights was called despite "

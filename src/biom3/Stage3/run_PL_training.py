@@ -1383,8 +1383,13 @@ def train_model(
     # Handle different training scenarios
     if args.finetune:
         # Finetuning
-        logger.info("Start finetuning")
-        trainer.fit(PL_model, data_module)
+        if resume_from_checkpoint is None:
+            logger.info("Start finetuning")
+            trainer.fit(PL_model, data_module)
+        else:
+            logger.info("Resume finetuning from checkpoint: %s",
+                        resume_from_checkpoint)
+            trainer.fit(PL_model, data_module, ckpt_path=resume_from_checkpoint)
     else:
         # Pretraining
         if resume_from_checkpoint is None:
@@ -1470,13 +1475,13 @@ def main(args, use_hydra=False, ds_config=None,):
     )
 
     # ----- Load pretrained weights and freeze if finetuning -----
-    # TODO: handle case where resume_from_checkpoint is specified
     finetuning = args.finetune
     if finetuning:
         finetune_last_n_blocks = args.finetune_last_n_blocks
         finetune_last_n_layers = args.finetune_last_n_layers
         finetune_output_layers = args.finetune_output_layers
         pretrained_weights = args.pretrained_weights
+        resume_from_checkpoint = args.resume_from_checkpoint
         if finetune_last_n_layers == -2:
             # If flag is set to finetune and layers not specified (default -2)
             # set to default actionable value 1
@@ -1485,7 +1490,27 @@ def main(args, use_hydra=False, ds_config=None,):
             # If flag is set to finetune and blocks not specified (default -2)
             # set to default actionable value 1
             finetune_last_n_blocks = 1
-        if pretrained_weights is None:
+        # When resuming, weights (and optimizer state) are restored from the
+        # Lightning checkpoint by trainer.fit(ckpt_path=...), so loading
+        # pretrained_weights would be wasted work and misleading. Still apply
+        # the freeze logic, since requires_grad flags are not persisted in
+        # Lightning checkpoints.
+        skip_pretrained = resume_from_checkpoint is not None
+        if skip_pretrained and pretrained_weights is not None:
+            logger.info(
+                "Ignoring --pretrained_weights (%s) because "
+                "--resume_from_checkpoint (%s) is set; weights will be "
+                "restored from the checkpoint.",
+                pretrained_weights, resume_from_checkpoint,
+            )
+        if skip_pretrained:
+            PL_model = freeze_except_last_n_blocks_and_layers(
+                PL_model=PL_model,
+                n_blocks=finetune_last_n_blocks,
+                n_layers=finetune_last_n_layers,
+                finetune_output_layers=finetune_output_layers
+            )
+        elif pretrained_weights is None:
             logger.warning("Finetuning flag --finetune set to True but "
                            "pretrained_weights path not specified.")
             logger.warning("Proceeding with loaded weights")

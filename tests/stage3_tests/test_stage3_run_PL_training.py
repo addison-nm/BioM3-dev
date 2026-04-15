@@ -344,12 +344,15 @@ def test_resume_finetune_ignores_pretrained_weights(device):
     args_a.lr = 1e-3
 
     # v1b: resume from v1a checkpoint with pretrained_weights still set.
-    # lr = 0 so no optimizer step moves weights; any mismatch means the
-    # resume did not load the v1a checkpoint.
+    # Must request strictly more epochs than v1a ran; otherwise Lightning
+    # sees current_epoch >= max_epochs at resume, stops immediately, never
+    # creates v1b's checkpoint dir, and save_model later fails writing into
+    # it. lr = 0 so the extra epoch leaves AdamW's weights unchanged; any
+    # mismatch with v1a then means the resume did not load the checkpoint.
     args_b = parse_arguments(argstring_b)
     prefix_paths(args_b)
     args_b.device = device
-    args_b.epochs = 1
+    args_b.epochs = 2
     args_b.lr = 0.0
 
     state_dict_a_path = (

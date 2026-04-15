@@ -6,6 +6,7 @@ Tests script: src/biom3/Stage3/run_PL_training.py
 
 import pytest
 import os
+import logging
 from contextlib import nullcontext as does_not_raise
 
 import numpy as np
@@ -298,24 +299,40 @@ def test_resume_training(
 
 # @pytest.mark.skip()
 @pytest.mark.parametrize("device", ["cuda", "xpu"])
-def test_resume_finetune_ignores_pretrained_weights(device):
+def test_resume_finetune_ignores_pretrained_weights(device, caplog, capfd):
     """Regression test for finetune resume with --pretrained_weights also set.
 
     When both --resume_from_checkpoint and --pretrained_weights are supplied
     alongside --finetune True, the intended behavior is that training resumes
-    from the checkpoint; the pretrained_weights path should be ignored because
-    the checkpoint already carries the weights (and optimizer state). The
-    original bug was twofold: (1) train_model never passed ckpt_path to
-    trainer.fit in the finetune branch, and (2) run_stage3_pretraining
-    unconditionally called load_pretrained_weights, clobbering the resume.
+    from the Lightning checkpoint; the pretrained_weights path should be
+    ignored because the checkpoint already carries the weights (and optimizer
+    state). The original bug was twofold: (1) train_model never passed
+    ckpt_path to trainer.fit in the finetune branch, and (2)
+    run_stage3_pretraining unconditionally called load_pretrained_weights,
+    clobbering the resume.
 
-    This test runs v1a to produce a checkpoint with drifted unfrozen weights
-    (lr > 0, one epoch), then runs v1b with both resume_from_checkpoint and
-    pretrained_weights set. Under the fix, v1b should load weights from the
-    v1a checkpoint, so with lr=0 the final state_dict of v1b matches v1a.
-    Under the old buggy code, v1b would reload the pretrained file and
-    ignore the checkpoint, leaving unfrozen weights at their pretrained
-    values instead of v1a's drifted values.
+    Weight equality can't be used to verify the fix: Lightning restores the
+    optimizer state (including lr) from the checkpoint, so args.lr is
+    silently overridden, and because training is deterministic both the fix
+    and bug paths amount to "two total epochs from the pretrained file" and
+    land at the same weights anyway. Instead, this test asserts three log
+    markers that appear only on the fix path:
+
+    (a) run_stage3_pretraining emits "Ignoring --pretrained_weights" from
+        the new skip branch — proves load_pretrained_weights was not called.
+    (b) train_model emits "Resume finetuning from checkpoint" from the new
+        else branch — proves the finetune branch took the resume path.
+    (c) Lightning's CheckpointConnector emits "Restoring states from the
+        checkpoint path" — only emitted when trainer.fit actually receives
+        a non-None ckpt_path.
+
+    Under the old buggy code none of the three markers appear.
+
+    Capture plumbing: biom3's logger is configured with propagate=False and
+    its own StreamHandler, so its records do not reach the root logger that
+    caplog is attached to. capfd picks them up at the stderr file-descriptor
+    level instead. Lightning's pytorch_lightning logger propagates normally,
+    so caplog captures it.
 
     Uses argfile(s):
         finetune_resume_pretrained_v1a.txt
@@ -334,60 +351,63 @@ def test_resume_finetune_ignores_pretrained_weights(device):
     )
     os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
-    # v1a: fresh finetune from pretrained weights with lr > 0 so the
-    # unfrozen subset drifts away from the pretrained file, making the
-    # v1a checkpoint distinguishable from pretrained_weights.
+    # v1a: fresh finetune run that produces a checkpoint v1b can resume
+    # from. lr is irrelevant because the test compares logs, not weights.
     args_a = parse_arguments(argstring_a)
     prefix_paths(args_a)
     args_a.device = device
     args_a.epochs = 1
-    args_a.lr = 1e-3
+    args_a.lr = 0.0
 
-    # v1b: resume from v1a checkpoint with pretrained_weights still set.
-    # Must request strictly more epochs than v1a ran; otherwise Lightning
-    # sees current_epoch >= max_epochs at resume, stops immediately, never
-    # creates v1b's checkpoint dir, and save_model later fails writing into
-    # it. lr = 0 so the extra epoch leaves AdamW's weights unchanged; any
-    # mismatch with v1a then means the resume did not load the checkpoint.
+    # v1b: resume from v1a's checkpoint with pretrained_weights still set.
+    # epochs must strictly exceed v1a's epoch count so Lightning runs at
+    # least one more step; otherwise ModelCheckpoint never creates v1b's
+    # output dir and save_model later fails writing into a nonexistent
+    # directory.
     args_b = parse_arguments(argstring_b)
     prefix_paths(args_b)
     args_b.device = device
     args_b.epochs = 2
     args_b.lr = 0.0
 
-    state_dict_a_path = (
-        f"{TMPDIR}/outputs/logs/history/"
-        f"finetune_resume_pretrained_v1a/state_dict.pth"
-    )
-    state_dict_b_path = (
-        f"{TMPDIR}/outputs/logs/history/"
-        f"finetune_resume_pretrained_v1b/state_dict.pth"
-    )
-
     main(args_a)
-    end_weights_a = torch.load(state_dict_a_path)
 
-    main(args_b)
-    end_weights_b = torch.load(state_dict_b_path)
+    # Discard v1a's captured output so only v1b's logs are inspected.
+    # v1a triggers its own "Loading pretrained weights from" log, which
+    # would otherwise break the negative assertion below.
+    capfd.readouterr()
+    caplog.clear()
+
+    with caplog.at_level(logging.INFO, logger="pytorch_lightning"):
+        main(args_b)
+
+    biom3_stderr = capfd.readouterr().err
+    lightning_log = caplog.text
 
     errors = []
-    if len(end_weights_a) != len(end_weights_b):
+    if "Ignoring --pretrained_weights" not in biom3_stderr:
         errors.append(
-            f"Parameter count mismatch: {len(end_weights_a)} vs "
-            f"{len(end_weights_b)}"
+            "Missing 'Ignoring --pretrained_weights' log from "
+            "run_stage3_pretraining — load_pretrained_weights was not "
+            "skipped when resume_from_checkpoint was set"
         )
-    for name, w_a in end_weights_a.items():
-        w_b = end_weights_b.get(name)
-        if w_b is None:
-            errors.append(f"Missing parameter in v1b: {name}")
-            continue
-        if not torch.allclose(w_a, w_b):
-            max_diff = torch.max(torch.abs(w_a - w_b)).item()
-            errors.append(
-                f"v1b final weight diverged from v1a checkpoint at "
-                f"{name} (max diff {max_diff}); resume likely did not "
-                f"use ckpt_path or pretrained_weights was reloaded"
-            )
+    if "Resume finetuning from checkpoint" not in biom3_stderr:
+        errors.append(
+            "Missing 'Resume finetuning from checkpoint' log from "
+            "train_model — trainer.fit did not receive ckpt_path in the "
+            "finetune branch"
+        )
+    if "Restoring states from the checkpoint path" not in lightning_log:
+        errors.append(
+            "Missing Lightning 'Restoring states from the checkpoint "
+            "path' log — trainer.fit was not called with ckpt_path"
+        )
+    if "Loading pretrained weights from" in biom3_stderr:
+        errors.append(
+            "Unexpected 'Loading pretrained weights from' log — "
+            "load_pretrained_weights was called despite "
+            "resume_from_checkpoint being set"
+        )
     remove_dir(OUTPUTS_DIR)
     assert not errors, "Errors occurred:\n{}".format("\n".join(errors))
 

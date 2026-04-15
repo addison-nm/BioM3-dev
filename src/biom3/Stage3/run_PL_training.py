@@ -1387,6 +1387,10 @@ def train_model(
             logger.info("Start finetuning")
             trainer.fit(PL_model, data_module)
         else:
+            # NOTE: the exact string "Resume finetuning from checkpoint" is
+            # asserted by test_resume_finetune_ignores_pretrained_weights in
+            # tests/stage3_tests/test_stage3_run_PL_training.py. Changing it
+            # will break that regression test.
             logger.info("Resume finetuning from checkpoint: %s",
                         resume_from_checkpoint)
             trainer.fit(PL_model, data_module, ckpt_path=resume_from_checkpoint)
@@ -1497,6 +1501,10 @@ def main(args, use_hydra=False, ds_config=None,):
         # Lightning checkpoints.
         skip_pretrained = resume_from_checkpoint is not None
         if skip_pretrained and pretrained_weights is not None:
+            # NOTE: the exact string "Ignoring --pretrained_weights" is
+            # asserted by test_resume_finetune_ignores_pretrained_weights in
+            # tests/stage3_tests/test_stage3_run_PL_training.py. Changing it
+            # will break that regression test.
             logger.info(
                 "Ignoring --pretrained_weights (%s) because "
                 "--resume_from_checkpoint (%s) is set; weights will be "

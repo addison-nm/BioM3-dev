@@ -297,12 +297,105 @@ def test_resume_training(
 
 
 # @pytest.mark.skip()
+@pytest.mark.parametrize("device", ["cuda", "xpu"])
+def test_resume_finetune_ignores_pretrained_weights(device):
+    """Regression test for finetune resume with --pretrained_weights also set.
+
+    When both --resume_from_checkpoint and --pretrained_weights are supplied
+    alongside --finetune True, the intended behavior is that training resumes
+    from the checkpoint; the pretrained_weights path should be ignored because
+    the checkpoint already carries the weights (and optimizer state). The
+    original bug was twofold: (1) train_model never passed ckpt_path to
+    trainer.fit in the finetune branch, and (2) run_stage3_pretraining
+    unconditionally called load_pretrained_weights, clobbering the resume.
+
+    This test runs v1a to produce a checkpoint with drifted unfrozen weights
+    (lr > 0, one epoch), then runs v1b with both resume_from_checkpoint and
+    pretrained_weights set. Under the fix, v1b should load weights from the
+    v1a checkpoint, so with lr=0 the final state_dict of v1b matches v1a.
+    Under the old buggy code, v1b would reload the pretrained file and
+    ignore the checkpoint, leaving unfrozen weights at their pretrained
+    values instead of v1a's drifted values.
+
+    Uses argfile(s):
+        finetune_resume_pretrained_v1a.txt
+        finetune_resume_pretrained_v1b.txt
+    """
+    if device == "cuda" and not torch.cuda.is_available():
+        pytest.skip(reason="device=cuda and cuda not available")
+    elif device == "xpu" and not torch.xpu.is_available():
+        pytest.skip(reason="device=xpu and xpu not available")
+
+    argstring_a = get_args(
+        f"{ARGS_DIR}/finetune_resume_pretrained_v1a.txt"
+    )
+    argstring_b = get_args(
+        f"{ARGS_DIR}/finetune_resume_pretrained_v1b.txt"
+    )
+    os.makedirs(OUTPUTS_DIR, exist_ok=True)
+
+    # v1a: fresh finetune from pretrained weights with lr > 0 so the
+    # unfrozen subset drifts away from the pretrained file, making the
+    # v1a checkpoint distinguishable from pretrained_weights.
+    args_a = parse_arguments(argstring_a)
+    prefix_paths(args_a)
+    args_a.device = device
+    args_a.epochs = 1
+    args_a.lr = 1e-3
+
+    # v1b: resume from v1a checkpoint with pretrained_weights still set.
+    # lr = 0 so no optimizer step moves weights; any mismatch means the
+    # resume did not load the v1a checkpoint.
+    args_b = parse_arguments(argstring_b)
+    prefix_paths(args_b)
+    args_b.device = device
+    args_b.epochs = 1
+    args_b.lr = 0.0
+
+    state_dict_a_path = (
+        f"{TMPDIR}/outputs/logs/history/"
+        f"finetune_resume_pretrained_v1a/state_dict.pth"
+    )
+    state_dict_b_path = (
+        f"{TMPDIR}/outputs/logs/history/"
+        f"finetune_resume_pretrained_v1b/state_dict.pth"
+    )
+
+    main(args_a)
+    end_weights_a = torch.load(state_dict_a_path)
+
+    main(args_b)
+    end_weights_b = torch.load(state_dict_b_path)
+
+    errors = []
+    if len(end_weights_a) != len(end_weights_b):
+        errors.append(
+            f"Parameter count mismatch: {len(end_weights_a)} vs "
+            f"{len(end_weights_b)}"
+        )
+    for name, w_a in end_weights_a.items():
+        w_b = end_weights_b.get(name)
+        if w_b is None:
+            errors.append(f"Missing parameter in v1b: {name}")
+            continue
+        if not torch.allclose(w_a, w_b):
+            max_diff = torch.max(torch.abs(w_a - w_b)).item()
+            errors.append(
+                f"v1b final weight diverged from v1a checkpoint at "
+                f"{name} (max diff {max_diff}); resume likely did not "
+                f"use ckpt_path or pretrained_weights was reloaded"
+            )
+    remove_dir(OUTPUTS_DIR)
+    assert not errors, "Errors occurred:\n{}".format("\n".join(errors))
+
+
+# @pytest.mark.skip()
 @pytest.mark.parametrize(
     "argstring_fpath, expect_error, weights_orig_fpath, exp_ckpt_fpath", [
     # Test that finetuning succeeds and only certain weights change
     [
-        f"{ARGS_DIR}/finetuning_args_v1.txt", 
-        False, 
+        f"{ARGS_DIR}/finetuning_args_v1.txt",
+        False,
         f"{DATDIR}/models/stage3/weights/minimodel1_weights1.pth",
         f"{TMPDIR}/outputs/logs/history/finetuning_args_v1/state_dict.pth",
     ],

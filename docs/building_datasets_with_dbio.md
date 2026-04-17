@@ -52,6 +52,75 @@ The results are concatenated and saved as `dataset.csv`.
 
 ---
 
+## Rebuilding the source CSVs from raw databases
+
+The two source CSVs can be built from raw databases (e.g. for a fresh
+UniProt/Pfam release, or when they aren't already available). Use:
+
+| CLI | Builds | Inputs |
+|-----|--------|--------|
+| `biom3_build_source_swissprot` | `fully_annotated_swiss_prot.csv` | `uniprot_sprot.dat.gz` + `Pfam-A.full.gz` (for family names) |
+| `biom3_build_source_pfam` | `Pfam_protein_text_dataset.csv` | `Pfam-A.fasta.gz` + `Pfam-A.full.gz` (for family metadata) |
+
+```bash
+biom3_build_source_swissprot \
+    --dat data/databases/swissprot/uniprot_sprot.dat.gz \
+    --pfam_metadata data/databases/pfam/Pfam-A.full.gz \
+    -o data/datasets/fully_annotated_swiss_prot.csv
+
+biom3_build_source_pfam \
+    --fasta data/databases/pfam/Pfam-A.fasta.gz \
+    --pfam_metadata data/databases/pfam/Pfam-A.full.gz \
+    -o data/datasets/Pfam_protein_text_dataset.csv
+```
+
+Both commands accept `--chunk_size` (default 10K / 100K rows) for write buffering.
+
+The Swiss-Prot builder has two legacy-parity flags:
+
+- `--require_pfam` / `--no_require_pfam` (default `--no_require_pfam`): by
+  default, Swiss-Prot entries without any `DR Pfam;` cross-references are
+  kept and emitted with `pfam_label=['nan']`, matching the legacy
+  `fully_annotated_swiss_prot.csv`. Pass `--require_pfam` to drop these
+  entries instead (useful if downstream code can't handle the `['nan']`
+  sentinel).
+- `--keep_intermediate_captions`: emits `text_caption` (raw) and
+  `[clean]text_caption` (evidence-stripped but PubMed-preserved) columns
+  alongside `[final]text_caption`. Useful for auditing what the PubMed/ECO
+  stripping passes remove. Without the flag, only `[final]text_caption` is
+  emitted (the column set used by `SwissProtReader`).
+
+**Caption formatting** is controlled by a `CaptionSpec` in each builder module.
+Defaults reproduce the legacy CSVs: ALL-CAPS labels for Swiss-Prot (`SWISSPROT_SPEC`
+in [src/biom3/dbio/build_source_swissprot.py](../src/biom3/dbio/build_source_swissprot.py)),
+lowercase labels for Pfam (`PFAM_SPEC` in
+[src/biom3/dbio/build_source_pfam.py](../src/biom3/dbio/build_source_pfam.py)).
+See [demos/custom_caption_format.py](../demos/custom_caption_format.py) for
+swapping fields or relabeling.
+
+**Row ordering.** `biom3_build_source_swissprot` emits rows in the order they
+appear in the input `.dat` file (Swiss-Prot's internal entry order), not
+alphabetically sorted by accession as the legacy CSV was. Any downstream code
+that does positional head/tail sampling or derives train/val splits from row
+indices will see different data between the legacy and the regenerated CSV
+even when the two have identical entry sets. Sort by `primary_Accession` before
+such positional slicing if you want reproducibility across the two formats.
+
+**Provenance.** Each builder writes a `<output_stem>.build_manifest.json`
+next to the output CSV (e.g. `fully_annotated_swiss_prot.csv` yields
+`fully_annotated_swiss_prot.build_manifest.json`) capturing the input file
+sizes/mtimes, the UniProt `reldate.txt` release version and Pfam
+`relnotes.txt` version when present alongside the inputs, plus the full
+`args`, `git_hash`, and `biom3_version`. The stem-based name lets multiple
+source CSVs coexist in the same directory without overwriting each other's
+manifest. Shape is otherwise identical to the `build_manifest.json` that
+`biom3_build_dataset` writes.
+
+For per-column provenance (which `.dat` lines map to which caption fields), see
+[training_csv_provenance.md](training_csv_provenance.md).
+
+---
+
 ## Step 1: Configure database paths
 
 Paths are resolved by `biom3.dbio.config` with this priority:

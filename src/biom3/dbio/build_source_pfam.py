@@ -13,11 +13,18 @@ Usage:
 import argparse
 import csv
 import gzip
+import os
+import re
 import sys
+from datetime import datetime
 
 from tqdm import tqdm
 
 from biom3.backend.device import setup_logger
+from biom3.core.run_utils import (
+    get_file_metadata,
+    write_manifest,
+)
 from biom3.dbio.caption import CaptionSpec, compose_row_caption
 from biom3.dbio.pfam_metadata import PfamMetadataParser
 
@@ -116,6 +123,9 @@ def build_pfam_csv(fasta_path, pfam_metadata, output_path,
         caption_spec: CaptionSpec controlling caption format. Defaults to
             PFAM_SPEC (original Pfam CSV format).
         chunk_size: rows to buffer before writing
+
+    Returns:
+        int: number of rows written.
     """
     if caption_spec is None:
         caption_spec = PFAM_SPEC
@@ -168,6 +178,33 @@ def build_pfam_csv(fasta_path, pfam_metadata, output_path,
     if skipped:
         logger.warning("Skipped %s unparseable FASTA headers", f"{skipped:,}")
     logger.info("Build complete: %s rows written to %s", f"{total:,}", output_path)
+    return total
+
+
+def _read_release_version(filepath, pattern):
+    """Read a release file and extract a version string matching *pattern*."""
+    try:
+        with open(filepath) as f:
+            text = f.read(2048)
+        match = re.search(pattern, text)
+        return match.group(1).strip() if match else None
+    except Exception:
+        return None
+
+
+def _collect_database_versions(fasta_path, pfam_metadata_path):
+    """Collect provenance metadata for the Pfam FASTA and metadata files."""
+    versions = {"pfam_fasta": get_file_metadata(fasta_path),
+                "pfam_metadata": get_file_metadata(pfam_metadata_path)}
+
+    pfam_dir = os.path.dirname(os.path.abspath(pfam_metadata_path))
+    relnotes_path = os.path.join(pfam_dir, "relnotes.txt")
+    if os.path.exists(relnotes_path):
+        versions["pfam_release"] = _read_release_version(
+            relnotes_path, r"RELEASE\s+(\S+)",
+        )
+
+    return versions
 
 
 def parse_arguments(args):
@@ -194,15 +231,36 @@ def parse_arguments(args):
 
 
 def main(args):
+    start_time = datetime.now()
+
     logger.info("Loading Pfam family metadata from %s", args.pfam_metadata)
     pfam_metadata = PfamMetadataParser(args.pfam_metadata).parse()
 
-    build_pfam_csv(
+    row_count = build_pfam_csv(
         fasta_path=args.fasta,
         pfam_metadata=pfam_metadata,
         output_path=args.output,
         chunk_size=args.chunk_size,
     )
+
+    elapsed = datetime.now() - start_time
+
+    outdir = os.path.dirname(os.path.abspath(args.output))
+    stem = os.path.splitext(os.path.basename(args.output))[0]
+    database_versions = _collect_database_versions(args.fasta, args.pfam_metadata)
+    resolved_paths = {
+        "fasta": os.path.abspath(args.fasta),
+        "pfam_metadata": os.path.abspath(args.pfam_metadata),
+        "output": os.path.abspath(args.output),
+    }
+    manifest_path = write_manifest(
+        args, outdir, start_time, elapsed,
+        outputs={"row_counts": {"pfam": row_count}},
+        resolved_paths=resolved_paths,
+        database_versions=database_versions,
+        manifest_filename=f"{stem}.build_manifest.json",
+    )
+    logger.info("Saved build manifest to %s", manifest_path)
 
 
 if __name__ == "__main__":

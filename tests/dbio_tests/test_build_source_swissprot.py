@@ -1,9 +1,15 @@
 import csv
+import json
 import os
 
 import pytest
 
-from biom3.dbio.build_source_swissprot import build_swissprot_csv, SWISSPROT_SPEC
+from biom3.dbio.build_source_swissprot import (
+    SWISSPROT_SPEC,
+    build_swissprot_csv,
+    main,
+    parse_arguments,
+)
 from biom3.dbio.caption import compose_row_caption
 from biom3.dbio.pfam_metadata import PfamMetadataParser
 
@@ -43,8 +49,9 @@ class TestBuildSwissprotCsv:
     def test_basic_build(self, dat_path, pfam_metadata, output_path):
         build_swissprot_csv(dat_path, pfam_metadata, output_path)
         rows = _read_csv(output_path)
-        # 3 entries have Pfam (Q6GZX4, A0A024SC78, P99999); Q197F8 does not
-        assert len(rows) == 3
+        # Default keeps all 4 entries; Q197F8 has no Pfam so its pfam_label
+        # is ['nan'] for legacy parity.
+        assert len(rows) == 4
 
     def test_output_columns(self, dat_path, pfam_metadata, output_path):
         build_swissprot_csv(dat_path, pfam_metadata, output_path)
@@ -58,14 +65,16 @@ class TestBuildSwissprotCsv:
             "pfam_label",
         ]
 
-    def test_only_pfam_entries(self, dat_path, pfam_metadata, output_path):
-        build_swissprot_csv(dat_path, pfam_metadata, output_path)
+    def test_only_pfam_entries_when_require_pfam(self, dat_path, pfam_metadata, output_path):
+        build_swissprot_csv(
+            dat_path, pfam_metadata, output_path, require_pfam=True,
+        )
         rows = _read_csv(output_path)
         accessions = {r["primary_Accession"] for r in rows}
         assert "Q6GZX4" in accessions
         assert "A0A024SC78" in accessions
         assert "P99999" in accessions
-        # Q197F8 has no Pfam DR lines
+        # Q197F8 has no Pfam DR lines — filtered out by require_pfam=True
         assert "Q197F8" not in accessions
 
     def test_sequence_extraction(self, dat_path, pfam_metadata, output_path):
@@ -146,3 +155,150 @@ class TestComposeCaption:
             pfam_family_names=["SH3 domain", "Cutinase"],
         )
         assert "FAMILY NAMES: Family names are SH3 domain, Cutinase." in result
+
+
+class TestRequirePfamFlag:
+
+    def test_no_require_pfam_keeps_pfamless_entry(self, dat_path, pfam_metadata, output_path):
+        build_swissprot_csv(
+            dat_path, pfam_metadata, output_path, require_pfam=False,
+        )
+        rows = _read_csv(output_path)
+        # All 4 entries should now appear (Q6GZX4, A0A024SC78, P99999, Q197F8)
+        assert len(rows) == 4
+        accessions = {r["primary_Accession"] for r in rows}
+        assert "Q197F8" in accessions
+
+    def test_no_require_pfam_uses_nan_label(self, dat_path, pfam_metadata, output_path):
+        build_swissprot_csv(
+            dat_path, pfam_metadata, output_path, require_pfam=False,
+        )
+        rows = _read_csv(output_path)
+        q197 = next(r for r in rows if r["primary_Accession"] == "Q197F8")
+        assert q197["pfam_label"] == "['nan']"
+
+    def test_no_require_pfam_preserves_pfam_entries(self, dat_path, pfam_metadata, output_path):
+        build_swissprot_csv(
+            dat_path, pfam_metadata, output_path, require_pfam=False,
+        )
+        rows = _read_csv(output_path)
+        q6 = next(r for r in rows if r["primary_Accession"] == "Q6GZX4")
+        # Pfam-having entries still get their real IDs, not ['nan']
+        assert q6["pfam_label"] == "['PF04947']"
+
+    def test_default_matches_legacy_behavior(self, dat_path, pfam_metadata, output_path):
+        # Default is require_pfam=False — matches the legacy CSV, which kept
+        # Pfam-less entries with pfam_label=['nan'].
+        build_swissprot_csv(dat_path, pfam_metadata, output_path)
+        rows = _read_csv(output_path)
+        assert len(rows) == 4
+        q197 = next(r for r in rows if r["primary_Accession"] == "Q197F8")
+        assert q197["pfam_label"] == "['nan']"
+
+    def test_require_pfam_filters_pfamless(self, dat_path, pfam_metadata, output_path):
+        build_swissprot_csv(
+            dat_path, pfam_metadata, output_path, require_pfam=True,
+        )
+        rows = _read_csv(output_path)
+        assert len(rows) == 3
+        accessions = {r["primary_Accession"] for r in rows}
+        assert "Q197F8" not in accessions
+
+
+class TestKeepIntermediateCaptions:
+
+    def test_default_emits_four_columns(self, dat_path, pfam_metadata, output_path):
+        build_swissprot_csv(dat_path, pfam_metadata, output_path)
+        with open(output_path) as f:
+            header = next(csv.reader(f))
+        assert header == [
+            "primary_Accession",
+            "protein_sequence",
+            "[final]text_caption",
+            "pfam_label",
+        ]
+
+    def test_keep_intermediate_emits_six_columns(self, dat_path, pfam_metadata, output_path):
+        build_swissprot_csv(
+            dat_path, pfam_metadata, output_path,
+            keep_intermediate_captions=True,
+        )
+        with open(output_path) as f:
+            header = next(csv.reader(f))
+        assert header == [
+            "primary_Accession",
+            "protein_sequence",
+            "text_caption",
+            "[clean]text_caption",
+            "[final]text_caption",
+            "pfam_label",
+        ]
+
+    def test_raw_text_caption_retains_pubmed_and_eco(self, dat_path, pfam_metadata, output_path):
+        build_swissprot_csv(
+            dat_path, pfam_metadata, output_path,
+            keep_intermediate_captions=True,
+        )
+        rows = _read_csv(output_path)
+        cut = next(r for r in rows if r["primary_Accession"] == "A0A024SC78")
+        raw = cut["text_caption"]
+        # The mini fixture for A0A024SC78 has PubMed refs — they should be
+        # retained in the raw column and stripped in the final column.
+        assert "(PubMed:" in raw
+        assert "(PubMed:" not in cut["[final]text_caption"]
+
+    def test_clean_text_caption_strips_eco_only(self, dat_path, pfam_metadata, output_path):
+        build_swissprot_csv(
+            dat_path, pfam_metadata, output_path,
+            keep_intermediate_captions=True,
+        )
+        rows = _read_csv(output_path)
+        cut = next(r for r in rows if r["primary_Accession"] == "A0A024SC78")
+        clean = cut["[clean]text_caption"]
+        # ECO evidence tags are stripped but PubMed refs are kept
+        assert "{ECO:" not in clean
+        # The mini_swissprot fixture carries PubMed refs on this entry
+        assert "PubMed:" in clean
+
+
+class TestMainWritesManifest:
+
+    def test_main_writes_build_manifest(self, dat_path, tmp_path):
+        pfam_sto = os.path.join(DATDIR, "mini_pfam_metadata.sto")
+        output_csv = tmp_path / "swissprot_source.csv"
+        args = parse_arguments([
+            "--dat", dat_path,
+            "--pfam_metadata", pfam_sto,
+            "-o", str(output_csv),
+        ])
+        main(args)
+
+        manifest_path = tmp_path / "swissprot_source.build_manifest.json"
+        assert manifest_path.exists()
+
+        with open(manifest_path) as f:
+            manifest = json.load(f)
+        for key in ("biom3_version", "git_hash", "timestamp",
+                    "command", "args", "database_versions", "outputs"):
+            assert key in manifest, f"missing top-level key: {key}"
+        # Default is require_pfam=False, so all 4 fixture entries are kept.
+        assert manifest["args"]["require_pfam"] is False
+        assert manifest["outputs"]["row_counts"]["swissprot"] == 4
+        assert manifest["database_versions"]["uniprot_dat"] is not None
+        assert manifest["database_versions"]["pfam_metadata"] is not None
+
+    def test_main_manifest_records_require_pfam_arg(self, dat_path, tmp_path):
+        pfam_sto = os.path.join(DATDIR, "mini_pfam_metadata.sto")
+        output_csv = tmp_path / "swissprot_source.csv"
+        args = parse_arguments([
+            "--dat", dat_path,
+            "--pfam_metadata", pfam_sto,
+            "-o", str(output_csv),
+            "--require_pfam",
+        ])
+        main(args)
+
+        with open(tmp_path / "swissprot_source.build_manifest.json") as f:
+            manifest = json.load(f)
+        assert manifest["args"]["require_pfam"] is True
+        assert manifest["outputs"]["row_counts"]["swissprot"] == 3

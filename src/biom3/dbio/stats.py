@@ -17,7 +17,7 @@ import statistics
 from collections import Counter
 
 
-_EMPTY_SENTINELS = {"", "nan", "none", "null", "[]", "['nan']"}
+_EMPTY_SENTINELS = {"", "nan", "none", "null", "[]", "['nan']", "<na>"}
 
 
 def _is_populated(value):

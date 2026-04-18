@@ -229,10 +229,12 @@ def parse_arguments(args):
     )
     parser.add_argument(
         "--per_pfam_output", action="store_true", default=False,
-        help="Also emit per-Pfam-ID subdirectories under --outdir, each "
-             "containing its own dataset.csv, dataset_annotations.csv, "
-             "build_manifest.json, and dataset.stats.md. The aggregate "
-             "top-level outputs are always written.",
+        help="Emit one self-contained subdirectory per Pfam ID under "
+             "--outdir (each with its own dataset.csv, "
+             "dataset_annotations.csv, build_manifest.json, "
+             "dataset.stats.md, pfam_ids.csv). No aggregate top-level "
+             "dataset is written in this mode. Default: a single "
+             "combined dataset at --outdir.",
     )
     return parser.parse_args(args)
 
@@ -430,33 +432,8 @@ def main(args):
     if args.use_smart and args.smart_csv:
         database_versions["smart_csv"] = get_file_metadata(args.smart_csv)
 
-    # Always write the aggregate top-level outputs
-    aggregate_row_counts = {
-        "swissprot": len(df_sp),
-        "pfam": len(df_pfam),
-        "combined": len(df_combined),
-    }
     if args.per_pfam_output:
-        per_pfam_counts = {}
-        for pid in args.pfam_ids:
-            mask = df_combined["pfam_label"].apply(
-                lambda s: _row_has_pfam(s, pid)
-            )
-            per_pfam_counts[pid] = int(mask.sum())
-        aggregate_row_counts["per_pfam"] = per_pfam_counts
-
-    _write_dataset_outputs(
-        df_combined, args.outdir, args.pfam_ids, args,
-        start_time=start_time, elapsed_fn=lambda: datetime.now() - start_time,
-        row_counts=aggregate_row_counts,
-        join_stats=join_stats,
-        resolved_paths=resolved_paths,
-        database_versions=database_versions,
-        stats_title="dataset — aggregate coverage stats",
-    )
-
-    # Per-Pfam subdirectories (opt-in)
-    if args.per_pfam_output:
+        # Per-Pfam subdirectories only — no aggregate output at top level.
         for pid in args.pfam_ids:
             subdir = os.path.join(args.outdir, pid)
             os.makedirs(subdir, exist_ok=True)
@@ -478,6 +455,21 @@ def main(args):
                 database_versions=database_versions,
                 stats_title=f"dataset/{pid} — coverage stats",
             )
+    else:
+        aggregate_row_counts = {
+            "swissprot": len(df_sp),
+            "pfam": len(df_pfam),
+            "combined": len(df_combined),
+        }
+        _write_dataset_outputs(
+            df_combined, args.outdir, args.pfam_ids, args,
+            start_time=start_time, elapsed_fn=lambda: datetime.now() - start_time,
+            row_counts=aggregate_row_counts,
+            join_stats=join_stats,
+            resolved_paths=resolved_paths,
+            database_versions=database_versions,
+            stats_title="dataset — coverage stats",
+        )
 
     logger.info("Done in %s", datetime.now() - start_time)
     logger.info("Log saved to %s", log_path)

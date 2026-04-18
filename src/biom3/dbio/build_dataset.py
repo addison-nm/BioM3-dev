@@ -4,6 +4,7 @@ import argparse
 import csv
 import logging
 import os
+import re
 import sys
 from datetime import datetime
 
@@ -25,8 +26,26 @@ from biom3.dbio.config import (
 from biom3.dbio.swissprot import SwissProtReader, OUTPUT_COLS
 from biom3.dbio.pfam import PfamReader
 from biom3.dbio.enrich import compose_caption
+from biom3.dbio.stats import (
+    compute_coverage_stats,
+    write_stats_markdown,
+)
 
 logger = setup_logger(__name__)
+
+_PFAM_ID_RE = re.compile(r"PF\d{5}")
+
+
+def _row_has_pfam(pfam_label_cell, pfam_id):
+    """Return True if *pfam_id* appears in *pfam_label_cell* (list-stringified)."""
+    if pfam_label_cell is None:
+        return False
+    try:
+        if pd.isna(pfam_label_cell):
+            return False
+    except (TypeError, ValueError):
+        pass
+    return pfam_id in _PFAM_ID_RE.findall(str(pfam_label_cell))
 
 
 def _read_release_version(filepath, pattern):
@@ -208,6 +227,13 @@ def parse_arguments(args):
         "--smart_csv", type=str, default=None,
         help="Path to smart_domains.csv (required if --use_smart).",
     )
+    parser.add_argument(
+        "--per_pfam_output", action="store_true", default=False,
+        help="Also emit per-Pfam-ID subdirectories under --outdir, each "
+             "containing its own dataset.csv, dataset_annotations.csv, "
+             "build_manifest.json, and dataset.stats.md. The aggregate "
+             "top-level outputs are always written.",
+    )
     return parser.parse_args(args)
 
 
@@ -372,46 +398,19 @@ def main(args):
     # SwissProt rows already have ALL-CAPS captions from the source CSV.
     df_pfam = compose_caption(df_pfam)
 
-    # Combine
-    df_combined = pd.concat([df_sp, df_pfam], ignore_index=True)
+    # Track provenance so stats can report per-source row counts, then combine.
+    df_combined = pd.concat([
+        df_sp.assign(_source="swissprot"),
+        df_pfam.assign(_source="pfam"),
+    ], ignore_index=True)
     logger.info("Combined dataset: %s rows", f"{len(df_combined):,}")
     logger.info("  SwissProt: %s", f"{len(df_sp):,}")
     logger.info("  Pfam:      %s", f"{len(df_pfam):,}")
 
-    # Apply taxonomy filters
     if args.taxonomy_filter:
-        df_combined = _apply_taxonomy_filters(
-            df_combined, args,
-        )
+        df_combined = _apply_taxonomy_filters(df_combined, args)
 
-    # Derive annotations filename from output filename
-    stem, ext = os.path.splitext(args.output_filename)
-    annotations_filename = f"{stem}_annotations{ext}"
-
-    # Save intermediate CSV with annotation columns (all columns preserved)
-    annotations_path = os.path.join(args.outdir, annotations_filename)
-    df_combined.to_csv(annotations_path, index=False, quoting=csv.QUOTE_NONNUMERIC)
-    logger.info("Saved annotated dataset to %s", annotations_path)
-
-    # Save final dataset (standard output columns only)
-    out_path = os.path.join(args.outdir, args.output_filename)
-    df_combined[OUTPUT_COLS].to_csv(out_path, index=False, quoting=csv.QUOTE_NONNUMERIC)
-    logger.info("Saved dataset to %s", out_path)
-
-    # Save metadata
-    pfam_ids_path = os.path.join(args.outdir, "pfam_ids.csv")
-    pd.DataFrame({"pfam_id": args.pfam_ids}).to_csv(pfam_ids_path, index=False)
-
-    elapsed = datetime.now() - start_time
-    logger.info("Done in %s", elapsed)
-    logger.info("Log saved to %s", log_path)
-
-    # Write reproducibility manifest
-    row_counts = {
-        "swissprot": len(df_sp),
-        "pfam": len(df_pfam),
-        "combined": len(df_combined),
-    }
+    # Precompute common build_manifest fields
     resolved_paths = {
         "swissprot_csv": os.path.abspath(_resolve_swissprot_path(args)),
         "pfam_csv": os.path.abspath(_resolve_pfam_path(args)),
@@ -431,20 +430,104 @@ def main(args):
     if args.use_smart and args.smart_csv:
         database_versions["smart_csv"] = get_file_metadata(args.smart_csv)
 
+    # Always write the aggregate top-level outputs
+    aggregate_row_counts = {
+        "swissprot": len(df_sp),
+        "pfam": len(df_pfam),
+        "combined": len(df_combined),
+    }
+    if args.per_pfam_output:
+        per_pfam_counts = {}
+        for pid in args.pfam_ids:
+            mask = df_combined["pfam_label"].apply(
+                lambda s: _row_has_pfam(s, pid)
+            )
+            per_pfam_counts[pid] = int(mask.sum())
+        aggregate_row_counts["per_pfam"] = per_pfam_counts
+
+    _write_dataset_outputs(
+        df_combined, args.outdir, args.pfam_ids, args,
+        start_time=start_time, elapsed_fn=lambda: datetime.now() - start_time,
+        row_counts=aggregate_row_counts,
+        join_stats=join_stats,
+        resolved_paths=resolved_paths,
+        database_versions=database_versions,
+        stats_title="dataset — aggregate coverage stats",
+    )
+
+    # Per-Pfam subdirectories (opt-in)
+    if args.per_pfam_output:
+        for pid in args.pfam_ids:
+            subdir = os.path.join(args.outdir, pid)
+            os.makedirs(subdir, exist_ok=True)
+            mask = df_combined["pfam_label"].apply(
+                lambda s: _row_has_pfam(s, pid)
+            )
+            df_pid = df_combined[mask].reset_index(drop=True)
+            per_pid_row_counts = {
+                "swissprot": int((df_pid["_source"] == "swissprot").sum()),
+                "pfam": int((df_pid["_source"] == "pfam").sum()),
+                "combined": len(df_pid),
+            }
+            _write_dataset_outputs(
+                df_pid, subdir, [pid], args,
+                start_time=start_time, elapsed_fn=lambda: datetime.now() - start_time,
+                row_counts=per_pid_row_counts,
+                join_stats=join_stats,
+                resolved_paths=resolved_paths,
+                database_versions=database_versions,
+                stats_title=f"dataset/{pid} — coverage stats",
+            )
+
+    logger.info("Done in %s", datetime.now() - start_time)
+    logger.info("Log saved to %s", log_path)
+
+    # Clean up file handler
+    teardown_file_logging("biom3.dbio", file_handler)
+
+
+def _write_dataset_outputs(df, outdir, pfam_ids, args, *,
+                           start_time, elapsed_fn,
+                           row_counts, join_stats, resolved_paths,
+                           database_versions, stats_title):
+    """Write dataset.csv, dataset_annotations.csv, pfam_ids.csv,
+    build_manifest.json, and dataset.stats.md into *outdir*."""
+    stem, ext = os.path.splitext(args.output_filename)
+    annotations_filename = f"{stem}_annotations{ext}"
+
+    annotations_path = os.path.join(outdir, annotations_filename)
+    df_to_save = df.drop(columns=["_source"], errors="ignore")
+    df_to_save.to_csv(annotations_path, index=False, quoting=csv.QUOTE_NONNUMERIC)
+    logger.info("Saved annotated dataset to %s", annotations_path)
+
+    out_path = os.path.join(outdir, args.output_filename)
+    df_to_save[OUTPUT_COLS].to_csv(out_path, index=False, quoting=csv.QUOTE_NONNUMERIC)
+    logger.info("Saved dataset to %s", out_path)
+
+    pfam_ids_path = os.path.join(outdir, "pfam_ids.csv")
+    pd.DataFrame({"pfam_id": pfam_ids}).to_csv(pfam_ids_path, index=False)
+
+    stats = compute_coverage_stats(
+        df,
+        source_col="_source" if "_source" in df.columns else None,
+        join_metadata=join_stats or None,
+    )
+    stats_path = os.path.join(outdir, f"{stem}.stats.md")
+    write_stats_markdown(stats, stats_path, title=stats_title)
+    logger.info("Saved stats report to %s", stats_path)
+
     outputs = {"row_counts": row_counts}
     if join_stats:
         outputs["join_stats"] = join_stats
 
     manifest_path = write_manifest(
-        args, args.outdir, start_time, elapsed,
+        args, outdir, start_time, elapsed_fn(),
         outputs=outputs,
         resolved_paths=resolved_paths,
         database_versions=database_versions,
+        stats=stats,
     )
     logger.info("Saved build manifest to %s", manifest_path)
-
-    # Clean up file handler
-    teardown_file_logging("biom3.dbio", file_handler)
 
 
 def _load_taxonomy(args, accessions):

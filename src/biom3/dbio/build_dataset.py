@@ -168,6 +168,46 @@ def parse_arguments(args):
         "--uniprot_batch_size", type=int, default=100,
         help="Batch size for UniProt API requests",
     )
+
+    # Source-CSV join layer (opt-in). Each flag enables an additional
+    # join against a per-database source CSV produced by the matching
+    # biom3_build_source_* builder.
+    parser.add_argument(
+        "--use_expasy", action="store_true", default=False,
+        help="Join ExPASy enzyme data on EC numbers extracted from "
+             "annot_catalytic_activity. Adds annot_ec_names and "
+             "annot_ec_description columns.",
+    )
+    parser.add_argument(
+        "--expasy_csv", type=str, default=None,
+        help="Path to expasy_enzyme.csv (required if --use_expasy).",
+    )
+    parser.add_argument(
+        "--use_brenda", action="store_true", default=False,
+        help="Join BRENDA per-organism kinetics on (EC, organism). Adds "
+             "annot_brenda_substrates / km_values / ph_optimum / "
+             "temperature_optimum columns.",
+    )
+    parser.add_argument(
+        "--brenda_csv", type=str, default=None,
+        help="Path to brenda_kinetics.csv (required if --use_brenda).",
+    )
+    parser.add_argument(
+        "--organism_match", choices=["strict", "relaxed", "ec_only"],
+        default="strict",
+        help="BRENDA organism matching strictness. 'strict' (default) "
+             "requires species-level match; 'relaxed' falls back to "
+             "genus; 'ec_only' accepts any EC-level BRENDA record.",
+    )
+    parser.add_argument(
+        "--use_smart", action="store_true", default=False,
+        help="Join SMART domain descriptions on UniProt DR SMART "
+             "cross-references. Adds annot_smart_domains column.",
+    )
+    parser.add_argument(
+        "--smart_csv", type=str, default=None,
+        help="Path to smart_domains.csv (required if --use_smart).",
+    )
     return parser.parse_args(args)
 
 
@@ -294,13 +334,38 @@ def main(args):
                 args, accessions,
             )
 
+    # Load source-CSV lookups for the join layer (opt-in)
+    expasy_lookup = None
+    brenda_lookup = None
+    smart_lookup = None
+
+    if args.use_expasy:
+        if not args.expasy_csv:
+            raise ValueError("--use_expasy requires --expasy_csv")
+        from biom3.dbio.enrich import load_expasy_lookup
+        expasy_lookup = load_expasy_lookup(args.expasy_csv)
+    if args.use_brenda:
+        if not args.brenda_csv:
+            raise ValueError("--use_brenda requires --brenda_csv")
+        from biom3.dbio.enrich import load_brenda_lookup
+        brenda_lookup = load_brenda_lookup(args.brenda_csv)
+    if args.use_smart:
+        if not args.smart_csv:
+            raise ValueError("--use_smart requires --smart_csv")
+        from biom3.dbio.enrich import load_smart_lookup
+        smart_lookup = load_smart_lookup(args.smart_csv)
+
     # Always run enrich_dataframe to copy family columns into annot_* columns
-    df_pfam = enrich_dataframe(
+    df_pfam, join_stats = enrich_dataframe(
         df_pfam,
         local_annotations=local_annotations,
         uniprot_data=uniprot_data,
         taxonomy_tree=taxonomy_tree,
         accession_taxid_map=accession_taxid_map,
+        expasy_lookup=expasy_lookup,
+        brenda_lookup=brenda_lookup,
+        smart_lookup=smart_lookup,
+        organism_match=args.organism_match,
     )
 
     # Step 2: Compose [final]text_caption from annotation columns (Pfam only).
@@ -351,10 +416,28 @@ def main(args):
         "swissprot_csv": os.path.abspath(_resolve_swissprot_path(args)),
         "pfam_csv": os.path.abspath(_resolve_pfam_path(args)),
     }
+    if args.use_expasy and args.expasy_csv:
+        resolved_paths["expasy_csv"] = os.path.abspath(args.expasy_csv)
+    if args.use_brenda and args.brenda_csv:
+        resolved_paths["brenda_csv"] = os.path.abspath(args.brenda_csv)
+    if args.use_smart and args.smart_csv:
+        resolved_paths["smart_csv"] = os.path.abspath(args.smart_csv)
+
     database_versions = _get_database_versions(args)
+    if args.use_expasy and args.expasy_csv:
+        database_versions["expasy_csv"] = get_file_metadata(args.expasy_csv)
+    if args.use_brenda and args.brenda_csv:
+        database_versions["brenda_csv"] = get_file_metadata(args.brenda_csv)
+    if args.use_smart and args.smart_csv:
+        database_versions["smart_csv"] = get_file_metadata(args.smart_csv)
+
+    outputs = {"row_counts": row_counts}
+    if join_stats:
+        outputs["join_stats"] = join_stats
+
     manifest_path = write_manifest(
         args, args.outdir, start_time, elapsed,
-        outputs={"row_counts": row_counts},
+        outputs=outputs,
         resolved_paths=resolved_paths,
         database_versions=database_versions,
     )

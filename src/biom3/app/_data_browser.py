@@ -52,12 +52,20 @@ def list_files(
     return files
 
 
+_SCOPE_ROOT = "(root only)"
+_SCOPE_ALL = "(all, recursive)"
+
+
 def browse_file(
     label: str = "Browse data",
     extensions: list[str] | None = None,
     key: str | None = None,
 ) -> Path | None:
     """Streamlit widget to browse configured data directories and select a file.
+
+    Presents a three-step picker: data directory → subfolder scope → file,
+    with a substring filter on file names. Selections persist across reruns
+    via Streamlit's session_state (keyed by the `key` argument).
 
     Returns the Path to the selected file, or None if nothing is selected.
     """
@@ -69,27 +77,66 @@ def browse_file(
         )
         return None
 
+    widget_key = key or "default"
+
     dir_labels = [d["label"] for d in dirs]
-    dir_key = f"_browse_dir_{key}" if key else "_browse_dir"
-    selected_label = st.selectbox("Data directory", dir_labels, key=dir_key)
+    selected_label = st.selectbox(
+        "Data directory",
+        dir_labels,
+        key=f"_browse_dir_{widget_key}",
+    )
+    root_dir = Path(next(d["path"] for d in dirs if d["label"] == selected_label))
 
-    selected_dir = next(d["path"] for d in dirs if d["label"] == selected_label)
-    files = list_files(selected_dir, extensions=extensions)
-
-    if not files:
-        st.warning(f"No matching files in `{selected_dir}`")
+    if not root_dir.is_dir():
+        st.warning(f"Directory `{root_dir}` does not exist")
         return None
 
-    base = Path(selected_dir)
-    display_names = []
+    subfolders = sorted(p.name for p in root_dir.iterdir() if p.is_dir())
+    scope_options = [_SCOPE_ROOT, _SCOPE_ALL, *subfolders]
+    scope = st.selectbox(
+        "Subfolder",
+        scope_options,
+        key=f"_browse_scope_{widget_key}",
+    )
+
+    if scope == _SCOPE_ROOT:
+        search_dir, recursive = root_dir, False
+    elif scope == _SCOPE_ALL:
+        search_dir, recursive = root_dir, True
+    else:
+        search_dir, recursive = root_dir / scope, True
+
+    filter_text = st.text_input(
+        "Filter",
+        key=f"_browse_filter_{widget_key}",
+        placeholder="substring match (case-insensitive)",
+    ).strip().lower()
+
+    files = list_files(search_dir, extensions=extensions, recursive=recursive)
+
+    entries: list[tuple[str, Path]] = []
     for f in files:
         try:
-            display_names.append(str(f.relative_to(base)))
+            name = str(f.relative_to(search_dir))
         except ValueError:
-            display_names.append(str(f))
+            name = str(f)
+        if filter_text and filter_text not in name.lower():
+            continue
+        entries.append((name, f))
 
-    file_key = f"_browse_file_{key}" if key else "_browse_file"
-    selected_name = st.selectbox(label, display_names, key=file_key)
+    if not entries:
+        if filter_text:
+            st.warning(f"No files match filter `{filter_text}` in `{search_dir}`")
+        else:
+            st.warning(f"No matching files in `{search_dir}`")
+        return None
+
+    display_names = [name for name, _ in entries]
+    selected_name = st.selectbox(
+        label,
+        display_names,
+        key=f"_browse_file_{widget_key}",
+    )
 
     idx = display_names.index(selected_name)
-    return files[idx]
+    return entries[idx][1]

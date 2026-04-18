@@ -117,6 +117,76 @@ def pick_pt(label: str = "PyTorch file", key: str = "pt"):
     )
 
 
+def render_colored_sequence(
+    seq: str,
+    colors: list[tuple[int, int, int]] | None = None,
+    label: str = "",
+    wrap: int = 60,
+    show_positions: bool = True,
+) -> str:
+    """Build HTML for a monospace sequence row with per-character background colors.
+
+    Parameters
+    ----------
+    seq : str
+        Sequence characters to render.
+    colors : list of (r, g, b) tuples or None
+        Background color per character. Must match ``len(seq)`` if given.
+    label : str
+        Row label shown at the start of each wrapped line.
+    wrap : int
+        Characters per line.
+    show_positions : bool
+        Whether to prefix each line with the 1-based start position.
+
+    Returns
+    -------
+    str
+        HTML string suitable for ``st.markdown(html, unsafe_allow_html=True)``.
+    """
+    if colors is not None and len(colors) != len(seq):
+        raise ValueError(
+            f"colors length {len(colors)} does not match seq length {len(seq)}"
+        )
+
+    def _span(ch: str, rgb: tuple[int, int, int] | None) -> str:
+        if rgb is None:
+            return f'<span>{ch}</span>'
+        r, g, b = rgb
+        lum = 0.299 * r + 0.587 * g + 0.114 * b
+        fg = "#000" if lum > 140 else "#fff"
+        return (
+            f'<span style="background-color:rgb({r},{g},{b});color:{fg};'
+            f'padding:0 2px;">{ch}</span>'
+        )
+
+    lines = []
+    for start in range(0, len(seq), wrap):
+        end = min(start + wrap, len(seq))
+        prefix_parts = []
+        if label:
+            prefix_parts.append(
+                f'<span style="color:#888;">{label:>8}</span>'
+            )
+        if show_positions:
+            prefix_parts.append(
+                f'<span style="color:#888;">{start + 1:>5}</span>'
+            )
+        prefix = " ".join(prefix_parts)
+        body = "".join(
+            _span(seq[i], colors[i] if colors is not None else None)
+            for i in range(start, end)
+        )
+        lines.append(f"{prefix}  {body}")
+
+    return (
+        '<div style="font-family:monospace;font-size:13px;line-height:1.6;'
+        'white-space:pre;">'
+        + "<br>".join(lines)
+        + "</div>"
+    )
+
+
 def load_pt(file_or_path):
     """Load a .pt file from either a Path or a Streamlit UploadedFile.
 

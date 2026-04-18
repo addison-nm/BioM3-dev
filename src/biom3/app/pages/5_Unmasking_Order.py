@@ -1,7 +1,15 @@
+import numpy as np
 import streamlit as st
 
 from biom3.viz.unmasking import view_unmasking_order
-from biom3.app._helpers import render_view, pick_pdb, pick_pt, load_pt
+from biom3.viz._tokens import TOKENS, SPECIAL_TOKENS, AA_COLORS
+from biom3.app._helpers import (
+    render_view,
+    pick_pdb,
+    pick_pt,
+    load_pt,
+    render_colored_sequence,
+)
 
 st.header("Unmasking Order Visualization")
 st.write(
@@ -31,6 +39,7 @@ colormap = st.selectbox("Colormap", ["coolwarm", "bwr", "viridis", "plasma", "Rd
 
 if pdb_data and pt_data:
     kind, file_or_path = pt_data
+    final_indices = None
     try:
         loaded = load_pt(file_or_path)
         if kind == "frames":
@@ -40,9 +49,30 @@ if pdb_data and pt_data:
             else:
                 frames = loaded
             v = view_unmasking_order(pdb_data, mask_realization_list=frames, colormap=colormap)
+            try:
+                final_indices = np.asarray(frames[-1], dtype=int)
+            except (IndexError, TypeError, ValueError):
+                final_indices = None
         else:
             v = view_unmasking_order(pdb_data, sampling_path=loaded, colormap=colormap)
 
         render_view(v)
+
+        if final_indices is not None:
+            seq_chars = []
+            color_list = []
+            for idx in final_indices:
+                tok = TOKENS[int(idx)]
+                if tok in SPECIAL_TOKENS:
+                    continue
+                seq_chars.append(tok)
+                color_list.append(AA_COLORS.get(tok, (140, 140, 140)))
+            seq_str = "".join(seq_chars)
+            if seq_str:
+                st.subheader(f"Generated sequence ({len(seq_str)} residues)")
+                html = render_colored_sequence(
+                    seq_str, colors=color_list, label="seq",
+                )
+                st.markdown(html, unsafe_allow_html=True)
     except Exception as e:
         st.error(f"Error: {e}")

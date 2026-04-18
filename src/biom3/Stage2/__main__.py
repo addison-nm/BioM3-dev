@@ -8,5 +8,10 @@ def run_Facilitator_sample():
     args = parse_arguments(sys.argv[1:])
     main(args)
 
+def run_stage2_pretraining():
+    from biom3.Stage2.run_PL_training import parse_arguments, main
+    args = parse_arguments(sys.argv[1:])
+    main(args)
+
 if __name__ == "__main__":
     main()

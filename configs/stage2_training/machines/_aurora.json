@@ -1,0 +1,4 @@
+{
+  "device": "xpu",
+  "gpu_devices": 12
+}

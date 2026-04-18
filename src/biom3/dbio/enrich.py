@@ -3,12 +3,16 @@
 Two-step workflow:
 1. enrich_dataframe() populates individual annotation columns (annot_protein_name,
    annot_function, annot_lineage, etc.) from UniProt API and/or local NCBI taxonomy.
+   Optionally joins ExPASy, BRENDA, and SMART source CSVs to add EC-based and
+   domain-based annotations.
 2. compose_caption() assembles [final]text_caption from those columns using the
    BioM3 ALL-CAPS field label format.
 
 This separation keeps the raw annotation data inspectable and the caption format
 customizable.
 """
+
+import re
 
 import pandas as pd
 
@@ -38,9 +42,27 @@ ANNOTATION_FIELDS = [
     ("INDUCTION",                  "annot_induction"),
     ("GENE ONTOLOGY",              "annot_gene_ontology"),
     ("LINEAGE",                    "annot_lineage"),
+    # Fields populated by the source-CSV join layer (opt-in via
+    # --use_expasy / --use_brenda / --use_smart). Kept together at the
+    # end so legacy captions don't shift.
+    ("EC NAMES",                   "annot_ec_names"),
+    ("EC DESCRIPTION",             "annot_ec_description"),
+    ("SMART DOMAINS",              "annot_smart_domains"),
+    ("BRENDA SUBSTRATES",          "annot_brenda_substrates"),
+    ("BRENDA KM VALUES",           "annot_brenda_km_values"),
+    ("BRENDA PH OPTIMUM",          "annot_brenda_ph_optimum"),
+    ("BRENDA TEMPERATURE OPTIMUM", "annot_brenda_temperature_optimum"),
 ]
 
 ANNOTATION_COLUMNS = [col for _, col in ANNOTATION_FIELDS]
+
+# Regex for extracting EC numbers from UniProt catalytic_activity text.
+# Matches patterns like "EC=1.2.3.4" (JSON API format), "EC 1.2.3.4"
+# (prose), and bare "1.2.3.4" when embedded in reaction strings. The
+# trailing dash forms ("1.2.-.-", "1.-.-.-") denote partial EC numbers.
+_EC_NUMBER_RE = re.compile(
+    r"(?<![\w.])(?:EC[\s=:]*)?(\d+\.(?:\d+|-)\.(?:\d+|-)\.(?:\d+|-))(?![\d-])"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -199,13 +221,319 @@ def extract_annotations(entry):
 
 
 # ---------------------------------------------------------------------------
+# Source-CSV lookup loaders (used by enrich_dataframe to join ExPASy/BRENDA/SMART)
+# ---------------------------------------------------------------------------
+
+def load_expasy_lookup(csv_path):
+    """Load expasy_enzyme.csv into a dict keyed by EC number.
+
+    Each value is a dict with keys: annot_name, annot_alternative_names,
+    annot_catalytic_activity, annot_comments, annot_uniprot_accessions.
+    Obsolete (Transferred, Deleted) entries are included so legacy EC
+    numbers resolve to a forwarding record.
+    """
+    logger.info("Loading ExPASy lookup from %s", csv_path)
+    df = pd.read_csv(csv_path, dtype=str).fillna("")
+    lookup = {}
+    for _, row in df.iterrows():
+        ec = row["ec"].strip()
+        if not ec:
+            continue
+        lookup[ec] = {
+            "name": row.get("annot_name", ""),
+            "alternative_names": row.get("annot_alternative_names", ""),
+            "catalytic_activity": row.get("annot_catalytic_activity", ""),
+            "comments": row.get("annot_comments", ""),
+            "uniprot_accessions": row.get("annot_uniprot_accessions", ""),
+            "transferred_to": row.get("transferred_to", ""),
+            "deleted": row.get("deleted", "False") == "True",
+        }
+    logger.info("Loaded %s ExPASy entries", f"{len(lookup):,}")
+    return lookup
+
+
+def load_brenda_lookup(csv_path):
+    """Load brenda_kinetics.csv into a nested dict keyed by (EC, organism_lower).
+
+    Each value is a dict with keys: substrates_products, km_values,
+    ph_optimum, temperature_optimum. EC-level fields (recommended_name,
+    synonyms) are stored under the "_shared" key per-EC for quick lookup
+    when no organism match is found.
+    """
+    logger.info("Loading BRENDA lookup from %s", csv_path)
+    df = pd.read_csv(csv_path, dtype=str).fillna("")
+    by_ec_org = {}
+    shared_by_ec = {}
+    for _, row in df.iterrows():
+        ec = row["ec"].strip()
+        organism = row["organism"].strip()
+        if not ec:
+            continue
+        key = (ec, organism.lower())
+        by_ec_org[key] = {
+            "substrates_products": row.get("annot_substrates_products", ""),
+            "km_values": row.get("annot_km_values", ""),
+            "ph_optimum": row.get("annot_ph_optimum", ""),
+            "temperature_optimum": row.get("annot_temperature_optimum", ""),
+        }
+        if ec not in shared_by_ec:
+            shared_by_ec[ec] = {
+                "recommended_name": row.get("annot_recommended_name", ""),
+                "systematic_name": row.get("annot_systematic_name", ""),
+                "synonyms": row.get("annot_synonyms", ""),
+                "reactions": row.get("annot_reactions", ""),
+            }
+    logger.info("Loaded %s BRENDA (EC, organism) records across %s ECs",
+                f"{len(by_ec_org):,}", f"{len(shared_by_ec):,}")
+    return {"by_ec_org": by_ec_org, "shared_by_ec": shared_by_ec}
+
+
+def load_smart_lookup(csv_path):
+    """Load smart_domains.csv into a dict keyed by SMART accession (SMxxxxx)."""
+    logger.info("Loading SMART lookup from %s", csv_path)
+    df = pd.read_csv(csv_path, dtype=str).fillna("")
+    lookup = {}
+    for _, row in df.iterrows():
+        smart_id = row["domain_id"].strip()
+        if not smart_id:
+            continue
+        lookup[smart_id] = {
+            "name": row.get("annot_domain_name", ""),
+            "definition": row.get("annot_definition", ""),
+            "description": row.get("annot_description", ""),
+        }
+    logger.info("Loaded %s SMART domains", f"{len(lookup):,}")
+    return lookup
+
+
+def extract_ec_numbers(catalytic_activity_text):
+    """Extract EC numbers from a UniProt catalytic_activity annotation.
+
+    Returns a de-duplicated list of strings like ["1.1.1.1", "2.7.11.1"].
+    """
+    if catalytic_activity_text is None:
+        return []
+    try:
+        if pd.isna(catalytic_activity_text):
+            return []
+    except (TypeError, ValueError):
+        pass
+    text = str(catalytic_activity_text)
+    if not text:
+        return []
+    matches = _EC_NUMBER_RE.findall(text)
+    seen = []
+    for m in matches:
+        if m not in seen:
+            seen.append(m)
+    return seen
+
+
+# ---------------------------------------------------------------------------
+# Join helpers (applied inside enrich_dataframe when lookups are provided)
+# ---------------------------------------------------------------------------
+
+def _strip_lineage_prefix(lineage_str):
+    prefix = "The organism lineage is "
+    if isinstance(lineage_str, str) and lineage_str.startswith(prefix):
+        return lineage_str[len(prefix):]
+    return str(lineage_str) if lineage_str else ""
+
+
+def _row_organism_candidates(row):
+    """Derive organism names for a row from annot_lineage, newest-first.
+
+    Species are typically the last taxon in a UniProt lineage; we also try
+    the last two tokens to catch genus+species binomials that BRENDA may
+    store in a slightly different form.
+    """
+    lineage = row.get("annot_lineage")
+    if lineage is None or (isinstance(lineage, float) and pd.isna(lineage)):
+        return []
+    parts = [p.strip() for p in _strip_lineage_prefix(lineage).split(",") if p.strip()]
+    candidates = []
+    if parts:
+        candidates.append(parts[-1])
+        if len(parts) >= 2:
+            candidates.append(f"{parts[-2]} {parts[-1]}")
+    return candidates
+
+
+def _join_expasy(df, expasy_lookup):
+    """Add annot_ec_names and annot_ec_description from ExPASy lookup.
+
+    Returns a (df, stats) tuple where stats is a dict of hit counters.
+    """
+    ec_extracted = 0
+    expasy_matched = 0
+
+    def _row_expasy(row):
+        nonlocal ec_extracted, expasy_matched
+        ecs = extract_ec_numbers(row.get("annot_catalytic_activity"))
+        if ecs:
+            ec_extracted += 1
+        names = []
+        descriptions = []
+        matched_this_row = False
+        for ec in ecs:
+            entry = expasy_lookup.get(ec)
+            if entry and entry["name"]:
+                names.append(f"EC {ec}: {entry['name']}")
+                if entry["comments"]:
+                    descriptions.append(entry["comments"])
+                matched_this_row = True
+        if matched_this_row:
+            expasy_matched += 1
+        return pd.Series({
+            "annot_ec_numbers": ", ".join(ecs) if ecs else pd.NA,
+            "annot_ec_names": "; ".join(names) if names else pd.NA,
+            "annot_ec_description": " | ".join(descriptions) if descriptions else pd.NA,
+        })
+
+    enriched = df.apply(_row_expasy, axis=1)
+    for col in ["annot_ec_numbers", "annot_ec_names", "annot_ec_description"]:
+        df[col] = enriched[col]
+
+    total = len(df)
+    return df, {
+        "ec_extraction_rate": ec_extracted / total if total else 0.0,
+        "expasy_hit_rate": expasy_matched / total if total else 0.0,
+    }
+
+
+def _join_brenda(df, brenda_lookup, organism_match="strict"):
+    """Add BRENDA per-(EC, organism) annotations.
+
+    organism_match:
+        - "strict": species-level match (last lineage taxon).
+        - "relaxed": genus-level fallback if strict misses.
+        - "ec_only": fall back to EC-level data when organism doesn't match.
+    """
+    by_ec_org = brenda_lookup["by_ec_org"]
+    shared_by_ec = brenda_lookup["shared_by_ec"]
+
+    hit_strict = 0
+    hit_relaxed = 0
+    hit_ec_only = 0
+
+    def _row_brenda(row):
+        nonlocal hit_strict, hit_relaxed, hit_ec_only
+        ec_numbers_text = row.get("annot_ec_numbers")
+        ecs = []
+        if pd.notna(ec_numbers_text) and ec_numbers_text:
+            ecs = [e.strip() for e in str(ec_numbers_text).split(",") if e.strip()]
+        if not ecs:
+            ecs = extract_ec_numbers(row.get("annot_catalytic_activity"))
+
+        organisms = _row_organism_candidates(row)
+        substrates = []
+        kms = []
+        phs = []
+        temps = []
+        matched_strict = False
+        matched_relaxed = False
+        matched_ec_only = False
+
+        for ec in ecs:
+            entry = None
+            for org in organisms:
+                entry = by_ec_org.get((ec, org.lower()))
+                if entry:
+                    matched_strict = True
+                    break
+            if not entry and organism_match == "relaxed" and organisms:
+                genus = organisms[0].split()[0].lower() if organisms[0] else ""
+                if genus:
+                    for (cand_ec, cand_org), rec in by_ec_org.items():
+                        if cand_ec == ec and cand_org.startswith(genus):
+                            entry = rec
+                            matched_relaxed = True
+                            break
+            if not entry and organism_match in ("strict", "relaxed", "ec_only"):
+                if ec in shared_by_ec and organism_match == "ec_only":
+                    matched_ec_only = True
+                    continue
+            if entry:
+                if entry["substrates_products"]:
+                    substrates.append(entry["substrates_products"])
+                if entry["km_values"]:
+                    kms.append(entry["km_values"])
+                if entry["ph_optimum"]:
+                    phs.append(entry["ph_optimum"])
+                if entry["temperature_optimum"]:
+                    temps.append(entry["temperature_optimum"])
+
+        if matched_strict:
+            hit_strict += 1
+        elif matched_relaxed:
+            hit_relaxed += 1
+        elif matched_ec_only:
+            hit_ec_only += 1
+
+        return pd.Series({
+            "annot_brenda_substrates": " | ".join(substrates) if substrates else pd.NA,
+            "annot_brenda_km_values": " | ".join(kms) if kms else pd.NA,
+            "annot_brenda_ph_optimum": " | ".join(phs) if phs else pd.NA,
+            "annot_brenda_temperature_optimum": " | ".join(temps) if temps else pd.NA,
+        })
+
+    enriched = df.apply(_row_brenda, axis=1)
+    for col in [
+        "annot_brenda_substrates", "annot_brenda_km_values",
+        "annot_brenda_ph_optimum", "annot_brenda_temperature_optimum",
+    ]:
+        df[col] = enriched[col]
+
+    total = len(df)
+    hit_any = hit_strict + hit_relaxed + hit_ec_only
+    return df, {
+        "brenda_hit_rate": hit_any / total if total else 0.0,
+        "brenda_strict_hits": hit_strict,
+        "brenda_relaxed_hits": hit_relaxed,
+        "brenda_ec_only_hits": hit_ec_only,
+    }
+
+
+def _join_smart(df, smart_lookup):
+    """Add annot_smart_domains from the xref_smart_ids list column."""
+    if "xref_smart_ids" not in df.columns:
+        df["annot_smart_domains"] = pd.NA
+        return df, {"smart_hit_rate": 0.0}
+
+    hit = 0
+
+    def _row_smart(row):
+        nonlocal hit
+        ids = row.get("xref_smart_ids")
+        if isinstance(ids, float) and pd.isna(ids):
+            return pd.NA
+        if ids is None or (hasattr(ids, "__len__") and len(ids) == 0):
+            return pd.NA
+        parts = []
+        for sid in ids:
+            entry = smart_lookup.get(str(sid).strip())
+            if entry and entry["definition"]:
+                parts.append(f"{sid}: {entry['definition']}")
+        if parts:
+            hit += 1
+            return "; ".join(parts)
+        return pd.NA
+
+    df["annot_smart_domains"] = df.apply(_row_smart, axis=1)
+    total = len(df)
+    return df, {"smart_hit_rate": hit / total if total else 0.0}
+
+
+# ---------------------------------------------------------------------------
 # DataFrame enrichment (Step 1: populate annotation columns)
 # ---------------------------------------------------------------------------
 
 def enrich_dataframe(df, local_annotations=None, uniprot_data=None,
-                     taxonomy_tree=None, accession_taxid_map=None):
+                     taxonomy_tree=None, accession_taxid_map=None,
+                     expasy_lookup=None, brenda_lookup=None,
+                     smart_lookup=None, organism_match="strict"):
     """Populate individual annotation columns from local .dat, UniProt API,
-    and/or NCBI taxonomy.
+    and/or NCBI taxonomy, and optionally join ExPASy/BRENDA/SMART source CSVs.
 
     Adds columns named annot_family_name, annot_family_description,
     annot_protein_name, annot_function, annot_lineage, etc. Each column
@@ -217,13 +545,20 @@ def enrich_dataframe(df, local_annotations=None, uniprot_data=None,
         df: DataFrame with primary_Accession column. Optionally family_name
             and family_description columns (for Pfam-sourced rows).
         local_annotations: optional dict mapping accession -> annotation dict
-            (annot_* keys), as returned by SwissProtDatParser.parse().
+            (annot_* keys plus optional xref_smart_ids/xref_interpro_ids/
+            xref_pdb_ids lists), as returned by SwissProtDatParser.parse().
         uniprot_data: optional dict mapping accession -> UniProt JSON entry.
         taxonomy_tree: optional TaxonomyTree instance.
         accession_taxid_map: optional dict mapping accession -> tax_id (int).
+        expasy_lookup: dict from load_expasy_lookup(); enables EC-based join.
+        brenda_lookup: dict from load_brenda_lookup(); enables (EC, organism)
+            kinetics join.
+        smart_lookup: dict from load_smart_lookup(); enables SMART domain join.
+        organism_match: 'strict' | 'relaxed' | 'ec_only' for BRENDA.
 
     Returns:
-        DataFrame with annotation columns added.
+        (df, join_stats) tuple where join_stats is a dict with hit-rate
+        counters (empty if no lookups supplied).
     """
     df = df.copy()
 
@@ -274,7 +609,36 @@ def enrich_dataframe(df, local_annotations=None, uniprot_data=None,
 
     logger.info("Enriched %s/%s rows with annotation columns",
                 f"{enriched_count:,}", f"{len(df):,}")
-    return df
+
+    join_stats = {}
+    if expasy_lookup is not None:
+        df, stats = _join_expasy(df, expasy_lookup)
+        join_stats.update(stats)
+        logger.info(
+            "ExPASy join: EC extraction %.1f%%, hit rate %.1f%%",
+            100 * stats.get("ec_extraction_rate", 0.0),
+            100 * stats.get("expasy_hit_rate", 0.0),
+        )
+    if brenda_lookup is not None:
+        df, stats = _join_brenda(df, brenda_lookup, organism_match=organism_match)
+        join_stats.update(stats)
+        logger.info(
+            "BRENDA join (%s): hit rate %.1f%% (strict=%s, relaxed=%s, ec_only=%s)",
+            organism_match,
+            100 * stats.get("brenda_hit_rate", 0.0),
+            stats.get("brenda_strict_hits", 0),
+            stats.get("brenda_relaxed_hits", 0),
+            stats.get("brenda_ec_only_hits", 0),
+        )
+    if smart_lookup is not None:
+        df, stats = _join_smart(df, smart_lookup)
+        join_stats.update(stats)
+        logger.info(
+            "SMART join: hit rate %.1f%%",
+            100 * stats.get("smart_hit_rate", 0.0),
+        )
+
+    return df, join_stats
 
 
 # ---------------------------------------------------------------------------

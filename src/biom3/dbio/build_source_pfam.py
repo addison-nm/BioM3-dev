@@ -27,6 +27,7 @@ from biom3.core.run_utils import (
 )
 from biom3.dbio.caption import CaptionSpec, compose_row_caption
 from biom3.dbio.pfam_metadata import PfamMetadataParser
+from biom3.dbio.stats import IncrementalStatsBuilder, write_stats_markdown
 
 logger = setup_logger(__name__)
 
@@ -130,6 +131,13 @@ def build_pfam_csv(fasta_path, pfam_metadata, output_path,
     if caption_spec is None:
         caption_spec = PFAM_SPEC
 
+    stats_builder = IncrementalStatsBuilder(
+        annotation_fields=[],
+        seq_field="sequence",
+        pfam_field="pfam_ids",
+        caption_field="caption",
+    )
+
     buffer = []
     total = 0
     skipped = 0
@@ -165,6 +173,12 @@ def build_pfam_csv(fasta_path, pfam_metadata, output_path,
                 caption,
             ])
 
+            stats_builder.update({
+                "sequence": sequence,
+                "pfam_ids": [pfam_label] if pfam_label else [],
+                "caption": caption,
+            })
+
             if len(buffer) >= chunk_size:
                 writer.writerows(buffer)
                 total += len(buffer)
@@ -178,7 +192,7 @@ def build_pfam_csv(fasta_path, pfam_metadata, output_path,
     if skipped:
         logger.warning("Skipped %s unparseable FASTA headers", f"{skipped:,}")
     logger.info("Build complete: %s rows written to %s", f"{total:,}", output_path)
-    return total
+    return total, stats_builder
 
 
 def _read_release_version(filepath, pattern):
@@ -236,7 +250,7 @@ def main(args):
     logger.info("Loading Pfam family metadata from %s", args.pfam_metadata)
     pfam_metadata = PfamMetadataParser(args.pfam_metadata).parse()
 
-    row_count = build_pfam_csv(
+    row_count, stats_builder = build_pfam_csv(
         fasta_path=args.fasta,
         pfam_metadata=pfam_metadata,
         output_path=args.output,
@@ -244,20 +258,28 @@ def main(args):
     )
 
     elapsed = datetime.now() - start_time
+    stats = stats_builder.finalize()
 
     outdir = os.path.dirname(os.path.abspath(args.output))
     stem = os.path.splitext(os.path.basename(args.output))[0]
+
+    stats_path = os.path.join(outdir, f"{stem}.stats.md")
+    write_stats_markdown(stats, stats_path, title=f"{stem} — coverage stats")
+    logger.info("Saved stats report to %s", stats_path)
+
     database_versions = _collect_database_versions(args.fasta, args.pfam_metadata)
     resolved_paths = {
         "fasta": os.path.abspath(args.fasta),
         "pfam_metadata": os.path.abspath(args.pfam_metadata),
         "output": os.path.abspath(args.output),
+        "stats_markdown": stats_path,
     }
     manifest_path = write_manifest(
         args, outdir, start_time, elapsed,
         outputs={"row_counts": {"pfam": row_count}},
         resolved_paths=resolved_paths,
         database_versions=database_versions,
+        stats=stats,
         manifest_filename=f"{stem}.build_manifest.json",
     )
     logger.info("Saved build manifest to %s", manifest_path)

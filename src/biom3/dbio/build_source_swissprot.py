@@ -25,6 +25,7 @@ from biom3.core.run_utils import (
 )
 from biom3.dbio.caption import CaptionSpec, build_lineage_string, compose_row_caption
 from biom3.dbio.pfam_metadata import PfamMetadataParser
+from biom3.dbio.stats import IncrementalStatsBuilder, write_stats_markdown
 from biom3.dbio.swissprot_dat import SwissProtDatParser
 
 logger = setup_logger(__name__)
@@ -141,6 +142,14 @@ def build_swissprot_csv(dat_path, pfam_metadata, output_path,
         clean_spec = None
         output_columns = OUTPUT_COLUMNS
 
+    annotation_fields = [field for (_, field) in caption_spec.fields]
+    stats_builder = IncrementalStatsBuilder(
+        annotation_fields=annotation_fields,
+        seq_field="sequence",
+        pfam_field="pfam_ids",
+        caption_field="caption",
+    )
+
     parser = SwissProtDatParser(dat_path)
     buffer = []
     total = 0
@@ -204,6 +213,12 @@ def build_swissprot_csv(dat_path, pfam_metadata, output_path,
                     _format_pfam_label(pfam_ids, require_pfam=require_pfam),
                 ]
 
+            stats_builder.update({
+                "sequence": entry["sequence"],
+                "pfam_ids": pfam_ids,
+                "caption": final_caption,
+                **annotations,
+            })
             buffer.append(row)
 
             if len(buffer) >= chunk_size:
@@ -217,7 +232,7 @@ def build_swissprot_csv(dat_path, pfam_metadata, output_path,
             total += len(buffer)
 
     logger.info("Build complete: %s rows written to %s", f"{total:,}", output_path)
-    return total
+    return total, stats_builder
 
 
 def _collect_database_versions(dat_path, pfam_metadata_path):
@@ -290,7 +305,7 @@ def main(args):
     logger.info("Loading Pfam family metadata from %s", args.pfam_metadata)
     pfam_metadata = PfamMetadataParser(args.pfam_metadata).parse()
 
-    row_count = build_swissprot_csv(
+    row_count, stats_builder = build_swissprot_csv(
         dat_path=args.dat,
         pfam_metadata=pfam_metadata,
         output_path=args.output,
@@ -300,20 +315,28 @@ def main(args):
     )
 
     elapsed = datetime.now() - start_time
+    stats = stats_builder.finalize()
 
     outdir = os.path.dirname(os.path.abspath(args.output))
     stem = os.path.splitext(os.path.basename(args.output))[0]
+
+    stats_path = os.path.join(outdir, f"{stem}.stats.md")
+    write_stats_markdown(stats, stats_path, title=f"{stem} — coverage stats")
+    logger.info("Saved stats report to %s", stats_path)
+
     database_versions = _collect_database_versions(args.dat, args.pfam_metadata)
     resolved_paths = {
         "dat": os.path.abspath(args.dat),
         "pfam_metadata": os.path.abspath(args.pfam_metadata),
         "output": os.path.abspath(args.output),
+        "stats_markdown": stats_path,
     }
     manifest_path = write_manifest(
         args, outdir, start_time, elapsed,
         outputs={"row_counts": {"swissprot": row_count}},
         resolved_paths=resolved_paths,
         database_versions=database_versions,
+        stats=stats,
         manifest_filename=f"{stem}.build_manifest.json",
     )
     logger.info("Saved build manifest to %s", manifest_path)

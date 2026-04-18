@@ -190,7 +190,13 @@ class SwissProtDatParser:
 
 
 def _parse_entry(lines):
-    """Parse a single .dat entry into an annotation dict with annot_* keys."""
+    """Parse a single .dat entry into an annotation dict with annot_* keys.
+
+    Also attaches SMART/InterPro/PDB cross-reference lists under the keys
+    ``xref_smart_ids``, ``xref_interpro_ids``, ``xref_pdb_ids`` when present.
+    These side-channel entries flow through ``enrich_dataframe`` into their
+    own DataFrame columns for downstream join functions.
+    """
     annotations = {}
 
     # Collect line groups
@@ -198,6 +204,9 @@ def _parse_entry(lines):
     oc_lines = []
     cc_blocks = {}
     go_terms = []
+    smart_ids = []
+    interpro_ids = []
+    pdb_ids = []
 
     current_cc_topic = None
     current_cc_text = []
@@ -250,6 +259,24 @@ def _parse_entry(lines):
                     if len(go_desc) > 2 and go_desc[1] == ":":
                         go_desc = go_desc[2:]
                     go_terms.append(go_desc)
+            elif text.startswith("SMART;"):
+                parts = text.split(";")
+                if len(parts) >= 2:
+                    smart_acc = parts[1].strip()
+                    if smart_acc and smart_acc not in smart_ids:
+                        smart_ids.append(smart_acc)
+            elif text.startswith("InterPro;"):
+                parts = text.split(";")
+                if len(parts) >= 2:
+                    ipr_acc = parts[1].strip()
+                    if ipr_acc and ipr_acc not in interpro_ids:
+                        interpro_ids.append(ipr_acc)
+            elif text.startswith("PDB;"):
+                parts = text.split(";")
+                if len(parts) >= 2:
+                    pdb_acc = parts[1].strip()
+                    if pdb_acc and pdb_acc not in pdb_ids:
+                        pdb_ids.append(pdb_acc)
 
     # Save last CC block if not already saved
     if current_cc_topic and current_cc_text:
@@ -287,6 +314,15 @@ def _parse_entry(lines):
     # GENE ONTOLOGY
     if go_terms:
         annotations["annot_gene_ontology"] = ", ".join(go_terms)
+
+    # Cross-reference side-channel — flow through enrich_dataframe into
+    # distinct DataFrame columns for downstream join functions.
+    if smart_ids:
+        annotations["xref_smart_ids"] = smart_ids
+    if interpro_ids:
+        annotations["xref_interpro_ids"] = interpro_ids
+    if pdb_ids:
+        annotations["xref_pdb_ids"] = pdb_ids
 
     return annotations
 
@@ -387,6 +423,9 @@ def _parse_entry_full(lines):
     cc_blocks = {}
     go_terms = []
     pfam_ids = []
+    smart_ids = []
+    interpro_ids = []
+    pdb_ids = []
     seq_lines = []
     tax_id = None
     in_sq = False
@@ -457,6 +496,24 @@ def _parse_entry_full(lines):
                     if len(go_desc) > 2 and go_desc[1] == ":":
                         go_desc = go_desc[2:]
                     go_terms.append(go_desc)
+            elif text.startswith("SMART;"):
+                parts = text.split(";")
+                if len(parts) >= 2:
+                    smart_acc = parts[1].strip()
+                    if smart_acc and smart_acc not in smart_ids:
+                        smart_ids.append(smart_acc)
+            elif text.startswith("InterPro;"):
+                parts = text.split(";")
+                if len(parts) >= 2:
+                    ipr_acc = parts[1].strip()
+                    if ipr_acc and ipr_acc not in interpro_ids:
+                        interpro_ids.append(ipr_acc)
+            elif text.startswith("PDB;"):
+                parts = text.split(";")
+                if len(parts) >= 2:
+                    pdb_acc = parts[1].strip()
+                    if pdb_acc and pdb_acc not in pdb_ids:
+                        pdb_ids.append(pdb_acc)
 
         elif code == "SQ":
             in_sq = True
@@ -503,5 +560,8 @@ def _parse_entry_full(lines):
         "annotations": annotations,
         "sequence": sequence,
         "pfam_ids": pfam_ids,
+        "smart_ids": smart_ids,
+        "interpro_ids": interpro_ids,
+        "pdb_ids": pdb_ids,
         "tax_id": tax_id,
     }

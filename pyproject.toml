@@ -31,6 +31,8 @@ where = ["src"]
 "biom3.app" = ["*.json"]
 
 [project.scripts]
+biom3_pretrain_stage1 = "biom3.Stage1.__main__:run_stage1_pretraining"
+biom3_pretrain_stage2 = "biom3.Stage2.__main__:run_stage2_pretraining"
 biom3_pretrain_stage3 = "biom3.Stage3.__main__:run_stage3_pretraining"
 biom3_PenCL_inference = "biom3.Stage1.__main__:run_PenCL_inference"
 biom3_Facilitator_sample = "biom3.Stage2.__main__:run_Facilitator_sample"

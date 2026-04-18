@@ -25,6 +25,13 @@ import biom3.Stage1.model as mod
 from biom3.backend.device import print_gpu_initialization, print_memory_usage
 
 
+def _safe_barrier():
+    # No-op when the default process group is not initialized (single-GPU,
+    # CPU smoke tests, inference). Safe replacement for `dist.barrier()`.
+    if dist.is_available() and dist.is_initialized():
+        _safe_barrier()
+
+
 ######################
 # Default PL wrapper #
 ######################
@@ -94,11 +101,11 @@ class PL_PEN_CL(pl.LightningModule):
                     x_t=text_batch,
                     x_s=protein_batch
         )
-        dist.barrier()
+        _safe_barrier()
 
         # gather all tensors
         z_t_all = self.all_gather(z_t, sync_grads=True)
-        dist.barrier()
+        _safe_barrier()
         z_s_all = self.all_gather(z_s, sync_grads=True)
         
         # stack the embeddings
@@ -146,10 +153,10 @@ class PL_PEN_CL(pl.LightningModule):
                     x_s=protein_batch
         )
         
-        dist.barrier()
+        _safe_barrier()
         # gather all tensors
         z_t_all = self.all_gather(z_t, sync_grads=True).view(-1, z_t.shape[-1])
-        dist.barrier()
+        _safe_barrier()
         z_s_all = self.all_gather(z_s, sync_grads=True).view(-1, z_s.shape[-1])
         
         # stack the embeddings
@@ -484,11 +491,11 @@ class mask_PL_PEN_CL(pl.LightningModule):
                     x_s=protein_batch,
                     compute_masked_logits=False
         )
-        dist.barrier()
+        _safe_barrier()
 
         # gather all tensors
         z_t_all = self.all_gather(z_t, sync_grads=True)
-        dist.barrier()
+        _safe_barrier()
         z_s_all = self.all_gather(z_s, sync_grads=True)
         
         # stack the embeddings
@@ -566,10 +573,10 @@ class mask_PL_PEN_CL(pl.LightningModule):
                     x_s=protein_batch
         )
         
-        dist.barrier()
+        _safe_barrier()
         # gather all tensors
         z_t_all = self.all_gather(z_t, sync_grads=True).view(-1, z_t.shape[-1])
-        dist.barrier()
+        _safe_barrier()
         z_s_all = self.all_gather(z_s, sync_grads=True).view(-1, z_s.shape[-1])
         
         # stack the embeddings
@@ -986,7 +993,7 @@ class pfam_PL_PEN_CL(pl.LightningModule):
         #print(f"Rank={dist.get_rank()}: Time taken for Swiss-Prot forward pass: {end_time_forward_pass - start_time_forward_pass} seconds.")
 
         # Ensure all GPUs are synchronized.
-        dist.barrier()
+        _safe_barrier()
 
         # Forward pass with Pfam data.
         z_t_pfam, z_p_pfam = self(
@@ -994,11 +1001,11 @@ class pfam_PL_PEN_CL(pl.LightningModule):
             x_p=pfam_protein_batch,
             compute_masked_logits=False
         )
-        dist.barrier()
+        _safe_barrier()
         
         #Gather tensors from all GPUs.
         z_t_swiss_all = self.all_gather(z_t_swiss, sync_grads=True)
-        dist.barrier()
+        _safe_barrier()
         z_p_swiss_all = self.all_gather(z_p_swiss, sync_grads=True)
 
         # Reshape the embeddings.
@@ -1008,7 +1015,7 @@ class pfam_PL_PEN_CL(pl.LightningModule):
 
         # Gather tensors from all GPUs.
         z_t_pfam_all = self.all_gather(z_t_pfam, sync_grads=True)
-        dist.barrier()
+        _safe_barrier()
         z_p_pfam_all = self.all_gather(z_p_pfam, sync_grads=True)
 
         # Reshape the embeddings.
@@ -1153,11 +1160,11 @@ class pfam_PL_PEN_CL(pl.LightningModule):
                                   x_p=protein_batch,
                                   compute_masked_logits=False
         )
-        dist.barrier() # wait till all GPUs catch up...
+        _safe_barrier() # wait till all GPUs catch up...
      
         # gather all tensors
         z_t_swiss_all = self.all_gather(z_t_swiss, sync_grads=True)
-        dist.barrier()    
+        _safe_barrier()    
         z_p_swiss_all = self.all_gather(z_p_swiss, sync_grads=True)
 
         # stack the embeddings
@@ -1170,11 +1177,11 @@ class pfam_PL_PEN_CL(pl.LightningModule):
                                 x_p=pfam_protein_batch,
                                 compute_masked_logits=False
         )
-        dist.barrier() # wait till all GPUs catch up...
+        _safe_barrier() # wait till all GPUs catch up...
         
         # gather all tensors
         z_t_pfam_all = self.all_gather(z_t_pfam, sync_grads=True)
-        dist.barrier()
+        _safe_barrier()
         z_p_pfam_all = self.all_gather(z_p_pfam, sync_grads=True)
         
         # stack the embeddings

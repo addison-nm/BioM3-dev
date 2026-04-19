@@ -119,6 +119,51 @@ manifest. Shape is otherwise identical to the `build_manifest.json` that
 For per-column provenance (which `.dat` lines map to which caption fields), see
 [training_csv_provenance.md](training_csv_provenance.md).
 
+### Annotated Pfam subsets from `Pfam-A.full.gz` (non-redundant scope)
+
+`biom3_build_source_pfam` reads `Pfam-A.fasta.gz`, which Pfam ships as a
+**90% non-redundant** FASTA (see `relnotes.txt` line 224). For large
+families this aggressively collapses near-duplicate sequences — SH3
+(PF00018) comes out to 26,468 rows in Pfam 38.1. The full `Pfam-A.full.gz`
+Stockholm alignment carries every reference-proteome hit (176,301 rows
+for PF00018 in 38.1) but isn't materialized as a CSV by the main builder.
+
+For finetuning datasets that want the full RP coverage, use
+`biom3_build_annotated_pfam_subsets`. It streams `Pfam-A.full.gz`
+directly, extracts only the requested families, strips Stockholm gap
+characters (`.` / `-`), uppercases insertion residues, and emits a CSV
+enriched with Pfam-level annotations beyond what the main builder
+captures: `family_type`, `family_clan`, `family_wikipedia`, and
+`family_references` (all `#=GF` header fields joined per row).
+
+```bash
+biom3_build_annotated_pfam_subsets \
+    -p PF00018 PF07714 \
+    --pfam_full data/databases/pfam/Pfam-A.full.gz \
+    -o outputs/SH3_Pkinase_full.csv
+```
+
+| CLI | Source file | Scope | PF00018 row count |
+|-----|-------------|-------|-------------------|
+| `biom3_build_source_pfam` | `Pfam-A.fasta.gz` | RP, 90% non-redundant | 26,468 |
+| `biom3_build_annotated_pfam_subsets` | `Pfam-A.full.gz` | RP, **non-redundant** | **176,301** |
+
+Output schema (11 columns): `id, range, pfam_label, sequence,
+family_name, family_description, family_type, family_clan,
+family_wikipedia, family_references, [final]text_caption`. The extra
+`family_*` columns exist as separate fields (not folded into the
+caption) so downstream training code can random-subsample them
+independently. Runtime on the DGX Spark data share is roughly 5–6
+minutes regardless of how many families you request — the scan cost is
+dominated by decompressing the 23 GB input, and multi-family requests
+share the same single pass. The builder warns (but does not fail) if
+any requested Pfam ID yields zero rows, e.g. a typo or an obsolete
+accession.
+
+Everything beyond the row-count lift (stats markdown, build manifest
+with Pfam release version, `IncrementalStatsBuilder`-backed coverage
+report) matches the other `biom3_build_source_*` tools.
+
 ---
 
 ## Step 1: Configure database paths

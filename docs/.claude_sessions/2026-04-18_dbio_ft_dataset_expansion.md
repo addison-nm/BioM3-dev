@@ -150,19 +150,71 @@ item), not multiprocessing.
   ExPASy matches). The 0% end-to-end reflects the legacy CSV's data
   shape, not a code defect.
 
+## Structured `annot_ec_numbers` column (commit `468dcd7`)
+
+Closed the "0% real-world hit rates" loose end from the verification
+pass by adding a dedicated `annot_ec_numbers` column owned by the
+source builder.
+
+Why it was needed:
+- The legacy SwissProt source CSV preserves reaction prose in
+  `annot_catalytic_activity` but strips the EC xref, so
+  `extract_ec_numbers()` always returned `[]` and the ExPASy/BRENDA
+  joins had nothing to join against.
+- User preferred keeping the caption prose clean and storing EC
+  numbers as a separate structured column rather than re-embedding
+  them in captions.
+
+What changed:
+- `swissprot_dat.py`: `_EC_IN_DAT_RE` + `_extract_ec_numbers_from_lines()`
+  helper; `_map_cc_catalytic_activity` now harvests EC xrefs while
+  keeping reaction prose clean in `annot_catalytic_activity`; both
+  `_parse_entry` and `_parse_entry_full` also scan DE lines for
+  standalone `EC=N.N.N.N` and merge with CC-derived ECs
+  (deduplicated).
+- `build_source_{swissprot,trembl}.py`: `OUTPUT_COLUMNS` grew to
+  include `annot_ec_numbers`. 5-column default schema now (7 with
+  intermediate captions).
+- `swissprot.py`: `OPTIONAL_OUTPUT_COLS = ["annot_ec_numbers"]`
+  preserves backward compatibility — `query_by_pfam` includes the
+  column only if present in the source CSV.
+- `enrich.py`: new `ALL_ANNOTATION_COLUMNS` (= `ANNOTATION_COLUMNS` +
+  `EXTRA_ANNOTATION_COLUMNS`) initialized to `pd.NA` in
+  `enrich_dataframe`. `_extract_row_ec_numbers` now checks
+  `annot_ec_numbers` → `annot_catalytic_activity` →
+  `[final]text_caption` in that precedence order. `_join_expasy` no
+  longer clobbers source-supplied ECs.
+
+Tests: +15 new (210 total, all green).
+- `test_ec_extraction.py`: low-level line-scanner, end-to-end .dat
+  entry cases (DE-only EC, CC EC, merged), enrich precedence, and
+  a `_join_expasy` hit using source-populated ECs.
+- `test_build_source_swissprot.py`: three assertions on the Cutinase
+  fixture (A0A024SC78 / EC=3.1.1.74).
+- Updated the column-count tests to the new 5/7-col schema.
+
+Backward compat verified: legacy 4-col SwissProt CSV still loads,
+joins run at 0% as before. Rebuilt source CSVs will feed into joins
+natively.
+
+## Documentation
+
+- `docs/database_linkage.md` — cross-reference spec (Phase 0).
+- `docs/dbio_examples.md` — usage examples for all new features
+  including `annot_ec_numbers`, Parquet path, per-Pfam output,
+  stats files.
+
 ## Open items (remaining)
 
-- **EC preservation in SwissProt source builder.** The current
-  `_map_cc_catalytic_activity` in `swissprot_dat.py` drops EC xrefs
-  during composition. If the source CSV preserved EC numbers in
-  `annot_catalytic_activity`, the ExPASy/BRENDA joins would hit
-  natively on SwissProt rows without needing `--uniprot_dat`.
+- **Rebuild the shared `fully_annotated_swiss_prot.csv`** with the
+  new builder so the EC column flows through downstream FT dataset
+  builds without `--uniprot_dat`. Same for `fully_annotated_trembl.csv`
+  when TrEMBL is wanted at scale.
 - **df_sp enrichment in build_dataset.** Today only df_pfam flows
   through `enrich_dataframe`. SwissProt rows skip the join layer
-  because they come from the pre-built source CSV with just 4
-  columns. Extending enrichment to df_sp would require re-parsing
-  `uniprot_sprot.dat.gz` for those accessions — a separate design
-  decision.
+  because they come from the pre-built source CSV. Extending
+  enrichment to df_sp would require a second enrichment pass keyed
+  on SwissProt accessions — deferred as a separate design decision.
 - **TrEMBL annotation cache for fast Pfam-row enrichment.** Large
   Pfam families are TrEMBL-dominated; populating
   `annot_catalytic_activity` for them requires either
@@ -170,9 +222,16 @@ item), not multiprocessing.
   `biom3_build_annotation_cache` Parquet path (instant lookup once
   built).
 
-## Commits
+## Commits (21 ahead of `addison-dev`)
 
 ```
+468dcd7 feat(dbio): structured annot_ec_numbers column across source + enrich
+f7ffb88 docs: session note update — config resolvers, tests, verification
+f7af1f6 fix(dbio): harden enrich_dataframe against pd.NA in boolean contexts
+5175fc8 test(dbio): unit tests for enrich join layer and stats module
+c5e5c95 test(dbio): unit tests for ExPASy, SMART, and BRENDA parsers
+47276b9 feat(dbio): config defaults for ExPASy/BRENDA/SMART/TrEMBL source CSVs
+7aac35c docs: session note for dbio FT dataset expansion work
 890e702 refactor(dbio): --per_pfam_output skips aggregate output entirely
 c3b19c5 feat(dbio): --per_pfam_output mode + dataset.stats.md for build_dataset
 4e6852d fix(dbio): treat pandas <NA> string as empty in stats coverage

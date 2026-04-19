@@ -333,11 +333,40 @@ def extract_ec_numbers(catalytic_activity_text):
 # Join helpers (applied inside enrich_dataframe when lookups are provided)
 # ---------------------------------------------------------------------------
 
+def _is_missing(value):
+    """Robust is-missing check that tolerates pd.NA, np.nan, None, '', etc."""
+    if value is None:
+        return True
+    try:
+        if pd.isna(value):
+            return True
+    except (TypeError, ValueError):
+        pass
+    return False
+
+
 def _strip_lineage_prefix(lineage_str):
     prefix = "The organism lineage is "
     if isinstance(lineage_str, str) and lineage_str.startswith(prefix):
         return lineage_str[len(prefix):]
-    return str(lineage_str) if lineage_str else ""
+    if _is_missing(lineage_str):
+        return ""
+    return str(lineage_str)
+
+
+def _extract_row_ec_numbers(row):
+    """Extract ECs from annot_catalytic_activity, falling back to the
+    composed caption.
+
+    SwissProt source rows carry their catalytic activity embedded in
+    [final]text_caption rather than in a structured annot_* column,
+    so a caption fallback keeps the joins useful even when local .dat
+    enrichment hasn't populated the structured fields.
+    """
+    ecs = extract_ec_numbers(row.get("annot_catalytic_activity"))
+    if ecs:
+        return ecs
+    return extract_ec_numbers(row.get("[final]text_caption"))
 
 
 def _row_organism_candidates(row):
@@ -348,7 +377,7 @@ def _row_organism_candidates(row):
     store in a slightly different form.
     """
     lineage = row.get("annot_lineage")
-    if lineage is None or (isinstance(lineage, float) and pd.isna(lineage)):
+    if _is_missing(lineage):
         return []
     parts = [p.strip() for p in _strip_lineage_prefix(lineage).split(",") if p.strip()]
     candidates = []
@@ -369,7 +398,7 @@ def _join_expasy(df, expasy_lookup):
 
     def _row_expasy(row):
         nonlocal ec_extracted, expasy_matched
-        ecs = extract_ec_numbers(row.get("annot_catalytic_activity"))
+        ecs = _extract_row_ec_numbers(row)
         if ecs:
             ec_extracted += 1
         names = []
@@ -420,10 +449,10 @@ def _join_brenda(df, brenda_lookup, organism_match="strict"):
         nonlocal hit_strict, hit_relaxed, hit_ec_only
         ec_numbers_text = row.get("annot_ec_numbers")
         ecs = []
-        if pd.notna(ec_numbers_text) and ec_numbers_text:
+        if not _is_missing(ec_numbers_text) and str(ec_numbers_text):
             ecs = [e.strip() for e in str(ec_numbers_text).split(",") if e.strip()]
         if not ecs:
-            ecs = extract_ec_numbers(row.get("annot_catalytic_activity"))
+            ecs = _extract_row_ec_numbers(row)
 
         organisms = _row_organism_candidates(row)
         substrates = []
@@ -505,9 +534,9 @@ def _join_smart(df, smart_lookup):
     def _row_smart(row):
         nonlocal hit
         ids = row.get("xref_smart_ids")
-        if isinstance(ids, float) and pd.isna(ids):
+        if _is_missing(ids):
             return pd.NA
-        if ids is None or (hasattr(ids, "__len__") and len(ids) == 0):
+        if hasattr(ids, "__len__") and len(ids) == 0:
             return pd.NA
         parts = []
         for sid in ids:
@@ -573,6 +602,20 @@ def enrich_dataframe(df, local_annotations=None, uniprot_data=None,
     if "family_description" in df.columns:
         df["annot_family_description"] = df["family_description"]
 
+    def _ensure_object_column(col):
+        """Make sure *col* exists in df as an object-dtype column so list
+        values can be stored per-cell via .at[]."""
+        if col not in df.columns:
+            df[col] = pd.Series([None] * len(df), dtype=object, index=df.index)
+        elif df[col].dtype != object:
+            df[col] = df[col].astype(object)
+
+    def _apply_annotations(idx, annots):
+        for col, val in annots.items():
+            if isinstance(val, (list, tuple, set)):
+                _ensure_object_column(col)
+            df.at[idx, col] = val
+
     enriched_count = 0
 
     # Local .dat annotations (preferred — no API needed)
@@ -581,8 +624,7 @@ def enrich_dataframe(df, local_annotations=None, uniprot_data=None,
             acc = str(row.get("primary_Accession", ""))
             annots = local_annotations.get(acc)
             if annots:
-                for col, val in annots.items():
-                    df.at[idx, col] = val
+                _apply_annotations(idx, annots)
                 enriched_count += 1
 
     # UniProt API annotations (fallback when --use-api is set)
@@ -592,8 +634,7 @@ def enrich_dataframe(df, local_annotations=None, uniprot_data=None,
             entry = uniprot_data.get(acc)
             if entry:
                 annotations = extract_annotations(entry)
-                for col, val in annotations.items():
-                    df.at[idx, col] = val
+                _apply_annotations(idx, annotations)
                 enriched_count += 1
 
     if taxonomy_tree and accession_taxid_map:

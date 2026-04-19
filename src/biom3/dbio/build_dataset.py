@@ -199,7 +199,8 @@ def parse_arguments(args):
     )
     parser.add_argument(
         "--expasy_csv", type=str, default=None,
-        help="Path to expasy_enzyme.csv (required if --use_expasy).",
+        help="Path to expasy_enzyme.csv. Defaults to the expasy_csv entry "
+             "in the dbio config.",
     )
     parser.add_argument(
         "--use_brenda", action="store_true", default=False,
@@ -209,7 +210,8 @@ def parse_arguments(args):
     )
     parser.add_argument(
         "--brenda_csv", type=str, default=None,
-        help="Path to brenda_kinetics.csv (required if --use_brenda).",
+        help="Path to brenda_kinetics.csv. Defaults to the brenda_csv entry "
+             "in the dbio config.",
     )
     parser.add_argument(
         "--organism_match", choices=["strict", "relaxed", "ec_only"],
@@ -225,7 +227,8 @@ def parse_arguments(args):
     )
     parser.add_argument(
         "--smart_csv", type=str, default=None,
-        help="Path to smart_domains.csv (required if --use_smart).",
+        help="Path to smart_domains.csv. Defaults to the smart_csv entry "
+             "in the dbio config.",
     )
     parser.add_argument(
         "--per_pfam_output", action="store_true", default=False,
@@ -249,6 +252,23 @@ def _resolve_pfam_path(args):
     if args.pfam:
         return args.pfam
     return str(get_training_data_path("pfam_csv", args.config))
+
+
+def _resolve_source_csv(args, attr_name, dataset_key):
+    """Return the CLI-provided path or fall back to `training_data_path(<dataset_key>)`.
+
+    Used for opt-in source CSVs (ExPASy/BRENDA/SMART). Returns None if no
+    CLI arg is given AND the config path doesn't exist on disk, so the
+    caller can surface a clear "--<flag>_csv required" error.
+    """
+    cli_value = getattr(args, attr_name, None)
+    if cli_value:
+        return cli_value
+    try:
+        resolved = str(get_training_data_path(dataset_key, args.config))
+    except Exception:
+        return None
+    return resolved if os.path.exists(resolved) else None
 
 
 
@@ -362,26 +382,42 @@ def main(args):
                 args, accessions,
             )
 
-    # Load source-CSV lookups for the join layer (opt-in)
+    # Load source-CSV lookups for the join layer (opt-in). CSV paths fall
+    # back to config defaults (configs/dbio_config.json training_datasets).
     expasy_lookup = None
     brenda_lookup = None
     smart_lookup = None
 
     if args.use_expasy:
-        if not args.expasy_csv:
-            raise ValueError("--use_expasy requires --expasy_csv")
+        expasy_path = _resolve_source_csv(args, "expasy_csv", "expasy_csv")
+        if not expasy_path:
+            raise ValueError(
+                "--use_expasy requires --expasy_csv or an expasy_csv entry "
+                "in the dbio config (and the file must exist on disk)."
+            )
+        args.expasy_csv = expasy_path
         from biom3.dbio.enrich import load_expasy_lookup
-        expasy_lookup = load_expasy_lookup(args.expasy_csv)
+        expasy_lookup = load_expasy_lookup(expasy_path)
     if args.use_brenda:
-        if not args.brenda_csv:
-            raise ValueError("--use_brenda requires --brenda_csv")
+        brenda_path = _resolve_source_csv(args, "brenda_csv", "brenda_csv")
+        if not brenda_path:
+            raise ValueError(
+                "--use_brenda requires --brenda_csv or a brenda_csv entry "
+                "in the dbio config (and the file must exist on disk)."
+            )
+        args.brenda_csv = brenda_path
         from biom3.dbio.enrich import load_brenda_lookup
-        brenda_lookup = load_brenda_lookup(args.brenda_csv)
+        brenda_lookup = load_brenda_lookup(brenda_path)
     if args.use_smart:
-        if not args.smart_csv:
-            raise ValueError("--use_smart requires --smart_csv")
+        smart_path = _resolve_source_csv(args, "smart_csv", "smart_csv")
+        if not smart_path:
+            raise ValueError(
+                "--use_smart requires --smart_csv or a smart_csv entry "
+                "in the dbio config (and the file must exist on disk)."
+            )
+        args.smart_csv = smart_path
         from biom3.dbio.enrich import load_smart_lookup
-        smart_lookup = load_smart_lookup(args.smart_csv)
+        smart_lookup = load_smart_lookup(smart_path)
 
     # Always run enrich_dataframe to copy family columns into annot_* columns
     df_pfam, join_stats = enrich_dataframe(

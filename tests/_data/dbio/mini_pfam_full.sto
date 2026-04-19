@@ -3,16 +3,18 @@
 #=GF AC   PF04947.18
 #=GF DE   Viral late transcription factor 3
 #=GF TP   Family
-#=GF CC   This family includes viral late transcription factor 3
-#=GF CC   proteins found in poxviruses and iridoviruses. These
-#=GF CC   proteins activate late gene transcription.
+#=GF CC   Clanless family used to exercise the clanless + no-WK code
+#=GF CC   paths in the parser.
 #=GF RN   [1]
 #=GF RM   11112222
-#=GF RT   Viral late gene transcription factors and their role in
-#=GF RT   poxvirus biology.
+#=GF RT   Viral late gene transcription factors.
 #=GF RA   Some A, Author B;
 #=GF RL   J Virol 2005;79:1234-1245.
-#=GF SQ   100
+#=GF SQ   2
+#=GS A0ATST1_FAKE1/1-16          AC A0ATST1.1
+#=GS B1ATST2_FAKE2/5-19          AC B1ATST2.2
+A0ATST1_FAKE1/1-16     MKLV-DEFG.HIJKLMNO
+B1ATST2_FAKE2/5-19     MK.LVDEFG.HIJK-LMN
 //
 # STOCKHOLM 1.0
 #=GF ID   Cutinase
@@ -22,8 +24,7 @@
 #=GF WK   Cutinase
 #=GF CL   CL0028
 #=GF CC   Cutinases are serine esterases that catalyze the
-#=GF CC   cleavage of cutin, the structural polymer of plant
-#=GF CC   cuticles.
+#=GF CC   cleavage of cutin.
 #=GF RN   [1]
 #=GF RM   22334455
 #=GF RT   Structure of cutinase from Fusarium solani.
@@ -35,7 +36,13 @@
 #=GF RT   revisited.
 #=GF RA   Baz Z, Qux W;
 #=GF RL   Biochemistry 1998;37:2345-2356.
-#=GF SQ   200
+#=GF SQ   3
+#=GS C1CUTI1_FUNG1/30-44         AC C1CUTI1.1
+#=GS D2CUTI2_FUNG2/40-54         AC D2CUTI2.3
+#=GS E3CUTI3_FUNG3/50-64         AC E3CUTI3.1
+C1CUTI1_FUNG1/30-44    STGAC.AQTLP-GTDVY
+D2CUTI2_FUNG2/40-54    STGAC-AQTLP.GTDVW
+E3CUTI3_FUNG3/50-64    STgac.AQTLP.GTDVV
 //
 # STOCKHOLM 1.0
 #=GF ID   SH3_1
@@ -50,5 +57,11 @@
 #=GF RT   domains from p67(phox), Grb2 and Pex13p.
 #=GF RA   Kami K, Takeya R, Sumimoto H, Kohda D;
 #=GF RL   EMBO J 2002;21:4268-4276.
-#=GF SQ   50
+#=GF SQ   3
+#=GS F4SH3A1_TEST1/100-126       AC F4SH3A1.1
+#=GS G5SH3A2_TEST2/200-227       AC G5SH3A2.2
+#=GS H6SH3A3_TEST3/300-327       AC H6SH3A3.1
+F4SH3A1_TEST1/100-126  YVRALYDY.TAKED-DLSFKEGDIIINLK
+G5SH3A2_TEST2/200-227  YIRALYDY-TAKEDrc--LSFKEGDIIINVK
+H6SH3A3_TEST3/300-327  yvralydY.tAKEDdc.LSFKEGDIIINLK
 //

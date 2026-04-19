@@ -74,6 +74,12 @@ def run_build_source_brenda():
     main(args)
 
 
+def run_build_annotated_pfam_subsets():
+    from biom3.dbio.build_annotated_pfam_subsets import parse_arguments, main
+    args = parse_arguments(sys.argv[1:])
+    main(args)
+
+
 def run_build_annotation_cache():
     from biom3.dbio.build_annotation_cache import parse_arguments, main
     args = parse_arguments(sys.argv[1:])

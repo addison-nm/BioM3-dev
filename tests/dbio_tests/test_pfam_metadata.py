@@ -52,3 +52,45 @@ class TestPfamMetadataParser:
         # CC lines should be joined with spaces
         assert "serine esterases" in desc
         assert "cuticles" in desc
+
+    def test_family_type(self, sto_path):
+        result = PfamMetadataParser(sto_path).parse()
+        assert result["PF04947"]["family_type"] == "Family"
+        assert result["PF01083"]["family_type"] == "Domain"
+        assert result["PF00018"]["family_type"] == "Domain"
+
+    def test_family_clan_populated(self, sto_path):
+        result = PfamMetadataParser(sto_path).parse()
+        assert result["PF01083"]["family_clan"] == "CL0028"
+        assert result["PF00018"]["family_clan"] == "CL0010"
+
+    def test_family_clan_clanless(self, sto_path):
+        result = PfamMetadataParser(sto_path).parse()
+        # Pox_VLTF3 has no #=GF CL line
+        assert result["PF04947"]["family_clan"] == ""
+
+    def test_family_wikipedia_populated(self, sto_path):
+        result = PfamMetadataParser(sto_path).parse()
+        assert result["PF01083"]["family_wikipedia"] == "Cutinase"
+        assert result["PF00018"]["family_wikipedia"] == "SH3_domain"
+
+    def test_family_wikipedia_absent(self, sto_path):
+        result = PfamMetadataParser(sto_path).parse()
+        # Pox_VLTF3 has no #=GF WK line
+        assert result["PF04947"]["family_wikipedia"] == ""
+
+    def test_family_references_joined(self, sto_path):
+        result = PfamMetadataParser(sto_path).parse()
+        # SH3_1 has one reference wrapped across two RT lines; expect them
+        # joined into a single normalized string.
+        refs = result["PF00018"]["family_references"]
+        assert "Diverse recognition of non-PxxP peptide ligands by the SH3 domains" in refs
+        assert "Grb2 and Pex13p" in refs
+
+    def test_family_references_multiple_references(self, sto_path):
+        result = PfamMetadataParser(sto_path).parse()
+        # Cutinase has two separate RN blocks with RT titles; both should
+        # appear in the joined family_references.
+        refs = result["PF01083"]["family_references"]
+        assert "Structure of cutinase from Fusarium solani" in refs
+        assert "Mechanism of cutin hydrolysis by fungal cutinases revisited" in refs

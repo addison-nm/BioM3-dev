@@ -1,6 +1,6 @@
 import streamlit as st
 
-from biom3.viz.viewer import view_overlay
+from biom3.viz.viewer import view_pdb, view_overlay
 from biom3.viz.alignment import superimpose
 from biom3.app._helpers import render_view, pick_pdb
 
@@ -14,6 +14,15 @@ with col_up2:
     pdb_moving = pick_pdb("Mobile (moving) PDB", key="moving")
 
 if pdb_fixed and pdb_moving:
+    st.subheader("Pre-alignment view")
+    preview_col1, preview_col2 = st.columns(2)
+    with preview_col1:
+        st.caption("Reference")
+        render_view(view_pdb(pdb_fixed), height=400)
+    with preview_col2:
+        st.caption("Mobile")
+        render_view(view_pdb(pdb_moving), height=400)
+
     if st.button("Superimpose"):
         with st.spinner("Aligning structures..."):
             result = superimpose(pdb_fixed, pdb_moving)

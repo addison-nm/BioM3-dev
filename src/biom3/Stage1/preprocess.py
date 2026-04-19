@@ -18,7 +18,7 @@ import esm
 from esm import pretrained
 from transformers import AutoTokenizer, AutoModel
 
-from biom3.backend.device import setup_logger
+from biom3.backend.device import get_device, setup_logger
 
 logger = setup_logger(__name__)
 
@@ -1024,8 +1024,7 @@ class Facilitator_Dataset(Dataset):
 
     def __init__(self, args: any, dataset: dict):
 
-        # Determine the device based on the number of GPUs
-        device = 'cuda' if args.num_gpus >= 1 else 'cpu'
+        device = get_device() if args.num_gpus >= 1 else torch.device('cpu')
 
         # Check if text_embeddings is a list and convert to a tensor
         if isinstance(dataset['text_embedding'], list):

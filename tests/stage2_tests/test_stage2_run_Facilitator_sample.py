@@ -13,6 +13,8 @@ from tests.conftest import DATDIR, TMPDIR, remove_dir, get_args, check_downloads
 import torch
 from biom3.Stage2.run_Facilitator_sample import parse_arguments, main
 
+pytestmark = [pytest.mark.slow]
+
 #####################
 ##  Configuration  ##
 #####################

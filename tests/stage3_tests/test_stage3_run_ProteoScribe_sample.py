@@ -19,6 +19,8 @@ from biom3.Stage3.run_ProteoScribe_sample import (
 from biom3.Stage3.io import build_model_ProteoScribe
 import biom3.Stage3.PL_wrapper as Stage3_PL_mod
 
+pytestmark = [pytest.mark.slow]
+
 #####################
 ##  Configuration  ##
 #####################

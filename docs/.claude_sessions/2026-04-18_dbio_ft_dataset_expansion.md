@@ -106,17 +106,69 @@ output sequentially writes subdirectories (~1 sec/Pfam after the
 initial scan). The real throughput win is the Parquet path (next
 item), not multiprocessing.
 
-## Open items
-- Config path resolvers for `expasy_csv`, `brenda_csv`, `smart_csv`,
-  `trembl_dat` in `config.py` + `configs/dbio_config.json`. Nice-to-have
-  so users can omit the `--*_csv` flags when the default layout is in
-  place.
-- Unit tests for new parsers (ExPASy, SMART, BRENDA, EC extraction,
-  ExPASy/SMART/BRENDA joins). Currently validated end-to-end only.
-- Verification pass: build with `--uniprot_dat` to populate
-  `annot_catalytic_activity`, then check ExPASy + BRENDA hit rates on
-  a real enzyme family (e.g. PF00001 GPCRs won't hit ExPASy; PF02515
-  CoA transferase would).
+## Additional work (since initial writeup)
+
+- **Config resolvers done.** `configs/dbio_config.json` gained
+  `training_datasets.{brenda,expasy,smart,trembl}_csv` entries plus
+  `databases.{brenda,trembl}` entries. `build_dataset.py` has
+  `_resolve_source_csv()` so `--expasy_csv` / `--brenda_csv` /
+  `--smart_csv` fall back to the config-resolved path when not
+  supplied. Verified end-to-end: `--use_expasy --use_smart` with no
+  `--*_csv` flags runs against Parquet sources in 5s.
+- **Unit tests added (76 new; 195 total in dbio).** Covers:
+  ExPASy parser (8), SMART reader (6), BRENDA parser (9), EC
+  extraction + ExPASy/BRENDA/SMART joins via `enrich_dataframe` (18),
+  stats module including IncrementalStatsBuilder (35). All green.
+- **Verification pass with --uniprot_dat on PF00128 (alpha-amylase).**
+  Ran end-to-end (18–34s depending on whether .dat parsing was
+  triggered); hit rates were 0% because:
+  - SwissProt source CSV only has the legacy 4-column schema (no
+    `annot_catalytic_activity`), so the 608 SwissProt rows can't be
+    EC-extracted directly.
+  - Pfam rows need local annotation via `--uniprot_dat`. Only
+    2/38,849 Pfam accessions were in `uniprot_sprot.dat.gz` (most
+    are TrEMBL).
+  - Legacy SwissProt captions have `CATALYTIC ACTIVITY:` describing
+    reactions in prose but with EC-number xrefs stripped, so the
+    caption fallback added during this session doesn't help those
+    specific rows either.
+
+  Fixes landed during the verification pass (commit `f7af1f6`):
+  - **pd.NA hardening** in `enrich_dataframe`,
+    `_strip_lineage_prefix`, `_row_organism_candidates`, `_row_smart`.
+    Factored `_is_missing()` helper; replaced ad-hoc checks.
+  - **Object-column pre-creation** in `enrich_dataframe` so list
+    values like `xref_smart_ids` can be stored in DataFrame cells
+    via `df.at[idx, col] = [...]` without pandas raising.
+  - **Caption fallback for EC extraction** in ExPASy/BRENDA joins
+    (`_extract_row_ec_numbers` tries `annot_catalytic_activity`
+    first, then `[final]text_caption`). Future-proof for source CSVs
+    that carry EC in the caption.
+
+  Real hit rates are deterministically validated by the integration
+  tests (`test_expasy_join_hit_rate_stats`: 3/4 EC extraction, 2/4
+  ExPASy matches). The 0% end-to-end reflects the legacy CSV's data
+  shape, not a code defect.
+
+## Open items (remaining)
+
+- **EC preservation in SwissProt source builder.** The current
+  `_map_cc_catalytic_activity` in `swissprot_dat.py` drops EC xrefs
+  during composition. If the source CSV preserved EC numbers in
+  `annot_catalytic_activity`, the ExPASy/BRENDA joins would hit
+  natively on SwissProt rows without needing `--uniprot_dat`.
+- **df_sp enrichment in build_dataset.** Today only df_pfam flows
+  through `enrich_dataframe`. SwissProt rows skip the join layer
+  because they come from the pre-built source CSV with just 4
+  columns. Extending enrichment to df_sp would require re-parsing
+  `uniprot_sprot.dat.gz` for those accessions — a separate design
+  decision.
+- **TrEMBL annotation cache for fast Pfam-row enrichment.** Large
+  Pfam families are TrEMBL-dominated; populating
+  `annot_catalytic_activity` for them requires either
+  `--uniprot_dat <trembl.dat.gz>` (hours) or the existing
+  `biom3_build_annotation_cache` Parquet path (instant lookup once
+  built).
 
 ## Commits
 

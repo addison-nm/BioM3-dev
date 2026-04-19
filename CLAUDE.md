@@ -4,6 +4,21 @@
 
 Store session notes in docs/.claude_sessions/
 
+## Parallel development with worktrees
+
+For large features, prefer working in a git worktree branched off `addison-dev`, so multiple Claude agents can work in parallel without stepping on each other.
+
+- Worktrees live under `.claude/worktrees/<feature-name>/` (gitignored).
+- Create with: `git worktree add .claude/worktrees/<feature> -b addison-<feature> addison-dev`
+- When a feature is ready, merge its branch back into `addison-dev`. Don't commit directly to `addison-dev` from the main checkout while worktrees are active.
+- Remove finished worktrees with `git worktree remove .claude/worktrees/<feature>`.
+
+While working in a worktree:
+- Edit only the files the feature requires. If bugs are spotted in unrelated areas, note them (e.g., in the session log or a TODO) but do not fix them in this worktree — they belong to their own branch.
+- Each new worktree starts without populated `data/databases/` or `data/datasets/`. Repopulate them via the appropriate `scripts/sync_*.sh` script before running anything that reads from them.
+
+Small fixes and docs edits can still be made directly on `addison-dev`.
+
 ## Project overview
 
 BioM3 is a multi-stage framework for generating novel protein sequences guided by natural language prompts (NeurIPS 2024). It combines protein language models (ESM-2), biomedical text encoders (BioBERT), and diffusion-based sequence generation.

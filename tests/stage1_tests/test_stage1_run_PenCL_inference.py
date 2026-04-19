@@ -13,6 +13,8 @@ import torch
 
 from biom3.Stage1.run_PenCL_inference import parse_arguments, main
 
+pytestmark = [pytest.mark.slow]
+
 #####################
 ##  Configuration  ##
 #####################

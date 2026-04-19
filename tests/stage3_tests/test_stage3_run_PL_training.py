@@ -16,6 +16,8 @@ from tests.conftest import DATDIR, TMPDIR, remove_dir, get_args, check_downloads
 from biom3.Stage3.run_PL_training import parse_arguments, main
 from biom3.core.io import load_state_dict
 
+pytestmark = [pytest.mark.slow]
+
 #####################
 ##  Configuration  ##
 #####################

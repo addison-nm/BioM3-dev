@@ -63,12 +63,17 @@ def pytest_addoption(parser):
         "--network", action="store_true", default=False,
         help="run tests that require network access"
     )
+    parser.addoption(
+        "--quick", action="store_true", default=False,
+        help="skip tests marked slow (entrypoint, training, pipeline)"
+    )
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "benchmark: mark test as benchmarking")
     config.addinivalue_line("markers", "use_gpu: mark test as GPU specific")
     config.addinivalue_line("markers", "database_files: mark test as requiring full database files")
     config.addinivalue_line("markers", "network: mark test as requiring network access")
+    config.addinivalue_line("markers", "slow: mark test as slow (skipped under --quick)")
 
 def pytest_collection_modifyitems(config, items):
     benchmark_flag_given = False
@@ -85,10 +90,12 @@ def pytest_collection_modifyitems(config, items):
     network_flag_given = False
     if config.getoption("--network"):
         network_flag_given = True
+    quick_flag_given = config.getoption("--quick")
     skip_benchmark = pytest.mark.skip(reason="need --benchmark option to run")
     skip_use_gpu = pytest.mark.skip(reason="need --use_gpu option to run")
     skip_database_files = pytest.mark.skip(reason="need --database_files option to run")
     skip_network = pytest.mark.skip(reason="need --network option to run")
+    skip_slow = pytest.mark.skip(reason="skipped under --quick; remove flag to run slow tests")
     for item in items:
         if "benchmark" in item.keywords and not benchmark_flag_given:
             item.add_marker(skip_benchmark)
@@ -98,3 +105,5 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(skip_database_files)
         if "network" in item.keywords and not network_flag_given:
             item.add_marker(skip_network)
+        if "slow" in item.keywords and quick_flag_given:
+            item.add_marker(skip_slow)

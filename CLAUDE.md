@@ -66,13 +66,16 @@ Defined in `pyproject.toml`:
 # Install (editable, from repo root)
 pip install -e .
 
-# Run tests (CPU-only, no downloaded weights needed for import tests)
+# Smoke only (imports)
 pytest tests/test_imports.py
 
-# Full test suite (requires weights/ to be populated)
+# Fast dev loop — skips entrypoint/training tests (~3 min, CPU, no weights required)
+pytest tests/ --quick
+
+# Full test suite (default — includes entrypoint + training tests; weight-gated tests skip if weights missing)
 pytest tests/
 
-# GPU-specific tests
+# Include GPU-only tests
 pytest tests/ --use_gpu
 ```
 
@@ -81,8 +84,14 @@ pytest tests/ --use_gpu
 - Test files live in `tests/` with subdirectories per stage.
 - Test data is in `tests/_data/`; test outputs go to `tests/_tmp/`.
 - CLI arguments for entrypoint tests are stored in `tests/_data/entrypoint_args/*.txt`.
-- Custom pytest markers: `@pytest.mark.benchmark` (needs `--benchmark`), `@pytest.mark.use_gpu` (needs `--use_gpu`).
+- Custom pytest markers:
+  - `@pytest.mark.benchmark` (needs `--benchmark` to run)
+  - `@pytest.mark.use_gpu` (needs `--use_gpu` to run)
+  - `@pytest.mark.network` (needs `--network` to run)
+  - `@pytest.mark.database_files` (needs `--database_files` to run)
+  - `@pytest.mark.slow` (skipped under `--quick`; applied module-wide to entrypoint + training + pipeline tests)
 - Tests that require downloaded weights skip gracefully with a message if files are missing.
+- For the fast dev loop, prefer `pytest tests/ --quick` over `pytest tests/test_imports.py` — the former covers dbio, viz, Stage 3 sampling/data-splitting/model-IO, and core utilities without needing weights or GPU.
 
 ## Code style
 

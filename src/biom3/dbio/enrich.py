@@ -56,6 +56,12 @@ ANNOTATION_FIELDS = [
 
 ANNOTATION_COLUMNS = [col for _, col in ANNOTATION_FIELDS]
 
+# Annotation columns that aren't part of the caption schema but are still
+# populated by source builders and consumed by the join layer. Initialized
+# to pd.NA by enrich_dataframe so downstream reads are consistent.
+EXTRA_ANNOTATION_COLUMNS = ["annot_ec_numbers"]
+ALL_ANNOTATION_COLUMNS = ANNOTATION_COLUMNS + EXTRA_ANNOTATION_COLUMNS
+
 # Regex for extracting EC numbers from UniProt catalytic_activity text.
 # Matches patterns like "EC=1.2.3.4" (JSON API format), "EC 1.2.3.4"
 # (prose), and bare "1.2.3.4" when embedded in reaction strings. The
@@ -355,14 +361,22 @@ def _strip_lineage_prefix(lineage_str):
 
 
 def _extract_row_ec_numbers(row):
-    """Extract ECs from annot_catalytic_activity, falling back to the
-    composed caption.
+    """Extract ECs for a row, checking three sources in precedence order:
 
-    SwissProt source rows carry their catalytic activity embedded in
-    [final]text_caption rather than in a structured annot_* column,
-    so a caption fallback keeps the joins useful even when local .dat
-    enrichment hasn't populated the structured fields.
+    1. ``annot_ec_numbers`` column — the canonical structured field
+       populated by SwissProt/TrEMBL source builders from .dat-level
+       EC xrefs.
+    2. ``annot_catalytic_activity`` — prose containing embedded EC
+       references (rare in cleanly-built source CSVs since the xrefs
+       are usually split out, but covers other data paths).
+    3. ``[final]text_caption`` — last-resort scan of the composed
+       caption for EC numbers.
     """
+    ec_numbers_text = row.get("annot_ec_numbers")
+    if not _is_missing(ec_numbers_text):
+        ecs = [e.strip() for e in str(ec_numbers_text).split(",") if e.strip()]
+        if ecs:
+            return ecs
     ecs = extract_ec_numbers(row.get("annot_catalytic_activity"))
     if ecs:
         return ecs
@@ -413,8 +427,14 @@ def _join_expasy(df, expasy_lookup):
                 matched_this_row = True
         if matched_this_row:
             expasy_matched += 1
+        # Write ecs back to annot_ec_numbers only when the row didn't already
+        # carry a source-supplied value — don't clobber the canonical column.
+        existing = row.get("annot_ec_numbers")
+        ec_cell = existing if not _is_missing(existing) and str(existing) else (
+            ", ".join(ecs) if ecs else pd.NA
+        )
         return pd.Series({
-            "annot_ec_numbers": ", ".join(ecs) if ecs else pd.NA,
+            "annot_ec_numbers": ec_cell,
             "annot_ec_names": "; ".join(names) if names else pd.NA,
             "annot_ec_description": " | ".join(descriptions) if descriptions else pd.NA,
         })
@@ -592,7 +612,7 @@ def enrich_dataframe(df, local_annotations=None, uniprot_data=None,
     df = df.copy()
 
     # Initialize annotation columns with NaN
-    for col in ANNOTATION_COLUMNS:
+    for col in ALL_ANNOTATION_COLUMNS:
         if col not in df.columns:
             df[col] = pd.NA
 

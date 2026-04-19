@@ -63,6 +63,7 @@ class TestBuildSwissprotCsv:
             "protein_sequence",
             "[final]text_caption",
             "pfam_label",
+            "annot_ec_numbers",
         ]
 
     def test_only_pfam_entries_when_require_pfam(self, dat_path, pfam_metadata, output_path):
@@ -99,6 +100,38 @@ class TestBuildSwissprotCsv:
         label = multi["pfam_label"]
         assert "PF01083" in label
         assert "PF04947" in label
+
+    def test_ec_numbers_extracted_from_catalytic_activity(
+        self, dat_path, pfam_metadata, output_path,
+    ):
+        # The Cutinase fixture entry (A0A024SC78) has
+        #   CC   -!- CATALYTIC ACTIVITY:
+        #   CC       Reaction=cutin + H2O = cutin monomers; EC=3.1.1.74;
+        # so annot_ec_numbers should carry 3.1.1.74.
+        build_swissprot_csv(dat_path, pfam_metadata, output_path)
+        rows = _read_csv(output_path)
+        cutinase = next(r for r in rows if r["primary_Accession"] == "A0A024SC78")
+        assert cutinase["annot_ec_numbers"] == "3.1.1.74"
+
+    def test_ec_numbers_absent_for_non_enzymes(
+        self, dat_path, pfam_metadata, output_path,
+    ):
+        build_swissprot_csv(dat_path, pfam_metadata, output_path)
+        rows = _read_csv(output_path)
+        non_enzyme = next(r for r in rows if r["primary_Accession"] == "Q6GZX4")
+        assert non_enzyme["annot_ec_numbers"] == ""
+
+    def test_catalytic_activity_prose_excludes_ec_xref(
+        self, dat_path, pfam_metadata, output_path,
+    ):
+        # annot_catalytic_activity stays prose-only; the EC xref lives in
+        # annot_ec_numbers instead of being embedded in the caption.
+        build_swissprot_csv(dat_path, pfam_metadata, output_path)
+        rows = _read_csv(output_path)
+        cutinase = next(r for r in rows if r["primary_Accession"] == "A0A024SC78")
+        caption = cutinase["[final]text_caption"]
+        assert "EC=" not in caption
+        assert "CATALYTIC ACTIVITY: cutin + H2O = cutin monomers" in caption
 
     def test_caption_has_protein_name(self, dat_path, pfam_metadata, output_path):
         build_swissprot_csv(dat_path, pfam_metadata, output_path)
@@ -207,7 +240,7 @@ class TestRequirePfamFlag:
 
 class TestKeepIntermediateCaptions:
 
-    def test_default_emits_four_columns(self, dat_path, pfam_metadata, output_path):
+    def test_default_emits_five_columns(self, dat_path, pfam_metadata, output_path):
         build_swissprot_csv(dat_path, pfam_metadata, output_path)
         with open(output_path) as f:
             header = next(csv.reader(f))
@@ -216,9 +249,10 @@ class TestKeepIntermediateCaptions:
             "protein_sequence",
             "[final]text_caption",
             "pfam_label",
+            "annot_ec_numbers",
         ]
 
-    def test_keep_intermediate_emits_six_columns(self, dat_path, pfam_metadata, output_path):
+    def test_keep_intermediate_emits_seven_columns(self, dat_path, pfam_metadata, output_path):
         build_swissprot_csv(
             dat_path, pfam_metadata, output_path,
             keep_intermediate_captions=True,
@@ -232,6 +266,7 @@ class TestKeepIntermediateCaptions:
             "[clean]text_caption",
             "[final]text_caption",
             "pfam_label",
+            "annot_ec_numbers",
         ]
 
     def test_raw_text_caption_retains_pubmed_and_eco(self, dat_path, pfam_metadata, output_path):

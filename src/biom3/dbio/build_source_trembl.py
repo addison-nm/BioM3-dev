@@ -157,6 +157,8 @@ def build_trembl_csv(dat_path, pfam_metadata, output_path,
                 annotations, caption_spec, pfam_family_names=family_names,
             )
 
+            ec_numbers = annotations.get("annot_ec_numbers", "")
+
             if keep_intermediate_captions:
                 raw_caption = compose_row_caption(
                     annotations, raw_spec, pfam_family_names=family_names,
@@ -171,6 +173,7 @@ def build_trembl_csv(dat_path, pfam_metadata, output_path,
                     clean_caption,
                     final_caption,
                     _format_pfam_label(pfam_ids, require_pfam=require_pfam),
+                    ec_numbers,
                 ]
             else:
                 row = [
@@ -178,6 +181,7 @@ def build_trembl_csv(dat_path, pfam_metadata, output_path,
                     entry["sequence"],
                     final_caption,
                     _format_pfam_label(pfam_ids, require_pfam=require_pfam),
+                    ec_numbers,
                 ]
 
             stats_builder.update({

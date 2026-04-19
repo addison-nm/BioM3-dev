@@ -268,7 +268,10 @@ def test_no_lookups_returns_empty_join_stats():
     })
     result, stats = enrich_dataframe(df)
     assert stats == {}
-    # Schema still includes the new annot_* columns (initialized to NA).
-    assert "annot_ec_numbers" not in result.columns  # not initialized when no join
+    # Canonical annotation schema is initialized regardless of joins so
+    # downstream code can trust the column set; all values are NA when
+    # no enrichment data was supplied.
+    assert "annot_ec_numbers" in result.columns
     assert "annot_ec_names" in result.columns
+    assert pd.isna(result.loc[0, "annot_ec_numbers"])
     assert pd.isna(result.loc[0, "annot_ec_names"])

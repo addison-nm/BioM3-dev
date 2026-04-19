@@ -27,6 +27,23 @@ from biom3.backend.device import setup_logger
 logger = setup_logger(__name__)
 
 
+# Matches UniProt EC-number cross-references in the .dat flat-file form
+# "EC=N.N.N.N". Used to harvest ECs from DE lines and CC CATALYTIC ACTIVITY
+# blocks into a structured annot_ec_numbers column.
+_EC_IN_DAT_RE = re.compile(r"EC=(\d+\.\d+\.\d+\.\d+)")
+
+
+def _extract_ec_numbers_from_lines(lines):
+    """Return a de-duplicated list of EC=N.N.N.N numbers found in *lines*."""
+    ecs = []
+    for line in lines:
+        for match in _EC_IN_DAT_RE.finditer(line):
+            ec = match.group(1)
+            if ec not in ecs:
+                ecs.append(ec)
+    return ecs
+
+
 def _open_gz(path):
     """Open a .gz file using pigz (parallel) if available, else gzip.
 
@@ -315,6 +332,19 @@ def _parse_entry(lines):
     if go_terms:
         annotations["annot_gene_ontology"] = ", ".join(go_terms)
 
+    # Merge EC numbers from DE lines with any already extracted from
+    # CC CATALYTIC ACTIVITY. The DE block frequently carries an explicit
+    # "EC=N.N.N.N" line that CC blocks may lack when the entry has no
+    # catalytic_activity annotation (e.g., sub-classified enzymes).
+    de_ecs = _extract_ec_numbers_from_lines(de_lines)
+    if de_ecs:
+        existing = annotations.get("annot_ec_numbers", "")
+        merged = [e.strip() for e in str(existing).split(",") if e.strip()]
+        for ec in de_ecs:
+            if ec not in merged:
+                merged.append(ec)
+        annotations["annot_ec_numbers"] = ", ".join(merged)
+
     # Cross-reference side-channel — flow through enrich_dataframe into
     # distinct DataFrame columns for downstream join functions.
     if smart_ids:
@@ -362,20 +392,40 @@ def _map_cc_field(cc_blocks, topic, annot_key, annotations):
 
 
 def _map_cc_catalytic_activity(cc_blocks, annotations):
-    """Parse CATALYTIC ACTIVITY blocks to extract Reaction= names."""
+    """Parse CATALYTIC ACTIVITY blocks.
+
+    Extracts two things in parallel:
+    - Reaction= prose (caption-safe, stored in ``annot_catalytic_activity``)
+    - Any EC=N.N.N.N xrefs (stored in ``annot_ec_numbers`` for downstream
+      joins; never added to captions)
+    """
     texts = cc_blocks.get("CATALYTIC ACTIVITY")
     if not texts:
         return
     parts = []
+    ecs = []
     for text in texts:
-        # Extract Reaction=...; portion
         match = re.search(r"Reaction=([^;]+)", text)
         if match:
             reaction = _strip_evidence(match.group(1)).strip()
             if reaction:
                 parts.append(reaction)
+        for match in _EC_IN_DAT_RE.finditer(text):
+            ec = match.group(1)
+            if ec not in ecs:
+                ecs.append(ec)
     if parts:
         annotations["annot_catalytic_activity"] = ". ".join(parts)
+    if ecs:
+        existing = annotations.get("annot_ec_numbers", "")
+        if existing:
+            merged = [e.strip() for e in str(existing).split(",") if e.strip()]
+            for ec in ecs:
+                if ec not in merged:
+                    merged.append(ec)
+            annotations["annot_ec_numbers"] = ", ".join(merged)
+        else:
+            annotations["annot_ec_numbers"] = ", ".join(ecs)
 
 
 def _map_cc_biophysicochemical(cc_blocks, annotations):
@@ -555,6 +605,17 @@ def _parse_entry_full(lines):
 
     if go_terms:
         annotations["annot_gene_ontology"] = ", ".join(go_terms)
+
+    # Merge DE-line EC numbers with any already harvested from
+    # CC CATALYTIC ACTIVITY (see _map_cc_catalytic_activity).
+    de_ecs = _extract_ec_numbers_from_lines(de_lines)
+    if de_ecs:
+        existing = annotations.get("annot_ec_numbers", "")
+        merged = [e.strip() for e in str(existing).split(",") if e.strip()]
+        for ec in de_ecs:
+            if ec not in merged:
+                merged.append(ec)
+        annotations["annot_ec_numbers"] = ", ".join(merged)
 
     return {
         "annotations": annotations,

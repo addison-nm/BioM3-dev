@@ -5,8 +5,14 @@ from torch.nn import functional as F
 import torch.distributed as dist
 
 # PL functions
-import pytorch_lightning as pl
-from pytorch_lightning import Trainer, seed_everything
+from biom3.backend.device import BACKEND_NAME, _XPU
+
+if BACKEND_NAME == _XPU:
+    import lightning as pl
+    from lightning import Trainer, seed_everything
+else:
+    import pytorch_lightning as pl
+    from pytorch_lightning import Trainer, seed_everything
 
 # misc functions
 import itertools

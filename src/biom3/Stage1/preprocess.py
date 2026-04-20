@@ -6,7 +6,6 @@ import ast
 import dask.dataframe as dd
 import os
 from sklearn.model_selection import train_test_split
-from pytorch_lightning import LightningDataModule
 from tqdm import tqdm
 import gc
 import psutil
@@ -18,7 +17,12 @@ import esm
 from esm import pretrained
 from transformers import AutoTokenizer, AutoModel
 
-from biom3.backend.device import get_device, setup_logger
+from biom3.backend.device import BACKEND_NAME, _XPU, get_device, setup_logger
+
+if BACKEND_NAME == _XPU:
+    from lightning import LightningDataModule
+else:
+    from pytorch_lightning import LightningDataModule
 
 logger = setup_logger(__name__)
 

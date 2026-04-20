@@ -30,6 +30,7 @@ if BACKEND_NAME == _XPU:
     from lightning.pytorch.callbacks import (
         LearningRateMonitor, DeviceStatsMonitor, EarlyStopping,
     )
+    from lightning.pytorch.strategies import SingleDeviceStrategy
 else:
     import pytorch_lightning as pl
     from pytorch_lightning import Trainer
@@ -37,6 +38,7 @@ else:
     from pytorch_lightning.callbacks import (
         LearningRateMonitor, DeviceStatsMonitor, EarlyStopping,
     )
+    from pytorch_lightning.strategies import SingleDeviceStrategy
 
 from biom3.Stage2.PL_wrapper import PL_Facilitator
 from biom3.Stage2.preprocess import Facilitator_DataModule
@@ -432,6 +434,12 @@ def train_model(args, PL_model, data_module):
 
     if args.device == 'cuda' and (gpu_devices > 1 or num_nodes > 1):
         strategy = 'ddp'
+    elif args.device == 'xpu' and gpu_devices == 1 and num_nodes == 1:
+        # Aurora Lightning's _choose_strategy() falls back to
+        # SingleDeviceStrategy(device="cpu") for XPU because 'xpu' isn't in its
+        # CUDA/MPS/GPU branch; that makes trainer.strategy.root_device report
+        # CPU and breaks DeviceStatsMonitor. Pin the strategy explicitly.
+        strategy = SingleDeviceStrategy(device=torch.device('xpu'))
     else:
         strategy = 'auto'
 

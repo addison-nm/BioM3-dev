@@ -6,6 +6,7 @@ for browsing and selecting files.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import streamlit as st
@@ -37,13 +38,20 @@ def list_files(
         File extensions to include (e.g. [".pdb", ".ent"]). Include the dot.
         If None, all files are returned.
     recursive : bool
-        If True, search subdirectories recursively.
+        If True, search subdirectories recursively. Symlinked directories
+        are followed, so trees populated by ``scripts/sync_weights.sh``
+        (which creates per-entry symlinks into a shared data directory)
+        are traversed in full.
     """
     d = Path(directory)
     if not d.is_dir():
         return []
     if recursive:
-        files = sorted(f for f in d.rglob("*") if f.is_file())
+        files: list[Path] = []
+        for dirpath, _dirnames, filenames in os.walk(d, followlinks=True):
+            for name in filenames:
+                files.append(Path(dirpath) / name)
+        files.sort()
     else:
         files = sorted(f for f in d.iterdir() if f.is_file())
     if extensions:

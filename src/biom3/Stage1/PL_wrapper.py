@@ -35,7 +35,7 @@ def _safe_barrier():
     # No-op when the default process group is not initialized (single-GPU,
     # CPU smoke tests, inference). Safe replacement for `dist.barrier()`.
     if dist.is_available() and dist.is_initialized():
-        _safe_barrier()
+        dist.barrier()
 
 
 ######################

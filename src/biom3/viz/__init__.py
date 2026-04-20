@@ -23,6 +23,14 @@ from biom3.viz.dynamics import (
     plot_probability_dynamics,
     plot_probability_dynamics_from_file,
 )
+from biom3.viz.stage3_training_runs import (
+    load_run_artifacts,
+    discover_metric_bases,
+    plot_metric,
+    plot_metric_from_dir,
+    plot_benchmark_history,
+    plot_benchmark_from_dir,
+)
 
 try:
     from biom3.viz.folding import fold_sequence, fold_sequences

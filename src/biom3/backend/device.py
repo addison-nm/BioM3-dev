@@ -4,6 +4,9 @@
 
 import os
 import logging
+import platform
+import socket
+import sys
 import torch
 
 _CPU = "cpu"
@@ -24,6 +27,100 @@ def get_device():
     if backend == _XPU:
         return torch.device("xpu")
     return torch.device(_CPU)
+
+
+def reset_peak_memory_stats():
+    """Reset peak memory counters for the active device backend.
+
+    No-op on CPU.  CUDA and XPU expose the same-named function.
+    """
+    backend = get_backend_name()
+    if backend == _CUDA:
+        torch.cuda.reset_peak_memory_stats()
+    elif backend == _XPU:
+        torch.xpu.reset_peak_memory_stats()
+
+
+def get_peak_memory_stats():
+    """Return ``(peak_allocated_bytes, peak_reserved_bytes)`` for the local device.
+
+    Returns ``(None, None)`` on CPU or if the backend does not expose the
+    relevant APIs.  CUDA and XPU expose identical function names.
+    """
+    backend = get_backend_name()
+    if backend == _CUDA:
+        return (torch.cuda.max_memory_allocated(),
+                torch.cuda.max_memory_reserved())
+    if backend == _XPU:
+        try:
+            return (torch.xpu.max_memory_allocated(),
+                    torch.xpu.max_memory_reserved())
+        except AttributeError:
+            return (None, None)
+    return (None, None)
+
+
+def device_sync():
+    """Block the host until all queued work on the active device finishes.
+
+    Intended for benchmark timing — wrap before ``perf_counter`` reads so
+    asynchronous kernel launches are accounted for.  No-op on CPU.
+    """
+    backend = get_backend_name()
+    if backend == _CUDA:
+        torch.cuda.synchronize()
+    elif backend == _XPU:
+        torch.xpu.synchronize()
+
+
+def get_device_name(index: int = 0) -> str:
+    """Return a human-readable name for the active device.
+
+    CUDA → ``torch.cuda.get_device_name``; XPU → ``torch.xpu.get_device_name``;
+    CPU → ``platform.processor()`` (falls back to ``platform.machine()``).
+    """
+    backend = get_backend_name()
+    if backend == _CUDA:
+        return torch.cuda.get_device_name(index)
+    if backend == _XPU:
+        try:
+            return torch.xpu.get_device_name(index)
+        except AttributeError:
+            return "xpu"
+    return platform.processor() or platform.machine() or "cpu"
+
+
+def get_device_info(index: int = 0) -> dict:
+    """Return a dict describing the active compute device and host environment.
+
+    Suitable for serialising alongside benchmark results so runs on different
+    machines (Spark / Polaris / Aurora / CPU) remain distinguishable.
+    """
+    backend = get_backend_name()
+    info = {
+        "backend": backend,
+        "device_name": get_device_name(index),
+        "hostname": socket.gethostname(),
+        "torch_version": torch.__version__,
+        "python_version": sys.version.split()[0],
+        "platform": platform.platform(),
+    }
+    if backend == _CUDA:
+        info["device_count"] = torch.cuda.device_count()
+        try:
+            cap = torch.cuda.get_device_capability(index)
+            info["cuda_capability"] = f"{cap[0]}.{cap[1]}"
+        except Exception:
+            pass
+        info["cuda_version"] = torch.version.cuda
+    elif backend == _XPU:
+        try:
+            info["device_count"] = torch.xpu.device_count()
+        except AttributeError:
+            info["device_count"] = None
+    else:
+        info["device_count"] = 0
+    return info
 
 def get_rank() -> int:
     """Get the global rank from environment variables set by the launcher.

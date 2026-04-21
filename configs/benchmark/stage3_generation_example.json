@@ -1,0 +1,39 @@
+{
+  "arch_id": "ProteoScribe_1block_v1",
+
+  "device": "cuda",
+
+  "model_path": "weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.renamed.bin",
+  "model_config_path": "configs/inference/stage3_ProteoScribe_sample.json",
+
+  "stage1_model_path": "weights/PenCL/PenCL_V09152023_last.ckpt",
+  "stage1_config_path": "configs/inference/stage1_PenCL.json",
+
+  "stage2_model_path": "weights/Facilitator/Facilitator_MMD15.ckpt/last.ckpt",
+  "stage2_config_path": "configs/inference/stage2_Facilitator.json",
+
+  "model_kwargs": {
+    "unmasking_order": "random",
+    "token_strategy": ["sample", "argmax"],
+    "diffusion_steps": 16
+  },
+
+  "sweep": {
+    "N": [4, 8, 16, 32, 64, 128],
+    "P": [2, 4],
+    "B": [4, 8, 16, 32, 64]
+  },
+
+  "pre_unmask": {
+    "enabled": true,
+    "strategy": "last_k",
+    "fill_with": "PAD"
+  },
+
+  "prompts": {
+    "source": "synthetic_aaaa",
+    "length": 4
+  },
+
+  "output_root": "outputs/Stage3_generation_bm"
+}

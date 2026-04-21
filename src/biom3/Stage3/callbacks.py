@@ -9,7 +9,14 @@ from datetime import datetime
 import numpy as np
 import torch
 
-from biom3.backend.device import BACKEND_NAME, _CUDA, _XPU, setup_logger
+from biom3.backend.device import (
+    BACKEND_NAME,
+    _CUDA,
+    _XPU,
+    setup_logger,
+    reset_peak_memory_stats as _reset_peak_memory_stats,
+    get_peak_memory_stats as _get_peak_memory_stats,
+)
 
 if BACKEND_NAME == _XPU:
     import lightning as pl
@@ -172,35 +179,6 @@ class MetricsHistoryCallback(pl.Callback):
             len(self.per_rank_val_loss),
             out_path,
         )
-
-
-def _reset_peak_memory_stats():
-    """Reset peak memory counters for the active device backend.
-
-    No-op on CPU.  CUDA and XPU expose the same-named function.
-    """
-    if BACKEND_NAME == _CUDA:
-        torch.cuda.reset_peak_memory_stats()
-    elif BACKEND_NAME == _XPU:
-        torch.xpu.reset_peak_memory_stats()
-
-
-def _get_peak_memory_stats():
-    """Return ``(peak_allocated_bytes, peak_reserved_bytes)`` for the local device.
-
-    Returns ``(None, None)`` on CPU or if the backend does not expose the
-    relevant APIs.  CUDA and XPU expose identical function names.
-    """
-    if BACKEND_NAME == _CUDA:
-        return (torch.cuda.max_memory_allocated(),
-                torch.cuda.max_memory_reserved())
-    if BACKEND_NAME == _XPU:
-        try:
-            return (torch.xpu.max_memory_allocated(),
-                    torch.xpu.max_memory_reserved())
-        except AttributeError:
-            return (None, None)
-    return (None, None)
 
 
 class TrainingBenchmarkCallback(pl.Callback):

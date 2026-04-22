@@ -1,18 +1,15 @@
-#!/usr/bin/env python
-"""Plot benchmark results written by ``benchmark_generation.py``.
+"""Plot benchmark results written by ``biom3.benchmarks.generation``.
 
 Reads ``results.npz`` + ``env.json`` from a benchmark run directory and
 writes PNGs into ``<run_dir>/images/``:
 
-- ``time_per_step_vs_batch.png``  — primary: time per diffusion step vs B
-- ``peak_memory_vs_batch.png``    — peak device memory vs B
-- ``throughput_vs_batch.png``     — sequences generated per second vs B
-- ``total_time_vs_N.png``         — total run time vs N, one line per B
+- ``time_per_step_vs_batch.png``   — primary: time per diffusion step vs B
+- ``peak_memory_vs_batch.png``     — peak device memory vs B
+- ``throughput_vs_batch.png``      — sequences generated per second vs B
+- ``total_time_vs_N.png``          — total run time vs N, one line per B
+- ``extrap_N{N}_D{D}.png``         — projected total time at full-length D
 
-Usage:
-
-    python scripts/plot_benchmark.py \\
-        --run_dir outputs/Stage3_generation_bm/<UTC timestamp>/
+CLI entry point: ``biom3_plot_benchmark --run_dir <path>``.
 """
 
 import argparse
@@ -27,7 +24,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
-def _parse_cli(argv):
+def parse_arguments(args):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run_dir", required=True,
                         help="Benchmark run directory (contains results.npz, env.json)")
@@ -37,13 +34,22 @@ def _parse_cli(argv):
                         help="Target N for extrapolation plot (default: 128)")
     parser.add_argument("--extrap_D", type=int, default=1024,
                         help="Target D (full-length diffusion) for extrapolation (default: 1024)")
-    return parser.parse_args(argv)
+    return parser.parse_args(args)
+
+
+_SUPPORTED_BENCHMARK_TYPES = ("stage3_generation",)
 
 
 def _load(run_dir):
     npz = np.load(os.path.join(run_dir, "results.npz"), allow_pickle=True)
     with open(os.path.join(run_dir, "env.json")) as fh:
         env = json.load(fh)
+    bt = env.get("benchmark_type")
+    if bt is not None and bt not in _SUPPORTED_BENCHMARK_TYPES:
+        raise ValueError(
+            f"viz.benchmark only supports {_SUPPORTED_BENCHMARK_TYPES}; "
+            f"this run is benchmark_type={bt!r}. Use the matching plotter."
+        )
     return npz, env
 
 
@@ -110,7 +116,6 @@ def plot_time_per_step_vs_batch(npz, env, out_path):
         ax.scatter(B[mask], per_step[mask] * 1000.0,
                    alpha=0.6, s=40, **{k: s[k] for k in ("color", "marker")},
                    label=f"{s['label']} (per run)")
-        # Median trend line across same-B points for this strategy.
         unique_b = np.unique(B[mask])
         med = np.array([np.median(per_step[mask][B[mask] == b]) for b in unique_b])
         ax.plot(unique_b, med * 1000.0, color=s["color"], linewidth=1.5,
@@ -312,10 +317,9 @@ def plot_total_time_vs_N(npz, env, out_path):
     plt.close(fig)
 
 
-def main(argv=None):
-    ns = _parse_cli(argv or sys.argv[1:])
-    run_dir = os.path.abspath(ns.run_dir)
-    image_dir = ns.image_dir or os.path.join(run_dir, "images")
+def main(args):
+    run_dir = os.path.abspath(args.run_dir)
+    image_dir = args.image_dir or os.path.join(run_dir, "images")
     os.makedirs(image_dir, exist_ok=True)
 
     npz, env = _load(run_dir)
@@ -335,11 +339,11 @@ def main(argv=None):
     plot_extrapolated_time(
         npz, env,
         os.path.join(image_dir,
-                     f"extrap_N{ns.extrap_N}_D{ns.extrap_D}.png"),
-        target_N=ns.extrap_N, target_D=ns.extrap_D,
+                     f"extrap_N{args.extrap_N}_D{args.extrap_D}.png"),
+        target_N=args.extrap_N, target_D=args.extrap_D,
     )
     print(f"Wrote plots to {image_dir}")
 
 
 if __name__ == "__main__":
-    main()
+    main(parse_arguments(sys.argv[1:]))

@@ -1,24 +1,20 @@
-#!/usr/bin/env python
-"""Benchmark ProteoScribe sequence generation across sweep configurations.
+"""Sequence-generation benchmark for ProteoScribe.
 
-Measures total wall-clock time, per-batch time, and peak device memory for
-each ``(token_strategy, N, P, B)`` triple in the sweep. Writes results to
-``<output_root>/<UTC timestamp>/`` with:
+Sweeps ``(token_strategy, N, P, B)`` over a config-driven grid, calling
+``batch_stage3_generate_sequences`` in-process for each combination and
+recording wall-clock time and peak device memory.
 
-- ``config.json`` — the input benchmark config, verbatim
-- ``env.json``    — device/backend/host info
-- ``results.json``— list of per-run records
-- ``results.npz`` — dense arrays (T_total_s, T_per_batch_s, peak_alloc_bytes,
-                    peak_reserved_bytes, plus sweep-axis arrays)
-- ``run.log``     — captured stdout/stderr
+Outputs land in ``<output_root>/<UTC timestamp>/``:
 
-Usage:
+- ``config.json``  — input config, verbatim
+- ``env.json``     — arch_id + device/host info
+- ``results.json`` — list of per-run records
+- ``results.npz``  — dense arrays keyed by sweep axes + metrics
+- ``run.log``      — captured stdout/stderr
+- ``prompts/``     — z_c cache + the CSV piped through Stage 1+2
 
-    python scripts/benchmark_generation.py \\
-        --config configs/benchmark/stage3_generation_example.json
-
-See ``configs/benchmark/stage3_generation_example.json`` for the config
-schema.
+CLI entry point: ``biom3_benchmark_generation --config <path>``.
+See ``configs/benchmark/stage3_generation_example.json`` for the schema.
 """
 
 import argparse
@@ -27,7 +23,6 @@ import itertools
 import json
 import logging
 import os
-import shutil
 import string
 import subprocess
 import sys
@@ -48,11 +43,11 @@ from biom3.Stage3.io import prepare_model_ProteoScribe
 from biom3.Stage3.run_ProteoScribe_sample import batch_stage3_generate_sequences
 
 
-def _parse_cli(argv):
+def parse_arguments(args):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", required=True,
                         help="Path to benchmark config JSON")
-    return parser.parse_args(argv)
+    return parser.parse_args(args)
 
 
 def _validate_sweep(cfg):
@@ -93,9 +88,9 @@ def _synthetic_prompts(num_prompts: int, length: int) -> list:
 def _write_prompts_csv(path: str, prompts: list):
     """Write a CSV compatible with biom3_PenCL_inference.
 
-    Columns: primary_Accession, [final]text_caption, sequence.
-    The sequence column is a dummy 10-AA placeholder (unused downstream for
-    benchmarking — only z_c is consumed by Stage 3).
+    Columns: primary_Accession, [final]text_caption, protein_sequence.
+    The protein_sequence column is a dummy 10-AA placeholder (unused
+    downstream for benchmarking — only z_c is consumed by Stage 3).
     """
     with open(path, "w") as fh:
         fh.write("primary_Accession,[final]text_caption,protein_sequence\n")
@@ -146,7 +141,7 @@ def _embed_prompts(cfg, prompts, work_dir, logger):
 
 
 def _setup_logger(log_path):
-    logger = logging.getLogger("biom3.benchmark_generation")
+    logger = logging.getLogger("biom3.benchmarks.generation")
     logger.setLevel(logging.INFO)
     logger.propagate = False
     fh = logging.FileHandler(log_path)
@@ -226,10 +221,9 @@ def _records_to_npz(records, axes_order, out_path):
     np.savez(out_path, **arrays)
 
 
-def main(argv=None):
+def main(args):
     os.environ.setdefault("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD", "true")
-    ns = _parse_cli(argv or sys.argv[1:])
-    cfg = load_json_config(ns.config)
+    cfg = load_json_config(args.config)
     _validate_sweep(cfg)
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -245,6 +239,7 @@ def main(argv=None):
         json.dump(cfg, fh, indent=2)
 
     env = {
+        "benchmark_type": "stage3_generation",
         "arch_id": cfg["arch_id"],
         "timestamp_utc": timestamp,
         **get_device_info(),
@@ -318,18 +313,18 @@ def main(argv=None):
                 B, N,
             )
             continue
-        args = _build_generation_args(cfg, model_config, token_strategy, B, R)
+        run_args = _build_generation_args(cfg, model_config, token_strategy, B, R)
         z_c_slice = z_c_full[:P].to(cfg["device"])
         logger.info(
             "Run: token_strategy=%s N=%d P=%d R=%d B=%d D=%d",
-            token_strategy, N, P, R, B, args.diffusion_steps,
+            token_strategy, N, P, R, B, run_args.diffusion_steps,
         )
-        metrics = _run_single(args, model, z_c_slice, logger)
+        metrics = _run_single(run_args, model, z_c_slice, logger)
         records.append({
             "token_strategy": token_strategy,
             "arch_id": cfg["arch_id"],
             "N": N, "P": P, "R": R, "B": B,
-            "D": args.diffusion_steps,
+            "D": run_args.diffusion_steps,
             **metrics,
         })
 
@@ -341,4 +336,4 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    main()
+    main(parse_arguments(sys.argv[1:]))

@@ -119,9 +119,10 @@ def plot_time_per_step_vs_batch(npz, env, out_path):
     ax.set_xscale("log", base=2)
     ax.set_yscale("log")
     ax.set_xlabel("Batch size B (sequences processed in parallel)")
-    ax.set_ylabel("Time per diffusion step (ms)\n[1 position unmasked across B sequences]")
+    ax.set_ylabel("Time per diffusion step (ms)")
     ax.set_title(
         "Time per unmasking step vs batch size\n"
+        "(each step unmasks 1 position across B parallel sequences)\n"
         f"{_title_suffix(env)}",
         fontsize=10,
     )
@@ -162,9 +163,10 @@ def plot_peak_memory_vs_batch(npz, env, out_path):
 
     ax.set_xscale("log", base=2)
     ax.set_xlabel("Batch size B (sequences processed in parallel)")
-    ax.set_ylabel("Peak GPU memory allocated (GB)\n[during one forward on B sequences × seq_len=1024]")
+    ax.set_ylabel("Peak GPU memory allocated (GB)")
     ax.set_title(
         "Peak device memory vs batch size\n"
+        "(during one forward pass; sequence length = 1024)\n"
         f"{_title_suffix(env)}",
         fontsize=10,
     )
@@ -201,12 +203,10 @@ def plot_throughput_vs_batch(npz, env, out_path):
 
     ax.set_xscale("log", base=2)
     ax.set_xlabel("Batch size B (sequences processed in parallel)")
-    ax.set_ylabel(
-        f"Throughput (full sequences / s)\n"
-        f"[1 sequence = {_D_str(npz)} unmasking steps]"
-    )
+    ax.set_ylabel("Throughput (full sequences / s)")
     ax.set_title(
-        f"Generation throughput vs batch size — {_D_str(npz)}\n"
+        "Generation throughput vs batch size\n"
+        f"(1 sequence = {_D_str(npz)} unmasking steps)\n"
         f"{_title_suffix(env)}",
         fontsize=10,
     )
@@ -256,11 +256,10 @@ def plot_extrapolated_time(npz, env, out_path, target_N, target_D):
     ax.set_xscale("log", base=2)
     ax.set_yscale("log")
     ax.set_xlabel("Batch size B (sequences processed in parallel)")
-    ax.set_ylabel(
-        f"Projected total wall-clock (min)\n[for {target_N} sequences × {target_D} unmasking steps]"
-    )
+    ax.set_ylabel("Projected total wall-clock (min)")
     ax.set_title(
-        f"Projected time to generate N={target_N} full sequences (D={target_D})\n"
+        f"Projected time to generate N={target_N} full sequences\n"
+        f"({target_N} sequences × {target_D} unmasking steps each)\n"
         f"{_title_suffix(env)}",
         fontsize=10,
     )
@@ -301,11 +300,11 @@ def plot_total_time_vs_N(npz, env, out_path):
         ax.set_title(f"token_strategy = {strategy}", fontsize=10)
         ax.grid(True, which="both", alpha=0.3)
         ax.legend(fontsize=8, loc="best")
-    axes[0, 0].set_ylabel(
-        f"Total wall-clock time (s)\n[N sequences × {_D_str(npz)} unmasking steps]"
-    )
+    axes[0, 0].set_ylabel("Total wall-clock time (s)")
     fig.suptitle(
-        f"Total generation time vs N — {_D_str(npz)}\n{_title_suffix(env)}",
+        f"Total generation time vs N\n"
+        f"(N full sequences × {_D_str(npz)} unmasking steps each)\n"
+        f"{_title_suffix(env)}",
         fontsize=10,
     )
     fig.tight_layout()

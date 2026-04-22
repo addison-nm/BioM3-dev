@@ -33,6 +33,10 @@ def _parse_cli(argv):
                         help="Benchmark run directory (contains results.npz, env.json)")
     parser.add_argument("--image_dir", default=None,
                         help="Override output dir (default: <run_dir>/images/)")
+    parser.add_argument("--extrap_N", type=int, default=128,
+                        help="Target N for extrapolation plot (default: 128)")
+    parser.add_argument("--extrap_D", type=int, default=1024,
+                        help="Target D (full-length diffusion) for extrapolation (default: 1024)")
     return parser.parse_args(argv)
 
 
@@ -53,6 +57,14 @@ def _title_suffix(env):
 
 def _token_strategies(npz):
     return sorted(set(str(t) for t in npz["token_strategy"]))
+
+
+def _D_str(npz):
+    """Compact description of the diffusion-step budget(s) in this run."""
+    Ds = sorted(set(int(d) for d in npz["D"]))
+    if len(Ds) == 1:
+        return f"D={Ds[0]}"
+    return f"D∈{{{','.join(str(d) for d in Ds)}}}"
 
 
 _STYLE = {
@@ -106,10 +118,13 @@ def plot_time_per_step_vs_batch(npz, env, out_path):
 
     ax.set_xscale("log", base=2)
     ax.set_yscale("log")
-    ax.set_xlabel("Batch size B")
-    ax.set_ylabel("Time per diffusion step (ms)")
-    ax.set_title(f"Time per unmasking step vs batch size\n{_title_suffix(env)}",
-                 fontsize=10)
+    ax.set_xlabel("Batch size B (sequences processed in parallel)")
+    ax.set_ylabel("Time per diffusion step (ms)\n[1 position unmasked across B sequences]")
+    ax.set_title(
+        "Time per unmasking step vs batch size\n"
+        f"{_title_suffix(env)}",
+        fontsize=10,
+    )
     ax.grid(True, which="both", alpha=0.3)
     ax.legend(fontsize=8, loc="best")
     _annotate_runs(ax, env, len(B))
@@ -146,10 +161,13 @@ def plot_peak_memory_vs_batch(npz, env, out_path):
                 linestyle="--", alpha=0.9, label=f"{s['label']} (median)")
 
     ax.set_xscale("log", base=2)
-    ax.set_xlabel("Batch size B")
-    ax.set_ylabel("Peak allocated (GB)")
-    ax.set_title(f"Peak device memory vs batch size\n{_title_suffix(env)}",
-                 fontsize=10)
+    ax.set_xlabel("Batch size B (sequences processed in parallel)")
+    ax.set_ylabel("Peak GPU memory allocated (GB)\n[during one forward on B sequences × seq_len=1024]")
+    ax.set_title(
+        "Peak device memory vs batch size\n"
+        f"{_title_suffix(env)}",
+        fontsize=10,
+    )
     ax.grid(True, which="both", alpha=0.3)
     ax.legend(fontsize=8, loc="best")
     _annotate_runs(ax, env, len(B))
@@ -182,13 +200,78 @@ def plot_throughput_vs_batch(npz, env, out_path):
                 linestyle="--", alpha=0.9, label=f"{s['label']} (median)")
 
     ax.set_xscale("log", base=2)
-    ax.set_xlabel("Batch size B")
-    ax.set_ylabel("Throughput (sequences / s)")
-    ax.set_title(f"Generation throughput vs batch size\n{_title_suffix(env)}",
-                 fontsize=10)
+    ax.set_xlabel("Batch size B (sequences processed in parallel)")
+    ax.set_ylabel(
+        f"Throughput (full sequences / s)\n"
+        f"[1 sequence = {_D_str(npz)} unmasking steps]"
+    )
+    ax.set_title(
+        f"Generation throughput vs batch size — {_D_str(npz)}\n"
+        f"{_title_suffix(env)}",
+        fontsize=10,
+    )
     ax.grid(True, which="both", alpha=0.3)
     ax.legend(fontsize=8, loc="best")
     _annotate_runs(ax, env, len(B))
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=140)
+    plt.close(fig)
+
+
+def plot_extrapolated_time(npz, env, out_path, target_N, target_D):
+    """Project total wall-clock to produce ``target_N`` sequences at full-length
+    ``target_D`` diffusion, using per-step time measured in this sweep.
+
+    Extrapolation: T = ceil(N / B) * D * t_per_step, where
+    t_per_step = T_total_s / (num_batches * D_measured). This holds because
+    per-step time is empirically independent of D (each step is a full
+    transformer forward regardless of how many positions are masked).
+    """
+    B = npz["B"]
+    T_total = npz["T_total_s"]
+    nb = npz["num_batches"]
+    D = npz["D"]
+    ts = np.array([str(t) for t in npz["token_strategy"]])
+    t_per_step = T_total / (nb * D)
+
+    fig, ax = plt.subplots(figsize=(6.5, 4.5))
+    for strategy in _token_strategies(npz):
+        mask = ts == strategy
+        s = _style(strategy)
+        target_nb = np.ceil(target_N / B[mask]).astype(int)
+        extrap = target_nb * target_D * t_per_step[mask]
+        ax.scatter(B[mask], extrap / 60.0, alpha=0.6, s=40,
+                   **{k: s[k] for k in ("color", "marker")},
+                   label=f"{s['label']} (per run)")
+        unique_b = np.unique(B[mask])
+        med = []
+        for b in unique_b:
+            sub = (B[mask] == b)
+            med.append(np.median(np.ceil(target_N / b) * target_D
+                                 * t_per_step[mask][sub]))
+        ax.plot(unique_b, np.array(med) / 60.0, color=s["color"],
+                linewidth=1.5, linestyle="--", alpha=0.9,
+                label=f"{s['label']} (median)")
+
+    ax.set_xscale("log", base=2)
+    ax.set_yscale("log")
+    ax.set_xlabel("Batch size B (sequences processed in parallel)")
+    ax.set_ylabel(
+        f"Projected total wall-clock (min)\n[for {target_N} sequences × {target_D} unmasking steps]"
+    )
+    ax.set_title(
+        f"Projected time to generate N={target_N} full sequences (D={target_D})\n"
+        f"{_title_suffix(env)}",
+        fontsize=10,
+    )
+    ax.grid(True, which="both", alpha=0.3)
+    ax.legend(fontsize=8, loc="best")
+    ax.text(
+        0.01, 0.99,
+        f"runs: {len(B)}  (extrapolated from per-step time measured at {_D_str(npz)})",
+        transform=ax.transAxes, va="top", ha="left",
+        fontsize=8, color="gray",
+    )
     fig.tight_layout()
     fig.savefig(out_path, dpi=140)
     plt.close(fig)
@@ -214,13 +297,17 @@ def plot_total_time_vs_N(npz, env, out_path):
                     marker="o", linewidth=1.3, label=f"B={int(b)}")
         ax.set_xscale("log", base=2)
         ax.set_yscale("log")
-        ax.set_xlabel("Total sequences N")
+        ax.set_xlabel("Total sequences N (full sequences generated)")
         ax.set_title(f"token_strategy = {strategy}", fontsize=10)
         ax.grid(True, which="both", alpha=0.3)
         ax.legend(fontsize=8, loc="best")
-    axes[0, 0].set_ylabel("Total time (s)")
-    fig.suptitle(f"Total generation time vs N\n{_title_suffix(env)}",
-                 fontsize=10)
+    axes[0, 0].set_ylabel(
+        f"Total wall-clock time (s)\n[N sequences × {_D_str(npz)} unmasking steps]"
+    )
+    fig.suptitle(
+        f"Total generation time vs N — {_D_str(npz)}\n{_title_suffix(env)}",
+        fontsize=10,
+    )
     fig.tight_layout()
     fig.savefig(out_path, dpi=140)
     plt.close(fig)
@@ -245,6 +332,12 @@ def main(argv=None):
     )
     plot_total_time_vs_N(
         npz, env, os.path.join(image_dir, "total_time_vs_N.png"),
+    )
+    plot_extrapolated_time(
+        npz, env,
+        os.path.join(image_dir,
+                     f"extrap_N{ns.extrap_N}_D{ns.extrap_D}.png"),
+        target_N=ns.extrap_N, target_D=ns.extrap_D,
     )
     print(f"Wrote plots to {image_dir}")
 

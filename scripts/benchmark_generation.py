@@ -280,9 +280,33 @@ def main(argv=None):
     if isinstance(token_strategies, str):
         token_strategies = [token_strategies]
 
+    sweep = cfg["sweep"]
+
+    # Burn-in pass: one untimed generation so per-sweep measurements aren't
+    # contaminated by first-call costs (kernel JIT, autocast init, allocator
+    # first-touch, Gumbel buffer alloc). Uses the smallest config in the
+    # sweep so it's cheap; warming with the first token strategy and
+    # smallest B/P is enough to settle the dominant kernels.
+    warmup_strategy = token_strategies[0]
+    warmup_B = min(sweep["B"])
+    warmup_P = min(sweep["P"])
+    warmup_R = max(1, warmup_B // warmup_P)
+    warmup_args = _build_generation_args(
+        cfg, model_config, warmup_strategy, warmup_B, warmup_R,
+    )
+    warmup_z = z_c_full[:warmup_P].to(cfg["device"])
+    logger.info(
+        "Warmup: token_strategy=%s B=%d P=%d R=%d D=%d (untimed)",
+        warmup_strategy, warmup_B, warmup_P, warmup_R, warmup_args.diffusion_steps,
+    )
+    device_sync()
+    t0 = time.perf_counter()
+    batch_stage3_generate_sequences(args=warmup_args, model=model, z_t=warmup_z)
+    device_sync()
+    logger.info("Warmup complete in %.2fs", time.perf_counter() - t0)
+
     records = []
     axes_order = ["token_strategy", "N", "P", "R", "B", "D"]
-    sweep = cfg["sweep"]
 
     for token_strategy, N, P, B in itertools.product(
         token_strategies, sweep["N"], sweep["P"], sweep["B"],

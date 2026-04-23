@@ -6,7 +6,10 @@ ref: https://huggingface.co/docs/transformers/v4.20.1/en/perf_train_gpu_one
 
 """
 
+import os
+
 import numpy as np
+import psutil
 import pynvml
 
 from biom3.backend.device import setup_logger

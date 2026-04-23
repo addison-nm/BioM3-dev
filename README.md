@@ -420,6 +420,12 @@ biom3_app
 
 See [docs/web_app.md](./docs/web_app.md) for app pages, configuration, and architecture. See [docs/structure_visualization.md](./docs/structure_visualization.md) for the `biom3.viz` Python API (3D rendering, structural alignment, BLAST, unmasking-order visualization).
 
+## Contributing
+
+Contributions from both internal collaborators and external contributors are welcome. New work is branched off `dev` and merged back into `dev` via pull request — `main` is reserved for tagged releases.
+
+See [docs/contributing.md](./docs/contributing.md) for the full workflow: forking and cloning, creating a personal branch from `dev`, commit conventions, and opening a pull request.
+
 ## References
 
 [1] Natural Language Prompts Guide the Design of Novel Functional Protein Sequences. Nikša Praljak, Hugh Yeh, Miranda Moore, Michael Socolich, Rama Ranganathan, Andrew L. Ferguson. bioRxiv 2024.11.11.622734; doi: [10.1101/2024.11.11.622734](https://doi.org/10.1101/2024.11.11.622734)

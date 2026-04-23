@@ -2,14 +2,20 @@
     "databases_root": "data/databases",
     "training_data_root": "data/datasets",
     "databases": {
+        "brenda": "brenda",
+        "expasy": "expasy",
         "ncbi_taxonomy": "ncbi_taxonomy",
         "pfam": "pfam",
-        "swissprot": "swissprot",
         "smart": "smart",
-        "expasy": "expasy"
+        "swissprot": "swissprot",
+        "trembl": "trembl"
     },
     "training_datasets": {
+        "brenda_csv": "brenda_kinetics.csv",
+        "expasy_csv": "expasy_enzyme.csv",
+        "pfam_csv": "Pfam_protein_text_dataset.csv",
+        "smart_csv": "smart_domains.csv",
         "swissprot_csv": "fully_annotated_swiss_prot.csv",
-        "pfam_csv": "Pfam_protein_text_dataset.csv"
+        "trembl_csv": "fully_annotated_trembl.csv"
     }
 }

@@ -16,6 +16,14 @@ OUTPUT_COLS = [
     "pfam_label",
 ]
 
+# Columns kept only when present in the source CSV. Lets newer source CSVs
+# (with structured annotations like annot_ec_numbers) pass through to the
+# enrichment layer without breaking backward compatibility with older
+# 4-column CSVs.
+OPTIONAL_OUTPUT_COLS = [
+    "annot_ec_numbers",
+]
+
 
 def _parquet_path_for(csv_path):
     """Return the corresponding .parquet path for a .csv path."""
@@ -64,10 +72,13 @@ class SwissProtReader(DatabaseReader):
         """Filter rows where pfam_label contains any of the given Pfam IDs.
 
         Uses regex matching because pfam_label stores stringified Python lists.
+        Keeps any OPTIONAL_OUTPUT_COLS that happen to be in the source CSV so
+        newer builds with structured annotations flow through unchanged.
         """
         df = self._load()
         pattern = "|".join(pfam_ids)
         mask = df["pfam_label"].str.contains(pattern, na=False)
-        result = df.loc[mask, OUTPUT_COLS].copy()
+        cols = OUTPUT_COLS + [c for c in OPTIONAL_OUTPUT_COLS if c in df.columns]
+        result = df.loc[mask, cols].copy()
         logger.info("SwissProt: %s rows matched for %s", f"{len(result):,}", pfam_ids)
         return result

@@ -31,6 +31,8 @@ where = ["src"]
 "biom3.app" = ["*.json"]
 
 [project.scripts]
+biom3_pretrain_stage1 = "biom3.Stage1.__main__:run_stage1_pretraining"
+biom3_pretrain_stage2 = "biom3.Stage2.__main__:run_stage2_pretraining"
 biom3_pretrain_stage3 = "biom3.Stage3.__main__:run_stage3_pretraining"
 biom3_PenCL_inference = "biom3.Stage1.__main__:run_PenCL_inference"
 biom3_Facilitator_sample = "biom3.Stage2.__main__:run_Facilitator_sample"
@@ -42,8 +44,15 @@ biom3_build_taxid_index = "biom3.dbio.__main__:run_build_taxid_index"
 biom3_convert_to_parquet = "biom3.dbio.__main__:run_convert_to_parquet"
 biom3_build_source_swissprot = "biom3.dbio.__main__:run_build_source_swissprot"
 biom3_build_source_pfam = "biom3.dbio.__main__:run_build_source_pfam"
+biom3_build_source_trembl = "biom3.dbio.__main__:run_build_source_trembl"
+biom3_build_source_expasy = "biom3.dbio.__main__:run_build_source_expasy"
+biom3_build_source_smart = "biom3.dbio.__main__:run_build_source_smart"
+biom3_build_source_brenda = "biom3.dbio.__main__:run_build_source_brenda"
+biom3_build_annotated_pfam_subsets = "biom3.dbio.__main__:run_build_annotated_pfam_subsets"
 biom3_build_annotation_cache = "biom3.dbio.__main__:run_build_annotation_cache"
 biom3_app = "biom3.app:main"
+biom3_benchmark_stage3_generation = "biom3.benchmarks.__main__:run_benchmark_stage3_generation"
+biom3_plot_benchmark = "biom3.benchmarks.__main__:run_plot_benchmark"
 
 [tool.pytest.ini_options]
 filterwarnings = [

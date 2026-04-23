@@ -4,6 +4,21 @@
 
 Store session notes in docs/.claude_sessions/
 
+## Parallel development with worktrees
+
+For large features, prefer working in a git worktree branched off `addison-dev`, so multiple Claude agents can work in parallel without stepping on each other.
+
+- Worktrees live under `.claude/worktrees/<feature-name>/` (gitignored).
+- Create with: `git worktree add .claude/worktrees/<feature> -b addison-<feature> addison-dev`
+- When a feature is ready, merge its branch back into `addison-dev`. Don't commit directly to `addison-dev` from the main checkout while worktrees are active.
+- Remove finished worktrees with `git worktree remove .claude/worktrees/<feature>`.
+
+While working in a worktree:
+- Edit only the files the feature requires. If bugs are spotted in unrelated areas, note them (e.g., in the session log or a TODO) but do not fix them in this worktree — they belong to their own branch.
+- Each new worktree starts without populated `data/databases/` or `data/datasets/`. Repopulate them via the appropriate `scripts/sync_*.sh` script before running anything that reads from them.
+
+Small fixes and docs edits can still be made directly on `addison-dev`.
+
 ## Project overview
 
 BioM3 is a multi-stage framework for generating novel protein sequences guided by natural language prompts (NeurIPS 2024). It combines protein language models (ESM-2), biomedical text encoders (BioBERT), and diffusion-based sequence generation.
@@ -66,13 +81,16 @@ Defined in `pyproject.toml`:
 # Install (editable, from repo root)
 pip install -e .
 
-# Run tests (CPU-only, no downloaded weights needed for import tests)
+# Smoke only (imports)
 pytest tests/test_imports.py
 
-# Full test suite (requires weights/ to be populated)
+# Fast dev loop — skips entrypoint/training tests (~3 min, CPU, no weights required)
+pytest tests/ --quick
+
+# Full test suite (default — includes entrypoint + training tests; weight-gated tests skip if weights missing)
 pytest tests/
 
-# GPU-specific tests
+# Include GPU-only tests
 pytest tests/ --use_gpu
 ```
 
@@ -81,8 +99,14 @@ pytest tests/ --use_gpu
 - Test files live in `tests/` with subdirectories per stage.
 - Test data is in `tests/_data/`; test outputs go to `tests/_tmp/`.
 - CLI arguments for entrypoint tests are stored in `tests/_data/entrypoint_args/*.txt`.
-- Custom pytest markers: `@pytest.mark.benchmark` (needs `--benchmark`), `@pytest.mark.use_gpu` (needs `--use_gpu`).
+- Custom pytest markers:
+  - `@pytest.mark.benchmark` (needs `--benchmark` to run)
+  - `@pytest.mark.use_gpu` (needs `--use_gpu` to run)
+  - `@pytest.mark.network` (needs `--network` to run)
+  - `@pytest.mark.database_files` (needs `--database_files` to run)
+  - `@pytest.mark.slow` (skipped under `--quick`; applied module-wide to entrypoint + training + pipeline tests)
 - Tests that require downloaded weights skip gracefully with a message if files are missing.
+- For the fast dev loop, prefer `pytest tests/ --quick` over `pytest tests/test_imports.py` — the former covers dbio, viz, Stage 3 sampling/data-splitting/model-IO, and core utilities without needing weights or GPU.
 
 ## Code style
 

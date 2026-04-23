@@ -2,23 +2,53 @@
 #=GF ID   Pox_VLTF3
 #=GF AC   PF04947.18
 #=GF DE   Viral late transcription factor 3
+#=GF TP   Family
 #=GF CC   This family includes viral late transcription factor 3
 #=GF CC   proteins found in poxviruses and iridoviruses. These
 #=GF CC   proteins activate late gene transcription.
+#=GF RN   [1]
+#=GF RM   11112222
+#=GF RT   Viral late gene transcription factors and their role in
+#=GF RT   poxvirus biology.
+#=GF RA   Some A, Author B;
+#=GF RL   J Virol 2005;79:1234-1245.
 #=GF SQ   100
 //
 # STOCKHOLM 1.0
 #=GF ID   Cutinase
 #=GF AC   PF01083.27
 #=GF DE   Cutinase
+#=GF TP   Domain
+#=GF WK   Cutinase
+#=GF CL   CL0028
 #=GF CC   Cutinases are serine esterases that catalyze the
 #=GF CC   cleavage of cutin, the structural polymer of plant
 #=GF CC   cuticles.
+#=GF RN   [1]
+#=GF RM   22334455
+#=GF RT   Structure of cutinase from Fusarium solani.
+#=GF RA   Foo X, Bar Y;
+#=GF RL   J Mol Biol 1992;225:123-135.
+#=GF RN   [2]
+#=GF RM   33445566
+#=GF RT   Mechanism of cutin hydrolysis by fungal cutinases
+#=GF RT   revisited.
+#=GF RA   Baz Z, Qux W;
+#=GF RL   Biochemistry 1998;37:2345-2356.
 #=GF SQ   200
 //
 # STOCKHOLM 1.0
 #=GF ID   SH3_1
 #=GF AC   PF00018.31
 #=GF DE   SH3 domain
+#=GF TP   Domain
+#=GF WK   SH3_domain
+#=GF CL   CL0010
+#=GF RN   [1]
+#=GF RM   12169629
+#=GF RT   Diverse recognition of non-PxxP peptide ligands by the SH3
+#=GF RT   domains from p67(phox), Grb2 and Pex13p.
+#=GF RA   Kami K, Takeya R, Sumimoto H, Kohda D;
+#=GF RL   EMBO J 2002;21:4268-4276.
 #=GF SQ   50
 //

@@ -1,9 +1,15 @@
 import csv
+import json
 import os
 
 import pytest
 
-from biom3.dbio.build_source_pfam import build_pfam_csv, _parse_fasta_header
+from biom3.dbio.build_source_pfam import (
+    _parse_fasta_header,
+    build_pfam_csv,
+    main,
+    parse_arguments,
+)
 from biom3.dbio.pfam_metadata import PfamMetadataParser
 
 DATDIR = os.path.join(os.path.dirname(__file__), "..", "_data", "dbio")
@@ -119,3 +125,28 @@ class TestBuildPfamCsv:
         rows = _read_csv(output_path)
         for row in rows:
             assert "." not in row["pfam_label"]
+
+
+class TestMainWritesManifest:
+
+    def test_main_writes_build_manifest(self, fasta_path, tmp_path):
+        pfam_sto = os.path.join(DATDIR, "mini_pfam_metadata.sto")
+        output_csv = tmp_path / "pfam_source.csv"
+        args = parse_arguments([
+            "--fasta", fasta_path,
+            "--pfam_metadata", pfam_sto,
+            "-o", str(output_csv),
+        ])
+        main(args)
+
+        manifest_path = tmp_path / "pfam_source.build_manifest.json"
+        assert manifest_path.exists()
+
+        with open(manifest_path) as f:
+            manifest = json.load(f)
+        for key in ("biom3_version", "git_hash", "timestamp",
+                    "command", "args", "database_versions", "outputs"):
+            assert key in manifest, f"missing top-level key: {key}"
+        assert manifest["outputs"]["row_counts"]["pfam"] == 5
+        assert manifest["database_versions"]["pfam_fasta"] is not None
+        assert manifest["database_versions"]["pfam_metadata"] is not None

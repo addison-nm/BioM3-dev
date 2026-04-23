@@ -50,6 +50,36 @@ def run_build_source_pfam():
     main(args)
 
 
+def run_build_source_trembl():
+    from biom3.dbio.build_source_trembl import parse_arguments, main
+    args = parse_arguments(sys.argv[1:])
+    main(args)
+
+
+def run_build_source_expasy():
+    from biom3.dbio.build_source_expasy import parse_arguments, main
+    args = parse_arguments(sys.argv[1:])
+    main(args)
+
+
+def run_build_source_smart():
+    from biom3.dbio.build_source_smart import parse_arguments, main
+    args = parse_arguments(sys.argv[1:])
+    main(args)
+
+
+def run_build_source_brenda():
+    from biom3.dbio.build_source_brenda import parse_arguments, main
+    args = parse_arguments(sys.argv[1:])
+    main(args)
+
+
+def run_build_annotated_pfam_subsets():
+    from biom3.dbio.build_annotated_pfam_subsets import parse_arguments, main
+    args = parse_arguments(sys.argv[1:])
+    main(args)
+
+
 def run_build_annotation_cache():
     from biom3.dbio.build_annotation_cache import parse_arguments, main
     args = parse_arguments(sys.argv[1:])

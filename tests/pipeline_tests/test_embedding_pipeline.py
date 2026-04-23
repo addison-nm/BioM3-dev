@@ -17,6 +17,8 @@ from tests.conftest import DATDIR, TMPDIR, remove_dir, check_downloads
 import h5py
 from biom3.pipeline.embedding_pipeline import parse_arguments, main
 
+pytestmark = [pytest.mark.slow]
+
 #####################
 ##  Configuration  ##
 #####################

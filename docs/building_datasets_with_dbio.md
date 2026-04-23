@@ -52,6 +52,120 @@ The results are concatenated and saved as `dataset.csv`.
 
 ---
 
+## Rebuilding the source CSVs from raw databases
+
+The two source CSVs can be built from raw databases (e.g. for a fresh
+UniProt/Pfam release, or when they aren't already available). Use:
+
+| CLI | Builds | Inputs |
+|-----|--------|--------|
+| `biom3_build_source_swissprot` | `fully_annotated_swiss_prot.csv` | `uniprot_sprot.dat.gz` + `Pfam-A.full.gz` (for family names) |
+| `biom3_build_source_pfam` | `Pfam_protein_text_dataset.csv` | `Pfam-A.fasta.gz` + `Pfam-A.full.gz` (for family metadata) |
+
+```bash
+biom3_build_source_swissprot \
+    --dat data/databases/swissprot/uniprot_sprot.dat.gz \
+    --pfam_metadata data/databases/pfam/Pfam-A.full.gz \
+    -o data/datasets/fully_annotated_swiss_prot.csv
+
+biom3_build_source_pfam \
+    --fasta data/databases/pfam/Pfam-A.fasta.gz \
+    --pfam_metadata data/databases/pfam/Pfam-A.full.gz \
+    -o data/datasets/Pfam_protein_text_dataset.csv
+```
+
+Both commands accept `--chunk_size` (default 10K / 100K rows) for write buffering.
+
+The Swiss-Prot builder has two legacy-parity flags:
+
+- `--require_pfam` / `--no_require_pfam` (default `--no_require_pfam`): by
+  default, Swiss-Prot entries without any `DR Pfam;` cross-references are
+  kept and emitted with `pfam_label=['nan']`, matching the legacy
+  `fully_annotated_swiss_prot.csv`. Pass `--require_pfam` to drop these
+  entries instead (useful if downstream code can't handle the `['nan']`
+  sentinel).
+- `--keep_intermediate_captions`: emits `text_caption` (raw) and
+  `[clean]text_caption` (evidence-stripped but PubMed-preserved) columns
+  alongside `[final]text_caption`. Useful for auditing what the PubMed/ECO
+  stripping passes remove. Without the flag, only `[final]text_caption` is
+  emitted (the column set used by `SwissProtReader`).
+
+**Caption formatting** is controlled by a `CaptionSpec` in each builder module.
+Defaults reproduce the legacy CSVs: ALL-CAPS labels for Swiss-Prot (`SWISSPROT_SPEC`
+in [src/biom3/dbio/build_source_swissprot.py](../src/biom3/dbio/build_source_swissprot.py)),
+lowercase labels for Pfam (`PFAM_SPEC` in
+[src/biom3/dbio/build_source_pfam.py](../src/biom3/dbio/build_source_pfam.py)).
+See [demos/custom_caption_format.py](../demos/custom_caption_format.py) for
+swapping fields or relabeling.
+
+**Row ordering.** `biom3_build_source_swissprot` emits rows in the order they
+appear in the input `.dat` file (Swiss-Prot's internal entry order), not
+alphabetically sorted by accession as the legacy CSV was. Any downstream code
+that does positional head/tail sampling or derives train/val splits from row
+indices will see different data between the legacy and the regenerated CSV
+even when the two have identical entry sets. Sort by `primary_Accession` before
+such positional slicing if you want reproducibility across the two formats.
+
+**Provenance.** Each builder writes a `<output_stem>.build_manifest.json`
+next to the output CSV (e.g. `fully_annotated_swiss_prot.csv` yields
+`fully_annotated_swiss_prot.build_manifest.json`) capturing the input file
+sizes/mtimes, the UniProt `reldate.txt` release version and Pfam
+`relnotes.txt` version when present alongside the inputs, plus the full
+`args`, `git_hash`, and `biom3_version`. The stem-based name lets multiple
+source CSVs coexist in the same directory without overwriting each other's
+manifest. Shape is otherwise identical to the `build_manifest.json` that
+`biom3_build_dataset` writes.
+
+For per-column provenance (which `.dat` lines map to which caption fields), see
+[training_csv_provenance.md](training_csv_provenance.md).
+
+### Annotated Pfam subsets from `Pfam-A.full.gz` (non-redundant scope)
+
+`biom3_build_source_pfam` reads `Pfam-A.fasta.gz`, which Pfam ships as a
+**90% non-redundant** FASTA (see `relnotes.txt` line 224). For large
+families this aggressively collapses near-duplicate sequences — SH3
+(PF00018) comes out to 26,468 rows in Pfam 38.1. The full `Pfam-A.full.gz`
+Stockholm alignment carries every reference-proteome hit (176,301 rows
+for PF00018 in 38.1) but isn't materialized as a CSV by the main builder.
+
+For finetuning datasets that want the full RP coverage, use
+`biom3_build_annotated_pfam_subsets`. It streams `Pfam-A.full.gz`
+directly, extracts only the requested families, strips Stockholm gap
+characters (`.` / `-`), uppercases insertion residues, and emits a CSV
+enriched with Pfam-level annotations beyond what the main builder
+captures: `family_type`, `family_clan`, `family_wikipedia`, and
+`family_references` (all `#=GF` header fields joined per row).
+
+```bash
+biom3_build_annotated_pfam_subsets \
+    -p PF00018 PF07714 \
+    --pfam_full data/databases/pfam/Pfam-A.full.gz \
+    -o outputs/SH3_Pkinase_full.csv
+```
+
+| CLI | Source file | Scope | PF00018 row count |
+|-----|-------------|-------|-------------------|
+| `biom3_build_source_pfam` | `Pfam-A.fasta.gz` | RP, 90% non-redundant | 26,468 |
+| `biom3_build_annotated_pfam_subsets` | `Pfam-A.full.gz` | RP, **non-redundant** | **176,301** |
+
+Output schema (11 columns): `id, range, pfam_label, sequence,
+family_name, family_description, family_type, family_clan,
+family_wikipedia, family_references, [final]text_caption`. The extra
+`family_*` columns exist as separate fields (not folded into the
+caption) so downstream training code can random-subsample them
+independently. Runtime on the DGX Spark data share is roughly 5–6
+minutes regardless of how many families you request — the scan cost is
+dominated by decompressing the 23 GB input, and multi-family requests
+share the same single pass. The builder warns (but does not fail) if
+any requested Pfam ID yields zero rows, e.g. a typo or an obsolete
+accession.
+
+Everything beyond the row-count lift (stats markdown, build manifest
+with Pfam release version, `IncrementalStatsBuilder`-backed coverage
+report) matches the other `biom3_build_source_*` tools.
+
+---
+
 ## Step 1: Configure database paths
 
 Paths are resolved by `biom3.dbio.config` with this priority:

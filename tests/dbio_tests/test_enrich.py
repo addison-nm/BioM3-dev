@@ -77,7 +77,8 @@ class TestEnrichDataframe:
             "pfam_label": ["PF00018", "PF00018"],
         })
         uniprot_data = {"A0A001": MOCK_UNIPROT_ENTRY}
-        result = enrich_dataframe(df, uniprot_data=uniprot_data)
+        result, join_stats = enrich_dataframe(df, uniprot_data=uniprot_data)
+        assert join_stats == {}
 
         # Annotation columns should be present
         for col in ANNOTATION_COLUMNS:
@@ -101,7 +102,7 @@ class TestEnrichDataframe:
             "[final]text_caption": ["original caption"],
             "pfam_label": ["PF00018"],
         })
-        result = enrich_dataframe(df, uniprot_data={"A0A001": MOCK_UNIPROT_ENTRY})
+        result, _ = enrich_dataframe(df, uniprot_data={"A0A001": MOCK_UNIPROT_ENTRY})
         assert result.loc[0, "[final]text_caption"] == "original caption"
 
 

@@ -27,6 +27,7 @@ biom3_ProteoScribe_sample \
 """
 
 import copy
+import json
 import os
 import sys
 from datetime import datetime
@@ -117,6 +118,13 @@ def parse_arguments(args):
     parser.add_argument('--fasta_dir', type=str, default=None,
                         help="Output directory for FASTA files. "
                              "Default: <output_dir>/fasta/")
+    parser.add_argument('--pre_unmask', action='store_true', default=False,
+                        help="Start diffusion from a partially-unmasked state. "
+                             "Requires --pre_unmask_config.")
+    parser.add_argument('--pre_unmask_config', type=str, default=None,
+                        help="Path to JSON config describing the pre-unmask "
+                             "strategy (strategy, fill_with, diffusion_budget). "
+                             "Required when --pre_unmask is set.")
     return parser.parse_args(args)
 
 
@@ -188,6 +196,102 @@ def resolve_animate_replicas(parsed, num_replicas):
         )
         parsed = num_replicas
     return set(range(parsed))
+
+
+_PRE_UNMASK_SUPPORTED_STRATEGIES = ("last_k",)
+_PRE_UNMASK_FILL_ALIASES = {
+    "PAD": "<PAD>",
+    "pad": "<PAD>",
+    "<PAD>": "<PAD>",
+}
+
+
+def load_pre_unmask_config(config_path: str) -> dict:
+    """Load and validate a pre-unmask config JSON file.
+
+    Required keys: ``strategy``, ``fill_with``, ``diffusion_budget``.
+    Unknown keys raise; unsupported enum values raise.
+    """
+    if config_path is None:
+        raise ValueError("--pre_unmask requires --pre_unmask_config")
+    with open(config_path) as fh:
+        cfg = json.load(fh)
+    required = {"strategy", "fill_with", "diffusion_budget"}
+    missing = required - cfg.keys()
+    if missing:
+        raise ValueError(f"pre_unmask_config is missing keys: {sorted(missing)}")
+    unknown = set(cfg) - required
+    if unknown:
+        raise ValueError(f"pre_unmask_config has unknown keys: {sorted(unknown)}")
+    if cfg["strategy"] not in _PRE_UNMASK_SUPPORTED_STRATEGIES:
+        raise ValueError(
+            f"pre_unmask strategy {cfg['strategy']!r} not supported; "
+            f"valid: {_PRE_UNMASK_SUPPORTED_STRATEGIES}"
+        )
+    if not isinstance(cfg["diffusion_budget"], int) or cfg["diffusion_budget"] <= 0:
+        raise ValueError(
+            f"pre_unmask diffusion_budget must be a positive int, got {cfg['diffusion_budget']!r}"
+        )
+    return cfg
+
+
+def _resolve_fill_token_id(fill_with: str, tokens: list) -> int:
+    """Map a ``fill_with`` alias (e.g. 'PAD') to its token id in ``tokens``."""
+    canonical = _PRE_UNMASK_FILL_ALIASES.get(fill_with)
+    if canonical is None:
+        raise ValueError(
+            f"pre_unmask fill_with={fill_with!r} not supported; "
+            f"valid aliases: {sorted(_PRE_UNMASK_FILL_ALIASES)}"
+        )
+    if canonical not in tokens:
+        raise ValueError(
+            f"Token {canonical!r} not present in vocabulary; cannot resolve fill id"
+        )
+    return tokens.index(canonical)
+
+
+def _build_initial_mask_state(args, batch_size: int, tokens: list):
+    """Construct the starting tensor and sampling path for a generation batch.
+
+    Returns ``(extract_digit_samples, sampling_path)`` where:
+
+    - ``extract_digit_samples`` has shape ``(batch_size, sequence_length)`` and
+      holds the initial mask state (0 = masked, non-zero = already filled).
+    - ``sampling_path`` is a per-batch permutation of ``range(diffusion_steps)``
+      that determines the order in which masked positions are unmasked.
+
+    When ``args.pre_unmask`` is False (default), returns an all-zero tensor of
+    shape ``(batch_size, args.diffusion_steps)`` — matching the original
+    behaviour where ``sequence_length == diffusion_steps``.
+
+    When ``args.pre_unmask`` is True, positions ``[0, D)`` are left masked
+    (value 0) and positions ``[D, sequence_length)`` are filled with the
+    resolved ``fill_with`` token id. Only the first ``D`` positions are
+    unmasked during diffusion.
+    """
+    diffusion_steps = args.diffusion_steps
+    sequence_length = getattr(args, 'sequence_length', diffusion_steps)
+
+    if not getattr(args, 'pre_unmask', False):
+        init = torch.zeros(batch_size, sequence_length, dtype=torch.long)
+        sampling_path = torch.stack([
+            torch.randperm(diffusion_steps) for _ in range(batch_size)
+        ])
+        return init, sampling_path
+
+    if diffusion_steps > sequence_length:
+        raise ValueError(
+            f"pre_unmask diffusion_budget ({diffusion_steps}) must be "
+            f"<= sequence_length ({sequence_length})"
+        )
+    fill_with = getattr(args, 'pre_unmask_fill_with', 'PAD')
+    fill_id = _resolve_fill_token_id(fill_with, tokens)
+    init = torch.full((batch_size, sequence_length), fill_id, dtype=torch.long)
+    init[:, :diffusion_steps] = 0
+    sampling_path = torch.stack([
+        torch.randperm(diffusion_steps) for _ in range(batch_size)
+    ])
+    return init, sampling_path
 
 
 # Step 4: Sample sequences from the model
@@ -298,24 +402,29 @@ def batch_stage3_generate_sequences(
         batch_prompt_indices = [p_idx for p_idx, r_idx in batch]
         batched_z_text_sample = z_t[batch_prompt_indices]
 
+        # Build initial mask state (all-masked by default, or partially
+        # pre-unmasked when args.pre_unmask is enabled).
+        initial_samples, batch_perms = _build_initial_mask_state(
+            args, current_batch_size, tokens,
+        )
+
         # Generate denoised samples using the model
         unmasking_order = getattr(args, 'unmasking_order', 'random')
         if unmasking_order in ('confidence', 'confidence_no_pad'):
             mask_realization_list, _, batch_probs = Stage3_sample_tools.batch_generate_denoised_sampled_confidence(
                 args=args,
                 model=model,
-                extract_digit_samples=torch.zeros(current_batch_size, args.diffusion_steps),
+                extract_digit_samples=initial_samples,
                 extract_time=torch.zeros(current_batch_size).long(),
                 extract_digit_label=batched_z_text_sample,
                 store_probabilities=store_probabilities,
                 skip_pad=(unmasking_order == 'confidence_no_pad'),
             )
         else:
-            batch_perms = torch.stack([torch.randperm(args.diffusion_steps) for _ in range(current_batch_size)])
             mask_realization_list, _, batch_probs = Stage3_sample_tools.batch_generate_denoised_sampled(
                 args=args,
                 model=model,
-                extract_digit_samples=torch.zeros(current_batch_size, args.diffusion_steps),
+                extract_digit_samples=initial_samples,
                 extract_time=torch.zeros(current_batch_size).long(),
                 extract_digit_label=batched_z_text_sample,
                 sampling_path=batch_perms,
@@ -434,6 +543,33 @@ def main(args, _setup_logging=True):
 
     logger.info("Unmasking order: %s", config_args.unmasking_order)
     logger.info("Token strategy: %s", config_args.token_strategy)
+
+    # Pre-unmask feature: snapshot the architectural sequence length (current
+    # diffusion_steps value from config == seq_len trained on), then if
+    # enabled, override diffusion_steps with the budget D.
+    config_args.sequence_length = config_args.diffusion_steps
+    config_args.pre_unmask = bool(getattr(config_args_parser, 'pre_unmask', False))
+    if config_args.pre_unmask:
+        pre_unmask_cfg = load_pre_unmask_config(config_args_parser.pre_unmask_config)
+        if pre_unmask_cfg["diffusion_budget"] > config_args.sequence_length:
+            raise ValueError(
+                f"pre_unmask diffusion_budget ({pre_unmask_cfg['diffusion_budget']}) "
+                f"must be <= sequence_length ({config_args.sequence_length})"
+            )
+        config_args.diffusion_steps = pre_unmask_cfg["diffusion_budget"]
+        config_args.pre_unmask_strategy = pre_unmask_cfg["strategy"]
+        config_args.pre_unmask_fill_with = pre_unmask_cfg["fill_with"]
+        logger.info(
+            "Pre-unmask enabled: strategy=%s fill_with=%s D=%d seq_len=%d",
+            config_args.pre_unmask_strategy,
+            config_args.pre_unmask_fill_with,
+            config_args.diffusion_steps,
+            config_args.sequence_length,
+        )
+    elif getattr(config_args_parser, 'pre_unmask_config', None):
+        logger.warning(
+            "--pre_unmask_config ignored because --pre_unmask is not set"
+        )
 
     # load test dataset
     embedding_dataset = torch.load(config_args_parser.input_path)

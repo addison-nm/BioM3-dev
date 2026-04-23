@@ -1,0 +1,11 @@
+id,pfam_label,sequence,[final]text_caption
+PFA00001,PF00001,MAKEDNIEMQGTVLETLPNTMFRVELEN,"PROTEIN NAME: Family one alpha. FUNCTION: Short example protein for family PF00001. SIMILARITY: Belongs to the toy test family one."
+PFA00002,PF00001,MKFTAQGIELPTVEGHGNIYYSGKRTMP,"PROTEIN NAME: Family one beta. FUNCTION: Second synthetic example for PF00001. SIMILARITY: Belongs to the toy test family one."
+PFA00003,PF00002,MVKMIVGLGNPGSKYEKTKHNIGFMAID,"PROTEIN NAME: Family two alpha. FUNCTION: Short example protein for family PF00002. SIMILARITY: Belongs to the toy test family two."
+PFA00004,PF00002,MTRPNKDETVYLAAGKFNVLQPEDCMIE,"PROTEIN NAME: Family two beta. FUNCTION: Second synthetic example for PF00002. SIMILARITY: Belongs to the toy test family two."
+PFA00005,PF00003,MTDYPIKYRLIKTEKHTGARLGEIITPH,"PROTEIN NAME: Family three alpha. FUNCTION: Short example protein for family PF00003. SIMILARITY: Belongs to the toy test family three."
+PFA00006,PF00003,MAKEDVVAQIGHNTAPEWRMKFCSDVIM,"PROTEIN NAME: Family three beta. FUNCTION: Second synthetic example for PF00003. SIMILARITY: Belongs to the toy test family three."
+PFA00007,PF00004,MGKAIGIDLGTTNSVVAVVVGGEPVVIP,"PROTEIN NAME: Family four alpha. FUNCTION: Short example protein for family PF00004. SIMILARITY: Belongs to the toy test family four."
+PFA00008,PF00004,MEQLAKDTSFLNQILRTGNPYVKEHAFV,"PROTEIN NAME: Family four beta. FUNCTION: Second synthetic example for PF00004. SIMILARITY: Belongs to the toy test family four."
+PFA00009,PF00005,MKLTPAELSQPGFNKQTIDRVCLVEWAM,"PROTEIN NAME: Family five alpha. FUNCTION: Short example protein for family PF00005. SIMILARITY: Belongs to the toy test family five."
+PFA00010,PF00006,MRKSEKTYVKFQIDNNPVELQWPAGHLV,"PROTEIN NAME: Family six alpha. FUNCTION: Short example protein for family PF00006. SIMILARITY: Belongs to the toy test family six."

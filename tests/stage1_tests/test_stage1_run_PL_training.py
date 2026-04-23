@@ -28,6 +28,8 @@ REQUIRED_DOWNLOADS = [
 def prefix_paths(args):
     if args.data_path is not None:
         args.data_path = os.path.join(DATDIR, args.data_path)
+    if args.pfam_data_path is not None:
+        args.pfam_data_path = os.path.join(DATDIR, args.pfam_data_path)
     if args.output_root is not None:
         args.output_root = os.path.join(TMPDIR, args.output_root)
     if args.pretrained_weights is not None:
@@ -35,12 +37,13 @@ def prefix_paths(args):
 
 
 @pytest.mark.parametrize(
-    "argstring_fpath, expect_error_context", [
-        [f"{ARGS_DIR}/stage1_training_args_scratch_v1.txt", does_not_raise()],
+    "argstring_fpath, expect_error_context, expected_dataset_type", [
+        [f"{ARGS_DIR}/stage1_training_args_scratch_v1.txt", does_not_raise(), "default"],
+        [f"{ARGS_DIR}/stage1_training_args_pfam_v1.txt", does_not_raise(), "pfam"],
     ],
 )
 @pytest.mark.parametrize("device", ["cuda", "xpu"])
-def test_stage1_train_from_scratch(argstring_fpath, expect_error_context, device):
+def test_stage1_train_from_scratch(argstring_fpath, expect_error_context, expected_dataset_type, device):
     issues, skip_reason = check_downloads(REQUIRED_DOWNLOADS)
     if issues:
         pytest.skip(reason=skip_reason)
@@ -70,7 +73,7 @@ def test_stage1_train_from_scratch(argstring_fpath, expect_error_context, device
 
     with open(os.path.join(artifacts_dir, "args.json")) as f:
         args_dict = json.load(f)
-    assert args_dict["dataset_type"] == "default"
+    assert args_dict["dataset_type"] == expected_dataset_type
     assert args_dict["epochs"] == 1
 
     remove_dir(OUTPUTS_DIR)

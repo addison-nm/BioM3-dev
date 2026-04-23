@@ -208,7 +208,7 @@ def plot_throughput_vs_batch(npz, env, out_path):
 
     ax.set_xscale("log", base=2)
     ax.set_xlabel("Batch size B (sequences processed in parallel)")
-    ax.set_ylabel("Throughput (full sequences / s)")
+    ax.set_ylabel("Throughput (sequences / s)")
     ax.set_title(
         "Generation throughput vs batch size\n"
         f"(1 sequence = {_D_str(npz)} unmasking steps)\n"
@@ -301,14 +301,14 @@ def plot_total_time_vs_N(npz, env, out_path):
                     marker="o", linewidth=1.3, label=f"B={int(b)}")
         ax.set_xscale("log", base=2)
         ax.set_yscale("log")
-        ax.set_xlabel("Total sequences N (full sequences generated)")
+        ax.set_xlabel("Total sequences N (sequences generated)")
         ax.set_title(f"token_strategy = {strategy}", fontsize=10)
         ax.grid(True, which="both", alpha=0.3)
         ax.legend(fontsize=8, loc="best")
     axes[0, 0].set_ylabel("Total wall-clock time (s)")
     fig.suptitle(
         f"Total generation time vs N\n"
-        f"(N full sequences × {_D_str(npz)} unmasking steps each)\n"
+        f"(N sequences × {_D_str(npz)} unmasking steps each)\n"
         f"{_title_suffix(env)}",
         fontsize=10,
     )

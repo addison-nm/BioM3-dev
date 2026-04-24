@@ -350,10 +350,14 @@ class PL_ProtARDM(pl.LightningModule):
         self.common_step(realization, realization_idx, stage='val')
         #self.common_step(realization, realization_idx, stage='EMA_val')
 
-    def on_train_epoch_end(self):
-        # Drain pending async collectives (DeepSpeed ZeRO grad allreduce on XPU/oneCCL
-        # can straggle on a subset of ranks; without this, validation's sync_dist
-        # logs race with the grad allreduce and deadlock).
+    def on_train_batch_end(self, outputs, batch, batch_idx):
+        # Force all ranks to synchronize after every training step. DeepSpeed
+        # ZeRO's backward-pass grad allreduce on XPU/oneCCL can straggle across
+        # ranks: some ranks return from backward() before others have finished
+        # their allreduce_bucket calls. Fast ranks then issue barrier (for val
+        # metric sync, checkpoint, etc.) on the same communicator while slow
+        # ranks are still in all_reduce — mismatched collectives, deadlock.
+        # Barrier here is the first point after backward+optimizer completes.
         if BACKEND_NAME == _XPU:
             torch.xpu.synchronize()
         if torch.distributed.is_available() and torch.distributed.is_initialized():

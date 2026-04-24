@@ -1,25 +1,15 @@
-#!/bin/bash -l
-#PBS -A NLDesignProtein
-#PBS -N <JOB_NAME>
-#PBS -l walltime=01:00:00
-#PBS -l select=<NUM_NODES>
-#PBS -l place=scatter
-#PBS -l filesystems=home:flare
-#PBS -q <QUEUE>
-#PBS -j oe
-# PBS -M <emailaddress>
-# PBS -m be
+#!/bin/bash
+#=============================================================================
+# Template: Stage 3 finetuning (DGX Spark)
+#=============================================================================
 
+set -euo pipefail
 
-projdir=${PBS_O_WORKDIR}  # Should submit job from the BioM3-dev directory
+projdir=$(cd "$(dirname "$0")/../.." && pwd)
 cd ${projdir}
-
-module load frameworks
-source ./venvs/biom3-env/bin/activate
 
 # Configurations to edit
 config_path=./configs/stage3_training/<CONFIG_NAME>.json  # JSON config file
-num_nodes=<NUM_NODES>           # Should match num requested nodes in PBS header
 epochs=5                        # Number of epochs to finetune
 resume_from_checkpoint=None     # None to start finetuning fresh
 pretrained_weights=<WEIGHTS_PATH>  # Path to pretrained weights (.bin)
@@ -28,9 +18,9 @@ finetune_last_n_layers=1        # Number of last layers per block to unfreeze
 primary_data_path=<DATA_PATH>   # Path to finetuning data (.hdf5)
 
 # Constant configurations
-num_devices=12                  # number of devices per node
-wandb_api_key=${WANDB_API_KEY:-}    # define W&B key prior to run, e.g. via .bashrc
-device=xpu                      # device available (cuda, xpu)
+num_nodes=1                     # single node
+num_devices=1                   # single GPU on Spark
+device=cuda                     # device available (cuda)
 
 # Construct the run ID
 datetime=$(date +%Y%m%d_%H%M%S)
@@ -39,15 +29,13 @@ run_id=${config_name}_ft${finetune_last_n_blocks}-${finetune_last_n_layers}_n${n
 
 # Direct output to log file
 mkdir -p logs
-log_fpath=logs/${run_id}.${PBS_JOBID}.o
+log_fpath=logs/${run_id}.o
 
 source environment.sh
-./scripts/stage3_train_multinode.sh \
+./scripts/stage3_train_singlenode.sh \
     ${config_path} \
-    ${num_nodes} \
     ${num_devices} \
     ${device} \
-    "${wandb_api_key}" \
     ${run_id} \
     --epochs ${epochs} \
     --resume_from_checkpoint ${resume_from_checkpoint} \

@@ -2,7 +2,7 @@
 #PBS -A NLDesignProtein
 #PBS -N <JOB_NAME>
 #PBS -l walltime=01:00:00
-#PBS -l select=<NUM_NODES>
+#PBS -l select=1
 #PBS -l place=scatter
 #PBS -l filesystems=home:flare
 #PBS -q <QUEUE>
@@ -18,17 +18,17 @@ module load frameworks
 source ./venvs/biom3-env/bin/activate
 
 # Configurations to edit
-config_path=./configs/stage1_training/pretrain_scratch_v1.json   # or pretrain_pfam_v1.json
-num_nodes=<NUM_NODES>           # Should match num requested nodes in PBS header
-epochs=20                       # Number of epochs to train
-resume_from_checkpoint=None     # None to train from scratch
+config_path=./configs/stage3_training/<CONFIG_NAME>.json  # JSON config file
+epochs=5                        # Ignored for Phase 2 training (uses max_steps)
+resume_from_checkpoint=None     # None to start Phase 2 training
+
+# Path to pretrained state_dict file.
+# Typically logs/history/Stage3_history/checkpoints/<NAME>/state_dict.best.pth
+pretrained_weights=<STATE_DICT_PATH>
 
 # Constant configurations
-# Multi-tile XPU (num_devices > 1) exercises the 'auto' strategy path in
-# Stage 1, which has only been smoke-tested with num_devices=1. Start small
-# and verify loss converges before scaling.
-num_devices=12                  # number of devices (tiles) per node
-wandb_api_key=${WANDB_API_KEY:-}    # define W&B key prior to run, e.g. via .bashrc
+num_nodes=1
+num_devices=12                  # number of devices (tiles) on this node
 device=xpu                      # device available (cuda, xpu)
 
 # Construct the run ID
@@ -41,14 +41,13 @@ mkdir -p logs
 log_fpath=logs/${run_id}.${PBS_JOBID}.o
 
 source environment.sh
-./scripts/stage1_train_multinode.sh \
+./scripts/stage3_train_singlenode.sh \
     ${config_path} \
-    ${num_nodes} \
     ${num_devices} \
     ${device} \
-    "${wandb_api_key}" \
     ${run_id} \
     --epochs ${epochs} \
     --resume_from_checkpoint ${resume_from_checkpoint} \
+    --pretrained_weights ${pretrained_weights} \
     --wandb True \
 > ${log_fpath} 2>&1

@@ -1,0 +1,49 @@
+#!/bin/bash -l
+#PBS -A NLDesignProtein
+#PBS -N <JOB_NAME>
+#PBS -l walltime=01:00:00
+#PBS -l select=1
+#PBS -l place=scatter
+#PBS -l filesystems=home:flare
+#PBS -q <QUEUE>
+#PBS -j oe
+# PBS -M <emailaddress>
+# PBS -m be
+
+
+projdir=${PBS_O_WORKDIR}  # Should submit job from the BioM3-dev directory
+cd ${projdir}
+
+module load frameworks
+source ./venvs/biom3-env/bin/activate
+
+# Configurations to edit
+config_path=./configs/stage2_training/pretrain_scratch_v1.json
+epochs=20                       # Number of epochs to train
+resume_from_checkpoint=None     # None to train from scratch
+
+# Constant configurations
+# Stage 2 Facilitator has ~66K trainable params; single-tile is intentional.
+num_nodes=1
+num_devices=1
+device=xpu
+
+# Construct the run ID
+datetime=$(date +%Y%m%d_%H%M%S)
+config_name=$(basename "${config_path}" .json)
+run_id=${config_name}_n${num_nodes}_d${num_devices}_e${epochs}_V${datetime}
+
+# Direct output to log file
+mkdir -p logs
+log_fpath=logs/${run_id}.${PBS_JOBID}.o
+
+source environment.sh
+./scripts/stage2_train_singlenode.sh \
+    ${config_path} \
+    ${num_devices} \
+    ${device} \
+    ${run_id} \
+    --epochs ${epochs} \
+    --resume_from_checkpoint ${resume_from_checkpoint} \
+    --wandb True \
+> ${log_fpath} 2>&1

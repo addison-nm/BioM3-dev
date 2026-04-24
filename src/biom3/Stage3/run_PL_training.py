@@ -35,7 +35,7 @@ if BACKEND_NAME == _XPU:
     # lightning imports (from local installation)
     import lightning as pl
     from lightning import Trainer
-    from lightning.fabric.strategies import DeepSpeedStrategy
+    from lightning.pytorch.strategies import DeepSpeedStrategy
     from lightning.pytorch.loggers import TensorBoardLogger
     from lightning.pytorch.loggers import WandbLogger
     from lightning.pytorch.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
@@ -1370,7 +1370,18 @@ def train_model(
             verbose=True,
         ))
 
-    # Define common trainer parameters
+    # Define common trainer parameters.
+    # overlap_comm=False: default True fires grad allreduces asynchronously during
+    # backward. On XPU/oneCCL this produces nondeterministic bucket ordering across
+    # ranks and causes mismatched-collective deadlocks. Disabling serializes grad
+    # reduction after backward — slightly slower, but stable.
+    deepspeed_strategy = DeepSpeedStrategy(
+        stage=2,
+        allgather_bucket_size=int(5e8),
+        reduce_bucket_size=int(5e8),
+        contiguous_gradients=True,
+        overlap_comm=(BACKEND_NAME != _XPU),
+    )
     trainer_params = {
         'enable_progress_bar': True,
         'enable_model_summary': True,
@@ -1378,7 +1389,7 @@ def train_model(
         'devices': gpu_devices,
         'num_nodes': num_nodes,
         'accelerator': args.device,
-        'strategy': 'deepspeed_stage_2',  # TODO: use strategy defined above?
+        'strategy': deepspeed_strategy,
         'accumulate_grad_batches': acc_grad_batches,
         'logger': loggers,
         'log_every_n_steps': log_every_n_steps,

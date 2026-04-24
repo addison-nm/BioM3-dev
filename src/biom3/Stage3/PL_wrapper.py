@@ -415,7 +415,12 @@ class PL_ProtARDM(pl.LightningModule):
         Returns:
             tuple: (loss, metrics) where metrics is a tuple of performance measurements
         """
-        device = self.script_args.device
+        # Use Lightning's rank-local device (xpu:N for rank N) rather than the
+        # CLI --device string ("xpu"), which resolves to xpu:0 on every rank and
+        # crashes under plain DDP with "Expected all tensors to be on the same
+        # device". DeepSpeedStrategy previously hid this by moving tensors
+        # transparently before use.
+        device = self.device
 
         bs, channel, seq_length = realization.size()
 

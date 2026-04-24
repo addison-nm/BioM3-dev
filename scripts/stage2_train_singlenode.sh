@@ -44,11 +44,18 @@ else
     wandb_override=""
 fi
 
-# ALCF-recommended per-rank CPU binding for a 12-tile Aurora node. Each rank
-# gets 4 framework cores, disjoint from the CCL worker cores pinned by
-# CCL_WORKER_AFFINITY in environment.sh. Tile-topology-specific; if NGPU != 12
-# the list below must be adjusted (see ALCF oneCCL.md §worker affinity).
-CPU_BIND="verbose,list:4-7:8-11:12-15:16-19:20-23:24-27:56-59:60-63:64-67:68-71:72-75:76-79"
+# ALCF-canonical per-rank CPU binding for a 12-tile Aurora node. Each rank
+# gets an 8-core slot adjacent to the GPU it drives:
+#   ranks  0,1 -> GPU 0 (cores  1-8 / 9-16)   socket 0
+#   ranks  2,3 -> GPU 1 (cores 17-24 / 25-32) socket 0
+#   ranks  4,5 -> GPU 2 (cores 33-40 / 41-48) socket 0
+#   ranks  6,7 -> GPU 3 (cores 53-60 / 61-68) socket 1
+#   ranks  8,9 -> GPU 4 (cores 69-76 / 77-84) socket 1
+#   ranks 10,11-> GPU 5 (cores 85-92 / 93-100) socket 1
+# Cores 0/52 are reserved for the OS; the gap 49-52 covers core-52 + buffer.
+# CCL progress threads land on the last core of each rank's range
+# (8,16,...,100) via CCL_WORKER_AFFINITY in environment.sh. NGPU must = 12.
+CPU_BIND="verbose,list:1-8:9-16:17-24:25-32:33-40:41-48:53-60:61-68:69-76:77-84:85-92:93-100"
 
 mpiexec \
     --verbose \

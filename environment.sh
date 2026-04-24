@@ -32,9 +32,12 @@ elif [[ "$_hostname" == x4* ]] || [[ "$_hostname" == aurora-uan* ]]; then
     export FI_MR_CACHE_MONITOR=userfaultfd
     # Hang avoidance — pairs with CCL_OP_SYNC (already set by frameworks module).
     export CCL_ATL_SYNC_COLL=1
-    # Pin CCL progress threads to last 6 cores of each socket, disjoint from
-    # framework cores (see --cpu-bind list in the train scripts).
-    export CCL_WORKER_AFFINITY=42,43,44,45,46,47,94,95,96,97,98,99
+    # Pin CCL progress threads to the last core of each rank's --cpu-bind range
+    # (see ALCF-canonical 8-cores-per-rank binding in the train scripts).
+    # Each rank therefore gets 7 framework cores + 1 CCL worker core within its
+    # pin domain — equivalent to CCL_WORKER_AFFINITY=auto but explicit so we
+    # can verify with `taskset`.
+    export CCL_WORKER_AFFINITY=8,16,24,32,40,48,60,68,76,84,92,100
     # Avoid `AF_UNIX path too long` on Lightning DataLoader workers
     # (known-issues.md #7).
     export TMPDIR=/tmp

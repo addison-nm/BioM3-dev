@@ -20,9 +20,8 @@
 
   "sweep": {
     "batch_size": [16, 32],
-    "acc_grad_batches": [1, 2],
     "precision": ["bf16", "32"]
   },
 
-  "output_root": "outputs/Stage3_training_bm"
+  "output_root": "outputs/Stage3_training_bm_spark"
 }

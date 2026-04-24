@@ -350,18 +350,18 @@ class PL_ProtARDM(pl.LightningModule):
         self.common_step(realization, realization_idx, stage='val')
         #self.common_step(realization, realization_idx, stage='EMA_val')
 
-    def on_train_batch_end(self, outputs, batch, batch_idx):
-        # Force all ranks to synchronize after every training step. DeepSpeed
-        # ZeRO's backward-pass grad allreduce on XPU/oneCCL can straggle across
-        # ranks: some ranks return from backward() before others have finished
-        # their allreduce_bucket calls. Fast ranks then issue barrier (for val
-        # metric sync, checkpoint, etc.) on the same communicator while slow
-        # ranks are still in all_reduce — mismatched collectives, deadlock.
-        # Barrier here is the first point after backward+optimizer completes.
-        if BACKEND_NAME == _XPU:
-            torch.xpu.synchronize()
+    def on_fit_start(self):
+        # Diagnostic: confirm which torch.distributed backend is actually in use.
+        # On Aurora frameworks/2025.3.1 this should print 'xccl'. If it prints
+        # 'ccl' or 'gloo' the DeepSpeedStrategy process_group_backend kwarg
+        # isn't taking effect and oneCCL collectives aren't going through the
+        # native xccl path.
         if torch.distributed.is_available() and torch.distributed.is_initialized():
-            torch.distributed.barrier()
+            backend = torch.distributed.get_backend()
+            import logging
+            logging.getLogger().info(
+                f"[rank {self.global_rank}] torch.distributed backend = {backend}"
+            )
 
     def on_before_optimizer_step(self, optimizer):
         norms = [p.grad.detach().norm(2) for p in self.parameters() if p.grad is not None]

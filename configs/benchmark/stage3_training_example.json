@@ -1,0 +1,29 @@
+{
+  "arch_id": "ProteoScribe_1block_v1",
+  "benchmark_type": "stage3_training",
+
+  "base_training_config_path": "configs/stage3_training/pretrain_scratch_v1.json",
+
+  "benchmark_per_step": true,
+  "benchmark_skip_first_epoch": true,
+
+  "training_extra_args": {
+    "epochs": 2,
+    "limit_train_batches": "50",
+    "limit_val_batches": "5",
+    "save_metrics_history": "False",
+    "wandb": "False",
+    "runs_folder": "runs",
+    "checkpoints_folder": "checkpoints"
+  },
+
+  "sweep": {
+    "batch_size": [16, 32],
+    "acc_grad_batches": [1, 2],
+    "precision": ["bf16", "32"],
+    "gpu_devices": [1],
+    "num_workers": [0]
+  },
+
+  "output_root": "outputs/Stage3_training_bm"
+}

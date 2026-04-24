@@ -52,6 +52,7 @@ biom3_build_annotated_pfam_subsets = "biom3.dbio.__main__:run_build_annotated_pf
 biom3_build_annotation_cache = "biom3.dbio.__main__:run_build_annotation_cache"
 biom3_app = "biom3.app:main"
 biom3_benchmark_stage3_generation = "biom3.benchmarks.__main__:run_benchmark_stage3_generation"
+biom3_benchmark_stage3_training = "biom3.benchmarks.__main__:run_benchmark_stage3_training"
 biom3_plot_benchmark = "biom3.benchmarks.__main__:run_plot_benchmark"
 
 [tool.pytest.ini_options]

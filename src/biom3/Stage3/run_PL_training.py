@@ -35,7 +35,7 @@ if BACKEND_NAME == _XPU:
     # lightning imports (from local installation)
     import lightning as pl
     from lightning import Trainer
-    from lightning.pytorch.strategies import DeepSpeedStrategy
+    from lightning.pytorch.strategies import DeepSpeedStrategy, DDPStrategy
     from lightning.pytorch.loggers import TensorBoardLogger
     from lightning.pytorch.loggers import WandbLogger
     from lightning.pytorch.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
@@ -47,7 +47,7 @@ else:
     # PyTorch Lightning imports
     import pytorch_lightning as pl
     from pytorch_lightning import Trainer
-    from pytorch_lightning.strategies import DeepSpeedStrategy
+    from pytorch_lightning.strategies import DeepSpeedStrategy, DDPStrategy
     from pytorch_lightning.loggers import TensorBoardLogger
     from pytorch_lightning.loggers import WandbLogger
     from pytorch_lightning.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
@@ -1386,6 +1386,19 @@ def train_model(
         overlap_comm=(BACKEND_NAME != _XPU),
         process_group_backend='xccl' if BACKEND_NAME == _XPU else None,
     )
+    # Plain DDP with static_graph=True. The static_graph flag tells DDP that
+    # the autograd graph structure is stable across iterations, so it can
+    # precompute the gradient-bucket ready order at iteration 0 and reuse it
+    # for every subsequent step. This removes the dynamic-hook race that
+    # produced the mismatched-collective deadlocks we observed on Aurora xccl
+    # (some ranks fired bucket-K allreduce while others moved on to the next
+    # collective). gradient_as_bucket_view=True is a small memory win that
+    # pairs naturally with static_graph.
+    ddp_strategy = DDPStrategy(
+        process_group_backend='xccl' if BACKEND_NAME == _XPU else None,
+        static_graph=True,
+        gradient_as_bucket_view=True,
+    )
     trainer_params = {
         'enable_progress_bar': True,
         'enable_model_summary': True,
@@ -1393,12 +1406,12 @@ def train_model(
         'devices': gpu_devices,
         'num_nodes': num_nodes,
         'accelerator': args.device,
-        # DIAGNOSTIC: temporarily use plain DDP instead of DeepSpeed to isolate
-        # whether the Aurora XPU hang is in DeepSpeed's comm path or in xccl
-        # itself. If DDP runs cleanly, DeepSpeed is the culprit. If it still
-        # hangs in the same pattern, xccl is the culprit and we escalate to
-        # ALCF. Revert to `deepspeed_strategy` after diagnosis.
-        'strategy': 'ddp',
+        # Plain DDP with static_graph=True (see ddp_strategy above) is the
+        # current default. Swap to deepspeed_strategy if you need ZeRO offload
+        # for larger models. DeepSpeedStrategy showed intermittent
+        # mismatched-collective hangs on Aurora xccl that do not reproduce
+        # under DDP+static_graph in our trials.
+        'strategy': ddp_strategy,
         'accumulate_grad_batches': acc_grad_batches,
         'logger': loggers,
         'log_every_n_steps': log_every_n_steps,

@@ -288,21 +288,25 @@ class PL_ProtARDM(pl.LightningModule):
         #         gpu_memory_usage = 0.0
         #     self.log(f"{stage}_gpu_memory_usage", gpu_memory_usage, sync_dist=True)
 
-        sync_dist = True if 'val' in stage else False
-        # track loss
-        self.log(f"{stage}_loss", loss, prog_bar=True, on_step=True, on_epoch=True, sync_dist=sync_dist)
-        # track performance metrics
+        # For train: log per-step, no cross-rank sync (grad allreduce already syncs).
+        # For val: skip per-step logging; accumulate locally and sync once at epoch end.
+        # Per-step sync_dist=True during val races with DeepSpeed ZeRO's grad
+        # allreduce on XPU/oneCCL and deadlocks (see docs/bug_reports/).
+        is_val = 'val' in stage
+        log_kwargs = dict(on_step=not is_val, on_epoch=True, sync_dist=is_val)
+
+        self.log(f"{stage}_loss", loss, prog_bar=True, **log_kwargs)
         if len(train_tuple) > 1:
-            self.log(f"{stage}_prev_hard_acc", metrics[0], prog_bar=True,  on_step=True, on_epoch=True, sync_dist=sync_dist)
-            self.log(f"{stage}_prev_soft_acc", metrics[1], on_step=True, on_epoch=True, sync_dist=sync_dist)
-            self.log(f"{stage}_fut_hard_acc", metrics[2], prog_bar=True, on_step=True, on_epoch=True, sync_dist=sync_dist)
-            self.log(f"{stage}_fut_soft_acc", metrics[3], on_step=True, on_epoch=True, sync_dist=sync_dist)
-            self.log(f"{stage}_current_hard_acc", metrics[4], prog_bar=True, on_step=True, on_epoch=True, sync_dist=sync_dist)
-            self.log(f"{stage}_current_soft_acc", metrics[5], on_step=True, on_epoch=True, sync_dist=sync_dist)
-            self.log(f"{stage}_current_ppl", metrics[6], on_step=True, on_epoch=True, sync_dist=sync_dist)
-            self.log(f"{stage}_prev_ppl", metrics[7], on_step=True, on_epoch=True, sync_dist=sync_dist)
-            self.log(f"{stage}_fut_ppl", metrics[8], on_step=True, on_epoch=True, sync_dist=sync_dist)
-            self.log(f"{stage}_pos_entropy", metrics[9], on_step=True, on_epoch=True, sync_dist=sync_dist)
+            self.log(f"{stage}_prev_hard_acc",    metrics[0], prog_bar=True, **log_kwargs)
+            self.log(f"{stage}_prev_soft_acc",    metrics[1], **log_kwargs)
+            self.log(f"{stage}_fut_hard_acc",     metrics[2], prog_bar=True, **log_kwargs)
+            self.log(f"{stage}_fut_soft_acc",     metrics[3], **log_kwargs)
+            self.log(f"{stage}_current_hard_acc", metrics[4], prog_bar=True, **log_kwargs)
+            self.log(f"{stage}_current_soft_acc", metrics[5], **log_kwargs)
+            self.log(f"{stage}_current_ppl",      metrics[6], **log_kwargs)
+            self.log(f"{stage}_prev_ppl",         metrics[7], **log_kwargs)
+            self.log(f"{stage}_fut_ppl",          metrics[8], **log_kwargs)
+            self.log(f"{stage}_pos_entropy",      metrics[9], **log_kwargs)
 
         if BACKEND_NAME == _XPU:
             torch.xpu.memory.empty_cache()
@@ -345,6 +349,15 @@ class PL_ProtARDM(pl.LightningModule):
         """
         self.common_step(realization, realization_idx, stage='val')
         #self.common_step(realization, realization_idx, stage='EMA_val')
+
+    def on_train_epoch_end(self):
+        # Drain pending async collectives (DeepSpeed ZeRO grad allreduce on XPU/oneCCL
+        # can straggle on a subset of ranks; without this, validation's sync_dist
+        # logs race with the grad allreduce and deadlock).
+        if BACKEND_NAME == _XPU:
+            torch.xpu.synchronize()
+        if torch.distributed.is_available() and torch.distributed.is_initialized():
+            torch.distributed.barrier()
 
     def on_before_optimizer_step(self, optimizer):
         norms = [p.grad.detach().norm(2) for p in self.parameters() if p.grad is not None]

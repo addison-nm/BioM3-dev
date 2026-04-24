@@ -10,6 +10,8 @@ lightning_logs/
 _misc/
 .uniprot_cache/
 demos/outputs/*
+hang_dumps/
+*.core
 
 # Claude Code
 .claude/

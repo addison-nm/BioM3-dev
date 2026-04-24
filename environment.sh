@@ -12,10 +12,12 @@ _hostname="$(hostname)"
 
 if [[ "$_hostname" == x3* ]] || [[ "$_hostname" == polaris-login* ]]; then
     # Polaris (ALCF) — NVIDIA GPUs
+    export BIOM3_MACHINE=polaris
     echo "[environment.sh] Detected Polaris"
 
 elif [[ "$_hostname" == x4* ]] || [[ "$_hostname" == aurora-uan* ]]; then
     # Aurora (ALCF) — Intel GPUs
+    export BIOM3_MACHINE=aurora
     export NUMEXPR_MAX_THREADS=64
     # Override the frameworks/2025.3.1 default `opencl:gpu;level_zero:gpu`,
     # which ALCF explicitly flags as potentially problematic for distributed jobs.
@@ -46,9 +48,11 @@ elif [[ "$_hostname" == x4* ]] || [[ "$_hostname" == aurora-uan* ]]; then
 
 elif [[ "$_hostname" == spark* ]]; then
     # DGX Spark — single NVIDIA GPU
+    export BIOM3_MACHINE=spark
     echo "[environment.sh] Detected DGX Spark"
 
 else
+    export BIOM3_MACHINE=unknown
     echo "[environment.sh] Unknown machine: $_hostname (using common settings only)"
 fi
 

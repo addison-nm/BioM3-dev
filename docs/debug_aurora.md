@@ -4,7 +4,9 @@ Snippets for diagnosing hangs, performance variance, and collective issues in
 distributed PyTorch + Lightning + xccl jobs on ALCF Aurora. Scoped to Aurora
 (XPU / oneCCL / frameworks/2025.3.1). All commands assume the `biom3-env`
 venv is active and the job was launched via one of the
-`scripts/stage*_train_*.sh` wrappers (which use `mpiexec`).
+`scripts/stage*_train_*.sh` wrappers, which dispatch to
+`scripts/launchers/aurora_{single,multi}node.sh` (which run `mpiexec` with
+ALCF-canonical CPU binding).
 
 ## Capturing py-spy stacks during a hung or stalled job
 
@@ -18,11 +20,11 @@ the iteration.
 
 # Dump all 12 ranks (and their dataloader workers) to one file per pid
 PY_SPY="$(dirname "$(which python)")/py-spy"
-mkdir -p /tmp/hang_dumps && rm -f /tmp/hang_dumps/*.txt
+mkdir -p ~/tmp/hang_dumps && rm -f ~/tmp/hang_dumps/*.txt
 for pid in $(pgrep -u "$USER" -f 'biom3_pretrain_stage3'); do
   ppid=$(ps -o ppid= -p $pid | tr -d ' ')
-  echo "pid=$pid ppid=$ppid" > /tmp/hang_dumps/pid_${pid}.txt
-  "$PY_SPY" dump --pid $pid >> /tmp/hang_dumps/pid_${pid}.txt 2>&1
+  echo "pid=$pid ppid=$ppid" > ~/tmp/hang_dumps/pid_${pid}.txt
+  "$PY_SPY" dump --pid $pid >> ~/tmp/hang_dumps/pid_${pid}.txt 2>&1
 done
 
 # scp back to your dev box for offline analysis

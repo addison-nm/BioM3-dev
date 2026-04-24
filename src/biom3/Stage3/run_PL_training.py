@@ -1371,16 +1371,20 @@ def train_model(
         ))
 
     # Define common trainer parameters.
-    # overlap_comm=False: default True fires grad allreduces asynchronously during
-    # backward. On XPU/oneCCL this produces nondeterministic bucket ordering across
-    # ranks and causes mismatched-collective deadlocks. Disabling serializes grad
-    # reduction after backward — slightly slower, but stable.
+    # overlap_comm=False on XPU: default True fires grad allreduces asynchronously
+    # during backward, producing nondeterministic bucket ordering across ranks on
+    # oneCCL and causing mismatched-collective deadlocks. Disabling serializes
+    # grad reduction after backward — slightly slower, but stable.
+    # process_group_backend='xccl' on XPU: frameworks/2025.3.1 removed the
+    # `oneccl-bindings-for-pytorch` module and replaced the 'ccl' backend with
+    # torch's native 'xccl' — breaking change documented in ALCF system-updates.
     deepspeed_strategy = DeepSpeedStrategy(
         stage=2,
         allgather_bucket_size=int(5e8),
         reduce_bucket_size=int(5e8),
         contiguous_gradients=True,
         overlap_comm=(BACKEND_NAME != _XPU),
+        process_group_backend='xccl' if BACKEND_NAME == _XPU else None,
     )
     trainer_params = {
         'enable_progress_bar': True,

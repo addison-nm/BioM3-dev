@@ -7,12 +7,18 @@
 #        RUN_ID [additional --key value overrides]
 #
 # DESCRIPTION: Single-node wrapper for Stage 1 PenCL training. Launches
-#   biom3_pretrain_stage1 directly (no mpiexec). The JSON config file provides
-#   model/training hyperparameters; per-job overrides (epochs, dataset_type,
-#   pfam_data_path, etc.) are passed as additional CLI arguments via "$@".
+#   biom3_pretrain_stage1 across NGPU ranks via mpiexec. The JSON config
+#   file provides model/training hyperparameters; per-job overrides (epochs,
+#   dataset_type, pfam_data_path, etc.) are passed as additional CLI arguments
+#   via "$@".
 #
 #   WANDB_API_KEY is read from the environment. If unset/empty, wandb
 #   logging is disabled.
+#
+#   On Aurora, launching via mpiexec is required so oneCCL uses the MPI
+#   transport + pmix bootstrap that ALCF documents and tests. Launching
+#   directly (no mpiexec) forces CCL to fall back to OFI/ATL, which is
+#   untested at any scale and has produced collective deadlocks.
 #
 #=============================================================================
 
@@ -39,11 +45,23 @@ else
     wandb_override=""
 fi
 
-biom3_pretrain_stage1 \
-    --config_path ${config_path} \
-    --run_id ${run_id} \
-    --device ${device} \
-    --num_nodes 1 \
-    --gpu_devices ${NGPU} \
-    ${wandb_override} \
-    "$@"
+# ALCF-recommended per-rank CPU binding for a 12-tile Aurora node. Each rank
+# gets 4 framework cores, disjoint from the CCL worker cores pinned by
+# CCL_WORKER_AFFINITY in environment.sh. Tile-topology-specific; if NGPU != 12
+# the list below must be adjusted (see ALCF oneCCL.md §worker affinity).
+CPU_BIND="verbose,list:4-7:8-11:12-15:16-19:20-23:24-27:56-59:60-63:64-67:68-71:72-75:76-79"
+
+mpiexec \
+    --verbose \
+    --envall \
+    -n "${NGPU}" \
+    --ppn "${NGPU}" \
+    --cpu-bind ${CPU_BIND} \
+    biom3_pretrain_stage1 \
+        --config_path ${config_path} \
+        --run_id ${run_id} \
+        --device ${device} \
+        --num_nodes 1 \
+        --gpu_devices ${NGPU} \
+        ${wandb_override} \
+        "$@"

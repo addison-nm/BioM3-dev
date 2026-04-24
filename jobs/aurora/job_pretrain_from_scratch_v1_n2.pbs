@@ -25,7 +25,6 @@ resume_from_checkpoint=None     # None to train from scratch
 
 # Constant configurations
 num_devices=12                  # number of devices per node
-wandb_api_key=${WANDB_API_KEY:-}    # define W&B key prior to run, e.g. via .bashrc
 device=xpu                      # device available (cuda, xpu)
 
 # Construct the run ID
@@ -43,7 +42,6 @@ source environment.sh
     ${num_nodes} \
     ${num_devices} \
     ${device} \
-    "${wandb_api_key}" \
     ${run_id} \
     --epochs ${epochs} \
     --resume_from_checkpoint ${resume_from_checkpoint} \

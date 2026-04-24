@@ -20,7 +20,6 @@ primary_data_path="outputs/embeddings/FINAL_SH3_all_dataset_with_prompts/FINAL_S
 # Constant configurations
 num_nodes=1                     # single node
 num_devices=1                   # single GPU on Spark
-wandb_api_key=${WANDB_API_KEY:-}    # define W&B key prior to run, e.g. via .bashrc
 device=cuda                     # device available (cuda)
 
 # Construct the run ID
@@ -37,7 +36,6 @@ source environment.sh
     ${config_path} \
     ${num_devices} \
     ${device} \
-    "${wandb_api_key}" \
     ${run_id} \
     --epochs ${epochs} \
     --resume_from_checkpoint ${resume_from_checkpoint} \

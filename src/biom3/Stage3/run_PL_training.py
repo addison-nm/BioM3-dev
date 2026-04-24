@@ -207,6 +207,9 @@ def get_args(parser):
                         help='number of steps before starting evaluation on validation...')
     parser.add_argument('--limit_val_batches', default=0.05, type=float,
                         help='number of samples to validate on...')
+    parser.add_argument('--limit_train_batches', default=None, type=float,
+                        help='Cap training batches per epoch (int or fraction in (0,1]). '
+                             'None = use full training dataset.')
     parser.add_argument('--log_every_n_steps', default=10001, type=float,
                         help='number of samples to validate on...')
     parser.add_argument('--start_secondary', default='False', type=str,
@@ -222,6 +225,13 @@ def get_args(parser):
                         help='Rank indices on which to save metrics history')
     parser.add_argument('--metrics_history_every_n_steps', default=1, type=int,
                         help='Record training metrics every N global steps')
+    parser.add_argument('--metrics_history_every_n_epochs', default=None, type=int,
+                        help='Also record training metrics at the end of every N epochs '
+                             '(captures epoch-averaged values). None disables.')
+    parser.add_argument('--metrics_history_flush_every_n_steps', default=None, type=int,
+                        help='Flush metrics_history.{train,val}.jsonl to disk every N '
+                             'global steps. None flushes only at train end (metrics are '
+                             'lost on timeout/crash).')
     parser.add_argument('--metrics_history_all_ranks_val_loss', default='False',
                         type=str,
                         help='Diagnostic: dump val_loss per rank at epoch end '
@@ -260,6 +270,9 @@ def get_args(parser):
     parser.add_argument('--benchmark_all_ranks_memory', default='False', type=str,
                         help='All-gather peak memory from every rank and save '
                              'per-rank lists in benchmark_history.json')
+    parser.add_argument('--benchmark_per_step', default='False', type=str,
+                        help='Write per-step wall-clock timing to '
+                             'benchmark_steps.jsonl (rank 0 only)')
 
     return parser
 
@@ -841,6 +854,7 @@ def retrieve_all_args(args):
     args.save_benchmark = str_to_bool(args.save_benchmark)
     args.benchmark_skip_first_epoch = str_to_bool(args.benchmark_skip_first_epoch)
     args.benchmark_all_ranks_memory = str_to_bool(args.benchmark_all_ranks_memory)
+    args.benchmark_per_step = str_to_bool(args.benchmark_per_step)
     args.early_stopping_metric = nonestr_to_none(args.early_stopping_metric)
     args.checkpoint_every_n_steps = nonestr_to_none(args.checkpoint_every_n_steps)
     args.checkpoint_every_n_epochs = nonestr_to_none(args.checkpoint_every_n_epochs)
@@ -1283,6 +1297,8 @@ def train_model(
             ckpt_kwargs["save_last"] = "link"
             if every_n_steps is not None:
                 ckpt_kwargs["every_n_train_steps"] = int(every_n_steps)
+            if every_n_epochs is not None:
+                ckpt_kwargs["every_n_epochs"] = int(every_n_epochs)
         else:
             # Additional monitors: keep best-1, unique filename
             metric_slug = mon["metric"].replace("/", "_")
@@ -1303,6 +1319,10 @@ def train_model(
             output_dir=artifacts_dir,
             save_ranks=getattr(args, 'metrics_history_ranks', [0]),
             every_n_steps=getattr(args, 'metrics_history_every_n_steps', 1),
+            every_n_epochs=getattr(args, 'metrics_history_every_n_epochs', None),
+            flush_every_n_steps=getattr(
+                args, 'metrics_history_flush_every_n_steps', None
+            ),
             all_ranks_val_loss=getattr(
                 args, 'metrics_history_all_ranks_val_loss', False
             ),
@@ -1324,6 +1344,7 @@ def train_model(
             num_workers=args.num_workers,
             skip_first_epoch=getattr(args, 'benchmark_skip_first_epoch', True),
             all_ranks_memory=getattr(args, 'benchmark_all_ranks_memory', False),
+            per_step=getattr(args, 'benchmark_per_step', False),
         )
     else:
         benchmark_cb = None
@@ -1371,6 +1392,13 @@ def train_model(
         trainer_params['max_steps'] = max_steps
         trainer_params['val_check_interval'] = val_check_interval
         trainer_params['limit_val_batches'] = limit_val_batches
+
+    limit_train_batches = getattr(args, 'limit_train_batches', None)
+    if limit_train_batches is not None:
+        trainer_params['limit_train_batches'] = (
+            int(limit_train_batches) if limit_train_batches > 1
+            else float(limit_train_batches)
+        )
 
     # Initialize trainer with configured parameters
     logger.info('Initializing Trainer...')

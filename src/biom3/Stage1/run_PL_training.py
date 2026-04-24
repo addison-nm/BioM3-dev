@@ -116,6 +116,9 @@ def get_args(parser):
     parser.add_argument('--valid_size', type=float, default=0.1)
     parser.add_argument('--val_check_interval', type=float, default=1.0)
     parser.add_argument('--limit_val_batches', type=float, default=1.0)
+    parser.add_argument('--limit_train_batches', type=float, default=None,
+                        help='Cap training batches per epoch (int or fraction). '
+                             'None = use full training dataset.')
     parser.add_argument('--log_every_n_steps', type=int, default=10)
 
     parser.add_argument('--weight_decay', type=float, default=1e-6)
@@ -135,12 +138,20 @@ def get_args(parser):
 
     parser.add_argument('--save_metrics_history', type=str, default='True')
     parser.add_argument('--metrics_history_every_n_steps', type=int, default=1)
+    parser.add_argument('--metrics_history_every_n_epochs', type=int, default=None,
+                        help='Also record training metrics every N epochs (captures '
+                             'epoch-averaged values). None disables.')
+    parser.add_argument('--metrics_history_flush_every_n_steps', type=int, default=None,
+                        help='Flush metrics JSONL to disk every N global steps. '
+                             'None flushes only at train end.')
     parser.add_argument('--metrics_history_ranks', type=int, nargs='*', default=[0])
     parser.add_argument('--metrics_history_all_ranks_val_loss', type=str, default='False')
 
     parser.add_argument('--save_benchmark', type=str, default='False')
     parser.add_argument('--benchmark_skip_first_epoch', type=str, default='True')
     parser.add_argument('--benchmark_all_ranks_memory', type=str, default='False')
+    parser.add_argument('--benchmark_per_step', type=str, default='False',
+                        help='Write per-step wall-clock timing to benchmark_steps.jsonl')
 
     parser.add_argument('--early_stopping_metric', type=str, default='None')
     parser.add_argument('--early_stopping_patience', type=int, default=10)
@@ -232,6 +243,7 @@ def retrieve_all_args(args):
     args.save_benchmark = str_to_bool(args.save_benchmark)
     args.benchmark_skip_first_epoch = str_to_bool(args.benchmark_skip_first_epoch)
     args.benchmark_all_ranks_memory = str_to_bool(args.benchmark_all_ranks_memory)
+    args.benchmark_per_step = str_to_bool(args.benchmark_per_step)
 
     args.data_path = nonestr_to_none(args.data_path) if args.data_path is not None else None
     args.pfam_data_path = nonestr_to_none(args.pfam_data_path)
@@ -432,6 +444,7 @@ def train_model(args, PL_model, data_module):
         checkpoint_monitors = json.loads(checkpoint_monitors)
 
     every_n_steps = args.checkpoint_every_n_steps
+    every_n_epochs = args.checkpoint_every_n_epochs
     checkpoint_callbacks = []
     for i, mon in enumerate(checkpoint_monitors):
         ckpt_kwargs = dict(
@@ -446,6 +459,8 @@ def train_model(args, PL_model, data_module):
             ckpt_kwargs["save_last"] = "link"
             if every_n_steps is not None:
                 ckpt_kwargs["every_n_train_steps"] = int(every_n_steps)
+            if every_n_epochs is not None:
+                ckpt_kwargs["every_n_epochs"] = int(every_n_epochs)
         else:
             metric_slug = mon["metric"].replace("/", "_")
             ckpt_kwargs["save_top_k"] = 1
@@ -465,6 +480,8 @@ def train_model(args, PL_model, data_module):
             output_dir=artifacts_dir,
             save_ranks=args.metrics_history_ranks,
             every_n_steps=args.metrics_history_every_n_steps,
+            every_n_epochs=args.metrics_history_every_n_epochs,
+            flush_every_n_steps=args.metrics_history_flush_every_n_steps,
             all_ranks_val_loss=args.metrics_history_all_ranks_val_loss,
         ))
 
@@ -481,6 +498,7 @@ def train_model(args, PL_model, data_module):
             num_workers=args.num_workers,
             skip_first_epoch=args.benchmark_skip_first_epoch,
             all_ranks_memory=args.benchmark_all_ranks_memory,
+            per_step=args.benchmark_per_step,
         ))
 
     if args.early_stopping_metric is not None:
@@ -543,6 +561,11 @@ def train_model(args, PL_model, data_module):
         'limit_val_batches': limit_val_batches,
         'num_sanity_val_steps': 0,
     }
+    if args.limit_train_batches is not None:
+        trainer_params['limit_train_batches'] = (
+            int(args.limit_train_batches) if args.limit_train_batches > 1
+            else float(args.limit_train_batches)
+        )
 
     logger.info("Initializing Trainer with strategy=%s, precision=%s", strategy, trainer_precision)
     trainer = Trainer(**trainer_params)

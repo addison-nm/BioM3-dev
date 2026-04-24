@@ -1393,7 +1393,12 @@ def train_model(
         'devices': gpu_devices,
         'num_nodes': num_nodes,
         'accelerator': args.device,
-        'strategy': deepspeed_strategy,
+        # DIAGNOSTIC: temporarily use plain DDP instead of DeepSpeed to isolate
+        # whether the Aurora XPU hang is in DeepSpeed's comm path or in xccl
+        # itself. If DDP runs cleanly, DeepSpeed is the culprit. If it still
+        # hangs in the same pattern, xccl is the culprit and we escalate to
+        # ALCF. Revert to `deepspeed_strategy` after diagnosis.
+        'strategy': 'ddp',
         'accumulate_grad_batches': acc_grad_batches,
         'logger': loggers,
         'log_every_n_steps': log_every_n_steps,

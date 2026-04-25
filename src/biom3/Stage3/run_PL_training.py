@@ -1406,12 +1406,12 @@ def train_model(
         'devices': gpu_devices,
         'num_nodes': num_nodes,
         'accelerator': args.device,
-        # Plain DDP with static_graph=True (see ddp_strategy above) is the
-        # current default. Swap to deepspeed_strategy if you need ZeRO offload
-        # for larger models. DeepSpeedStrategy showed intermittent
-        # mismatched-collective hangs on Aurora xccl that do not reproduce
-        # under DDP+static_graph in our trials.
-        'strategy': ddp_strategy,
+        # RETEST 2026-04-24: switching back to DeepSpeed ZeRO stage 2 to find
+        # out whether the launcher + CCL env + Lightning fork patches that
+        # made plain DDP stable also fix DeepSpeed. Known-good config is
+        # ddp_strategy (see commit c0ef4f9 in docs/debug_aurora.md).
+        # If hangs return, revert: 'strategy': ddp_strategy
+        'strategy': deepspeed_strategy,
         'accumulate_grad_batches': acc_grad_batches,
         'logger': loggers,
         'log_every_n_steps': log_every_n_steps,

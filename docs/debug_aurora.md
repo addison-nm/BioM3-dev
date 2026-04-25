@@ -8,45 +8,51 @@ venv is active and the job was launched via one of the
 `scripts/launchers/aurora_{single,multi}node.sh` (which run `mpiexec` with
 ALCF-canonical CPU binding).
 
-## Known-good configuration (2026-04-24)
+## Configuration status (2026-04-24)
 
-Stage 3 finetune (12 ranks × 1 node, SH3pFamonly dataset, batch_size=16)
-runs cleanly through multiple epochs under this combination:
+**The earlier "known-good" claim for DDP + `static_graph=True` was
+premature.** A subsequent trial under that exact configuration hung at
+the *end* of validation (Validation DataLoader 0: 18/18 reached, no
+forward progress after) — a different boundary than the
+last-training-step hang `static_graph=True` was theorized to fix. Both
+DDPStrategy+static_graph and DeepSpeedStrategy currently exhibit
+intermittent hangs; neither is verified clean over a long run.
+
+What **does** appear to be load-bearing for *getting past most boundaries
+some of the time*:
 
 - **Launch:** `scripts/stage3_train_singlenode.sh` →
   `scripts/launchers/aurora_singlenode.sh` (mpiexec --envall, ALCF
-  8-cores-per-rank `--cpu-bind` list).
+  8-cores-per-rank `--cpu-bind` list). Without mpiexec, CCL silently
+  downgrades to OFI/ATL transport and hangs on the first real validation.
 - **CCL env (`environment.sh`):** `CCL_PROCESS_LAUNCHER=pmix`,
   `CCL_ATL_TRANSPORT=mpi`, `CCL_KVS_MODE=mpi`, `FI_MR_CACHE_MONITOR=userfaultfd`,
   `CCL_ATL_SYNC_COLL=1`, `CCL_WORKER_AFFINITY=8,16,...,100`,
   `ONEAPI_DEVICE_SELECTOR=level_zero:gpu`, `TMPDIR=/tmp`.
 - **Lightning fork:** `_sync_ddp` skips its pre-`all_reduce` barrier on xccl
-  (commit `008da352f`).
-- **Strategy:** `DDPStrategy(process_group_backend='xccl', static_graph=True,
-  gradient_as_bucket_view=True)` — `static_graph=True` is the load-bearing
-  flag. Without it, DDP's dynamic bucket-readiness order races against
-  xccl's strict same-op-on-all-ranks requirement and produces intermittent
-  mismatched-collective deadlocks (one rank in autograd backward, others
-  in next-step's all_reduce).
-- **biom3 fixes that pair with the above:**
+  (commit `008da352f`). Without this, jobs hang on the val-epoch-end
+  metric barrier even if everything else is right.
+- **biom3 fixes:**
   `PL_wrapper.common_step` only syncs val metrics at epoch end (not
   per-step); device placement uses rank-local `self.device` (not the CLI
   `--device` string); `cond_elbo_objective` runs on the rank's tile.
+- **Strategy:** alternated between
+  `DDPStrategy(static_graph=True, gradient_as_bucket_view=True)` and
+  `DeepSpeedStrategy(stage=2, overlap_comm=False, ...)`. Both have shown
+  hangs in trials. `static_graph=True` plausibly addresses the
+  last-training-step deadlock pattern but does not address the
+  val-epoch-end deadlock pattern observed afterward.
 
-What did NOT work on its own and could be relevant if symptoms return:
+**Open hangs** (failure modes that have reproduced under one or more
+configurations after all the above were applied):
 
-- DeepSpeed ZeRO stage 2 (with overlap_comm=False, xccl backend, every
-  fix above except `static_graph` which DeepSpeedStrategy doesn't expose
-  directly): intermittent hangs at the train→val boundary.
-- Any combination without the Lightning `_sync_ddp` barrier-skip patch:
-  hangs on the val-epoch-end metric barrier.
-- Any combination launched without mpiexec (subprocess-script launcher):
-  CCL silently downgrades to OFI/ATL transport, hangs at start of first
-  real validation.
+| Boundary | Symptom | Stragglers stuck in | Affects |
+|---|---|---|---|
+| Last training step (epoch end) | progress bar at 71/71 or 71/72, then stops | `_engine_run_backward` (autograd C++ engine) on 1–3 ranks; `all_reduce` from `_sync_ddp` on the rest | DDP without static_graph; DeepSpeed |
+| End of validation (`Validation DataLoader 0: 18/18` then stop) | val finished but next epoch never starts | unverified — capture stacks next time | DDP + static_graph (observed once); DeepSpeed |
 
-When changing any of the above, retest with the procedure in `Stalls vs
-hangs` below — a single trial isn't enough; the failure mode is
-nondeterministic.
+When changing any knob, retest more than once; the failure mode is
+nondeterministic and a single clean run is not evidence of a fix.
 
 ## Capturing py-spy stacks during a hung or stalled job
 

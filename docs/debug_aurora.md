@@ -8,6 +8,46 @@ venv is active and the job was launched via one of the
 `scripts/launchers/aurora_{single,multi}node.sh` (which run `mpiexec` with
 ALCF-canonical CPU binding).
 
+## Known-good configuration (2026-04-24)
+
+Stage 3 finetune (12 ranks × 1 node, SH3pFamonly dataset, batch_size=16)
+runs cleanly through multiple epochs under this combination:
+
+- **Launch:** `scripts/stage3_train_singlenode.sh` →
+  `scripts/launchers/aurora_singlenode.sh` (mpiexec --envall, ALCF
+  8-cores-per-rank `--cpu-bind` list).
+- **CCL env (`environment.sh`):** `CCL_PROCESS_LAUNCHER=pmix`,
+  `CCL_ATL_TRANSPORT=mpi`, `CCL_KVS_MODE=mpi`, `FI_MR_CACHE_MONITOR=userfaultfd`,
+  `CCL_ATL_SYNC_COLL=1`, `CCL_WORKER_AFFINITY=8,16,...,100`,
+  `ONEAPI_DEVICE_SELECTOR=level_zero:gpu`, `TMPDIR=/tmp`.
+- **Lightning fork:** `_sync_ddp` skips its pre-`all_reduce` barrier on xccl
+  (commit `008da352f`).
+- **Strategy:** `DDPStrategy(process_group_backend='xccl', static_graph=True,
+  gradient_as_bucket_view=True)` — `static_graph=True` is the load-bearing
+  flag. Without it, DDP's dynamic bucket-readiness order races against
+  xccl's strict same-op-on-all-ranks requirement and produces intermittent
+  mismatched-collective deadlocks (one rank in autograd backward, others
+  in next-step's all_reduce).
+- **biom3 fixes that pair with the above:**
+  `PL_wrapper.common_step` only syncs val metrics at epoch end (not
+  per-step); device placement uses rank-local `self.device` (not the CLI
+  `--device` string); `cond_elbo_objective` runs on the rank's tile.
+
+What did NOT work on its own and could be relevant if symptoms return:
+
+- DeepSpeed ZeRO stage 2 (with overlap_comm=False, xccl backend, every
+  fix above except `static_graph` which DeepSpeedStrategy doesn't expose
+  directly): intermittent hangs at the train→val boundary.
+- Any combination without the Lightning `_sync_ddp` barrier-skip patch:
+  hangs on the val-epoch-end metric barrier.
+- Any combination launched without mpiexec (subprocess-script launcher):
+  CCL silently downgrades to OFI/ATL transport, hangs at start of first
+  real validation.
+
+When changing any of the above, retest with the procedure in `Stalls vs
+hangs` below — a single trial isn't enough; the failure mode is
+nondeterministic.
+
 ## Capturing py-spy stacks during a hung or stalled job
 
 Run from a **second shell on the same compute node** while the job is

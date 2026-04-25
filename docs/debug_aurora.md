@@ -43,16 +43,33 @@ some of the time*:
   last-training-step deadlock pattern but does not address the
   val-epoch-end deadlock pattern observed afterward.
 
-**Open hangs** (failure modes that have reproduced under one or more
-configurations after all the above were applied):
+**Open hang** (one failure mode, has reproduced under every
+configuration tried so far):
 
 | Boundary | Symptom | Stragglers stuck in | Affects |
 |---|---|---|---|
-| Last training step (epoch end) | progress bar at 71/71 or 71/72, then stops | `_engine_run_backward` (autograd C++ engine) on 1–3 ranks; `all_reduce` from `_sync_ddp` on the rest | DDP without static_graph; DeepSpeed |
-| End of validation (`Validation DataLoader 0: 18/18` then stop) | val finished but next epoch never starts | unverified — capture stacks next time | DDP + static_graph (observed once); DeepSpeed |
+| Last training step → val-epoch-end metric sync | log reaches `Validation DataLoader 0: 18/18`, no further progress | `_engine_run_backward` (autograd C++ engine) on 1–3 ranks; `all_reduce` from `_sync_ddp` on the rest | every config tested (DDP, DDP+static_graph, DeepSpeed) |
 
-When changing any knob, retest more than once; the failure mode is
-nondeterministic and a single clean run is not evidence of a fix.
+The progress-bar reading at "Validation DataLoader 0: 18/18" is misleading
+— val *did* complete, but the all_reduce that follows it (val-epoch-end
+metric aggregation) is where 11 ranks block, waiting for 1–3 stragglers
+that never finished the previous training step's backward. So the actual
+deadlock site is the same as it has been throughout: the train→val
+boundary's collective.
+
+Per-configuration straggler-count signal (lower is better but every
+config still produced ≥1 straggler in some trial):
+
+| Config | Trials | Stragglers per trial |
+|---|---|---|
+| DDP (no static_graph) | 7 | 3, 3, 2, 1, 0✓, ?, 2 |
+| DDP + static_graph=True | 1+ | 1 |
+| DeepSpeed ZeRO 2 | 1+ | 3 |
+
+A single clean run is not evidence of a fix — the failure is
+nondeterministic, ranges from 0 to 3 stragglers per run on the same
+config, and reproduces eventually. When changing knobs, retest at least
+3 times.
 
 ## Capturing py-spy stacks during a hung or stalled job
 

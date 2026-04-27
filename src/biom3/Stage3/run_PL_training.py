@@ -1354,7 +1354,7 @@ def train_model(
     if isinstance(early_stopping_metric, str) and early_stopping_metric.lower() == 'none':
         early_stopping_metric = None
 
-    callbacks = checkpoint_callbacks + [lr_monitor, gpu_logger]
+    callbacks = checkpoint_callbacks + [lr_monitor]
     if metrics_cb is not None:
         callbacks.append(metrics_cb)
     if benchmark_cb is not None:
@@ -1411,7 +1411,15 @@ def train_model(
         # for larger models. DeepSpeedStrategy showed intermittent
         # mismatched-collective hangs on Aurora xccl that do not reproduce
         # under DDP+static_graph in our trials.
-        'strategy': ddp_strategy,
+        # ROUND 20: keep DeepSpeed; drop limit_train_batches to capture per-rank
+        # batch divergence at the failure point with BATCH instrumentation.
+        'strategy': deepspeed_strategy,
+        # We construct DistributedSampler(drop_last=True) ourselves in
+        # PL_wrapper.{train,val}_dataloader so every rank gets exactly the
+        # same number of samples; see PL_wrapper._make_distributed_sampler.
+        # use_distributed_sampler=False prevents Lightning from auto-wrapping
+        # our explicit sampler with its own (non-drop_last) one.
+        'use_distributed_sampler': False,
         'accumulate_grad_batches': acc_grad_batches,
         'logger': loggers,
         'log_every_n_steps': log_every_n_steps,
@@ -1419,12 +1427,12 @@ def train_model(
     }
 
     # Configure training mode: epoch-based (primary_only) or step-based (combine)
+    trainer_params['limit_val_batches'] = limit_val_batches
     if training_strategy == 'primary_only':
         trainer_params['max_epochs'] = epochs
     else:
         trainer_params['max_steps'] = max_steps
         trainer_params['val_check_interval'] = val_check_interval
-        trainer_params['limit_val_batches'] = limit_val_batches
 
     limit_train_batches = getattr(args, 'limit_train_batches', None)
     if limit_train_batches is not None:

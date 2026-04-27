@@ -1,0 +1,8 @@
+_jobscript.sh
+docs/.claude_prompts/2026-04-25_aurora-hang-handoff.md
+docs/.claude_prompts/2026-04-26_alcf-ticket-draft.md
+docs/bug_reports/2026-04-27_ddp_xccl_phantom_hang/biom3_debug_state.patch
+docs/bug_reports/2026-04-27_ddp_xccl_phantom_hang/biom3_untracked_files.txt
+docs/bug_reports/2026-04-27_ddp_xccl_phantom_hang/lightning_debug_state.patch
+jobs/aurora/job_stage1_pretrain_pfam_v1_n1.pbs
+jobs/aurora/job_stage1_pretrain_pfam_v1_n2.pbs

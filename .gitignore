@@ -12,6 +12,7 @@ _misc/
 demos/outputs/*
 hang_dumps/
 *.core
+debug/
 
 # Claude Code
 .claude/

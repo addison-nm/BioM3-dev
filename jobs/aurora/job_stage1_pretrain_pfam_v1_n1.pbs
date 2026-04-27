@@ -1,0 +1,58 @@
+#!/bin/bash -l
+#PBS -A NLDesignProtein
+#PBS -N stage1_pretrain_pfam_v1_n1
+#PBS -l walltime=01:00:00
+#PBS -l select=1
+#PBS -l place=scatter
+#PBS -l filesystems=home:flare
+#PBS -q debug
+#PBS -j oe
+# PBS -M <emailaddress>
+# PBS -m be
+
+
+projdir=${PBS_O_WORKDIR}  # Should submit job from the BioM3-dev directory
+cd ${projdir}
+
+module load frameworks
+source ./venvs/biom3-env/bin/activate
+
+# Configurations to edit
+config_path=./configs/stage1_training/pretrain_pfam_v1.json  # JSON config file
+num_nodes=1                     # Should match num requested nodes in PBS header
+epochs=3                        # Number of epochs to train
+resume_from_checkpoint=None     # None to train from scratch
+
+# Stage 1 pfam data paths (override config defaults)
+data_path=./data/datasets/fully_annotated_swiss_prot.csv
+pfam_data_path=./data/datasets/Pfam_protein_text_dataset.csv
+
+# Constant configurations
+num_devices=12                  # number of devices per node
+wandb_api_key=${WANDB_API_KEY:-}    # define W&B key prior to run, e.g. via .bashrc
+device=xpu                      # device available (cuda, xpu)
+precision=bf16                  # bf16 on XPU (manual autocast inside trainer)
+
+# Construct the run ID
+datetime=$(date +%Y%m%d_%H%M%S)
+config_name=$(basename "${config_path}" .json)
+run_id=${config_name}_n${num_nodes}_d${num_devices}_e${epochs}_V${datetime}
+
+# Direct output to log file
+mkdir -p logs
+log_fpath=logs/${run_id}.${PBS_JOBID}.o
+
+source environment.sh
+./scripts/stage1_train_multinode.sh \
+    ${config_path} \
+    ${num_nodes} \
+    ${num_devices} \
+    ${device} \
+    "${wandb_api_key}" \
+    ${run_id} \
+    --epochs ${epochs} \
+    --resume_from_checkpoint ${resume_from_checkpoint} \
+    --data_path ${data_path} \
+    --pfam_data_path ${pfam_data_path} \
+    --precision ${precision} \
+> ${log_fpath} 2>&1

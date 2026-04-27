@@ -50,7 +50,7 @@ def _pick_run_artifacts() -> Path | None:
 
     Unlike the shared :func:`browse_file`, this walks with
     ``followlinks=True`` so symlinked weights trees (produced by
-    ``scripts/sync_weights.sh`` in worktrees) are traversed.
+    ``scripts/link_weights.sh`` in worktrees) are traversed.
     """
     dirs = get_data_dirs()
     if not dirs:

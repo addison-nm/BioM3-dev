@@ -1,0 +1,234 @@
+diff --git a/.gitignore b/.gitignore
+index 0af4f78..ecd7a21 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -12,6 +12,7 @@ _misc/
+ demos/outputs/*
+ hang_dumps/
+ *.core
++debug/
+ 
+ # Claude Code
+ .claude/
+diff --git a/src/biom3/Stage3/PL_wrapper.py b/src/biom3/Stage3/PL_wrapper.py
+index eb83cc3..9118358 100755
+--- a/src/biom3/Stage3/PL_wrapper.py
++++ b/src/biom3/Stage3/PL_wrapper.py
+@@ -32,7 +32,7 @@ import deepspeed  # DeepSpeed integration
+ import h5py  # HDF5 file format support
+ import numpy as np
+ import pandas as pd
+-from torch.utils.data import DataLoader, ConcatDataset, Subset
++from torch.utils.data import DataLoader, ConcatDataset, Subset, DistributedSampler
+ from sklearn.model_selection import train_test_split
+ 
+ # ----- Optimization & Scheduling -----
+@@ -50,11 +50,39 @@ from biom3.Stage3.DSEma import moving_average, clone_zero_model  # EMA implement
+ import biom3.Stage3.transformer_training_helper as trainer_tools
+ import biom3.Stage3.eval_metrics as eval_funcs
+ import biom3.Stage3.preprocess as prep
+-from biom3.backend.device import print_gpu_initialization, setup_logger
++from biom3.backend.device import print_gpu_initialization, setup_logger, device_sync
+ 
+ logger = setup_logger(__name__)
+ 
+ 
++def _make_distributed_sampler(dataset, *, shuffle: bool, seed: int):
++    """Return a DistributedSampler with drop_last=True if torch.distributed is
++    initialized, else None.
++
++    drop_last=True at the sampler level is required for distributed training:
++    without it, sklearn's train_test_split produces an effective train set
++    whose size is rarely a multiple of (world_size * batch_size). The leftover
++    samples get distributed unevenly across ranks (e.g. 11 ranks get 71 batches,
++    1 rank gets 72), causing the next DDP gradient allreduce to deadlock on a
++    genuinely mismatched collective. Sampler-level drop_last truncates the shard
++    so every rank gets exactly the same number of samples.
++
++    Pair with Trainer(use_distributed_sampler=False) so Lightning doesn't
++    auto-wrap the DataLoader with its own (non-drop_last) sampler.
++    """
++    import torch.distributed as dist
++    if dist.is_available() and dist.is_initialized():
++        return DistributedSampler(
++            dataset,
++            num_replicas=dist.get_world_size(),
++            rank=dist.get_rank(),
++            shuffle=shuffle,
++            drop_last=True,
++            seed=seed,
++        )
++    return None
++
++
+ class PL_ProtARDM(pl.LightningModule):
+     """
+     PyTorch Lightning module for Protein Autoregressive Diffusion Models.
+@@ -256,6 +284,15 @@ class PL_ProtARDM(pl.LightningModule):
+         Returns:
+             dict: Dictionary containing the computed loss
+         """
++        # Diagnostic: per-rank batch-size trace.  If different ranks see
++        # different bs values for the same idx (or some ranks reach an idx
++        # that others don't), we have an uneven DistributedSampler shard
++        # which is the upstream cause of the DDP gradient-allreduce deadlock.
++        import os
++        _R = int(os.environ.get('PALS_LOCAL_RANKID', os.environ.get('RANK', '?')))
++        _bs = realization[0].shape[0] if isinstance(realization, list) else realization.shape[0]
++        print(f"[r{_R}] BATCH stage={stage} idx={realization_idx} bs={_bs}", flush=True)
++
+         if isinstance(realization, list):
+ 
+             # class labels
+@@ -363,6 +400,15 @@ class PL_ProtARDM(pl.LightningModule):
+                 f"[rank {self.global_rank}] torch.distributed backend = {backend}"
+             )
+ 
++    def on_after_backward(self):
++        # Force the host to wait for all backward kernels (including DDP
++        # gradient-bucket allreduces issued from autograd hooks) to finish
++        # before the next collective is issued. On Aurora xccl, async kernel
++        # completion events have been observed to drop, leaving the autograd
++        # worker thread spinning indefinitely; an explicit synchronize closes
++        # the race window.
++        device_sync()
++
+     def on_before_optimizer_step(self, optimizer):
+         norms = [p.grad.detach().norm(2) for p in self.parameters() if p.grad is not None]
+         if norms:
+@@ -675,34 +721,35 @@ class PFamDataModule(pl.LightningDataModule):
+         """
+         Create a DataLoader for the training dataset.
+ 
+-        The DataLoader applies batching and enables multi-process data loading
+-        with the specified number of worker processes.
+-
+-        Returns:
+-            DataLoader: PyTorch DataLoader configured for the training dataset
++        Uses an explicit DistributedSampler with drop_last=True under
++        distributed training so every rank gets the same number of samples.
++        See _make_distributed_sampler for the rationale. Pair with
++        Trainer(use_distributed_sampler=False).
+         """
++        sampler = _make_distributed_sampler(
++            self.train_dataset, shuffle=True, seed=getattr(self.args, 'seed', 0)
++        )
+         return DataLoader(
+             self.train_dataset,
+             batch_size=self.args.batch_size,
+             num_workers=self.args.num_workers,
+-            shuffle=True
++            sampler=sampler,
++            shuffle=(sampler is None),
+         )
+ 
+     def val_dataloader(self):
+         """
+         Create a DataLoader for the validation dataset.
+-
+-        Similar to train_dataloader but configured for evaluation (no shuffling)
+-        to ensure reproducible validation results.
+-
+-        Returns:
+-            DataLoader: PyTorch DataLoader configured for the validation dataset
+         """
++        sampler = _make_distributed_sampler(
++            self.val_dataset, shuffle=False, seed=getattr(self.args, 'seed', 0)
++        )
+         return DataLoader(
+             self.val_dataset,
+             batch_size=self.args.batch_size,
+             num_workers=self.args.num_workers,
+-            shuffle=False
++            sampler=sampler,
++            shuffle=False,
+         )
+ 
+ class HDF5Dataset(torch.utils.data.Dataset):
+@@ -933,23 +980,31 @@ class HDF5DataModule(pl.LightningDataModule):
+ 
+     def train_dataloader(self):
+         """
+-        Create a DataLoader for the training dataset.
+-
+-        Returns:
+-            DataLoader: PyTorch DataLoader for the training dataset with
+-                       batching and shuffling enabled
++        Create a DataLoader for the training dataset.  Uses an explicit
++        DistributedSampler with drop_last=True under distributed training.
++        See _make_distributed_sampler.
+         """
+-        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
++        sampler = _make_distributed_sampler(self.train_dataset, shuffle=True, seed=self.seed)
++        return DataLoader(
++            self.train_dataset,
++            batch_size=self.batch_size,
++            num_workers=self.num_workers,
++            sampler=sampler,
++            shuffle=(sampler is None),
++        )
+ 
+     def val_dataloader(self):
+         """
+         Create a DataLoader for the validation dataset.
+-
+-        Returns:
+-            DataLoader: PyTorch DataLoader for the validation dataset
+-                       (without shuffling to ensure reproducible validation)
+         """
+-        return DataLoader(self.val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
++        sampler = _make_distributed_sampler(self.val_dataset, shuffle=False, seed=self.seed)
++        return DataLoader(
++            self.val_dataset,
++            batch_size=self.batch_size,
++            num_workers=self.num_workers,
++            sampler=sampler,
++            shuffle=False,
++        )
+ 
+     def teardown(self, stage=None):
+         """
+diff --git a/src/biom3/Stage3/run_PL_training.py b/src/biom3/Stage3/run_PL_training.py
+index 21c2ef8..95166d8 100644
+--- a/src/biom3/Stage3/run_PL_training.py
++++ b/src/biom3/Stage3/run_PL_training.py
+@@ -1354,7 +1354,7 @@ def train_model(
+     if isinstance(early_stopping_metric, str) and early_stopping_metric.lower() == 'none':
+         early_stopping_metric = None
+ 
+-    callbacks = checkpoint_callbacks + [lr_monitor, gpu_logger]
++    callbacks = checkpoint_callbacks + [lr_monitor]
+     if metrics_cb is not None:
+         callbacks.append(metrics_cb)
+     if benchmark_cb is not None:
+@@ -1411,7 +1411,15 @@ def train_model(
+         # for larger models. DeepSpeedStrategy showed intermittent
+         # mismatched-collective hangs on Aurora xccl that do not reproduce
+         # under DDP+static_graph in our trials.
+-        'strategy': ddp_strategy,
++        # ROUND 20: keep DeepSpeed; drop limit_train_batches to capture per-rank
++        # batch divergence at the failure point with BATCH instrumentation.
++        'strategy': deepspeed_strategy,
++        # We construct DistributedSampler(drop_last=True) ourselves in
++        # PL_wrapper.{train,val}_dataloader so every rank gets exactly the
++        # same number of samples; see PL_wrapper._make_distributed_sampler.
++        # use_distributed_sampler=False prevents Lightning from auto-wrapping
++        # our explicit sampler with its own (non-drop_last) one.
++        'use_distributed_sampler': False,
+         'accumulate_grad_batches': acc_grad_batches,
+         'logger': loggers,
+         'log_every_n_steps': log_every_n_steps,
+@@ -1419,12 +1427,12 @@ def train_model(
+     }
+ 
+     # Configure training mode: epoch-based (primary_only) or step-based (combine)
++    trainer_params['limit_val_batches'] = limit_val_batches
+     if training_strategy == 'primary_only':
+         trainer_params['max_epochs'] = epochs
+     else:
+         trainer_params['max_steps'] = max_steps
+         trainer_params['val_check_interval'] = val_check_interval
+-        trainer_params['limit_val_batches'] = limit_val_batches
+ 
+     limit_train_batches = getattr(args, 'limit_train_batches', None)
+     if limit_train_batches is not None:

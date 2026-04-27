@@ -8,7 +8,7 @@ def run_PenCL_inference():
     args = parse_arguments(sys.argv[1:])
     main(args)
 
-def run_stage1_pretraining():
+def run_stage1_training():
     from biom3.Stage1.run_PL_training import parse_arguments, main
     args = parse_arguments(sys.argv[1:])
     main(args)

@@ -81,20 +81,24 @@ For installation and setup instructions on the following machines, refer to the 
 
 Building fine-tuning datasets with `biom3.dbio` requires access to protein reference databases (NCBI Taxonomy, Pfam, Swiss-Prot, etc.) and pre-processed training CSVs. These files are too large to commit to git and are stored in a shared directory on each machine.
 
-The local `data/databases/` directory is populated with symlinks to the shared databases using a sync script — the same pattern used for model weights. To set up:
+The local `data/databases/` directory is populated with symlinks to the shared databases using `scripts/link_data.sh` — a generic helper for linking any shared data tree (use the same script to populate `data/datasets/` from a shared datasets directory). The companion `scripts/link_weights.sh` follows the same pattern for model weights.
 
 ```bash
 # Preview what will be linked
-./scripts/sync_databases.sh <shared_databases_path> data/databases --dry-run
+./scripts/link_data.sh <shared_databases_path> data/databases --dry-run
 
 # Create symlinks
-./scripts/sync_databases.sh <shared_databases_path> data/databases
+./scripts/link_data.sh <shared_databases_path> data/databases
+
+# Same script for prepared datasets
+./scripts/link_data.sh <shared_datasets_path> data/datasets
 ```
 
 For example, on DGX Spark:
 
 ```bash
-./scripts/sync_databases.sh /data/data-share/BioM3-data-share/databases data/databases
+./scripts/link_data.sh /data/data-share/BioM3-data-share/databases data/databases
+./scripts/link_data.sh /data/data-share/BioM3-data-share/datasets  data/datasets
 ```
 
 Once synced, you can use `biom3_build_dataset` to construct fine-tuning datasets by subsetting Swiss-Prot and Pfam by Pfam ID, optionally enriched with UniProt annotations and taxonomy data:
@@ -115,6 +119,8 @@ See [docs/setup_databases.md](./docs/setup_databases.md) for machine-specific sh
 ## Usage
 
 After the pip installation, a number of entrypoints should be available from the command line. These include scripts to run Stages 1, 2, and 3 in inference mode, as well as a general Stage 3 training script for both pretraining and finetuning ProteoScribe.
+
+> **CLI reference:** see [docs/CLI_reference.md](./docs/CLI_reference.md) for the full per-entrypoint argument tables. The walkthroughs below show common invocations; the reference covers the complete argument surface.
 
 ### End-to-end inference pipeline
 
@@ -150,18 +156,7 @@ This stage encodes protein sequences and text descriptions into a shared latent 
 "text_model_path": "/path/to/weights/LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext"
 ```
 
-**Arguments:**
-
-| Flag | Long form | Required | Description |
-| ---- | --------- | -------- | ----------- |
-| `-i` | `--input_data_path` | Yes | Path to input CSV file, or `None` to use the built-in test dataset |
-| `-c` | `--config_path` | Yes | Path to JSON configuration file |
-| `-m` | `--model_path` | Yes | Path to model weights (`.bin`/`.pt`) or Lightning checkpoint (`.ckpt`) |
-| `-o` | `--output_path` | Yes | Path to save output embeddings (`.pt`) |
-| | `--device` | No | Device to use: `cuda` (default), `cpu`, or `xpu` |
-| | `--batch_size` | No | Batch size for inference (default: 32) |
-| | `--num_workers` | No | Number of DataLoader workers (default: 0) |
-| | `--load_from_checkpoint` | No | Force loading `--model_path` as a Lightning checkpoint (auto-detected from `.ckpt` extension) |
+**Arguments:** see [docs/CLI_reference.md#biom3_pencl_inference--stage-1-pencl-inference](./docs/CLI_reference.md#biom3_pencl_inference--stage-1-pencl-inference).
 
 #### Example: using the built-in test dataset with raw weights
 
@@ -203,16 +198,7 @@ The `.ckpt` extension is detected automatically; alternatively, use `--load_from
 Run Facilitator sampling from the entrypoint `biom3_Facilitator_sample`, which accesses the script `src/biom3/Stage2/run_Facilitator_sample.py`.
 This stage maps text embeddings (`z_t`) into the protein embedding distribution (`z_c`) using a learned MMD-based alignment model.
 
-**Arguments:**
-
-| Flag | Long form | Required | Description |
-| ---- | --------- | -------- | ----------- |
-| `-i` | `--input_data_path` | Yes | Path to Stage 1 output embeddings (`.pt` file containing `z_t` and `z_p`) |
-| `-c` | `--config_path` | Yes | Path to JSON configuration file |
-| `-m` | `--model_path` | Yes | Path to Facilitator model weights (`.bin`/`.pt`) |
-| `-o` | `--output_data_path` | Yes | Path to save output embeddings (`.pt`) |
-| | `--device` | No | Device to use: `cuda` (default), `cpu`, or `xpu` |
-| | `--mmd_sample_limit` | No | Max number of samples used to compute MMD diagnostics; `-1` uses all (default: -1) |
+**Arguments:** see [docs/CLI_reference.md#biom3_facilitator_sample--stage-2-facilitator-sampling](./docs/CLI_reference.md#biom3_facilitator_sample--stage-2-facilitator-sampling).
 
 #### Example: standard usage following Stage 1
 
@@ -240,7 +226,7 @@ biom3_Facilitator_sample \
 
 #### Pretraining
 
-The entrypoint `biom3_pretrain_stage3` (script `src/biom3/Stage3/run_PL_training.py`) handles both pretraining and finetuning of ProteoScribe.
+The entrypoint `biom3_train_stage3` (script `src/biom3/Stage3/run_PL_training.py`) handles both pretraining and finetuning of ProteoScribe.
 Training configuration is specified via a JSON config file passed with `--config_path`, with per-job overrides (device, number of nodes, run ID, etc.) passed as CLI arguments.
 CLI arguments override JSON values, which override argparse defaults.
 
@@ -251,17 +237,18 @@ HPC job templates in `jobs/{polaris,aurora,spark}/` demonstrate how to use these
 
 ```bash
 # Direct usage
-biom3_pretrain_stage3 \
+biom3_train_stage3 \
     --config_path configs/stage3_training/pretrain_scratch_v2.json \
     --run_id my_run_v1 \
     --device cuda \
     --epochs 10
 
-# Via multinode wrapper (from an HPC job template)
+# Via multinode wrapper (from an HPC job template). Wandb is auto-resolved
+# from the WANDB_API_KEY env var; pass `--wandb True|False` to override.
 ./scripts/stage3_train_multinode.sh \
     configs/stage3_training/pretrain_scratch_v2.json \
-    2 4 cuda $WANDB_API_KEY my_run_v1 \
-    --epochs 10
+    2 4 cuda my_run_v1 \
+    --epochs 10 --wandb True
 ```
 
 #### Finetuning
@@ -271,7 +258,7 @@ The key difference is that we must specify a pretrained model and the number of 
 Example finetuning configs are in `configs/stage3_training/finetune_*.json`.
 
 ```bash
-biom3_pretrain_stage3 \
+biom3_train_stage3 \
     --config_path configs/stage3_training/finetune_v1.json \
     --run_id finetune_v1 \
     --device cuda \
@@ -285,22 +272,7 @@ biom3_pretrain_stage3 \
 Run ProteoScribe sampling from the entrypoint `biom3_ProteoScribe_sample`, which accesses the script `src/biom3/Stage3/run_ProteoScribe_sample.py`.
 This stage generates protein sequences from the facilitated text embeddings (`z_c`) produced by Stage 2, using the conditional diffusion transformer.
 
-**Arguments:**
-
-| Flag | Long form | Required | Description |
-| ---- | --------- | -------- | ----------- |
-| `-i` | `--input_path` | Yes | Path to Stage 2 output embeddings (`.pt` file containing `z_c`) |
-| `-c` | `--config_path` | Yes | Path to JSON configuration file |
-| `-m` | `--model_path` | Yes | Path to ProteoScribe model weights (`.bin`/`.pt`) or Lightning checkpoint (`.ckpt`) |
-| `-o` | `--output_path` | Yes | Path to save generated sequences (`.pt`) |
-| | `--seed` | No | Random seed for reproducibility. Pass `0` or omit for a random seed (default: 0) |
-| | `--device` | No | Device to use: `cuda` (default), `cpu`, or `xpu` |
-| | `--animate_prompts` | No | Prompt indices to animate (e.g. `0 1 2`), `all`, or `none`. Omit to disable animation. |
-| | `--animate_replicas` | No | Replicas to animate: integer `i` selects `range(0, i)`, `all`, or `none` (default: `1`) |
-| | `--animation_dir` | No | Directory for GIF output. Default: `<output_dir>/animations/` |
-| | `--fasta` | No | Write one FASTA file per prompt to `<output_dir>/fasta/` |
-| | `--fasta_merge` | No | Also write a single merged FASTA with all sequences (requires `--fasta`) |
-| | `--fasta_dir` | No | Custom output directory for FASTA files |
+**Arguments:** see [docs/CLI_reference.md#biom3_proteoscribe_sample--stage-3-sequence-generation](./docs/CLI_reference.md#biom3_proteoscribe_sample--stage-3-sequence-generation). Animation, FASTA, and pre-unmask flags are documented there as well.
 
 > **Note:** To control sampling behavior (number of sequences per prompt, batch size, diffusion steps), edit `num_replicas`, `batch_size_sample`, and `diffusion_steps` in the JSON config.
 

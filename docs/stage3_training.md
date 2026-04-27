@@ -5,8 +5,10 @@ Stage 3 trains a conditional diffusion transformer (ProteoScribe) that generates
 Training uses PyTorch Lightning with DeepSpeed Stage 2 as the distributed strategy. The entry point is:
 
 ```
-biom3_pretrain_stage3 --config_path <path_to_json>
+biom3_train_stage3 --config_path <path_to_json>
 ```
+
+> **CLI argument reference:** see [CLI_reference.md#biom3_train_stage3--stage-3-proteoscribe-training-and-finetuning](CLI_reference.md#biom3_train_stage3--stage-3-proteoscribe-training-and-finetuning) for the full argument table. This document focuses on workflows, output layout, and per-machine submission.
 
 ---
 
@@ -17,7 +19,7 @@ biom3_pretrain_stage3 --config_path <path_to_json>
 The standard workflow. Uses a single primary HDF5 dataset (typically SwissProt embeddings from Stage 2) with epoch-based training.
 
 ```bash
-biom3_pretrain_stage3 \
+biom3_train_stage3 \
     --config_path configs/stage3_training/pretrain_scratch_v2.json \
     --run_id my_run_001 \
     --epochs 100
@@ -30,7 +32,7 @@ When `training_strategy` is `auto` (the default) and no `secondary_data_paths` a
 After pretraining on the primary dataset, you can continue training on a combined primary+secondary dataset (e.g., adding Pfam). This switches to step-based training.
 
 ```bash
-biom3_pretrain_stage3 \
+biom3_train_stage3 \
     --config_path configs/stage3_training/pretrain_phase2.json \
     --run_id my_run_phase2 \
     --resume_from_checkpoint /path/to/checkpoints/run_id/last.ckpt \
@@ -46,7 +48,7 @@ When `start_secondary` is set, the model weights are loaded from `--resume_from_
 To resume a run that was interrupted (same dataset, same optimizer state):
 
 ```bash
-biom3_pretrain_stage3 \
+biom3_train_stage3 \
     --config_path configs/stage3_training/pretrain_scratch_v2.json \
     --run_id my_run_001 \
     --resume_from_checkpoint /path/to/checkpoints/my_run_001/last.ckpt
@@ -61,7 +63,7 @@ This calls `trainer.fit(..., ckpt_path=...)` which restores the full training st
 Finetuning freezes most of the model and trains only selected layers on a new dataset. Requires pretrained weights.
 
 ```bash
-biom3_pretrain_stage3 \
+biom3_train_stage3 \
     --config_path configs/stage3_training/finetune_example.json \
     --run_id finetune_001 \
     --finetune True \
@@ -142,6 +144,24 @@ configs/stage3_training/
 
 Here `device` and `gpu_devices` in the file body serve as local-testing defaults, but the Polaris machine config overrides them with `cuda` / `4`. CLI args still win over everything.
 
+### Choosing `limit_val_batches` and `limit_train_batches`
+
+Both flags accept two value conventions, decided at runtime by the magnitude:
+
+- **`> 1`** → absolute batch count (e.g. `200` = 200 batches per validation pass). Wall time is predictable across dataset sizes.
+- **`(0, 1]`** → fraction of the val/train set (e.g. `0.05` = 5%). Wall time scales with dataset size.
+
+**Recommended recipes:**
+
+| Scenario | `valid_size` | `limit_val_batches` | `limit_train_batches` | Why |
+|---|---|---|---|---|
+| Small dataset (~10K rows), many epochs (100s) | `0.2` | `1.0` (full val set) | `None` (full train set) | Validation is fast even on the full set; full coverage gives stable loss-curve interpretation across epochs. |
+| Large dataset (10M+ rows), few epochs (10s) | `0.2` | `200` (absolute) | `None` (full train set) | Fractional caps balloon validation time; absolute count keeps each val pass to seconds while still giving a statistically meaningful sample (~3200 sequences at `batch_size=16`). |
+| Step-based training (`combine` strategy) | `0.2` | `200` (absolute) | `None` | Combined with `val_check_interval`, an absolute val cap makes each validation event a fixed cost. |
+| Quick smoke test / CI | -- | `3` (absolute) | `3` (absolute) | Bound the entire run to a few batches; matches the pattern used in `configs/benchmark/`. |
+
+**Argparser defaults today:** `--limit_val_batches=200` (Stage 3) and `=1.0` (Stage 1); `--limit_train_batches=None` (both). Existing production configs in `configs/stage3_training/*.json` explicitly set `limit_val_batches: 0.05` (a fraction). To switch a config to the absolute-count convention, change the value to e.g. `200` (no quotes — JSON int) and the runtime will treat it as a batch count.
+
 ### Key config parameters
 
 The primary config example is `configs/stage3_training/pretrain_scratch_v2.json`. The table below lists the most important parameters.
@@ -166,7 +186,7 @@ The primary config example is `configs/stage3_training/pretrain_scratch_v2.json`
 | `transformer_dim` | `512` | Transformer hidden dimension |
 | `transformer_heads` | `16` | Number of attention heads |
 | `val_check_interval` | `10000` | Steps between validation (step-based mode) |
-| `limit_val_batches` | `0.05` | Fraction of validation set to evaluate per check |
+| `limit_val_batches` | `200` | Cap validation batches per check. Values >1 are an absolute batch count; values in (0,1] are a fraction. See "Choosing limit_val_batches and limit_train_batches" below. |
 | `output_root` | `null` | Base directory for all training outputs |
 | `checkpoint_monitors` | `[{"metric": "val_loss", "mode": "min"}]` | List of metrics to monitor for checkpointing |
 | `seed` | `0` | Random seed |

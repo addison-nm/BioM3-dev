@@ -48,7 +48,7 @@ else:
 import biom3.Stage1.preprocess as prep
 import biom3.Stage1.model as mod
 import biom3.Stage1.PL_wrapper as PL_mod
-from biom3.core.helpers import load_json_config
+from biom3.core.helpers import coerce_limit_batches, load_json_config
 from biom3.core.run_utils import (
     backup_if_exists, setup_file_logging, teardown_file_logging, write_manifest,
 )
@@ -98,86 +98,182 @@ def get_args(parser):
                         help='Where to write per-rank Pfam shards. '
                              'Default: under the run directory.')
     parser.add_argument('--dataset_type', type=str, default='default',
-                        choices=['default', 'masked', 'pfam', 'pfam_ablated'])
+                        choices=['default', 'masked', 'pfam', 'pfam_ablated'],
+                        help='Which dataset/loader variant to use. Selects the '
+                             'PenCL training mode and matching collate/data flow.')
     parser.add_argument('--model_type', type=str, default='default',
                         choices=['default', 'pfam'],
                         help='Model class: default (PEN_CL) or pfam (pfam_PEN_CL). '
                              'Auto-set from dataset_type when unspecified.')
 
-    parser.add_argument('--output_root', type=str, default='./outputs/Stage1/pretraining')
-    parser.add_argument('--checkpoints_folder', type=str, default='checkpoints')
-    parser.add_argument('--resume_from_checkpoint', type=str, default='None')
-    parser.add_argument('--pretrained_weights', type=str, default='None')
+    parser.add_argument('--output_root', type=str, default='./outputs/Stage1/pretraining',
+                        help='Base directory for all training outputs '
+                             '(checkpoints/, runs/).')
+    parser.add_argument('--checkpoints_folder', type=str, default='checkpoints',
+                        help='Subdirectory under output_root for checkpoint files.')
+    parser.add_argument('--resume_from_checkpoint', type=str, default='None',
+                        help='Path to a Lightning .ckpt to resume training from. '
+                             "Pass 'None' (string) or omit to start fresh.")
+    parser.add_argument('--pretrained_weights', type=str, default='None',
+                        help="Path to a raw weights file to load before training "
+                             "(no optimizer state). Pass 'None' to skip.")
 
-    parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--num_workers', type=int, default=0)
-    parser.add_argument('--batch_size', type=int, default=8)
-    parser.add_argument('--epochs', type=int, default=20)
-    parser.add_argument('--valid_size', type=float, default=0.1)
-    parser.add_argument('--val_check_interval', type=float, default=1.0)
-    parser.add_argument('--limit_val_batches', type=float, default=1.0)
-    parser.add_argument('--log_every_n_steps', type=int, default=10)
+    parser.add_argument('--seed', type=int, default=42,
+                        help='Random seed for shuffling, weight init, and '
+                             'reproducibility.')
+    parser.add_argument('--num_workers', type=int, default=0,
+                        help='DataLoader worker count. 0 = main process only.')
+    parser.add_argument('--batch_size', type=int, default=8,
+                        help='Per-device mini-batch size.')
+    parser.add_argument('--epochs', type=int, default=20,
+                        help='Number of training epochs.')
+    parser.add_argument('--valid_size', type=float, default=0.1,
+                        help='Fraction of dataset held out for validation '
+                             '(default 0.1 = 90/10 train/val split).')
+    parser.add_argument('--val_check_interval', type=float, default=1.0,
+                        help='Validation cadence (1.0 = once per epoch).')
+    parser.add_argument('--limit_val_batches', type=float, default=1.0,
+                        help='Cap validation batches per epoch. Values >1 are an '
+                             'absolute batch count; values in (0,1] are a fraction. '
+                             'Default 1.0 uses the full val set, appropriate for '
+                             'typical Stage 1 dataset sizes.')
+    parser.add_argument('--limit_train_batches', type=float, default=None,
+                        help='Cap training batches per epoch. Values >1 are an '
+                             'absolute batch count; values in (0,1] are a fraction. '
+                             'None = use full training dataset.')
+    parser.add_argument('--log_every_n_steps', type=int, default=10,
+                        help='Lightning Trainer log_every_n_steps (TensorBoard / wandb).')
 
-    parser.add_argument('--weight_decay', type=float, default=1e-6)
-    parser.add_argument('--head_lr', type=float, default=1e-3)
-    parser.add_argument('--protein_encoder_lr', type=float, default=1e-4)
-    parser.add_argument('--text_encoder_lr', type=float, default=1e-6)
-    parser.add_argument('--choose_optim', type=str, default='AdamW')
-    parser.add_argument('--scale_learning_rate', type=str, default='False')
+    parser.add_argument('--weight_decay', type=float, default=1e-6,
+                        help='AdamW weight decay.')
+    parser.add_argument('--head_lr', type=float, default=1e-3,
+                        help='Learning rate for the projection head (z_t/z_p heads).')
+    parser.add_argument('--protein_encoder_lr', type=float, default=1e-4,
+                        help='Learning rate for the protein encoder (ESM-2) trunk.')
+    parser.add_argument('--text_encoder_lr', type=float, default=1e-6,
+                        help='Learning rate for the text encoder (BERT) trunk.')
+    parser.add_argument('--choose_optim', type=str, default='AdamW',
+                        help="Optimizer name (e.g. 'AdamW').")
+    parser.add_argument('--scale_learning_rate', type=str, default='False',
+                        help="'True'/'False'. When True, scale all learning "
+                             'rates by num_nodes * gpu_devices.')
 
     parser.add_argument('--precision', type=str, default='32',
                         help="Training precision: '32', '16', 'bf16', 'bf16-mixed'.")
     parser.add_argument('--device', type=str, default='cuda',
-                        choices=['cuda', 'xpu', 'cpu'])
-    parser.add_argument('--gpu_devices', type=int, default=1)
-    parser.add_argument('--num_nodes', type=int, default=1)
-    parser.add_argument('--acc_grad_batches', type=int, default=1)
+                        choices=['cuda', 'xpu', 'cpu'],
+                        help='Compute device for training.')
+    parser.add_argument('--gpu_devices', type=int, default=1,
+                        help='Number of GPUs (CUDA) or tiles (XPU) per node.')
+    parser.add_argument('--num_nodes', type=int, default=1,
+                        help='Number of nodes participating in training.')
+    parser.add_argument('--acc_grad_batches', type=int, default=1,
+                        help='Gradient accumulation steps. Effective batch size = '
+                             'batch_size * acc_grad_batches * num_nodes * gpu_devices.')
 
-    parser.add_argument('--save_metrics_history', type=str, default='True')
-    parser.add_argument('--metrics_history_every_n_steps', type=int, default=1)
-    parser.add_argument('--metrics_history_ranks', type=int, nargs='*', default=[0])
-    parser.add_argument('--metrics_history_all_ranks_val_loss', type=str, default='False')
+    parser.add_argument('--save_metrics_history', type=str, default='True',
+                        help="'True'/'False'. Save MetricsHistoryCallback "
+                             'JSONL files alongside checkpoints.')
+    parser.add_argument('--metrics_history_every_n_steps', type=int, default=1,
+                        help='Record training metrics every N global steps.')
+    parser.add_argument('--metrics_history_every_n_epochs', type=int, default=None,
+                        help='Also record training metrics every N epochs (captures '
+                             'epoch-averaged values). None disables.')
+    parser.add_argument('--metrics_history_flush_every_n_steps', type=int, default=None,
+                        help='Flush metrics JSONL to disk every N global steps. '
+                             'None flushes only at train end.')
+    parser.add_argument('--metrics_history_ranks', type=int, nargs='*', default=[0],
+                        help='Rank indices that write metrics JSONL '
+                             '(default: rank 0 only).')
+    parser.add_argument('--metrics_history_all_ranks_val_loss', type=str, default='False',
+                        help="'True'/'False'. Diagnostic: dump val_loss per "
+                             'rank at epoch end to check sync_dist consistency.')
 
-    parser.add_argument('--save_benchmark', type=str, default='False')
-    parser.add_argument('--benchmark_skip_first_epoch', type=str, default='True')
-    parser.add_argument('--benchmark_all_ranks_memory', type=str, default='False')
+    parser.add_argument('--save_benchmark', type=str, default='False',
+                        help="'True'/'False'. Save per-epoch wall-clock + memory "
+                             'benchmark to artifacts/benchmark_history.json.')
+    parser.add_argument('--benchmark_skip_first_epoch', type=str, default='True',
+                        help="'True'/'False'. Exclude first epoch from "
+                             'benchmark summary stats (treats it as warmup).')
+    parser.add_argument('--benchmark_all_ranks_memory', type=str, default='False',
+                        help="'True'/'False'. All-gather peak memory from every "
+                             'rank (vs rank-0 only).')
+    parser.add_argument('--benchmark_per_step', type=str, default='False',
+                        help='Write per-step wall-clock timing to benchmark_steps.jsonl')
 
-    parser.add_argument('--early_stopping_metric', type=str, default='None')
-    parser.add_argument('--early_stopping_patience', type=int, default=10)
-    parser.add_argument('--early_stopping_min_delta', type=float, default=0.0)
-    parser.add_argument('--early_stopping_mode', type=str, default='min')
+    parser.add_argument('--early_stopping_metric', type=str, default='None',
+                        help="Metric to monitor for early stopping (e.g. 'val_loss'). "
+                             "'None' disables early stopping.")
+    parser.add_argument('--early_stopping_patience', type=int, default=10,
+                        help='Validation checks with no improvement before stopping.')
+    parser.add_argument('--early_stopping_min_delta', type=float, default=0.0,
+                        help='Minimum change in monitored metric to qualify as improvement.')
+    parser.add_argument('--early_stopping_mode', type=str, default='min',
+                        help="'min' or 'max' — whether smaller or larger is better.")
 
     parser.add_argument('--checkpoint_monitors', default=None,
                         help='JSON list of {"metric","mode"} dicts, or None for default val_loss.')
-    parser.add_argument('--checkpoint_every_n_steps', default=None)
-    parser.add_argument('--checkpoint_every_n_epochs', default=None)
-    parser.add_argument('--use_sync_safe_checkpoint', type=str, default='False')
+    parser.add_argument('--checkpoint_every_n_steps', default=None,
+                        help='Periodic snapshot every N training steps '
+                             '(orthogonal to best-metric saves).')
+    parser.add_argument('--checkpoint_every_n_epochs', default=None,
+                        help='Periodic snapshot every N epochs '
+                             '(orthogonal to best-metric saves).')
+    parser.add_argument('--checkpoint_periodic_max_keep', type=int, default=-1,
+                        choices=[-1, 0, 1],
+                        help='Periodic snapshot retention: -1 = keep all '
+                             '(default), 0 = disable, 1 = keep only most recent.')
+    parser.add_argument('--use_sync_safe_checkpoint', type=str, default='False',
+                        help="'True'/'False'. Use SyncSafeModelCheckpoint to "
+                             'bypass reduce_boolean_decision (workaround for '
+                             'XPU/CCL integer all-reduce bug).')
     return parser
 
 
 def get_model_args(parser):
     parser.add_argument('--seq_model_path', type=str,
-                        default='./weights/LLMs/esm2_t33_650M_UR50D.pt')
-    parser.add_argument('--pretrained_seq', type=str, default='True')
-    parser.add_argument('--trainable_seq', type=str, default='True')
-    parser.add_argument('--pLM_n_layers_to_finetune', type=int, default=1)
-    parser.add_argument('--rep_layer', type=int, default=33)
-    parser.add_argument('--protein_encoder_embedding', type=int, default=1280)
+                        default='./weights/LLMs/esm2_t33_650M_UR50D.pt',
+                        help='Path to the ESM-2 protein LM weights.')
+    parser.add_argument('--pretrained_seq', type=str, default='True',
+                        help="'True'/'False'. Load pretrained ESM-2 weights "
+                             '(False = random init).')
+    parser.add_argument('--trainable_seq', type=str, default='True',
+                        help="'True'/'False'. Allow ESM-2 parameters to update.")
+    parser.add_argument('--pLM_n_layers_to_finetune', type=int, default=1,
+                        help='Number of last ESM-2 layers to train when '
+                             'trainable_seq=True (rest are frozen).')
+    parser.add_argument('--rep_layer', type=int, default=33,
+                        help='ESM-2 layer index used as the protein representation.')
+    parser.add_argument('--protein_encoder_embedding', type=int, default=1280,
+                        help='ESM-2 hidden dim (must match seq_model_path).')
 
     parser.add_argument('--text_model_path', type=str,
-                        default='./weights/LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext')
-    parser.add_argument('--pretrained_text', type=str, default='True')
-    parser.add_argument('--trainable_text', type=str, default='True')
-    parser.add_argument('--bLM_n_layers_to_finetune', type=int, default=1)
-    parser.add_argument('--text_encoder_embedding', type=int, default=768)
-    parser.add_argument('--text_max_length', type=int, default=512)
+                        default='./weights/LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext',
+                        help='Path to the BioBERT/BiomedBERT text encoder weights.')
+    parser.add_argument('--pretrained_text', type=str, default='True',
+                        help="'True'/'False'. Load pretrained text encoder weights.")
+    parser.add_argument('--trainable_text', type=str, default='True',
+                        help="'True'/'False'. Allow text encoder parameters to update.")
+    parser.add_argument('--bLM_n_layers_to_finetune', type=int, default=1,
+                        help='Number of last text-encoder layers to train when '
+                             'trainable_text=True.')
+    parser.add_argument('--text_encoder_embedding', type=int, default=768,
+                        help='Text encoder hidden dim (must match text_model_path).')
+    parser.add_argument('--text_max_length', type=int, default=512,
+                        help='Max BERT token length. Must be 512 (training '
+                             'pad-to-max contract — see docs/bug_reports/).')
 
-    parser.add_argument('--proj_embedding_dim', type=int, default=512)
-    parser.add_argument('--dropout', type=float, default=0.1)
-    parser.add_argument('--temperature', type=float, default=0.8)
+    parser.add_argument('--proj_embedding_dim', type=int, default=512,
+                        help='Output dim of the projection heads (z_t, z_p).')
+    parser.add_argument('--dropout', type=float, default=0.1,
+                        help='Dropout rate inside the projection heads.')
+    parser.add_argument('--temperature', type=float, default=0.8,
+                        help='Softmax temperature for the contrastive loss.')
 
-    parser.add_argument('--sequence_keyword', type=str, default='protein_sequence')
-    parser.add_argument('--id_keyword', type=str, default='primary_Accession')
+    parser.add_argument('--sequence_keyword', type=str, default='protein_sequence',
+                        help='CSV column name for the protein sequence.')
+    parser.add_argument('--id_keyword', type=str, default='primary_Accession',
+                        help='CSV column name for the protein accession ID.')
     return parser
 
 
@@ -190,11 +286,17 @@ def get_path_args(parser):
 
 
 def get_wrapper_args(parser):
-    parser.add_argument('--wandb', type=str, default='False')
-    parser.add_argument('--wandb_name', type=str, default=None)
-    parser.add_argument('--wandb_entity', type=str, default=None)
-    parser.add_argument('--wandb_project', type=str, default=None)
-    parser.add_argument('--wandb_tags', type=str, nargs='*', default=[])
+    parser.add_argument('--wandb', type=str, default='False',
+                        help="'True'/'False'. Enable Weights & Biases logging. "
+                             'Requires WANDB_API_KEY in env when True.')
+    parser.add_argument('--wandb_name', type=str, default=None,
+                        help='Optional wandb run display name.')
+    parser.add_argument('--wandb_entity', type=str, default=None,
+                        help='wandb entity (team/user) the run belongs to.')
+    parser.add_argument('--wandb_project', type=str, default=None,
+                        help='wandb project the run belongs to.')
+    parser.add_argument('--wandb_tags', type=str, nargs='*', default=[],
+                        help='wandb tags applied to the run.')
     return parser
 
 
@@ -232,6 +334,7 @@ def retrieve_all_args(args):
     args.save_benchmark = str_to_bool(args.save_benchmark)
     args.benchmark_skip_first_epoch = str_to_bool(args.benchmark_skip_first_epoch)
     args.benchmark_all_ranks_memory = str_to_bool(args.benchmark_all_ranks_memory)
+    args.benchmark_per_step = str_to_bool(args.benchmark_per_step)
 
     args.data_path = nonestr_to_none(args.data_path) if args.data_path is not None else None
     args.pfam_data_path = nonestr_to_none(args.pfam_data_path)
@@ -425,38 +528,20 @@ def train_model(args, PL_model, data_module):
     if args.device != 'cpu':
         callbacks.append(DeviceStatsMonitor())
 
-    checkpoint_monitors = args.checkpoint_monitors
-    if checkpoint_monitors is None:
-        checkpoint_monitors = [{"metric": "valid_loss", "mode": "min"}]
-    elif isinstance(checkpoint_monitors, str):
-        checkpoint_monitors = json.loads(checkpoint_monitors)
-
-    every_n_steps = args.checkpoint_every_n_steps
-    checkpoint_callbacks = []
-    for i, mon in enumerate(checkpoint_monitors):
-        ckpt_kwargs = dict(
-            dirpath=checkpoint_dir,
-            verbose=True,
-            monitor=mon["metric"],
-            mode=mon["mode"],
-            enable_version_counter=False,
-        )
-        if i == 0:
-            ckpt_kwargs["save_top_k"] = 2
-            ckpt_kwargs["save_last"] = "link"
-            if every_n_steps is not None:
-                ckpt_kwargs["every_n_train_steps"] = int(every_n_steps)
-        else:
-            metric_slug = mon["metric"].replace("/", "_")
-            ckpt_kwargs["save_top_k"] = 1
-            ckpt_kwargs["save_last"] = False
-            ckpt_kwargs["filename"] = f"best-{metric_slug}-{{epoch}}"
-        if args.use_sync_safe_checkpoint:
-            from biom3.Stage3.callbacks import SyncSafeModelCheckpoint
-            checkpoint_callbacks.append(SyncSafeModelCheckpoint(**ckpt_kwargs))
-        else:
-            from biom3.Stage3.callbacks import LoggingModelCheckpoint
-            checkpoint_callbacks.append(LoggingModelCheckpoint(**ckpt_kwargs))
+    from biom3.Stage3.callbacks import build_checkpoint_callbacks
+    monitored_callbacks, periodic_callback = build_checkpoint_callbacks(
+        checkpoint_dir=checkpoint_dir,
+        checkpoint_monitors=args.checkpoint_monitors
+            if args.checkpoint_monitors is not None
+            else [{"metric": "valid_loss", "mode": "min"}],
+        periodic_every_n_steps=args.checkpoint_every_n_steps,
+        periodic_every_n_epochs=args.checkpoint_every_n_epochs,
+        periodic_max_keep=args.checkpoint_periodic_max_keep,
+        use_sync_safe=args.use_sync_safe_checkpoint,
+    )
+    checkpoint_callbacks = monitored_callbacks + (
+        [periodic_callback] if periodic_callback is not None else []
+    )
     callbacks = checkpoint_callbacks + callbacks
 
     if args.save_metrics_history:
@@ -465,6 +550,8 @@ def train_model(args, PL_model, data_module):
             output_dir=artifacts_dir,
             save_ranks=args.metrics_history_ranks,
             every_n_steps=args.metrics_history_every_n_steps,
+            every_n_epochs=args.metrics_history_every_n_epochs,
+            flush_every_n_steps=args.metrics_history_flush_every_n_steps,
             all_ranks_val_loss=args.metrics_history_all_ranks_val_loss,
         ))
 
@@ -481,6 +568,7 @@ def train_model(args, PL_model, data_module):
             num_workers=args.num_workers,
             skip_first_epoch=args.benchmark_skip_first_epoch,
             all_ranks_memory=args.benchmark_all_ranks_memory,
+            per_step=args.benchmark_per_step,
         ))
 
     if args.early_stopping_metric is not None:
@@ -540,9 +628,13 @@ def train_model(args, PL_model, data_module):
         'precision': trainer_precision,
         'max_epochs': epochs,
         'val_check_interval': val_check_interval,
-        'limit_val_batches': limit_val_batches,
+        'limit_val_batches': coerce_limit_batches(limit_val_batches),
         'num_sanity_val_steps': 0,
     }
+    if args.limit_train_batches is not None:
+        trainer_params['limit_train_batches'] = coerce_limit_batches(
+            args.limit_train_batches
+        )
 
     logger.info("Initializing Trainer with strategy=%s, precision=%s", strategy, trainer_precision)
     trainer = Trainer(**trainer_params)

@@ -13,10 +13,10 @@ for the original Pfam-centric workflow.
 ## Prerequisites
 
 Source databases symlinked under `data/databases/` via
-`scripts/sync_databases.sh`:
+`scripts/link_data.sh`:
 
 ```bash
-./scripts/sync_databases.sh /data/data-share/BioM3-data-share/databases \
+./scripts/link_data.sh /data/data-share/BioM3-data-share/databases \
                             data/databases
 ```
 

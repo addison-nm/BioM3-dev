@@ -1,0 +1,23 @@
+diff --git a/src/lightning/fabric/utilities/distributed.py b/src/lightning/fabric/utilities/distributed.py
+index 3913531c7..159cc8f54 100644
+--- a/src/lightning/fabric/utilities/distributed.py
++++ b/src/lightning/fabric/utilities/distributed.py
+@@ -218,16 +218,8 @@ def _sync_ddp(result: Tensor, group: Optional[Any] = None, reduce_op: Optional[U
+         rank_zero_info("Long tensor unsupported on HPU, casting to float")
+         result = result.float()
+ 
+-    # Sync all processes before reduction.
+-    # Skip on xccl: the torch native xccl backend's barrier() has been observed
+-    # to release asymmetrically across ranks on Intel XPU (Aurora), even with
+-    # CCL_OP_SYNC=1 / CCL_ATL_SYNC_COLL=1 set. That breaks the invariant this
+-    # barrier is supposed to uphold and causes cascading mismatched-collective
+-    # hangs. The all_reduce below is itself a blocking synchronizing collective,
+-    # so the pre-barrier is redundant on any backend — we only keep it on
+-    # non-xccl backends to preserve historical behavior.
+-    if torch.distributed.get_backend(group) != "xccl":
+-        torch.distributed.barrier(group=group)
++    # Sync all processes before reduction
++    torch.distributed.barrier(group=group)
+     torch.distributed.all_reduce(result, op=op, group=group, async_op=False)
+     world_size = torch.distributed.get_world_size(group)
+ 

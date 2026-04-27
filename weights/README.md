@@ -14,7 +14,7 @@ This directory is gitignored. It contains pre-trained model weights for the BioM
 Weights are synced from a shared directory on each machine using the sync script:
 
 ```bash
-./scripts/sync_weights.sh <shared_weights_path> weights
+./scripts/link_weights.sh <shared_weights_path> weights
 ```
 
 See [docs/setup_shared_weights.md](../docs/setup_shared_weights.md) for machine-specific shared paths, the full list of required files, and setup instructions.

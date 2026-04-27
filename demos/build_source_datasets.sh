@@ -22,7 +22,7 @@
 # Prerequisites:
 #   pip install -e .
 #   source environment.sh
-#   ./scripts/sync_databases.sh <shared_path> data/databases
+#   ./scripts/link_data.sh <shared_path> data/databases
 #
 # Usage:
 #   bash demos/build_source_datasets.sh

@@ -73,6 +73,9 @@ def prefix_paths(args):
 @pytest.mark.parametrize(
     "argstring_fpath, expect_error_context", [
     [f"{ARGS_DIR}/training_args_scratch_v1.txt", does_not_raise()],
+    # Same config but with absolute-batch-count limits (>1), exercises the
+    # int branch of coerce_limit_batches end-to-end through PL Trainer.
+    [f"{ARGS_DIR}/training_args_scratch_v1_abs_val.txt", does_not_raise()],
 ])
 @pytest.mark.parametrize("device", ["cuda", "xpu"])
 def test_train_from_scratch(
@@ -82,7 +85,9 @@ def test_train_from_scratch(
     Tests that basic training succeeds.
 
     Uses argfile(s):
-        training_args_scratch_v1.txt
+        training_args_scratch_v1.txt           — fractional limit_val_batches (0.05)
+        training_args_scratch_v1_abs_val.txt   — absolute limit_val_batches and
+                                                 limit_train_batches (>1)
     """
     # This test relies on the following downloaded weights. Check existence.
     issues, skip_reason = check_downloads(REQUIRED_DOWNLOADS)
@@ -309,7 +314,7 @@ def test_resume_finetune_ignores_pretrained_weights(device):
     ignored because the checkpoint already carries the weights (and optimizer
     state). The original bug was twofold: (1) train_model never passed
     ckpt_path to trainer.fit in the finetune branch, and (2)
-    run_stage3_pretraining unconditionally called load_pretrained_weights,
+    run_stage3_training unconditionally called load_pretrained_weights,
     clobbering the resume.
 
     Weight equality can't be used to verify the fix: Lightning restores the
@@ -320,7 +325,7 @@ def test_resume_finetune_ignores_pretrained_weights(device):
     two log markers that appear only on the fix path by reading v1b's
     run.log artifact:
 
-    (a) run_stage3_pretraining emits "Ignoring --pretrained_weights" from
+    (a) run_stage3_training emits "Ignoring --pretrained_weights" from
         the new skip branch — proves load_pretrained_weights was not called.
     (b) train_model emits "Resume finetuning from checkpoint" from the new
         else branch — proves the finetune branch took the resume path. The
@@ -385,7 +390,7 @@ def test_resume_finetune_ignores_pretrained_weights(device):
     if "Ignoring --pretrained_weights" not in v1b_log:
         errors.append(
             "Missing 'Ignoring --pretrained_weights' log from "
-            "run_stage3_pretraining — load_pretrained_weights was not "
+            "run_stage3_training — load_pretrained_weights was not "
             "skipped when resume_from_checkpoint was set"
         )
     if "Resume finetuning from checkpoint" not in v1b_log:

@@ -15,7 +15,7 @@ For large features, prefer working in a git worktree branched off `addison-dev`,
 
 While working in a worktree:
 - Edit only the files the feature requires. If bugs are spotted in unrelated areas, note them (e.g., in the session log or a TODO) but do not fix them in this worktree — they belong to their own branch.
-- Each new worktree starts without populated `data/databases/` or `data/datasets/`. Repopulate them via the appropriate `scripts/sync_*.sh` script before running anything that reads from them.
+- Each new worktree starts without populated `data/databases/` or `data/datasets/`. Repopulate them via the appropriate `scripts/link_*.sh` script before running anything that reads from them.
 
 Small fixes and docs edits can still be made directly on `addison-dev`.
 
@@ -69,7 +69,7 @@ jobs/               # HPC job submission scripts
 Defined in `pyproject.toml`:
 - `biom3_PenCL_inference` → `biom3.Stage1.__main__:run_PenCL_inference`
 - `biom3_Facilitator_sample` → `biom3.Stage2.__main__:run_Facilitator_sample`
-- `biom3_pretrain_stage3` → `biom3.Stage3.__main__:run_stage3_pretraining`
+- `biom3_train_stage3` → `biom3.Stage3.__main__:run_stage3_training`
 - `biom3_ProteoScribe_sample` → `biom3.Stage3.__main__:run_ProteoScribe_sample`
 - `biom3_build_dataset` → `biom3.dbio.__main__:run_build_dataset`
 - `biom3_build_taxid_index` → `biom3.dbio.__main__:run_build_taxid_index`
@@ -174,7 +174,7 @@ When loading models, use `core.io.load_and_prepare_model` for raw weights. For L
 - **Base configs**: `configs/inference/models/` has shared encoder/model configs (`_base_PenCL.json`, `_base_Facilitator.json`). `configs/stage3_training/models/` has shared model architecture configs (`_base_ProteoScribe_1block.json`, `_base_ProteoScribe_16blocks.json`). `configs/stage3_training/machines/` has per-machine device configs (`_aurora.json`, `_polaris.json`, `_spark.json`). Stage 3 inference reuses the training model base configs via `_base_configs`.
 
 ### Training output structure
-Stage 3 training (`biom3_pretrain_stage3`) organizes outputs under `--output_root` with three key CLI args: `--checkpoints_folder` (default `checkpoints`), `--runs_folder` (default `runs`), and `--run_id` (unique per run, constructed automatically by HPC job templates).
+Stage 3 training (`biom3_train_stage3`) organizes outputs under `--output_root` with three key CLI args: `--checkpoints_folder` (default `checkpoints`), `--runs_folder` (default `runs`), and `--run_id` (unique per run, constructed automatically by HPC job templates).
 
 ```
 {output_root}/

@@ -1,9 +1,51 @@
 #!/usr/bin/env python3
 
-"""Training script for BioM3 Stage 3
+"""BioM3 Stage 3: ProteoScribe training and finetuning
 
-Support for PyTorch Lightning and Weights&Biases
+Trains the conditional diffusion transformer (ProteoScribe) that generates
+protein sequences from text-conditioned embeddings produced by Stage 2.
+Supports pretraining from scratch, continuation with secondary data,
+resumption from checkpoint, and selective-layer finetuning.
 
+Config file:
+    configs/stage3_training/*.json  (uses _base_configs composition)
+
+Configuration precedence (high → low):
+    CLI args  >  --config_path JSON  >  argparse defaults
+
+Example: pretrain from scratch (epoch-based, primary data only)
+
+biom3_train_stage3 \
+    --config_path configs/stage3_training/pretrain_scratch_v2.json \
+    --run_id my_run_001 \
+    --epochs 100
+
+Example: continue with secondary data (step-based, combine strategy)
+
+biom3_train_stage3 \
+    --config_path configs/stage3_training/pretrain_phase2.json \
+    --run_id my_run_phase2 \
+    --resume_from_checkpoint /path/to/checkpoints/my_run_001/last.ckpt \
+    --start_secondary True \
+    --secondary_data_paths ./data/pfam_embeddings.hdf5 \
+    --max_steps 3000000
+
+Example: finetune selected blocks/layers from pretrained weights
+
+biom3_train_stage3 \
+    --config_path configs/stage3_training/finetune_v1.json \
+    --run_id finetune_001 \
+    --finetune True \
+    --pretrained_weights /path/to/state_dict.best.pth \
+    --finetune_last_n_blocks 4 \
+    --finetune_last_n_layers -1 \
+    --finetune_output_layers True
+
+Outputs are organized under {output_root}/{checkpoints_folder|runs_folder}/
+{run_id}/ with checkpoints, derived state_dict.pth files, args.json, and
+build_manifest.json. See docs/stage3_training.md for the full output
+layout, metric definitions, and per-machine submission examples. See
+docs/CLI_reference.md for the complete argument list.
 """
 
 import sys
@@ -35,7 +77,7 @@ if BACKEND_NAME == _XPU:
     # lightning imports (from local installation)
     import lightning as pl
     from lightning import Trainer
-    from lightning.fabric.strategies import DeepSpeedStrategy
+    from lightning.pytorch.strategies import DeepSpeedStrategy, DDPStrategy
     from lightning.pytorch.loggers import TensorBoardLogger
     from lightning.pytorch.loggers import WandbLogger
     from lightning.pytorch.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
@@ -47,7 +89,7 @@ else:
     # PyTorch Lightning imports
     import pytorch_lightning as pl
     from pytorch_lightning import Trainer
-    from pytorch_lightning.strategies import DeepSpeedStrategy
+    from pytorch_lightning.strategies import DeepSpeedStrategy, DDPStrategy
     from pytorch_lightning.loggers import TensorBoardLogger
     from pytorch_lightning.loggers import WandbLogger
     from pytorch_lightning.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
@@ -66,7 +108,7 @@ import biom3.Stage3.preprocess as prep
 import biom3.Stage3.cond_diff_transformer_layer as mod
 import biom3.Stage3.PL_wrapper as PL_mod
 from biom3.Stage3.io import prepare_model_ProteoScribe
-from biom3.core.helpers import load_json_config
+from biom3.core.helpers import coerce_limit_batches, load_json_config
 from biom3.core.run_utils import (
     backup_if_exists, setup_file_logging, teardown_file_logging, write_manifest,
 )
@@ -205,8 +247,17 @@ def get_args(parser):
                         help='number of iteration steps for training...')
     parser.add_argument('--val_check_interval', default=10000, type=int,
                         help='number of steps before starting evaluation on validation...')
-    parser.add_argument('--limit_val_batches', default=0.05, type=float,
-                        help='number of samples to validate on...')
+    parser.add_argument('--limit_val_batches', default=200, type=float,
+                        help='Cap validation batches per epoch. Values >1 are an '
+                             'absolute batch count (predictable wall time across '
+                             'dataset sizes); values in (0,1] are a fraction of '
+                             'the val set (scales with dataset size). '
+                             'Default 200 batches gives a stable val signal across '
+                             'small (~10K) to large (10M+) datasets.')
+    parser.add_argument('--limit_train_batches', default=None, type=float,
+                        help='Cap training batches per epoch. Values >1 are an '
+                             'absolute batch count; values in (0,1] are a fraction. '
+                             'None = use full training dataset.')
     parser.add_argument('--log_every_n_steps', default=10001, type=float,
                         help='number of samples to validate on...')
     parser.add_argument('--start_secondary', default='False', type=str,
@@ -222,6 +273,13 @@ def get_args(parser):
                         help='Rank indices on which to save metrics history')
     parser.add_argument('--metrics_history_every_n_steps', default=1, type=int,
                         help='Record training metrics every N global steps')
+    parser.add_argument('--metrics_history_every_n_epochs', default=None, type=int,
+                        help='Also record training metrics at the end of every N epochs '
+                             '(captures epoch-averaged values). None disables.')
+    parser.add_argument('--metrics_history_flush_every_n_steps', default=None, type=int,
+                        help='Flush metrics_history.{train,val}.jsonl to disk every N '
+                             'global steps. None flushes only at train end (metrics are '
+                             'lost on timeout/crash).')
     parser.add_argument('--metrics_history_all_ranks_val_loss', default='False',
                         type=str,
                         help='Diagnostic: dump val_loss per rank at epoch end '
@@ -238,11 +296,30 @@ def get_args(parser):
                         choices=['min', 'max'],
                         help='Whether to minimize or maximize the monitored metric')
 
-    # Periodic checkpoint saving
+    # Periodic checkpoint saving (orthogonal to best-metric saves; written
+    # to a separate `<checkpoint_dir>/periodic` subdirectory and never pruned
+    # by the monitored callback's save_top_k cap).
     parser.add_argument('--checkpoint_every_n_steps', default=None, type=int,
-                        help='Save checkpoints every N training steps (in addition to best-metric saves)')
+                        help='Save periodic snapshot every N training steps '
+                             '(in addition to best-metric saves)')
     parser.add_argument('--checkpoint_every_n_epochs', default=None, type=int,
-                        help='Save checkpoints every N epochs (in addition to best-metric saves)')
+                        help='Save periodic snapshot every N epochs '
+                             '(in addition to best-metric saves)')
+    parser.add_argument('--checkpoint_periodic_max_keep', default=-1, type=int,
+                        choices=[-1, 0, 1],
+                        help='Periodic snapshot retention: -1 = keep all '
+                             '(default), 0 = disable, 1 = keep only most recent. '
+                             "Lightning's ModelCheckpoint forbids other values "
+                             'when monitor=None.')
+    # Mid-training artifact sync: re-runs the DeepSpeed→fp32 conversion +
+    # state_dict.best.pth copy on each new best checkpoint so that a
+    # timeout-killed run leaves a ready-to-use artifact on disk.
+    parser.add_argument('--artifact_sync_on_best', default='True', type=str,
+                        help='Re-emit state_dict.best*.pth + checkpoint_summary.json '
+                             'each time a new best checkpoint is saved. Disable '
+                             'if the DeepSpeed→fp32 conversion is too costly.')
+    parser.add_argument('--artifact_sync_every_n_val', default=1, type=int,
+                        help='Throttle: sync at most every Nth validation epoch.')
 
     # Multi-metric checkpoint monitors (JSON config only)
     parser.add_argument('--checkpoint_monitors', default=None, type=str,
@@ -260,6 +337,9 @@ def get_args(parser):
     parser.add_argument('--benchmark_all_ranks_memory', default='False', type=str,
                         help='All-gather peak memory from every rank and save '
                              'per-rank lists in benchmark_history.json')
+    parser.add_argument('--benchmark_per_step', default='False', type=str,
+                        help='Write per-step wall-clock timing to '
+                             'benchmark_steps.jsonl (rank 0 only)')
 
     return parser
 
@@ -495,6 +575,138 @@ def get_deepspeed_model(args: any, PL_model) -> pl.LightningModule:
     return PL_model
 
 
+def _convert_or_copy_checkpoint(src_ckpt, dst_single_ckpt, label):
+    """Materialize a single-file PL-loadable .ckpt from a checkpoint path.
+
+    DeepSpeed Stage 2 writes a sharded directory; DDP / single-device DeepSpeed
+    writes a single .ckpt file. The directory form needs ZeRO→fp32 conversion;
+    the single-file form is already loadable — just copy it.
+    """
+    if os.path.isdir(src_ckpt):
+        logger.info('Converting DeepSpeed checkpoint to fp32 (%s)...', label)
+        with contextlib.redirect_stdout(io.StringIO()), \
+             contextlib.redirect_stderr(io.StringIO()):
+            convert_zero_checkpoint_to_fp32_state_dict(src_ckpt, dst_single_ckpt)
+    else:
+        logger.info('Copying single-file checkpoint (%s)...', label)
+        shutil.copy2(src_ckpt, dst_single_ckpt)
+
+
+def _sync_best_artifact(
+    args,
+    checkpoint_path: str,
+    artifacts_path: str,
+    primary_callback,
+    extra_callbacks=None,
+    expected_dtype=None,
+) -> dict:
+    """Materialize ``state_dict.best*.pth`` artifacts + ``checkpoint_summary.json``.
+
+    Idempotent: safe to call mid-training (e.g. from BestArtifactSyncCallback)
+    or at end-of-training (from save_model). Existing files are backed up
+    rather than overwritten in place. Runs on rank 0 — caller is responsible
+    for the rank guard.
+
+    Returns the ``checkpoint_summary`` dict that was written, so the caller
+    can stash it for further composition.
+    """
+    image_size = args.image_size
+    num_classes = args.num_classes
+
+    best_ckpt_fpath = primary_callback.best_model_path
+    if not best_ckpt_fpath or not os.path.exists(best_ckpt_fpath):
+        logger.warning(
+            "Skipping best-artifact sync: no best checkpoint yet "
+            "(best_model_path=%r)", best_ckpt_fpath,
+        )
+        return {}
+
+    best_single_ckpt_fpath = os.path.join(checkpoint_path, 'single_model.best.pth')
+    best_state_dict_fpath = os.path.join(checkpoint_path, 'state_dict.best.pth')
+    best_state_dict_ema_fpath = os.path.join(checkpoint_path, 'state_dict_ema.best.pth')
+
+    for fpath in (best_single_ckpt_fpath, best_state_dict_fpath,
+                  best_state_dict_ema_fpath,
+                  os.path.join(checkpoint_path, 'params.csv')):
+        backup_if_exists(fpath)
+
+    _convert_or_copy_checkpoint(best_ckpt_fpath, best_single_ckpt_fpath, "best")
+    logger.info('Save model (best)')
+    new_temp_model = mod.get_model(
+        args=args, data_shape=(image_size, image_size), num_classes=num_classes,
+    ).cpu()
+    loaded_model = PL_mod.PL_ProtARDM.load_from_checkpoint(
+        best_single_ckpt_fpath, args=args, model=new_temp_model,
+    )
+    if expected_dtype is not None and expected_dtype != loaded_model.dtype:
+        raise AssertionError(
+            f"Data types are not matching. Expected {expected_dtype}. "
+            f"Loaded: {loaded_model.dtype}"
+        )
+    torch.save(loaded_model.model.state_dict(), best_state_dict_fpath)
+    if hasattr(loaded_model, 'ema_model'):
+        logger.info('Also saving EMA model...')
+        torch.save(loaded_model.ema_model.state_dict(), best_state_dict_ema_fpath)
+    get_model_params(
+        os.path.join(checkpoint_path, 'params.csv'), model=loaded_model.model,
+    )
+
+    # Copy best state_dict to artifacts directory
+    os.makedirs(artifacts_path, exist_ok=True)
+    artifact_best = os.path.join(artifacts_path, 'state_dict.best.pth')
+    backup_if_exists(artifact_best)
+    shutil.copy2(best_state_dict_fpath, artifact_best)
+    logger.info("Copied best state_dict to %s", artifact_best)
+
+    checkpoint_summary = {
+        "primary": {
+            "metric": primary_callback.monitor or "val_loss",
+            "best_path": artifact_best,
+            "best_score": float(primary_callback.best_model_score)
+                if primary_callback.best_model_score is not None else None,
+        },
+        "additional": [],
+    }
+    for cb in (extra_callbacks or []):
+        if not cb.best_model_path or not os.path.exists(cb.best_model_path):
+            logger.warning("No best checkpoint found for monitor %s", cb.monitor)
+            continue
+        metric_slug = cb.monitor.replace("/", "_")
+        extra_sd_fname = f"state_dict.best_{metric_slug}.pth"
+        extra_sd_fpath = os.path.join(checkpoint_path, extra_sd_fname)
+        extra_single_fpath = os.path.join(
+            checkpoint_path, f"single_model.best_{metric_slug}.pth"
+        )
+        backup_if_exists(extra_sd_fpath)
+        backup_if_exists(extra_single_fpath)
+        _convert_or_copy_checkpoint(cb.best_model_path, extra_single_fpath, cb.monitor)
+        extra_temp_model = mod.get_model(
+            args=args, data_shape=(image_size, image_size), num_classes=num_classes,
+        ).cpu()
+        extra_loaded = PL_mod.PL_ProtARDM.load_from_checkpoint(
+            extra_single_fpath, args=args, model=extra_temp_model,
+        )
+        torch.save(extra_loaded.model.state_dict(), extra_sd_fpath)
+        artifact_extra = os.path.join(artifacts_path, extra_sd_fname)
+        backup_if_exists(artifact_extra)
+        shutil.copy2(extra_sd_fpath, artifact_extra)
+        logger.info("Saved best state_dict for %s to %s", cb.monitor, artifact_extra)
+        checkpoint_summary["additional"].append({
+            "metric": cb.monitor,
+            "mode": cb.mode,
+            "best_score": float(cb.best_model_score)
+                if cb.best_model_score is not None else None,
+            "artifact": extra_sd_fname,
+        })
+
+    summary_path = os.path.join(artifacts_path, 'checkpoint_summary.json')
+    backup_if_exists(summary_path)
+    with open(summary_path, 'w') as f:
+        json.dump(checkpoint_summary, f, indent=2)
+    logger.info("Checkpoint summary written to %s", summary_path)
+    return checkpoint_summary
+
+
 def save_model(
         args: any,
         checkpoint_path: str,
@@ -529,62 +741,38 @@ def save_model(
     best_ckpt_fpath = trainer.checkpoint_callback.best_model_path
     last_single_ckpt_fpath = os.path.join(checkpoint_path, 'single_model.last.pth')
     best_single_ckpt_fpath = os.path.join(checkpoint_path, 'single_model.best.pth')
-    last_state_dict_fpath = os.path.join(checkpoint_path, 'state_dict.last.pth')
     best_state_dict_fpath = os.path.join(checkpoint_path, 'state_dict.best.pth')
+    last_state_dict_fpath = os.path.join(checkpoint_path, 'state_dict.last.pth')
     last_state_dict_ema_fpath = os.path.join(checkpoint_path, 'state_dict_ema.last.pth')
     best_state_dict_ema_fpath = os.path.join(checkpoint_path, 'state_dict_ema.best.pth')
 
     symlink_to = "best"  # symlink from state_dict.pth to either best or last
-    
+
     if trainer.is_global_zero:
-        # Back up any derived files from a previous run in this directory
+        # Back up "last" derived files from a previous run; "best" backups are
+        # handled inside _sync_best_artifact.
         for fpath in (
-            best_single_ckpt_fpath, best_state_dict_fpath, best_state_dict_ema_fpath,
             last_single_ckpt_fpath, last_state_dict_fpath, last_state_dict_ema_fpath,
             os.path.join(checkpoint_path, 'state_dict.pth'),
             os.path.join(checkpoint_path, 'state_dict_ema.pth'),
-            os.path.join(checkpoint_path, 'params.csv'),
         ):
             backup_if_exists(fpath)
+
+        # ---------------- BEST MODEL + checkpoint_summary.json ----------------
+        _sync_best_artifact(
+            args=args,
+            checkpoint_path=checkpoint_path,
+            artifacts_path=artifacts_path,
+            primary_callback=trainer.checkpoint_callback,
+            extra_callbacks=extra_checkpoint_callbacks,
+            expected_dtype=PL_model.dtype,
+        )
 
         # Check whether last and best point to the same checkpoint
         # (last.ckpt is a symlink when save_last="link")
         last_real = os.path.realpath(last_ckpt_fpath)
         best_real = os.path.realpath(best_ckpt_fpath)
         same_checkpoint = (last_real == best_real)
-
-        # ---------------- BEST MODEL ----------------
-        logger.info('Converting DeepSpeed checkpoint to fp32 (best)...')
-        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-            convert_zero_checkpoint_to_fp32_state_dict(
-                best_ckpt_fpath, best_single_ckpt_fpath
-            )
-        logger.info('Save model (best)')
-        new_temp_model = mod.get_model(
-            args=args,
-            data_shape=(image_size, image_size),
-            num_classes=num_classes
-        ).cpu()
-        loaded_model = PL_mod.PL_ProtARDM.load_from_checkpoint(
-            best_single_ckpt_fpath,
-            args=args, model=new_temp_model
-        )
-        # make sure that datatypes are the same ...
-        if PL_model.dtype != loaded_model.dtype:
-            msg = "Data types are not matching."
-            msg += f" Expected {PL_model.dtype}. Loaded: {loaded_model.dtype}"
-            assert False, msg
-        else:
-            # save model state dict without pytorch lightning wrapper
-            torch.save(loaded_model.model.state_dict(), best_state_dict_fpath)
-            if hasattr(loaded_model, 'ema_model'):
-                logger.info('Also saving EMA model...')
-                torch.save(loaded_model.ema_model.state_dict(), best_state_dict_ema_fpath)
-            # check model params
-            get_model_params(
-                    os.path.join(checkpoint_path, 'params.csv'),
-                    model=loaded_model.model
-            )
 
         # ---------------- LAST MODEL ----------------
         if same_checkpoint:
@@ -594,11 +782,15 @@ def save_model(
             if os.path.exists(best_state_dict_ema_fpath):
                 os.symlink(best_state_dict_ema_fpath, last_state_dict_ema_fpath)
         else:
-            logger.info('Converting DeepSpeed checkpoint to fp32 (last)...')
-            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-                convert_zero_checkpoint_to_fp32_state_dict(
-                    last_ckpt_fpath, last_single_ckpt_fpath
-                )
+            if os.path.isdir(last_ckpt_fpath):
+                logger.info('Converting DeepSpeed checkpoint to fp32 (last)...')
+                with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                    convert_zero_checkpoint_to_fp32_state_dict(
+                        last_ckpt_fpath, last_single_ckpt_fpath
+                    )
+            else:
+                logger.info('Copying single-file checkpoint (last)...')
+                shutil.copy2(last_ckpt_fpath, last_single_ckpt_fpath)
             logger.info('Save model (last)')
             new_temp_model = mod.get_model(
                 args=args,
@@ -633,69 +825,6 @@ def save_model(
             os.symlink(last_state_dict_fpath, symlink_path)
             if os.path.exists(last_state_dict_ema_fpath):
                 os.symlink(last_state_dict_ema_fpath, symlink_ema_path)
-
-        # Copy best state_dict to artifacts directory
-        os.makedirs(artifacts_path, exist_ok=True)
-        artifact_best = os.path.join(artifacts_path, 'state_dict.best.pth')
-        backup_if_exists(artifact_best)
-        shutil.copy2(best_state_dict_fpath, artifact_best)
-        logger.info("Copied best state_dict to %s", artifact_best)
-
-        # ---- Process additional checkpoint monitors ----
-        checkpoint_summary = {
-            "primary": {
-                "metric": "val_loss",
-                "best_path": artifact_best,
-                "best_score": float(trainer.checkpoint_callback.best_model_score)
-                    if trainer.checkpoint_callback.best_model_score is not None else None,
-            },
-            "additional": [],
-        }
-        if extra_checkpoint_callbacks:
-            for cb in extra_checkpoint_callbacks:
-                if not cb.best_model_path:
-                    logger.warning("No best checkpoint found for monitor %s", cb.monitor)
-                    continue
-                metric_slug = cb.monitor.replace("/", "_")
-                extra_sd_fname = f"state_dict.best_{metric_slug}.pth"
-                extra_sd_fpath = os.path.join(checkpoint_path, extra_sd_fname)
-                backup_if_exists(extra_sd_fpath)
-                # Convert DeepSpeed checkpoint to state_dict
-                extra_single_fpath = os.path.join(checkpoint_path, f"single_model.best_{metric_slug}.pth")
-                backup_if_exists(extra_single_fpath)
-                logger.info("Converting DeepSpeed checkpoint for %s...", cb.monitor)
-                with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-                    convert_zero_checkpoint_to_fp32_state_dict(
-                        cb.best_model_path, extra_single_fpath
-                    )
-                extra_temp_model = mod.get_model(
-                    args=args,
-                    data_shape=(image_size, image_size),
-                    num_classes=num_classes
-                ).cpu()
-                extra_loaded = PL_mod.PL_ProtARDM.load_from_checkpoint(
-                    extra_single_fpath,
-                    args=args, model=extra_temp_model
-                )
-                torch.save(extra_loaded.model.state_dict(), extra_sd_fpath)
-                # Copy to artifacts
-                artifact_extra = os.path.join(artifacts_path, extra_sd_fname)
-                backup_if_exists(artifact_extra)
-                shutil.copy2(extra_sd_fpath, artifact_extra)
-                logger.info("Saved best state_dict for %s to %s", cb.monitor, artifact_extra)
-                checkpoint_summary["additional"].append({
-                    "metric": cb.monitor,
-                    "mode": cb.mode,
-                    "best_score": float(cb.best_model_score)
-                        if cb.best_model_score is not None else None,
-                    "artifact": extra_sd_fname,
-                })
-
-        summary_path = os.path.join(artifacts_path, 'checkpoint_summary.json')
-        backup_if_exists(summary_path)
-        with open(summary_path, 'w') as f:
-            json.dump(checkpoint_summary, f, indent=2)
-        logger.info("Checkpoint summary written to %s", summary_path)
 
     return
 
@@ -841,9 +970,11 @@ def retrieve_all_args(args):
     args.save_benchmark = str_to_bool(args.save_benchmark)
     args.benchmark_skip_first_epoch = str_to_bool(args.benchmark_skip_first_epoch)
     args.benchmark_all_ranks_memory = str_to_bool(args.benchmark_all_ranks_memory)
+    args.benchmark_per_step = str_to_bool(args.benchmark_per_step)
     args.early_stopping_metric = nonestr_to_none(args.early_stopping_metric)
     args.checkpoint_every_n_steps = nonestr_to_none(args.checkpoint_every_n_steps)
     args.checkpoint_every_n_epochs = nonestr_to_none(args.checkpoint_every_n_epochs)
+    args.artifact_sync_on_best = str_to_bool(args.artifact_sync_on_best)
 
     return args
 
@@ -1254,47 +1385,26 @@ def train_model(
     # ---- Checkpoint callbacks ----
     logger.info("Configuring ModelCheckpoint...")
 
-    # Parse checkpoint_monitors from config (list of {metric, mode} dicts)
-    checkpoint_monitors = getattr(args, 'checkpoint_monitors', None)
-    if checkpoint_monitors is None:
-        checkpoint_monitors = [{"metric": "val_loss", "mode": "min"}]
-    elif isinstance(checkpoint_monitors, str):
-        checkpoint_monitors = json.loads(checkpoint_monitors)
+    # Optional periodic saving (orthogonal to monitored top-k saves).
+    # For step-based training (combine strategy), default periodic saving to
+    # log_every_n_steps so that the previous behavior is preserved.
+    periodic_every_n_steps = getattr(args, 'checkpoint_every_n_steps', None)
+    periodic_every_n_epochs = getattr(args, 'checkpoint_every_n_epochs', None)
+    if training_strategy == 'combine' and periodic_every_n_steps is None:
+        periodic_every_n_steps = int(log_every_n_steps)
 
-    # Optional periodic saving
-    every_n_steps = getattr(args, 'checkpoint_every_n_steps', None)
-    every_n_epochs = getattr(args, 'checkpoint_every_n_epochs', None)
-    # For step-based training (combine strategy), default periodic saving to log_every_n_steps
-    if training_strategy == 'combine' and every_n_steps is None:
-        every_n_steps = int(log_every_n_steps)
-
-    checkpoint_callbacks = []
-    for i, mon in enumerate(checkpoint_monitors):
-        ckpt_kwargs = dict(
-            dirpath=checkpoint_dir,
-            verbose=True,
-            monitor=mon["metric"],
-            mode=mon["mode"],
-            enable_version_counter=False,
-        )
-        if i == 0:
-            # Primary monitor: keep top-2, save last symlink
-            ckpt_kwargs["save_top_k"] = 2
-            ckpt_kwargs["save_last"] = "link"
-            if every_n_steps is not None:
-                ckpt_kwargs["every_n_train_steps"] = int(every_n_steps)
-        else:
-            # Additional monitors: keep best-1, unique filename
-            metric_slug = mon["metric"].replace("/", "_")
-            ckpt_kwargs["save_top_k"] = 1
-            ckpt_kwargs["save_last"] = False
-            ckpt_kwargs["filename"] = f"best-{metric_slug}-{{epoch}}"
-        if getattr(args, 'use_sync_safe_checkpoint', False):
-            from biom3.Stage3.callbacks import SyncSafeModelCheckpoint
-            checkpoint_callbacks.append(SyncSafeModelCheckpoint(**ckpt_kwargs))
-        else:
-            from biom3.Stage3.callbacks import LoggingModelCheckpoint
-            checkpoint_callbacks.append(LoggingModelCheckpoint(**ckpt_kwargs))
+    from biom3.Stage3.callbacks import build_checkpoint_callbacks
+    monitored_callbacks, periodic_callback = build_checkpoint_callbacks(
+        checkpoint_dir=checkpoint_dir,
+        checkpoint_monitors=getattr(args, 'checkpoint_monitors', None),
+        periodic_every_n_steps=periodic_every_n_steps,
+        periodic_every_n_epochs=periodic_every_n_epochs,
+        periodic_max_keep=getattr(args, 'checkpoint_periodic_max_keep', -1),
+        use_sync_safe=getattr(args, 'use_sync_safe_checkpoint', False),
+    )
+    checkpoint_callbacks = monitored_callbacks + (
+        [periodic_callback] if periodic_callback is not None else []
+    )
 
     # ---- Metrics history ----
     if getattr(args, 'save_metrics_history', True):
@@ -1303,6 +1413,10 @@ def train_model(
             output_dir=artifacts_dir,
             save_ranks=getattr(args, 'metrics_history_ranks', [0]),
             every_n_steps=getattr(args, 'metrics_history_every_n_steps', 1),
+            every_n_epochs=getattr(args, 'metrics_history_every_n_epochs', None),
+            flush_every_n_steps=getattr(
+                args, 'metrics_history_flush_every_n_steps', None
+            ),
             all_ranks_val_loss=getattr(
                 args, 'metrics_history_all_ranks_val_loss', False
             ),
@@ -1324,6 +1438,7 @@ def train_model(
             num_workers=args.num_workers,
             skip_first_epoch=getattr(args, 'benchmark_skip_first_epoch', True),
             all_ranks_memory=getattr(args, 'benchmark_all_ranks_memory', False),
+            per_step=getattr(args, 'benchmark_per_step', False),
         )
     else:
         benchmark_cb = None
@@ -1338,6 +1453,31 @@ def train_model(
         callbacks.append(metrics_cb)
     if benchmark_cb is not None:
         callbacks.append(benchmark_cb)
+
+    # ---- Best-artifact mid-training sync (Tier 2/3) ----
+    # Re-emits state_dict.best.pth + state_dict.best_<metric>.pth +
+    # checkpoint_summary.json each time ModelCheckpoint promotes a new best,
+    # so a SIGTERM/timeout leaves a ready-to-use artifact on disk.
+    if getattr(args, 'artifact_sync_on_best', True):
+        from biom3.Stage3.callbacks import BestArtifactSyncCallback
+
+        def _sync_fn(primary_callback, extra_callbacks):
+            _sync_best_artifact(
+                args=args,
+                checkpoint_path=checkpoint_dir,
+                artifacts_path=artifacts_dir,
+                primary_callback=primary_callback,
+                extra_callbacks=extra_callbacks,
+                expected_dtype=None,  # PL_model.dtype not yet known here; safe to skip the strict check mid-training
+            )
+
+        callbacks.append(BestArtifactSyncCallback(
+            sync_fn=_sync_fn,
+            primary_callback=monitored_callbacks[0],
+            extra_callbacks=monitored_callbacks[1:],
+            every_n_val=getattr(args, 'artifact_sync_every_n_val', 1),
+        ))
+
     if early_stopping_metric is not None:
         logger.info("Enabling early stopping on %s (patience=%d)",
                      early_stopping_metric, args.early_stopping_patience)
@@ -1349,7 +1489,35 @@ def train_model(
             verbose=True,
         ))
 
-    # Define common trainer parameters
+    # Define common trainer parameters.
+    # overlap_comm=False on XPU: default True fires grad allreduces asynchronously
+    # during backward, producing nondeterministic bucket ordering across ranks on
+    # oneCCL and causing mismatched-collective deadlocks. Disabling serializes
+    # grad reduction after backward — slightly slower, but stable.
+    # process_group_backend='xccl' on XPU: frameworks/2025.3.1 removed the
+    # `oneccl-bindings-for-pytorch` module and replaced the 'ccl' backend with
+    # torch's native 'xccl' — breaking change documented in ALCF system-updates.
+    deepspeed_strategy = DeepSpeedStrategy(
+        stage=2,
+        allgather_bucket_size=int(5e8),
+        reduce_bucket_size=int(5e8),
+        contiguous_gradients=True,
+        overlap_comm=(BACKEND_NAME != _XPU),
+        process_group_backend='xccl' if BACKEND_NAME == _XPU else None,
+    )
+    # Plain DDP with static_graph=True. The static_graph flag tells DDP that
+    # the autograd graph structure is stable across iterations, so it can
+    # precompute the gradient-bucket ready order at iteration 0 and reuse it
+    # for every subsequent step. This removes the dynamic-hook race that
+    # produced the mismatched-collective deadlocks we observed on Aurora xccl
+    # (some ranks fired bucket-K allreduce while others moved on to the next
+    # collective). gradient_as_bucket_view=True is a small memory win that
+    # pairs naturally with static_graph.
+    ddp_strategy = DDPStrategy(
+        process_group_backend='xccl' if BACKEND_NAME == _XPU else None,
+        static_graph=True,
+        gradient_as_bucket_view=True,
+    )
     trainer_params = {
         'enable_progress_bar': True,
         'enable_model_summary': True,
@@ -1357,7 +1525,18 @@ def train_model(
         'devices': gpu_devices,
         'num_nodes': num_nodes,
         'accelerator': args.device,
-        'strategy': 'deepspeed_stage_2',  # TODO: use strategy defined above?
+        # DeepSpeed Stage 2 is the production default — historical configuration
+        # used by the test suite and prior runs. Swap to ddp_strategy for plain
+        # DDP (verified equivalent under the DistributedSampler(drop_last=True)
+        # fix, but writes a single-file .ckpt rather than a sharded ZeRO dir,
+        # which currently breaks save_model's convert_zero_checkpoint call).
+        'strategy': deepspeed_strategy,
+        # We construct DistributedSampler(drop_last=True) ourselves in
+        # PL_wrapper.{train,val}_dataloader so every rank gets exactly the
+        # same number of samples; see PL_wrapper._make_distributed_sampler.
+        # use_distributed_sampler=False prevents Lightning from auto-wrapping
+        # our explicit sampler with its own (non-drop_last) one.
+        'use_distributed_sampler': False,
         'accumulate_grad_batches': acc_grad_batches,
         'logger': loggers,
         'log_every_n_steps': log_every_n_steps,
@@ -1365,12 +1544,18 @@ def train_model(
     }
 
     # Configure training mode: epoch-based (primary_only) or step-based (combine)
+    trainer_params['limit_val_batches'] = coerce_limit_batches(limit_val_batches)
     if training_strategy == 'primary_only':
         trainer_params['max_epochs'] = epochs
     else:
         trainer_params['max_steps'] = max_steps
         trainer_params['val_check_interval'] = val_check_interval
-        trainer_params['limit_val_batches'] = limit_val_batches
+
+    limit_train_batches = getattr(args, 'limit_train_batches', None)
+    if limit_train_batches is not None:
+        trainer_params['limit_train_batches'] = coerce_limit_batches(
+            limit_train_batches
+        )
 
     # Initialize trainer with configured parameters
     logger.info('Initializing Trainer...')
@@ -1415,14 +1600,17 @@ def train_model(
         torch.save(data_module.split_info, splits_path)
         logger.info("Saved dataset splits to %s", splits_path)
 
-    # Save trained model in multiple formats
+    # Save trained model in multiple formats. Only the *monitored* callbacks
+    # (best-by-metric) get state-dict conversion; the periodic snapshots stay
+    # as raw .ckpts under checkpoint_dir/periodic and can be converted
+    # post-hoc if needed.
     save_model(
             args=args,
-            checkpoint_path=checkpoint_callbacks[0].dirpath,
+            checkpoint_path=monitored_callbacks[0].dirpath,
             artifacts_path=artifacts_dir,
             PL_model=PL_model,
             trainer=trainer,
-            extra_checkpoint_callbacks=checkpoint_callbacks[1:],
+            extra_checkpoint_callbacks=monitored_callbacks[1:],
     )
 
 

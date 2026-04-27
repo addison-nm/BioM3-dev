@@ -12,12 +12,12 @@ cd ${projdir}
 # Configurations to edit
 config_path=./configs/stage3_training/pretrain_scratch_v1.json  # JSON config file
 epochs=600                      # Number of epochs to train
+use_wandb=True                  # set to False to disable wandb (requires WANDB_API_KEY exported when True)
 resume_from_checkpoint=None     # None to train from scratch
 
 # Constant configurations
 num_nodes=1                     # single node
 num_devices=1                   # single GPU on Spark
-wandb_api_key=${WANDB_API_KEY:-}    # define W&B key prior to run, e.g. via .bashrc
 device=cuda                     # device available (cuda)
 
 # Construct the run ID
@@ -34,9 +34,8 @@ source environment.sh
     ${config_path} \
     ${num_devices} \
     ${device} \
-    "${wandb_api_key}" \
     ${run_id} \
     --epochs ${epochs} \
     --resume_from_checkpoint ${resume_from_checkpoint} \
-    --wandb True \
+    --wandb ${use_wandb} \
 > ${log_fpath} 2>&1

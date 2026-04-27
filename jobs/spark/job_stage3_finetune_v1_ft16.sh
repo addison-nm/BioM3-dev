@@ -11,6 +11,7 @@ cd ${projdir}
 # Configurations to edit
 config_path=./configs/stage3_training/finetune_v1.json  # JSON config file
 epochs=100                      # Number of epochs to finetune
+use_wandb=True                  # set to False to disable wandb (requires WANDB_API_KEY exported when True)
 resume_from_checkpoint=None     # None to start finetuning fresh
 pretrained_weights="./weights/ProteoScribe/ProteoScribe_epoch200.pth"  # Path to pretrained weights (.bin)
 finetune_last_n_blocks=1        # Number of last transformer blocks to unfreeze
@@ -20,7 +21,6 @@ primary_data_path="outputs/embeddings/FINAL_SH3_all_dataset_with_prompts/FINAL_S
 # Constant configurations
 num_nodes=1                     # single node
 num_devices=1                   # single GPU on Spark
-wandb_api_key=${WANDB_API_KEY:-}    # define W&B key prior to run, e.g. via .bashrc
 device=cuda                     # device available (cuda)
 
 # Construct the run ID
@@ -37,7 +37,6 @@ source environment.sh
     ${config_path} \
     ${num_devices} \
     ${device} \
-    "${wandb_api_key}" \
     ${run_id} \
     --epochs ${epochs} \
     --resume_from_checkpoint ${resume_from_checkpoint} \
@@ -46,5 +45,5 @@ source environment.sh
     --finetune_last_n_blocks ${finetune_last_n_blocks} \
     --finetune_last_n_layers ${finetune_last_n_layers} \
     --primary_data_path ${primary_data_path} \
-    --wandb True \
+    --wandb ${use_wandb} \
 > ${log_fpath} 2>&1

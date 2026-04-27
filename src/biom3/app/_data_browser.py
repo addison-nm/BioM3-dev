@@ -39,7 +39,7 @@ def list_files(
         If None, all files are returned.
     recursive : bool
         If True, search subdirectories recursively. Symlinked directories
-        are followed, so trees populated by ``scripts/sync_weights.sh``
+        are followed, so trees populated by ``scripts/link_weights.sh``
         (which creates per-entry symlinks into a shared data directory)
         are traversed in full.
     """

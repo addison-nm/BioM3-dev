@@ -12,19 +12,47 @@ _hostname="$(hostname)"
 
 if [[ "$_hostname" == x3* ]] || [[ "$_hostname" == polaris-login* ]]; then
     # Polaris (ALCF) — NVIDIA GPUs
+    export BIOM3_MACHINE=polaris
     echo "[environment.sh] Detected Polaris"
 
 elif [[ "$_hostname" == x4* ]] || [[ "$_hostname" == aurora-uan* ]]; then
     # Aurora (ALCF) — Intel GPUs
+    export BIOM3_MACHINE=aurora
     export NUMEXPR_MAX_THREADS=64
+    # Override the frameworks/2025.3.1 default `opencl:gpu;level_zero:gpu`,
+    # which ALCF explicitly flags as potentially problematic for distributed jobs.
     export ONEAPI_DEVICE_SELECTOR="level_zero:gpu"
+
+    # ALCF-recommended oneCCL environment (see user-guides/aurora/data-science/
+    # frameworks/oneCCL.md). The MPI transport variables below are honored only
+    # under an MPI launcher — launch via the stage*_train_{singlenode,multinode}.sh
+    # wrappers, which use mpiexec. Without mpiexec, oneCCL silently falls back
+    # to OFI/ATL and these are ignored.
+    export CCL_PROCESS_LAUNCHER=pmix
+    export CCL_ATL_TRANSPORT=mpi
+    export CCL_KVS_MODE=mpi
+    export FI_MR_CACHE_MONITOR=userfaultfd
+    # Hang avoidance — pairs with CCL_OP_SYNC (already set by frameworks module).
+    export CCL_ATL_SYNC_COLL=1
+    # Pin CCL progress threads to the last core of each rank's --cpu-bind range
+    # (see ALCF-canonical 8-cores-per-rank binding in the train scripts).
+    # Each rank therefore gets 7 framework cores + 1 CCL worker core within its
+    # pin domain — equivalent to CCL_WORKER_AFFINITY=auto but explicit so we
+    # can verify with `taskset`.
+    export CCL_WORKER_AFFINITY=8,16,24,32,40,48,60,68,76,84,92,100
+    # Avoid `AF_UNIX path too long` on Lightning DataLoader workers
+    # (known-issues.md #7).
+    export TMPDIR=/tmp
+
     echo "[environment.sh] Detected Aurora"
 
 elif [[ "$_hostname" == spark* ]]; then
     # DGX Spark — single NVIDIA GPU
+    export BIOM3_MACHINE=spark
     echo "[environment.sh] Detected DGX Spark"
 
 else
+    export BIOM3_MACHINE=unknown
     echo "[environment.sh] Unknown machine: $_hostname (using common settings only)"
 fi
 

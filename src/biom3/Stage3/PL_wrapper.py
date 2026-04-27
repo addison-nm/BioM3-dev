@@ -32,7 +32,7 @@ import deepspeed  # DeepSpeed integration
 import h5py  # HDF5 file format support
 import numpy as np
 import pandas as pd
-from torch.utils.data import DataLoader, ConcatDataset, Subset
+from torch.utils.data import DataLoader, ConcatDataset, Subset, DistributedSampler
 from sklearn.model_selection import train_test_split
 
 # ----- Optimization & Scheduling -----
@@ -53,6 +53,34 @@ import biom3.Stage3.preprocess as prep
 from biom3.backend.device import print_gpu_initialization, setup_logger
 
 logger = setup_logger(__name__)
+
+
+def _make_distributed_sampler(dataset, *, shuffle: bool, seed: int):
+    """Return a DistributedSampler with drop_last=True if torch.distributed is
+    initialized, else None.
+
+    drop_last=True at the sampler level is required for distributed training:
+    without it, sklearn's train_test_split produces an effective train set
+    whose size is rarely a multiple of (world_size * batch_size). The leftover
+    samples get distributed unevenly across ranks (e.g. 11 ranks get 71 batches,
+    1 rank gets 72), causing the next DDP gradient allreduce to deadlock on a
+    genuinely mismatched collective. Sampler-level drop_last truncates the shard
+    so every rank gets exactly the same number of samples.
+
+    Pair with Trainer(use_distributed_sampler=False) so Lightning doesn't
+    auto-wrap the DataLoader with its own (non-drop_last) sampler.
+    """
+    import torch.distributed as dist
+    if dist.is_available() and dist.is_initialized():
+        return DistributedSampler(
+            dataset,
+            num_replicas=dist.get_world_size(),
+            rank=dist.get_rank(),
+            shuffle=shuffle,
+            drop_last=True,
+            seed=seed,
+        )
+    return None
 
 
 class PL_ProtARDM(pl.LightningModule):
@@ -288,21 +316,25 @@ class PL_ProtARDM(pl.LightningModule):
         #         gpu_memory_usage = 0.0
         #     self.log(f"{stage}_gpu_memory_usage", gpu_memory_usage, sync_dist=True)
 
-        sync_dist = True if 'val' in stage else False
-        # track loss
-        self.log(f"{stage}_loss", loss, prog_bar=True, on_step=True, on_epoch=True, sync_dist=sync_dist)
-        # track performance metrics
+        # For train: log per-step, no cross-rank sync (grad allreduce already syncs).
+        # For val: skip per-step logging; accumulate locally and sync once at epoch end.
+        # Per-step sync_dist=True during val races with DeepSpeed ZeRO's grad
+        # allreduce on XPU/oneCCL and deadlocks (see docs/bug_reports/).
+        is_val = 'val' in stage
+        log_kwargs = dict(on_step=not is_val, on_epoch=True, sync_dist=is_val)
+
+        self.log(f"{stage}_loss", loss, prog_bar=True, **log_kwargs)
         if len(train_tuple) > 1:
-            self.log(f"{stage}_prev_hard_acc", metrics[0], prog_bar=True,  on_step=True, on_epoch=True, sync_dist=sync_dist)
-            self.log(f"{stage}_prev_soft_acc", metrics[1], on_step=True, on_epoch=True, sync_dist=sync_dist)
-            self.log(f"{stage}_fut_hard_acc", metrics[2], prog_bar=True, on_step=True, on_epoch=True, sync_dist=sync_dist)
-            self.log(f"{stage}_fut_soft_acc", metrics[3], on_step=True, on_epoch=True, sync_dist=sync_dist)
-            self.log(f"{stage}_current_hard_acc", metrics[4], prog_bar=True, on_step=True, on_epoch=True, sync_dist=sync_dist)
-            self.log(f"{stage}_current_soft_acc", metrics[5], on_step=True, on_epoch=True, sync_dist=sync_dist)
-            self.log(f"{stage}_current_ppl", metrics[6], on_step=True, on_epoch=True, sync_dist=sync_dist)
-            self.log(f"{stage}_prev_ppl", metrics[7], on_step=True, on_epoch=True, sync_dist=sync_dist)
-            self.log(f"{stage}_fut_ppl", metrics[8], on_step=True, on_epoch=True, sync_dist=sync_dist)
-            self.log(f"{stage}_pos_entropy", metrics[9], on_step=True, on_epoch=True, sync_dist=sync_dist)
+            self.log(f"{stage}_prev_hard_acc",    metrics[0], prog_bar=True, **log_kwargs)
+            self.log(f"{stage}_prev_soft_acc",    metrics[1], **log_kwargs)
+            self.log(f"{stage}_fut_hard_acc",     metrics[2], prog_bar=True, **log_kwargs)
+            self.log(f"{stage}_fut_soft_acc",     metrics[3], **log_kwargs)
+            self.log(f"{stage}_current_hard_acc", metrics[4], prog_bar=True, **log_kwargs)
+            self.log(f"{stage}_current_soft_acc", metrics[5], **log_kwargs)
+            self.log(f"{stage}_current_ppl",      metrics[6], **log_kwargs)
+            self.log(f"{stage}_prev_ppl",         metrics[7], **log_kwargs)
+            self.log(f"{stage}_fut_ppl",          metrics[8], **log_kwargs)
+            self.log(f"{stage}_pos_entropy",      metrics[9], **log_kwargs)
 
         if BACKEND_NAME == _XPU:
             torch.xpu.memory.empty_cache()
@@ -345,6 +377,19 @@ class PL_ProtARDM(pl.LightningModule):
         """
         self.common_step(realization, realization_idx, stage='val')
         #self.common_step(realization, realization_idx, stage='EMA_val')
+
+    def on_fit_start(self):
+        # Diagnostic: confirm which torch.distributed backend is actually in use.
+        # On Aurora frameworks/2025.3.1 this should print 'xccl'. If it prints
+        # 'ccl' or 'gloo' the DeepSpeedStrategy process_group_backend kwarg
+        # isn't taking effect and oneCCL collectives aren't going through the
+        # native xccl path.
+        if torch.distributed.is_available() and torch.distributed.is_initialized():
+            backend = torch.distributed.get_backend()
+            import logging
+            logging.getLogger().info(
+                f"[rank {self.global_rank}] torch.distributed backend = {backend}"
+            )
 
     def on_before_optimizer_step(self, optimizer):
         norms = [p.grad.detach().norm(2) for p in self.parameters() if p.grad is not None]
@@ -398,7 +443,12 @@ class PL_ProtARDM(pl.LightningModule):
         Returns:
             tuple: (loss, metrics) where metrics is a tuple of performance measurements
         """
-        device = self.script_args.device
+        # Use Lightning's rank-local device (xpu:N for rank N) rather than the
+        # CLI --device string ("xpu"), which resolves to xpu:0 on every rank and
+        # crashes under plain DDP with "Expected all tensors to be on the same
+        # device". DeepSpeedStrategy previously hid this by moving tensors
+        # transparently before use.
+        device = self.device
 
         bs, channel, seq_length = realization.size()
 
@@ -653,34 +703,35 @@ class PFamDataModule(pl.LightningDataModule):
         """
         Create a DataLoader for the training dataset.
 
-        The DataLoader applies batching and enables multi-process data loading
-        with the specified number of worker processes.
-
-        Returns:
-            DataLoader: PyTorch DataLoader configured for the training dataset
+        Uses an explicit DistributedSampler with drop_last=True under
+        distributed training so every rank gets the same number of samples.
+        See _make_distributed_sampler for the rationale. Pair with
+        Trainer(use_distributed_sampler=False).
         """
+        sampler = _make_distributed_sampler(
+            self.train_dataset, shuffle=True, seed=self.args.seed
+        )
         return DataLoader(
             self.train_dataset,
             batch_size=self.args.batch_size,
             num_workers=self.args.num_workers,
-            shuffle=True
+            sampler=sampler,
+            shuffle=(sampler is None),
         )
 
     def val_dataloader(self):
         """
         Create a DataLoader for the validation dataset.
-
-        Similar to train_dataloader but configured for evaluation (no shuffling)
-        to ensure reproducible validation results.
-
-        Returns:
-            DataLoader: PyTorch DataLoader configured for the validation dataset
         """
+        sampler = _make_distributed_sampler(
+            self.val_dataset, shuffle=False, seed=self.args.seed
+        )
         return DataLoader(
             self.val_dataset,
             batch_size=self.args.batch_size,
             num_workers=self.args.num_workers,
-            shuffle=False
+            sampler=sampler,
+            shuffle=False,
         )
 
 class HDF5Dataset(torch.utils.data.Dataset):
@@ -911,23 +962,31 @@ class HDF5DataModule(pl.LightningDataModule):
 
     def train_dataloader(self):
         """
-        Create a DataLoader for the training dataset.
-
-        Returns:
-            DataLoader: PyTorch DataLoader for the training dataset with
-                       batching and shuffling enabled
+        Create a DataLoader for the training dataset.  Uses an explicit
+        DistributedSampler with drop_last=True under distributed training.
+        See _make_distributed_sampler.
         """
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
+        sampler = _make_distributed_sampler(self.train_dataset, shuffle=True, seed=self.seed)
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            sampler=sampler,
+            shuffle=(sampler is None),
+        )
 
     def val_dataloader(self):
         """
         Create a DataLoader for the validation dataset.
-
-        Returns:
-            DataLoader: PyTorch DataLoader for the validation dataset
-                       (without shuffling to ensure reproducible validation)
         """
-        return DataLoader(self.val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
+        sampler = _make_distributed_sampler(self.val_dataset, shuffle=False, seed=self.seed)
+        return DataLoader(
+            self.val_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            sampler=sampler,
+            shuffle=False,
+        )
 
     def teardown(self, stage=None):
         """

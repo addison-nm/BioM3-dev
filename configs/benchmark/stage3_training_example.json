@@ -1,0 +1,28 @@
+{
+  "arch_id": "ProteoScribe_1block_v1",
+  "benchmark_type": "stage3_training",
+
+  "base_training_config_path": "configs/stage3_training/pretrain_scratch_v1.json",
+
+  "benchmark_per_step": true,
+  "benchmark_skip_first_epoch": true,
+
+  "training_extra_args": {
+    "primary_data_path": "./data/benchmark/Stage2_MMD_swissprot_embedding_bench_4096.hdf5",
+    "epochs": 3,
+    "limit_val_batches": "3",
+    "save_metrics_history": "False",
+    "wandb": "False",
+    "gpu_devices": 1,
+    "num_nodes": 1,
+    "num_workers": 1
+  },
+
+  "sweep": {
+    "batch_size": [16, 32],
+    "acc_grad_batches": [1, 2],
+    "precision": ["bf16", "32"]
+  },
+
+  "output_root": "outputs/Stage3_training_bm"
+}

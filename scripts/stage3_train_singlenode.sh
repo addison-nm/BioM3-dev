@@ -4,45 +4,63 @@
 # FILE: stage3_train_singlenode.sh
 #
 # USAGE: stage3_train_singlenode.sh CONFIG_PATH NGPU DEVICE \
-#        WANDB_API_KEY RUN_ID [additional --key value overrides]
+#        RUN_ID [additional --key value overrides]
 #
 # DESCRIPTION: Single-node wrapper for Stage 3 training (pretraining and
-#   finetuning). Launches biom3_pretrain_stage3 directly (no mpiexec).
-#   The JSON config file provides model/training hyperparameters; per-job
-#   overrides (epochs, resume, finetune flags, etc.) are passed as additional
-#   CLI arguments via "$@".
+#   finetuning). Dispatches to the machine-specific launcher under
+#   scripts/launchers/${BIOM3_MACHINE}_singlenode.sh, which knows how to
+#   spawn ranks (mpiexec on Aurora/Polaris, bare exec on Spark).
+#
+#   The JSON config provides model/training hyperparameters; per-job
+#   overrides (epochs, resume, finetune flags, etc.) are passed via "$@".
+#   Wandb logging is resolved by scripts/_wandb_resolve.sh: explicit
+#   --wandb True|False in the args wins; otherwise it defaults to True if
+#   WANDB_API_KEY is set, else False. --wandb True without WANDB_API_KEY
+#   errors out.
+#
+#   Requires: source environment.sh first so BIOM3_MACHINE is set.
 #
 #=============================================================================
+set -euo pipefail
 
-if [ "$#" -lt 5 ]; then
-  echo "Usage: $0 CONFIG_PATH NGPU DEVICE WANDB_API_KEY RUN_ID [--key value ...]"
-  exit 1
+if [ "$#" -lt 4 ]; then
+    echo "Usage: $0 CONFIG_PATH NGPU DEVICE RUN_ID [--key value ...]"
+    echo "Wandb: pass --wandb True|False to override; defaults to True iff WANDB_API_KEY is set."
+    exit 1
 fi
 
 config_path=$1
 NGPU=$2
 device=$3
-wandb_api_key=$4
-run_id=$5
-shift 5
+run_id=$4
+shift 4
 
-echo "Single-node: NGPU=${NGPU} ($device)"
+echo "Single-node: NGPU=${NGPU} (${device})"
 
 export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=true
 
-if [ -z "$wandb_api_key" ]; then
-    echo "WARNING: WANDB_API_KEY is empty — disabling wandb logging"
-    wandb_override="--wandb False"
-else
-    export WANDB_API_KEY=$wandb_api_key
-    wandb_override=""
+# Resolve machine-specific launcher
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Resolve wandb (sets `wandb_resolved`; errors if --wandb True without API key)
+source "${SCRIPT_DIR}/_wandb_resolve.sh" "$@"
+MACHINE="${BIOM3_MACHINE:?BIOM3_MACHINE not set; source environment.sh first}"
+LAUNCHER="${SCRIPT_DIR}/launchers/${MACHINE}_singlenode.sh"
+
+if [ ! -x "${LAUNCHER}" ]; then
+    echo "ERROR: no launcher for ${MACHINE} singlenode at ${LAUNCHER}"
+    exit 1
 fi
 
-biom3_pretrain_stage3 \
-    --config_path ${config_path} \
-    --run_id ${run_id} \
-    --device ${device} \
-    --num_nodes 1 \
-    --gpu_devices ${NGPU} \
-    ${wandb_override} \
-    "$@"
+# Export args the launcher reads from env
+export NGPU
+
+exec "${LAUNCHER}" \
+    biom3_train_stage3 \
+        --config_path "${config_path}" \
+        --run_id "${run_id}" \
+        --device "${device}" \
+        --num_nodes 1 \
+        --gpu_devices "${NGPU}" \
+        ${wandb_resolved} \
+        "$@"

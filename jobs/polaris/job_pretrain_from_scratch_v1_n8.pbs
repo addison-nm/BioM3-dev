@@ -23,11 +23,11 @@ source ./venvs/biom3-env/bin/activate
 config_path=./configs/stage3_training/pretrain_scratch_v1.json  # JSON config file
 num_nodes=8                     # Should match num requested nodes in PBS header
 epochs=3                        # Number of epochs to train
+use_wandb=True                  # set to False to disable wandb (requires WANDB_API_KEY exported when True)
 resume_from_checkpoint=None     # None to train from scratch
 
 # Constant configurations
 num_devices=4                   # number of devices per node
-wandb_api_key=${WANDB_API_KEY:-}    # define W&B key prior to run, e.g. via .bashrc
 device=cuda                     # device available (cuda, xpu)
 
 # Construct the run ID
@@ -45,9 +45,8 @@ source environment.sh
     ${num_nodes} \
     ${num_devices} \
     ${device} \
-    "${wandb_api_key}" \
     ${run_id} \
     --epochs ${epochs} \
     --resume_from_checkpoint ${resume_from_checkpoint} \
-    --wandb True \
+    --wandb ${use_wandb} \
 > ${log_fpath} 2>&1

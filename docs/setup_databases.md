@@ -24,21 +24,21 @@ databases/
 
 ## Populating the local `data/databases/` directory
 
-The script `scripts/sync_databases.sh` creates symlinks in your local `data/databases/` directory for any files present in the shared directory that you don't already have locally. Existing local files are left untouched and verified against the shared copy via md5 checksum.
+The script `scripts/link_data.sh` creates symlinks in your local `data/databases/` directory for any files present in the shared directory that you don't already have locally. Existing local files are left untouched and verified against the shared copy via md5 checksum.
 
 ```bash
 # Preview what will be linked (recommended before first run)
-./scripts/sync_databases.sh <shared_databases_path> data/databases --dry-run
+./scripts/link_data.sh <shared_databases_path> data/databases --dry-run
 
 # Create symlinks
-./scripts/sync_databases.sh <shared_databases_path> data/databases
+./scripts/link_data.sh <shared_databases_path> data/databases
 ```
 
 For example, on DGX Spark:
 
 ```bash
-./scripts/sync_databases.sh /data/data-share/BioM3-data-share/databases data/databases --dry-run
-./scripts/sync_databases.sh /data/data-share/BioM3-data-share/databases data/databases
+./scripts/link_data.sh /data/data-share/BioM3-data-share/databases data/databases --dry-run
+./scripts/link_data.sh /data/data-share/BioM3-data-share/databases data/databases
 ```
 
 The script will report `MATCH`, `MISMATCH`, or `LINK` for each entry.
@@ -51,7 +51,7 @@ The `biom3.dbio` package resolves database paths in the following order:
 2. **Config file**: the default config at `configs/dbio_config.json` sets `databases_root` to `data/databases` (relative to the repo root).
 3. **CLI flags**: the `biom3_build_dataset` command accepts `--databases_root` and per-database path overrides (`--swissprot`, `--pfam`).
 
-**Read vs. write paths**: The shared database directory is typically read-only. The `sync_databases.sh` script creates a local `data/databases/` directory with symlinks to individual shared files, so the local directory itself is writable. Derived files like the SQLite taxonomy index should be written to this local directory (or any user-specified path via `-o` / `--taxid_index`), not to the shared source.
+**Read vs. write paths**: The shared database directory is typically read-only. The `link_data.sh` script creates a local `data/databases/` directory with symlinks to individual shared files, so the local directory itself is writable. Derived files like the SQLite taxonomy index should be written to this local directory (or any user-specified path via `-o` / `--taxid_index`), not to the shared source.
 
 ## Available databases
 

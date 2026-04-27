@@ -314,7 +314,7 @@ def test_resume_finetune_ignores_pretrained_weights(device):
     ignored because the checkpoint already carries the weights (and optimizer
     state). The original bug was twofold: (1) train_model never passed
     ckpt_path to trainer.fit in the finetune branch, and (2)
-    run_stage3_pretraining unconditionally called load_pretrained_weights,
+    run_stage3_training unconditionally called load_pretrained_weights,
     clobbering the resume.
 
     Weight equality can't be used to verify the fix: Lightning restores the
@@ -325,7 +325,7 @@ def test_resume_finetune_ignores_pretrained_weights(device):
     two log markers that appear only on the fix path by reading v1b's
     run.log artifact:
 
-    (a) run_stage3_pretraining emits "Ignoring --pretrained_weights" from
+    (a) run_stage3_training emits "Ignoring --pretrained_weights" from
         the new skip branch — proves load_pretrained_weights was not called.
     (b) train_model emits "Resume finetuning from checkpoint" from the new
         else branch — proves the finetune branch took the resume path. The
@@ -390,7 +390,7 @@ def test_resume_finetune_ignores_pretrained_weights(device):
     if "Ignoring --pretrained_weights" not in v1b_log:
         errors.append(
             "Missing 'Ignoring --pretrained_weights' log from "
-            "run_stage3_pretraining — load_pretrained_weights was not "
+            "run_stage3_training — load_pretrained_weights was not "
             "skipped when resume_from_checkpoint was set"
         )
     if "Resume finetuning from checkpoint" not in v1b_log:

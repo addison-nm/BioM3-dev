@@ -84,7 +84,7 @@ the iteration.
 # Dump all 12 ranks (and their dataloader workers) to one file per pid
 PY_SPY="$(dirname "$(which python)")/py-spy"
 mkdir -p ~/tmp/hang_dumps && rm -f ~/tmp/hang_dumps/*.txt
-for pid in $(pgrep -u "$USER" -f 'biom3_pretrain_stage3'); do
+for pid in $(pgrep -u "$USER" -f 'biom3_train_stage3'); do
   ppid=$(ps -o ppid= -p $pid | tr -d ' ')
   echo "pid=$pid ppid=$ppid" > ~/tmp/hang_dumps/pid_${pid}.txt
   "$PY_SPY" dump --pid $pid >> ~/tmp/hang_dumps/pid_${pid}.txt 2>&1
@@ -97,7 +97,7 @@ done
 Falls back to gdb if py-spy can't attach (rare on Aurora compute nodes):
 
 ```bash
-for pid in $(pgrep -u "$USER" -f 'biom3_pretrain_stage3'); do
+for pid in $(pgrep -u "$USER" -f 'biom3_train_stage3'); do
   echo "===== PID $pid ====="
   gdb -batch -p $pid -ex 'set pagination off' \
     -ex 'thread apply all bt' -ex detach -ex quit 2>&1
@@ -258,7 +258,7 @@ oneCCL wait below the GIL and the SIGINT handler can't run. Bypass:
 
 ```bash
 # Kill by command pattern
-pkill -9 -f biom3_pretrain_stage3
+pkill -9 -f biom3_train_stage3
 
 # Or by launcher PID (then its children)
 LAUNCHER=$(pgrep -u "$USER" -f mpiexec | head -1)

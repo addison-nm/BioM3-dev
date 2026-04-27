@@ -226,7 +226,7 @@ biom3_Facilitator_sample \
 
 #### Pretraining
 
-The entrypoint `biom3_pretrain_stage3` (script `src/biom3/Stage3/run_PL_training.py`) handles both pretraining and finetuning of ProteoScribe.
+The entrypoint `biom3_train_stage3` (script `src/biom3/Stage3/run_PL_training.py`) handles both pretraining and finetuning of ProteoScribe.
 Training configuration is specified via a JSON config file passed with `--config_path`, with per-job overrides (device, number of nodes, run ID, etc.) passed as CLI arguments.
 CLI arguments override JSON values, which override argparse defaults.
 
@@ -237,7 +237,7 @@ HPC job templates in `jobs/{polaris,aurora,spark}/` demonstrate how to use these
 
 ```bash
 # Direct usage
-biom3_pretrain_stage3 \
+biom3_train_stage3 \
     --config_path configs/stage3_training/pretrain_scratch_v2.json \
     --run_id my_run_v1 \
     --device cuda \
@@ -258,7 +258,7 @@ The key difference is that we must specify a pretrained model and the number of 
 Example finetuning configs are in `configs/stage3_training/finetune_*.json`.
 
 ```bash
-biom3_pretrain_stage3 \
+biom3_train_stage3 \
     --config_path configs/stage3_training/finetune_v1.json \
     --run_id finetune_v1 \
     --device cuda \

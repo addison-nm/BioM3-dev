@@ -188,7 +188,7 @@ Runs `biom3_PenCL_inference` → `biom3_Facilitator_sample` → HDF5 compilation
 
 All three training entrypoints share a similar argparser shape (assembled from `get_args`, `get_model_args`, `get_path_args`, `get_wrapper_args`) and read CLI < JSON < argparse defaults. Stringified booleans (e.g. `--wandb True`, `--scale_learning_rate False`) are converted via `str_to_bool` inside the script.
 
-### `biom3_pretrain_stage1` — Stage 1 PenCL training
+### `biom3_train_stage1` — Stage 1 PenCL training
 
 Trains the joint protein/text encoder (PenCL) from a CSV dataset.
 
@@ -202,7 +202,7 @@ None positional. `--config_path` is technically optional but expected in practic
 
 #### Key arguments
 
-The argparser declares ~50 flags. Highlights below; run `biom3_pretrain_stage1 --help` for the complete list.
+The argparser declares ~50 flags. Highlights below; run `biom3_train_stage1 --help` for the complete list.
 
 | Arg | Type | Default | Description |
 |---|---|---|---|
@@ -239,7 +239,7 @@ The argparser declares ~50 flags. Highlights below; run `biom3_pretrain_stage1 -
 
 ---
 
-### `biom3_pretrain_stage2` — Stage 2 Facilitator training
+### `biom3_train_stage2` — Stage 2 Facilitator training
 
 Trains the Facilitator that aligns text embeddings (`z_t`) to protein embeddings (`z_p`). Consumes Stage 1 output `.pt` dicts.
 
@@ -272,11 +272,11 @@ None positional.
 | `--emb_dim` / `--hid_dim` | int | 512 / 1024 | Facilitator I/O and hidden dims. |
 | `--wandb` | str | `'False'` | Enable wandb (requires `WANDB_API_KEY`). |
 
-Run `biom3_pretrain_stage2 --help` for the complete list.
+Run `biom3_train_stage2 --help` for the complete list.
 
 ---
 
-### `biom3_pretrain_stage3` — Stage 3 ProteoScribe training and finetuning
+### `biom3_train_stage3` — Stage 3 ProteoScribe training and finetuning
 
 Trains the conditional diffusion transformer that generates protein sequences. Supports pretraining from scratch, secondary-data continuation, and selective-layer finetuning.
 
@@ -321,12 +321,12 @@ The argparser is the largest in the project (70+ flags across `get_args`, `get_m
 | `--wandb` | str | `'False'` | Enable wandb (requires `WANDB_API_KEY`). |
 | `--output_root` | str | None | Base output directory. |
 
-Run `biom3_pretrain_stage3 --help` for the full list, including model-architecture flags (`--diffusion_steps`, `--transformer_blocks`, etc.) and benchmark flags (`--save_benchmark`, `--benchmark_per_step`).
+Run `biom3_train_stage3 --help` for the full list, including model-architecture flags (`--diffusion_steps`, `--transformer_blocks`, etc.) and benchmark flags (`--save_benchmark`, `--benchmark_per_step`).
 
 #### Example: pretrain from scratch
 
 ```bash
-biom3_pretrain_stage3 \
+biom3_train_stage3 \
     --config_path configs/stage3_training/pretrain_scratch_v2.json \
     --run_id my_run_001 \
     --epochs 100
@@ -335,7 +335,7 @@ biom3_pretrain_stage3 \
 #### Example: finetune
 
 ```bash
-biom3_pretrain_stage3 \
+biom3_train_stage3 \
     --config_path configs/stage3_training/finetune_v1.json \
     --run_id finetune_001 \
     --finetune True \
@@ -374,9 +374,9 @@ biom3_PenCL_inference --help
 biom3_Facilitator_sample --help
 biom3_ProteoScribe_sample --help
 biom3_embedding_pipeline --help
-biom3_pretrain_stage1 --help
-biom3_pretrain_stage2 --help
-biom3_pretrain_stage3 --help
+biom3_train_stage1 --help
+biom3_train_stage2 --help
+biom3_train_stage3 --help
 ```
 
 If any table in this document drifts from `--help` output, the argparser is the source of truth.

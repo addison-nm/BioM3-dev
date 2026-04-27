@@ -59,7 +59,7 @@ fi
 export NGPU_PER_NODE NGPU_TOTAL
 
 exec "${LAUNCHER}" \
-    biom3_pretrain_stage3 \
+    biom3_train_stage3 \
         --config_path "${config_path}" \
         --run_id "${run_id}" \
         --device "${device}" \

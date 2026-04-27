@@ -53,10 +53,10 @@ else
 fi
 
 # Identify all rank PIDs of the hung job. Matches biom3 stage 1/2/3 entry
-# points, plus a generic biom3-pretrain fallback.
-RANK_PIDS=$(pgrep -u "$USER" -f 'biom3_pretrain_stage[123]' 2>/dev/null | sort -n)
+# points (biom3_train_stage{1,2,3}).
+RANK_PIDS=$(pgrep -u "$USER" -f 'biom3_train_stage[123]' 2>/dev/null | sort -n)
 if [ -z "${RANK_PIDS}" ]; then
-    echo "[diagnose_hang.sh] ERROR: no biom3_pretrain_stage{1,2,3} rank processes found."
+    echo "[diagnose_hang.sh] ERROR: no biom3_train_stage{1,2,3} rank processes found."
     echo "    hint: pgrep -u $USER -af python  to see what's running."
     exit 1
 fi

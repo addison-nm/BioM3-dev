@@ -15,14 +15,14 @@ Configuration precedence (high → low):
 
 Example: pretrain from scratch (epoch-based, primary data only)
 
-biom3_pretrain_stage3 \
+biom3_train_stage3 \
     --config_path configs/stage3_training/pretrain_scratch_v2.json \
     --run_id my_run_001 \
     --epochs 100
 
 Example: continue with secondary data (step-based, combine strategy)
 
-biom3_pretrain_stage3 \
+biom3_train_stage3 \
     --config_path configs/stage3_training/pretrain_phase2.json \
     --run_id my_run_phase2 \
     --resume_from_checkpoint /path/to/checkpoints/my_run_001/last.ckpt \
@@ -32,7 +32,7 @@ biom3_pretrain_stage3 \
 
 Example: finetune selected blocks/layers from pretrained weights
 
-biom3_pretrain_stage3 \
+biom3_train_stage3 \
     --config_path configs/stage3_training/finetune_v1.json \
     --run_id finetune_001 \
     --finetune True \

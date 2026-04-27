@@ -55,7 +55,7 @@ fi
 export NGPU
 
 exec "${LAUNCHER}" \
-    biom3_pretrain_stage1 \
+    biom3_train_stage1 \
         --config_path "${config_path}" \
         --run_id "${run_id}" \
         --device "${device}" \

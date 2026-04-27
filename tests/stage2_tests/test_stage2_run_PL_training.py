@@ -1,4 +1,4 @@
-"""Smoke test for `biom3_pretrain_stage2` (Stage 2 Facilitator training).
+"""Smoke test for `biom3_train_stage2` (Stage 2 Facilitator training).
 
 Builds a tiny embedding-dict fixture on the fly, runs one epoch, and asserts
 that the transformed SwissProt embedding dict gets written with the expected

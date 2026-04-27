@@ -5,10 +5,10 @@ Stage 3 trains a conditional diffusion transformer (ProteoScribe) that generates
 Training uses PyTorch Lightning with DeepSpeed Stage 2 as the distributed strategy. The entry point is:
 
 ```
-biom3_pretrain_stage3 --config_path <path_to_json>
+biom3_train_stage3 --config_path <path_to_json>
 ```
 
-> **CLI argument reference:** see [CLI_reference.md#biom3_pretrain_stage3--stage-3-proteoscribe-training-and-finetuning](CLI_reference.md#biom3_pretrain_stage3--stage-3-proteoscribe-training-and-finetuning) for the full argument table. This document focuses on workflows, output layout, and per-machine submission.
+> **CLI argument reference:** see [CLI_reference.md#biom3_train_stage3--stage-3-proteoscribe-training-and-finetuning](CLI_reference.md#biom3_train_stage3--stage-3-proteoscribe-training-and-finetuning) for the full argument table. This document focuses on workflows, output layout, and per-machine submission.
 
 ---
 
@@ -19,7 +19,7 @@ biom3_pretrain_stage3 --config_path <path_to_json>
 The standard workflow. Uses a single primary HDF5 dataset (typically SwissProt embeddings from Stage 2) with epoch-based training.
 
 ```bash
-biom3_pretrain_stage3 \
+biom3_train_stage3 \
     --config_path configs/stage3_training/pretrain_scratch_v2.json \
     --run_id my_run_001 \
     --epochs 100
@@ -32,7 +32,7 @@ When `training_strategy` is `auto` (the default) and no `secondary_data_paths` a
 After pretraining on the primary dataset, you can continue training on a combined primary+secondary dataset (e.g., adding Pfam). This switches to step-based training.
 
 ```bash
-biom3_pretrain_stage3 \
+biom3_train_stage3 \
     --config_path configs/stage3_training/pretrain_phase2.json \
     --run_id my_run_phase2 \
     --resume_from_checkpoint /path/to/checkpoints/run_id/last.ckpt \
@@ -48,7 +48,7 @@ When `start_secondary` is set, the model weights are loaded from `--resume_from_
 To resume a run that was interrupted (same dataset, same optimizer state):
 
 ```bash
-biom3_pretrain_stage3 \
+biom3_train_stage3 \
     --config_path configs/stage3_training/pretrain_scratch_v2.json \
     --run_id my_run_001 \
     --resume_from_checkpoint /path/to/checkpoints/my_run_001/last.ckpt
@@ -63,7 +63,7 @@ This calls `trainer.fit(..., ckpt_path=...)` which restores the full training st
 Finetuning freezes most of the model and trains only selected layers on a new dataset. Requires pretrained weights.
 
 ```bash
-biom3_pretrain_stage3 \
+biom3_train_stage3 \
     --config_path configs/stage3_training/finetune_example.json \
     --run_id finetune_001 \
     --finetune True \

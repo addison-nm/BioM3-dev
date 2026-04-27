@@ -1,6 +1,6 @@
 """Tests for the Stage 3 training benchmark sweep driver (pure helpers).
 
-The driver itself invokes ``biom3_pretrain_stage3`` in a subprocess per
+The driver itself invokes ``biom3_train_stage3`` in a subprocess per
 sweep cell, which needs weights; those are out of scope here. We cover the
 pure-Python helpers: config validation, cell enumeration, cell_id
 formatting, and summary aggregation from synthetic benchmark outputs.
@@ -128,7 +128,7 @@ def test_build_training_cmd_includes_overrides():
         cfg, cell={"batch_size": 16, "precision": "bf16"},
         cell_output_root="/tmp/cell", run_id="r1",
     )
-    assert cmd[0] == "biom3_pretrain_stage3"
+    assert cmd[0] == "biom3_train_stage3"
     # Cell sweep values are passed as CLI overrides
     assert "--batch_size" in cmd and "16" in cmd
     assert "--precision" in cmd and "bf16" in cmd

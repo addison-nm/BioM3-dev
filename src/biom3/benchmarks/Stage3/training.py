@@ -1,7 +1,7 @@
 """Training-loop benchmark for Stage 3 (ProteoScribe).
 
 Sweeps a config-driven grid of training hyperparameters and launches
-``biom3_pretrain_stage3`` as a subprocess for each cell. The existing
+``biom3_train_stage3`` as a subprocess for each cell. The existing
 ``TrainingBenchmarkCallback`` emits ``benchmark_history.json`` (per-epoch)
 and ``benchmark_steps.jsonl`` (per-step) into each cell's artifacts
 directory; this driver reads those back and aggregates into a single
@@ -104,9 +104,9 @@ def _cell_id(cell):
 
 
 def _build_training_cmd(cfg, cell, cell_output_root, run_id):
-    """Assemble the biom3_pretrain_stage3 command for one sweep cell."""
+    """Assemble the biom3_train_stage3 command for one sweep cell."""
     cmd = [
-        "biom3_pretrain_stage3",
+        "biom3_train_stage3",
         "--config_path", cfg["base_training_config_path"],
         "--output_root", cell_output_root,
         "--run_id", run_id,

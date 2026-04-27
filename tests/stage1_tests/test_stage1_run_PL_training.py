@@ -1,4 +1,4 @@
-"""Smoke test for `biom3_pretrain_stage1` (Stage 1 PenCL training).
+"""Smoke test for `biom3_train_stage1` (Stage 1 PenCL training).
 
 Runs one epoch of default-mode training on a tiny CSV and asserts that the
 expected artifacts land in the run directory.

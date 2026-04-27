@@ -160,8 +160,16 @@ def get_args(parser):
 
     parser.add_argument('--checkpoint_monitors', default=None,
                         help='JSON list of {"metric","mode"} dicts, or None for default val_loss.')
-    parser.add_argument('--checkpoint_every_n_steps', default=None)
-    parser.add_argument('--checkpoint_every_n_epochs', default=None)
+    parser.add_argument('--checkpoint_every_n_steps', default=None,
+                        help='Periodic snapshot every N training steps '
+                             '(orthogonal to best-metric saves).')
+    parser.add_argument('--checkpoint_every_n_epochs', default=None,
+                        help='Periodic snapshot every N epochs '
+                             '(orthogonal to best-metric saves).')
+    parser.add_argument('--checkpoint_periodic_max_keep', type=int, default=-1,
+                        choices=[-1, 0, 1],
+                        help='Periodic snapshot retention: -1 = keep all '
+                             '(default), 0 = disable, 1 = keep only most recent.')
     parser.add_argument('--use_sync_safe_checkpoint', type=str, default='False')
     return parser
 
@@ -437,41 +445,20 @@ def train_model(args, PL_model, data_module):
     if args.device != 'cpu':
         callbacks.append(DeviceStatsMonitor())
 
-    checkpoint_monitors = args.checkpoint_monitors
-    if checkpoint_monitors is None:
-        checkpoint_monitors = [{"metric": "valid_loss", "mode": "min"}]
-    elif isinstance(checkpoint_monitors, str):
-        checkpoint_monitors = json.loads(checkpoint_monitors)
-
-    every_n_steps = args.checkpoint_every_n_steps
-    every_n_epochs = args.checkpoint_every_n_epochs
-    checkpoint_callbacks = []
-    for i, mon in enumerate(checkpoint_monitors):
-        ckpt_kwargs = dict(
-            dirpath=checkpoint_dir,
-            verbose=True,
-            monitor=mon["metric"],
-            mode=mon["mode"],
-            enable_version_counter=False,
-        )
-        if i == 0:
-            ckpt_kwargs["save_top_k"] = 2
-            ckpt_kwargs["save_last"] = "link"
-            if every_n_steps is not None:
-                ckpt_kwargs["every_n_train_steps"] = int(every_n_steps)
-            if every_n_epochs is not None:
-                ckpt_kwargs["every_n_epochs"] = int(every_n_epochs)
-        else:
-            metric_slug = mon["metric"].replace("/", "_")
-            ckpt_kwargs["save_top_k"] = 1
-            ckpt_kwargs["save_last"] = False
-            ckpt_kwargs["filename"] = f"best-{metric_slug}-{{epoch}}"
-        if args.use_sync_safe_checkpoint:
-            from biom3.Stage3.callbacks import SyncSafeModelCheckpoint
-            checkpoint_callbacks.append(SyncSafeModelCheckpoint(**ckpt_kwargs))
-        else:
-            from biom3.Stage3.callbacks import LoggingModelCheckpoint
-            checkpoint_callbacks.append(LoggingModelCheckpoint(**ckpt_kwargs))
+    from biom3.Stage3.callbacks import build_checkpoint_callbacks
+    monitored_callbacks, periodic_callback = build_checkpoint_callbacks(
+        checkpoint_dir=checkpoint_dir,
+        checkpoint_monitors=args.checkpoint_monitors
+            if args.checkpoint_monitors is not None
+            else [{"metric": "valid_loss", "mode": "min"}],
+        periodic_every_n_steps=args.checkpoint_every_n_steps,
+        periodic_every_n_epochs=args.checkpoint_every_n_epochs,
+        periodic_max_keep=args.checkpoint_periodic_max_keep,
+        use_sync_safe=args.use_sync_safe_checkpoint,
+    )
+    checkpoint_callbacks = monitored_callbacks + (
+        [periodic_callback] if periodic_callback is not None else []
+    )
     callbacks = checkpoint_callbacks + callbacks
 
     if args.save_metrics_history:

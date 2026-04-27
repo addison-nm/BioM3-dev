@@ -9,8 +9,12 @@ import pytest
 import torch
 
 from biom3.Stage3.callbacks import (
+    BestArtifactSyncCallback,
+    LoggingModelCheckpoint,
     MetricsHistoryCallback,
+    SyncSafeModelCheckpoint,
     TrainingBenchmarkCallback,
+    build_checkpoint_callbacks,
     rebuild_metrics_history_pt,
 )
 
@@ -738,3 +742,281 @@ class TestRebuildMetricsHistoryPt:
         assert n_val == 0
         payload = torch.load(out_path, weights_only=False)
         assert list(payload["train"]["global_step"]) == [1]
+
+
+class TestBuildCheckpointCallbacks:
+    """Verifies the orthogonal monitored / periodic checkpoint helper.
+
+    The pre-refactor bug was that periodic ``every_n_*`` knobs were attached
+    to the same monitored ``ModelCheckpoint`` that had ``save_top_k=2``, so
+    periodic-trigger saves were silently pruned by the metric-based retention.
+    These tests pin the orthogonal split and the parameter wiring.
+    """
+
+    def test_default_no_periodic(self, tmp_path):
+        ckpt_dir = str(tmp_path / "ckpt")
+        monitored, periodic = build_checkpoint_callbacks(checkpoint_dir=ckpt_dir)
+        assert periodic is None
+        assert len(monitored) == 1
+        cb = monitored[0]
+        assert cb.monitor == "val_loss"
+        assert cb.mode == "min"
+        assert cb.save_top_k == 2
+        assert cb.save_last == "link"
+        assert cb.dirpath == ckpt_dir
+        # The bug fixed by the refactor: monitored callbacks must NOT carry
+        # periodic cadences (which would compete with save_top_k pruning).
+        assert cb._every_n_train_steps == 0
+        assert cb._every_n_epochs == 1  # PL default; no explicit override
+
+    def test_periodic_every_n_steps(self, tmp_path):
+        ckpt_dir = str(tmp_path / "ckpt")
+        monitored, periodic = build_checkpoint_callbacks(
+            checkpoint_dir=ckpt_dir, periodic_every_n_steps=50,
+        )
+        assert periodic is not None
+        # Monitored callback stays clean.
+        assert monitored[0]._every_n_train_steps == 0
+        # Periodic callback: monitor=None, keep-all, separate subdir, step cadence wired.
+        assert periodic.monitor is None
+        assert periodic.save_top_k == -1
+        assert periodic.save_last is False
+        assert periodic.dirpath == os.path.join(ckpt_dir, "periodic")
+        assert periodic._every_n_train_steps == 50
+
+    def test_periodic_every_n_epochs(self, tmp_path):
+        ckpt_dir = str(tmp_path / "ckpt")
+        _, periodic = build_checkpoint_callbacks(
+            checkpoint_dir=ckpt_dir, periodic_every_n_epochs=5,
+        )
+        assert periodic is not None
+        assert periodic._every_n_epochs == 5
+        assert periodic._every_n_train_steps == 0
+
+    def test_periodic_both_cadences_rejected(self, tmp_path):
+        # Lightning's ModelCheckpoint enforces step-vs-epoch exclusivity;
+        # we surface that as a clear error at helper-call time.
+        ckpt_dir = str(tmp_path / "ckpt")
+        with pytest.raises(ValueError, match="mutually exclusive"):
+            build_checkpoint_callbacks(
+                checkpoint_dir=ckpt_dir,
+                periodic_every_n_steps=100,
+                periodic_every_n_epochs=2,
+            )
+
+    def test_periodic_max_keep_keep_last_one(self, tmp_path):
+        # save_top_k=1 with monitor=None means "keep most recent only" — the
+        # smallest legal positive bound under Lightning's constraint.
+        ckpt_dir = str(tmp_path / "ckpt")
+        _, periodic = build_checkpoint_callbacks(
+            checkpoint_dir=ckpt_dir,
+            periodic_every_n_epochs=1,
+            periodic_max_keep=1,
+        )
+        assert periodic.save_top_k == 1
+
+    def test_periodic_max_keep_invalid_raises(self, tmp_path):
+        # Anything outside {-1, 0, 1} is rejected; Lightning's monitor=None
+        # constraint makes other values unsupportable without custom pruning.
+        ckpt_dir = str(tmp_path / "ckpt")
+        with pytest.raises(ValueError, match="periodic_max_keep"):
+            build_checkpoint_callbacks(
+                checkpoint_dir=ckpt_dir,
+                periodic_every_n_epochs=1,
+                periodic_max_keep=3,
+            )
+
+    def test_multiple_monitors(self, tmp_path):
+        ckpt_dir = str(tmp_path / "ckpt")
+        monitored, _ = build_checkpoint_callbacks(
+            checkpoint_dir=ckpt_dir,
+            checkpoint_monitors=[
+                {"metric": "val_loss", "mode": "min"},
+                {"metric": "val_acc", "mode": "max"},
+            ],
+        )
+        assert len(monitored) == 2
+        # Primary keeps top-2 + last symlink.
+        assert monitored[0].monitor == "val_loss"
+        assert monitored[0].save_top_k == 2
+        assert monitored[0].save_last == "link"
+        # Secondary monitors keep best-1 with metric-slug filename, no last.
+        assert monitored[1].monitor == "val_acc"
+        assert monitored[1].mode == "max"
+        assert monitored[1].save_top_k == 1
+        assert monitored[1].save_last is False
+        assert "val_acc" in monitored[1].filename
+
+    def test_checkpoint_monitors_accepts_json_string(self, tmp_path):
+        ckpt_dir = str(tmp_path / "ckpt")
+        monitors_json = json.dumps([{"metric": "loss_gap", "mode": "min"}])
+        monitored, _ = build_checkpoint_callbacks(
+            checkpoint_dir=ckpt_dir, checkpoint_monitors=monitors_json,
+        )
+        assert len(monitored) == 1
+        assert monitored[0].monitor == "loss_gap"
+
+    def test_use_sync_safe_swaps_class(self, tmp_path):
+        ckpt_dir = str(tmp_path / "ckpt")
+        # Default: monitored callbacks are LoggingModelCheckpoint.
+        mon_default, _ = build_checkpoint_callbacks(checkpoint_dir=ckpt_dir)
+        assert isinstance(mon_default[0], LoggingModelCheckpoint)
+        assert not isinstance(mon_default[0], SyncSafeModelCheckpoint)
+        # use_sync_safe=True: monitored callbacks become SyncSafeModelCheckpoint.
+        mon_sync, periodic = build_checkpoint_callbacks(
+            checkpoint_dir=ckpt_dir,
+            use_sync_safe=True,
+            periodic_every_n_steps=10,
+        )
+        assert isinstance(mon_sync[0], SyncSafeModelCheckpoint)
+        # Periodic always uses LoggingModelCheckpoint regardless — SyncSafe's
+        # override only matters when comparing against a monitored metric.
+        assert isinstance(periodic, LoggingModelCheckpoint)
+        assert not isinstance(periodic, SyncSafeModelCheckpoint)
+
+
+class TestProgressiveMetricsHistorySnapshot:
+    """metrics_history.pt must exist on disk after each validation epoch end,
+    not only after on_train_end. Pins the timeout-resilience behavior."""
+
+    def test_pt_snapshot_on_validation_epoch_end(self, tmp_output_dir):
+        cb = MetricsHistoryCallback(output_dir=tmp_output_dir)
+        pl_module = _mock_pl_module()
+        metrics = {
+            "val_loss": torch.tensor(1.5),
+            "val_loss_epoch": torch.tensor(1.5),
+            "train_loss_epoch": torch.tensor(1.0),
+        }
+        trainer = _make_metrics_trainer(
+            global_step=100, current_epoch=1, callback_metrics=metrics,
+        )
+        cb.on_train_start(trainer, pl_module)
+        cb.on_validation_epoch_end(trainer, pl_module)
+
+        pt_path = os.path.join(tmp_output_dir, "metrics_history.pt")
+        assert os.path.exists(pt_path), (
+            "metrics_history.pt must exist after a validation epoch — not "
+            "only after on_train_end. Otherwise a SIGTERM mid-run loses "
+            "the consolidated metrics file."
+        )
+        payload = torch.load(pt_path, weights_only=False)
+        assert payload["val"]["val_loss"][0] == pytest.approx(1.5)
+
+    def test_jsonl_fsynced_at_validation_end(self, tmp_output_dir):
+        # Even with flush_every_n_steps=None (default), val-end must fsync.
+        cb = MetricsHistoryCallback(output_dir=tmp_output_dir)
+        pl_module = _mock_pl_module()
+        trainer = _make_metrics_trainer(
+            global_step=10, current_epoch=0,
+            callback_metrics={"val_loss": torch.tensor(1.0)},
+        )
+        cb.on_train_start(trainer, pl_module)
+        with patch("biom3.Stage3.callbacks.os.fsync") as fsync_mock:
+            cb.on_validation_epoch_end(trainer, pl_module)
+            # Both train and val JSONL handles get fsynced.
+            assert fsync_mock.call_count >= 2
+
+
+class TestProgressiveBenchmarkHistorySnapshot:
+    """benchmark_history.json must be re-written on each train epoch end."""
+
+    def test_json_snapshot_on_train_epoch_end(self, tmp_output_dir):
+        cb = _make_callback(tmp_output_dir, batch_size=4, gpu_devices=1,
+                            num_nodes=1, acc_grad_batches=1)
+        pl_module = _mock_pl_module()
+        trainer = _make_metrics_trainer(global_step=100, current_epoch=0)
+        cb.on_train_start(trainer, pl_module)
+        cb.on_train_epoch_start(trainer, pl_module)
+        # Move time forward so wall-time math doesn't divide by zero.
+        time.sleep(0.01)
+        trainer.global_step = 110
+        cb.on_train_epoch_end(trainer, pl_module)
+
+        json_path = os.path.join(tmp_output_dir, "benchmark_history.json")
+        assert os.path.exists(json_path), (
+            "benchmark_history.json must be written after each training "
+            "epoch — otherwise a timeout loses the per-epoch summary."
+        )
+        with open(json_path) as fh:
+            payload = json.load(fh)
+        assert len(payload["epochs"]) == 1
+
+
+class TestBestArtifactSyncCallback:
+    """The mid-training best-artifact sync must:
+       - Skip until the monitored callback has produced a best.
+       - Run sync_fn on each new best (best_model_path changed).
+       - NOT re-run sync_fn when the best path is unchanged (idempotent).
+       - Throttle by every_n_val.
+       - Tolerate sync_fn exceptions without aborting training.
+    """
+
+    def _make(self, every_n_val=1):
+        primary = MagicMock()
+        primary.best_model_path = ""
+        sync_fn = MagicMock()
+        cb = BestArtifactSyncCallback(
+            sync_fn=sync_fn, primary_callback=primary,
+            extra_callbacks=[], every_n_val=every_n_val,
+        )
+        trainer = _mock_trainer(global_rank=0)
+        pl_module = _mock_pl_module()
+        return cb, primary, sync_fn, trainer, pl_module
+
+    def test_skips_when_no_best_yet(self):
+        cb, primary, sync_fn, trainer, pl_module = self._make()
+        primary.best_model_path = ""  # no checkpoint yet
+        cb.on_validation_epoch_end(trainer, pl_module)
+        sync_fn.assert_not_called()
+
+    def test_runs_on_first_best(self, tmp_path):
+        cb, primary, sync_fn, trainer, pl_module = self._make()
+        # Simulate ModelCheckpoint having just promoted a best path.
+        primary.best_model_path = str(tmp_path / "best.ckpt")
+        cb.on_validation_epoch_end(trainer, pl_module)
+        sync_fn.assert_called_once()
+
+    def test_idempotent_when_best_unchanged(self, tmp_path):
+        cb, primary, sync_fn, trainer, pl_module = self._make()
+        primary.best_model_path = str(tmp_path / "best.ckpt")
+        cb.on_validation_epoch_end(trainer, pl_module)
+        cb.on_validation_epoch_end(trainer, pl_module)
+        cb.on_validation_epoch_end(trainer, pl_module)
+        # Three val cycles, one new best — only one sync call.
+        assert sync_fn.call_count == 1
+
+    def test_re_runs_when_best_changes(self, tmp_path):
+        cb, primary, sync_fn, trainer, pl_module = self._make()
+        primary.best_model_path = str(tmp_path / "best_v1.ckpt")
+        cb.on_validation_epoch_end(trainer, pl_module)
+        primary.best_model_path = str(tmp_path / "best_v2.ckpt")
+        cb.on_validation_epoch_end(trainer, pl_module)
+        assert sync_fn.call_count == 2
+
+    def test_throttle_every_n_val(self, tmp_path):
+        cb, primary, sync_fn, trainer, pl_module = self._make(every_n_val=3)
+        # Even with a new best every cycle, sync only fires every 3rd cycle.
+        for i in range(6):
+            primary.best_model_path = str(tmp_path / f"best_v{i}.ckpt")
+            cb.on_validation_epoch_end(trainer, pl_module)
+        # Cycles 3 and 6 trigger.
+        assert sync_fn.call_count == 2
+
+    def test_sync_exception_does_not_propagate(self, tmp_path):
+        cb, primary, sync_fn, trainer, pl_module = self._make()
+        sync_fn.side_effect = RuntimeError("DeepSpeed conversion failed")
+        primary.best_model_path = str(tmp_path / "best.ckpt")
+        # Must not raise — losing an artifact-sync should not abort training.
+        cb.on_validation_epoch_end(trainer, pl_module)
+        assert sync_fn.call_count == 1
+        # Failed sync must NOT mark the path as synced; the next val cycle
+        # will retry against the same best path.
+        cb.on_validation_epoch_end(trainer, pl_module)
+        assert sync_fn.call_count == 2
+
+    def test_non_zero_rank_skips(self, tmp_path):
+        cb, primary, sync_fn, _, pl_module = self._make()
+        trainer = _mock_trainer(global_rank=1)
+        primary.best_model_path = str(tmp_path / "best.ckpt")
+        cb.on_validation_epoch_end(trainer, pl_module)
+        sync_fn.assert_not_called()

@@ -2,7 +2,7 @@
 
 The webapp's file picker is used by every page that reads from disk;
 ``list_files`` must follow symlinked directories because
-``scripts/sync_weights.sh`` populates ``weights/`` with per-entry symlinks
+``scripts/link_weights.sh`` populates ``weights/`` with per-entry symlinks
 into a shared data directory (and worktree workflows depend on it).
 """
 

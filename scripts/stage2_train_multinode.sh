@@ -19,7 +19,7 @@ set -euo pipefail
 
 if [ "$#" -lt 5 ]; then
     echo "Usage: $0 CONFIG_PATH NUM_NODES NGPU_PER_NODE DEVICE RUN_ID [--key value ...]"
-    echo "WANDB_API_KEY is read from the environment (wandb disabled if unset)."
+    echo "Wandb: pass --wandb True|False to override; defaults to True iff WANDB_API_KEY is set."
     exit 1
 fi
 
@@ -36,14 +36,10 @@ echo "NUM_NODES: ${NUM_NODES}, NGPU_PER_NODE: ${NGPU_PER_NODE}, NGPU_TOTAL: ${NG
 
 export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=true
 
-if [ -z "${WANDB_API_KEY:-}" ]; then
-    echo "WARNING: WANDB_API_KEY is empty — disabling wandb logging"
-    wandb_override="--wandb False"
-else
-    wandb_override=""
-fi
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Resolve wandb (sets `wandb_resolved`; errors if --wandb True without API key)
+source "${SCRIPT_DIR}/_wandb_resolve.sh" "$@"
 MACHINE="${BIOM3_MACHINE:?BIOM3_MACHINE not set; source environment.sh first}"
 LAUNCHER="${SCRIPT_DIR}/launchers/${MACHINE}_multinode.sh"
 
@@ -61,5 +57,5 @@ exec "${LAUNCHER}" \
         --device "${device}" \
         --num_nodes "${NUM_NODES}" \
         --gpu_devices "${NGPU_PER_NODE}" \
-        ${wandb_override} \
+        ${wandb_resolved} \
         "$@"

@@ -15,7 +15,7 @@ For large features, prefer working in a git worktree branched off `addison-dev`,
 
 While working in a worktree:
 - Edit only the files the feature requires. If bugs are spotted in unrelated areas, note them (e.g., in the session log or a TODO) but do not fix them in this worktree — they belong to their own branch.
-- Each new worktree starts without populated `data/databases/` or `data/datasets/`. Repopulate them via the appropriate `scripts/sync_*.sh` script before running anything that reads from them.
+- Each new worktree starts without populated `data/databases/` or `data/datasets/`. Repopulate them via the appropriate `scripts/link_*.sh` script before running anything that reads from them.
 
 Small fixes and docs edits can still be made directly on `addison-dev`.
 

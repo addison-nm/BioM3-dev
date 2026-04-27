@@ -11,6 +11,7 @@ cd ${projdir}
 # Configurations to edit
 config_path=./configs/stage3_training/<CONFIG_NAME>.json  # JSON config file
 epochs=5                        # Number of epochs to train. Note: Should be greater than num already trained.
+use_wandb=True                  # set to False to disable wandb (requires WANDB_API_KEY exported when True)
 
 # Path to Lightning checkpoint directory
 # Typically logs/history/Stage3_history/checkpoints/<NAME>/last.ckpt
@@ -38,5 +39,5 @@ source environment.sh
     ${run_id} \
     --epochs ${epochs} \
     --resume_from_checkpoint ${resume_from_checkpoint} \
-    --wandb True \
+    --wandb ${use_wandb} \
 > ${log_fpath} 2>&1

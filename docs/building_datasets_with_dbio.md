@@ -28,7 +28,7 @@ For real datasets, you need the database files. See [setup_databases.md](setup_d
 for shared paths per machine. Sync them with:
 
 ```bash
-./scripts/sync_databases.sh /data/data-share/BioM3-data-share/databases data/databases
+./scripts/link_data.sh /data/data-share/BioM3-data-share/databases data/databases
 ```
 
 ---

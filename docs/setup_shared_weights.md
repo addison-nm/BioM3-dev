@@ -22,28 +22,28 @@ weights/
 
 ## Populating the local `weights/` directory
 
-The script `scripts/sync_weights.sh` creates symlinks in your local `weights/` directory for any files present in the shared directory that you don't already have locally. Existing local files are left untouched and verified against the shared copy via md5 checksum.
+The script `scripts/link_weights.sh` creates symlinks in your local `weights/` directory for any files present in the shared directory that you don't already have locally. Existing local files are left untouched and verified against the shared copy via md5 checksum.
 
 ```bash
 # Preview what will be linked (recommended before first run)
-./scripts/sync_weights.sh <shared_weights_path> weights --dry-run
+./scripts/link_weights.sh <shared_weights_path> weights --dry-run
 
 # Create symlinks
-./scripts/sync_weights.sh <shared_weights_path> weights
+./scripts/link_weights.sh <shared_weights_path> weights
 ```
 
 For example, on DGX Spark:
 
 ```bash
-./scripts/sync_weights.sh /data/data-share/BioM3-data-share/data/weights weights --dry-run
-./scripts/sync_weights.sh /data/data-share/BioM3-data-share/data/weights weights
+./scripts/link_weights.sh /data/data-share/BioM3-data-share/data/weights weights --dry-run
+./scripts/link_weights.sh /data/data-share/BioM3-data-share/data/weights weights
 ```
 
 The script will report `MATCH`, `MISMATCH`, or `LINK` for each entry. A `MISMATCH` does not necessarily indicate a problem -- files saved with different versions of PyTorch may differ at the byte level while containing identical tensor data. The script output includes a command to verify tensor-level equivalence when mismatches are found.
 
 ## Adding additional weights
 
-The local `weights/` directory supports a mix of symlinked shared files and additional local files. To add new weights that are not in the shared directory, simply place them in the appropriate subdirectory under `weights/`. Running `sync_weights.sh` again will skip any files that already exist locally.
+The local `weights/` directory supports a mix of symlinked shared files and additional local files. To add new weights that are not in the shared directory, simply place them in the appropriate subdirectory under `weights/`. Running `link_weights.sh` again will skip any files that already exist locally.
 
 The script creates real directories for each component (e.g. `weights/PenCL/`) and symlinks only the individual files within them. This ensures you can always write new local files alongside the shared symlinks.
 
@@ -61,4 +61,4 @@ Some tests depend on pretrained weight files that are too large to commit to git
 | `ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.renamed.bin` | 3 | `test_model_load_from_bin`, `test_stage3_run_ProteoScribe_sample` |
 | `ProteoScribe/epoch200_full.ckpt/single_model.pth` | 3 | `test_model_load_from_checkpoint_file` |
 
-All of these files are available in the shared weights directory and can be populated by running `sync_weights.sh` as described above. Tests that do not depend on these files — including the key-correction tests using committed dummy weights (see `docs/bug_reports/axial_positional_embedding_keys.md`) — will always run.
+All of these files are available in the shared weights directory and can be populated by running `link_weights.sh` as described above. Tests that do not depend on these files — including the key-correction tests using committed dummy weights (see `docs/bug_reports/axial_positional_embedding_keys.md`) — will always run.

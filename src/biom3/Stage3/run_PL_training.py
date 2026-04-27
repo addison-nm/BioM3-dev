@@ -1,9 +1,51 @@
 #!/usr/bin/env python3
 
-"""Training script for BioM3 Stage 3
+"""BioM3 Stage 3: ProteoScribe training and finetuning
 
-Support for PyTorch Lightning and Weights&Biases
+Trains the conditional diffusion transformer (ProteoScribe) that generates
+protein sequences from text-conditioned embeddings produced by Stage 2.
+Supports pretraining from scratch, continuation with secondary data,
+resumption from checkpoint, and selective-layer finetuning.
 
+Config file:
+    configs/stage3_training/*.json  (uses _base_configs composition)
+
+Configuration precedence (high → low):
+    CLI args  >  --config_path JSON  >  argparse defaults
+
+Example: pretrain from scratch (epoch-based, primary data only)
+
+biom3_pretrain_stage3 \
+    --config_path configs/stage3_training/pretrain_scratch_v2.json \
+    --run_id my_run_001 \
+    --epochs 100
+
+Example: continue with secondary data (step-based, combine strategy)
+
+biom3_pretrain_stage3 \
+    --config_path configs/stage3_training/pretrain_phase2.json \
+    --run_id my_run_phase2 \
+    --resume_from_checkpoint /path/to/checkpoints/my_run_001/last.ckpt \
+    --start_secondary True \
+    --secondary_data_paths ./data/pfam_embeddings.hdf5 \
+    --max_steps 3000000
+
+Example: finetune selected blocks/layers from pretrained weights
+
+biom3_pretrain_stage3 \
+    --config_path configs/stage3_training/finetune_v1.json \
+    --run_id finetune_001 \
+    --finetune True \
+    --pretrained_weights /path/to/state_dict.best.pth \
+    --finetune_last_n_blocks 4 \
+    --finetune_last_n_layers -1 \
+    --finetune_output_layers True
+
+Outputs are organized under {output_root}/{checkpoints_folder|runs_folder}/
+{run_id}/ with checkpoints, derived state_dict.pth files, args.json, and
+build_manifest.json. See docs/stage3_training.md for the full output
+layout, metric definitions, and per-machine submission examples. See
+docs/CLI_reference.md for the complete argument list.
 """
 
 import sys
@@ -66,7 +108,7 @@ import biom3.Stage3.preprocess as prep
 import biom3.Stage3.cond_diff_transformer_layer as mod
 import biom3.Stage3.PL_wrapper as PL_mod
 from biom3.Stage3.io import prepare_model_ProteoScribe
-from biom3.core.helpers import load_json_config
+from biom3.core.helpers import coerce_limit_batches, load_json_config
 from biom3.core.run_utils import (
     backup_if_exists, setup_file_logging, teardown_file_logging, write_manifest,
 )
@@ -205,10 +247,16 @@ def get_args(parser):
                         help='number of iteration steps for training...')
     parser.add_argument('--val_check_interval', default=10000, type=int,
                         help='number of steps before starting evaluation on validation...')
-    parser.add_argument('--limit_val_batches', default=0.05, type=float,
-                        help='number of samples to validate on...')
+    parser.add_argument('--limit_val_batches', default=200, type=float,
+                        help='Cap validation batches per epoch. Values >1 are an '
+                             'absolute batch count (predictable wall time across '
+                             'dataset sizes); values in (0,1] are a fraction of '
+                             'the val set (scales with dataset size). '
+                             'Default 200 batches gives a stable val signal across '
+                             'small (~10K) to large (10M+) datasets.')
     parser.add_argument('--limit_train_batches', default=None, type=float,
-                        help='Cap training batches per epoch (int or fraction in (0,1]). '
+                        help='Cap training batches per epoch. Values >1 are an '
+                             'absolute batch count; values in (0,1] are a fraction. '
                              'None = use full training dataset.')
     parser.add_argument('--log_every_n_steps', default=10001, type=float,
                         help='number of samples to validate on...')
@@ -1496,7 +1544,7 @@ def train_model(
     }
 
     # Configure training mode: epoch-based (primary_only) or step-based (combine)
-    trainer_params['limit_val_batches'] = limit_val_batches
+    trainer_params['limit_val_batches'] = coerce_limit_batches(limit_val_batches)
     if training_strategy == 'primary_only':
         trainer_params['max_epochs'] = epochs
     else:
@@ -1505,9 +1553,8 @@ def train_model(
 
     limit_train_batches = getattr(args, 'limit_train_batches', None)
     if limit_train_batches is not None:
-        trainer_params['limit_train_batches'] = (
-            int(limit_train_batches) if limit_train_batches > 1
-            else float(limit_train_batches)
+        trainer_params['limit_train_batches'] = coerce_limit_batches(
+            limit_train_batches
         )
 
     # Initialize trainer with configured parameters

@@ -73,6 +73,9 @@ def prefix_paths(args):
 @pytest.mark.parametrize(
     "argstring_fpath, expect_error_context", [
     [f"{ARGS_DIR}/training_args_scratch_v1.txt", does_not_raise()],
+    # Same config but with absolute-batch-count limits (>1), exercises the
+    # int branch of coerce_limit_batches end-to-end through PL Trainer.
+    [f"{ARGS_DIR}/training_args_scratch_v1_abs_val.txt", does_not_raise()],
 ])
 @pytest.mark.parametrize("device", ["cuda", "xpu"])
 def test_train_from_scratch(
@@ -82,7 +85,9 @@ def test_train_from_scratch(
     Tests that basic training succeeds.
 
     Uses argfile(s):
-        training_args_scratch_v1.txt
+        training_args_scratch_v1.txt           — fractional limit_val_batches (0.05)
+        training_args_scratch_v1_abs_val.txt   — absolute limit_val_batches and
+                                                 limit_train_batches (>1)
     """
     # This test relies on the following downloaded weights. Check existence.
     issues, skip_reason = check_downloads(REQUIRED_DOWNLOADS)

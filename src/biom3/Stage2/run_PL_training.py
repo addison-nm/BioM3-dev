@@ -42,7 +42,7 @@ else:
 
 from biom3.Stage2.PL_wrapper import PL_Facilitator
 from biom3.Stage2.preprocess import Facilitator_DataModule
-from biom3.core.helpers import load_json_config
+from biom3.core.helpers import coerce_limit_batches, load_json_config
 from biom3.core.run_utils import (
     backup_if_exists, setup_file_logging, teardown_file_logging, write_manifest,
 )
@@ -77,9 +77,12 @@ def nonestr_to_none(s):
 
 
 def get_args(parser):
-    parser.add_argument('--description', type=str, default="")
-    parser.add_argument('--tags', type=str, nargs="*", default=[])
-    parser.add_argument('--notes', type=str, nargs="*", default=[])
+    parser.add_argument('--description', type=str, default="",
+                        help='Free-text description of the run (stored in args.json).')
+    parser.add_argument('--tags', type=str, nargs="*", default=[],
+                        help='Tags categorizing this run (stored in args.json).')
+    parser.add_argument('--notes', type=str, nargs="*", default=[],
+                        help='Free-form notes about this run (stored in args.json).')
 
     parser.add_argument('--swissprot_data_path', type=str, default='None',
                         help='Path to Stage 1 SwissProt embeddings .pt dict.')
@@ -90,54 +93,102 @@ def get_args(parser):
     parser.add_argument('--output_pfam_dict_path', type=str, default=None,
                         help='Where to save Stage 2 Pfam embeddings dict.')
 
-    parser.add_argument('--output_root', type=str, default='./outputs/Stage2/pretraining')
-    parser.add_argument('--checkpoints_folder', type=str, default='checkpoints')
-    parser.add_argument('--resume_from_checkpoint', type=str, default='None')
-    parser.add_argument('--pretrained_weights', type=str, default='None')
+    parser.add_argument('--output_root', type=str, default='./outputs/Stage2/pretraining',
+                        help='Base directory for all training outputs '
+                             '(checkpoints/, runs/).')
+    parser.add_argument('--checkpoints_folder', type=str, default='checkpoints',
+                        help='Subdirectory under output_root for checkpoint files.')
+    parser.add_argument('--resume_from_checkpoint', type=str, default='None',
+                        help='Path to a Lightning .ckpt to resume training from. '
+                             "Pass 'None' (string) or omit to start fresh.")
+    parser.add_argument('--pretrained_weights', type=str, default='None',
+                        help="Path to a raw weights file to load before training "
+                             "(no optimizer state). Pass 'None' to skip.")
 
-    parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--num_workers', type=int, default=0)
-    parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--epochs', type=int, default=20)
-    parser.add_argument('--valid_size', type=float, default=0.2)
-    parser.add_argument('--val_check_interval', type=float, default=1.0)
-    parser.add_argument('--limit_val_batches', type=float, default=1.0)
-    parser.add_argument('--log_every_n_steps', type=int, default=10)
+    parser.add_argument('--seed', type=int, default=42,
+                        help='Random seed for shuffling, weight init, and '
+                             'reproducibility.')
+    parser.add_argument('--num_workers', type=int, default=0,
+                        help='DataLoader worker count. 0 = main process only.')
+    parser.add_argument('--batch_size', type=int, default=32,
+                        help='Per-device mini-batch size.')
+    parser.add_argument('--epochs', type=int, default=20,
+                        help='Number of training epochs.')
+    parser.add_argument('--valid_size', type=float, default=0.2,
+                        help='Fraction of dataset held out for validation '
+                             '(default 0.2 = 80/20 train/val split).')
+    parser.add_argument('--val_check_interval', type=float, default=1.0,
+                        help='Validation cadence (1.0 = once per epoch).')
+    parser.add_argument('--limit_val_batches', type=float, default=1.0,
+                        help='Cap validation batches per epoch. Values >1 are an '
+                             'absolute batch count; values in (0,1] are a fraction. '
+                             'Default 1.0 uses the full val set.')
+    parser.add_argument('--log_every_n_steps', type=int, default=10,
+                        help='Lightning Trainer log_every_n_steps (TensorBoard / wandb).')
 
-    parser.add_argument('--lr', type=float, default=1e-3)
-    parser.add_argument('--weight_decay', type=float, default=1e-6)
-    parser.add_argument('--scale_learning_rate', type=str, default='False')
+    parser.add_argument('--lr', type=float, default=1e-3,
+                        help='Base learning rate.')
+    parser.add_argument('--weight_decay', type=float, default=1e-6,
+                        help='AdamW weight decay.')
+    parser.add_argument('--scale_learning_rate', type=str, default='False',
+                        help="'True'/'False'. When True, scale lr by "
+                             'num_nodes * gpu_devices.')
 
-    parser.add_argument('--precision', type=str, default='32')
+    parser.add_argument('--precision', type=str, default='32',
+                        help="Training precision: '32', '16', 'bf16', 'bf16-mixed'.")
     parser.add_argument('--device', type=str, default='cuda',
-                        choices=['cuda', 'xpu', 'cpu'])
-    parser.add_argument('--gpu_devices', type=int, default=1)
+                        choices=['cuda', 'xpu', 'cpu'],
+                        help='Compute device for training.')
+    parser.add_argument('--gpu_devices', type=int, default=1,
+                        help='Number of GPUs (CUDA) or tiles (XPU) per node.')
     parser.add_argument('--num_gpus', type=int, default=1,
                         help='Alias exposed for Facilitator_Dataset device logic.')
-    parser.add_argument('--num_nodes', type=int, default=1)
-    parser.add_argument('--acc_grad_batches', type=int, default=1)
+    parser.add_argument('--num_nodes', type=int, default=1,
+                        help='Number of nodes participating in training.')
+    parser.add_argument('--acc_grad_batches', type=int, default=1,
+                        help='Gradient accumulation steps. Effective batch size = '
+                             'batch_size * acc_grad_batches * num_nodes * gpu_devices.')
 
-    parser.add_argument('--save_metrics_history', type=str, default='True')
-    parser.add_argument('--metrics_history_every_n_steps', type=int, default=1)
+    parser.add_argument('--save_metrics_history', type=str, default='True',
+                        help="'True'/'False'. Save MetricsHistoryCallback "
+                             'JSONL files alongside checkpoints.')
+    parser.add_argument('--metrics_history_every_n_steps', type=int, default=1,
+                        help='Record training metrics every N global steps.')
     parser.add_argument('--metrics_history_every_n_epochs', type=int, default=None,
                         help='Also record training metrics every N epochs '
                              '(captures epoch-averaged values). None disables.')
     parser.add_argument('--metrics_history_flush_every_n_steps', type=int, default=None,
                         help='Flush metrics JSONL to disk every N global steps. '
                              'None flushes only at train end.')
-    parser.add_argument('--metrics_history_ranks', type=int, nargs='*', default=[0])
-    parser.add_argument('--metrics_history_all_ranks_val_loss', type=str, default='False')
+    parser.add_argument('--metrics_history_ranks', type=int, nargs='*', default=[0],
+                        help='Rank indices that write metrics JSONL '
+                             '(default: rank 0 only).')
+    parser.add_argument('--metrics_history_all_ranks_val_loss', type=str, default='False',
+                        help="'True'/'False'. Diagnostic: dump val_loss per "
+                             'rank at epoch end to check sync_dist consistency.')
 
-    parser.add_argument('--save_benchmark', type=str, default='False')
-    parser.add_argument('--benchmark_skip_first_epoch', type=str, default='True')
-    parser.add_argument('--benchmark_all_ranks_memory', type=str, default='False')
+    parser.add_argument('--save_benchmark', type=str, default='False',
+                        help="'True'/'False'. Save per-epoch wall-clock + memory "
+                             'benchmark to artifacts/benchmark_history.json.')
+    parser.add_argument('--benchmark_skip_first_epoch', type=str, default='True',
+                        help="'True'/'False'. Exclude first epoch from "
+                             'benchmark summary stats (treats it as warmup).')
+    parser.add_argument('--benchmark_all_ranks_memory', type=str, default='False',
+                        help="'True'/'False'. All-gather peak memory from every "
+                             'rank (vs rank-0 only).')
 
-    parser.add_argument('--early_stopping_metric', type=str, default='None')
-    parser.add_argument('--early_stopping_patience', type=int, default=10)
-    parser.add_argument('--early_stopping_min_delta', type=float, default=0.0)
-    parser.add_argument('--early_stopping_mode', type=str, default='min')
+    parser.add_argument('--early_stopping_metric', type=str, default='None',
+                        help="Metric to monitor for early stopping (e.g. 'val_loss'). "
+                             "'None' disables early stopping.")
+    parser.add_argument('--early_stopping_patience', type=int, default=10,
+                        help='Validation checks with no improvement before stopping.')
+    parser.add_argument('--early_stopping_min_delta', type=float, default=0.0,
+                        help='Minimum change in monitored metric to qualify as improvement.')
+    parser.add_argument('--early_stopping_mode', type=str, default='min',
+                        help="'min' or 'max' — whether smaller or larger is better.")
 
-    parser.add_argument('--checkpoint_monitors', default=None)
+    parser.add_argument('--checkpoint_monitors', default=None,
+                        help='JSON list of {"metric","mode"} dicts, or None for default val_loss.')
     parser.add_argument('--checkpoint_every_n_steps', default=None,
                         help='Periodic snapshot every N training steps '
                              '(orthogonal to best-metric saves).')
@@ -148,31 +199,48 @@ def get_args(parser):
                         choices=[-1, 0, 1],
                         help='Periodic snapshot retention: -1 = keep all '
                              '(default), 0 = disable, 1 = keep only most recent.')
-    parser.add_argument('--use_sync_safe_checkpoint', type=str, default='False')
+    parser.add_argument('--use_sync_safe_checkpoint', type=str, default='False',
+                        help="'True'/'False'. Use SyncSafeModelCheckpoint to "
+                             'bypass reduce_boolean_decision (workaround for '
+                             'XPU/CCL integer all-reduce bug).')
     return parser
 
 
 def get_model_args(parser):
-    parser.add_argument('--emb_dim', type=int, default=512)
-    parser.add_argument('--hid_dim', type=int, default=1024)
-    parser.add_argument('--dropout', type=float, default=0.1)
+    parser.add_argument('--emb_dim', type=int, default=512,
+                        help='Facilitator input/output embedding dim '
+                             '(must match Stage 1 z_t/z_p dim).')
+    parser.add_argument('--hid_dim', type=int, default=1024,
+                        help='Facilitator hidden layer dim.')
+    parser.add_argument('--dropout', type=float, default=0.1,
+                        help='Dropout rate inside the Facilitator.')
     parser.add_argument('--loss_type', type=str, default='MSE',
-                        choices=['MSE', 'MMD'])
+                        choices=['MSE', 'MMD'],
+                        help="Facilitator training loss: 'MSE' (point-wise) or "
+                             "'MMD' (distribution-matching).")
     return parser
 
 
 def get_path_args(parser):
-    parser.add_argument('--run_id', default=None, type=str)
-    parser.add_argument('--runs_folder', default='runs', type=str)
+    parser.add_argument('--run_id', default=None, type=str,
+                        help='Unique identifier for this training run.')
+    parser.add_argument('--runs_folder', default='runs', type=str,
+                        help='Subdirectory under output_root for per-run logs and artifacts.')
     return parser
 
 
 def get_wrapper_args(parser):
-    parser.add_argument('--wandb', type=str, default='False')
-    parser.add_argument('--wandb_name', type=str, default=None)
-    parser.add_argument('--wandb_entity', type=str, default=None)
-    parser.add_argument('--wandb_project', type=str, default=None)
-    parser.add_argument('--wandb_tags', type=str, nargs='*', default=[])
+    parser.add_argument('--wandb', type=str, default='False',
+                        help="'True'/'False'. Enable Weights & Biases logging. "
+                             'Requires WANDB_API_KEY in env when True.')
+    parser.add_argument('--wandb_name', type=str, default=None,
+                        help='Optional wandb run display name.')
+    parser.add_argument('--wandb_entity', type=str, default=None,
+                        help='wandb entity (team/user) the run belongs to.')
+    parser.add_argument('--wandb_project', type=str, default=None,
+                        help='wandb project the run belongs to.')
+    parser.add_argument('--wandb_tags', type=str, nargs='*', default=[],
+                        help='wandb tags applied to the run.')
     return parser
 
 
@@ -182,7 +250,8 @@ def retrieve_all_args(args):
     pre_args, _ = pre_parser.parse_known_args(args)
 
     parser = argparse.ArgumentParser(description='Stage 2: Facilitator training')
-    parser.add_argument('--config_path', '-c', type=str, default=None)
+    parser.add_argument('--config_path', '-c', type=str, default=None,
+                        help='Path to JSON config file. CLI overrides JSON.')
     get_args(parser)
     get_model_args(parser)
     get_path_args(parser)
@@ -475,7 +544,7 @@ def train_model(args, PL_model, data_module):
         precision=trainer_precision,
         max_epochs=epochs,
         val_check_interval=args.val_check_interval,
-        limit_val_batches=args.limit_val_batches,
+        limit_val_batches=coerce_limit_batches(args.limit_val_batches),
         num_sanity_val_steps=0,
     )
 

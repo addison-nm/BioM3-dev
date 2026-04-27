@@ -33,6 +33,15 @@ biom3_PenCL_inference \
     --model_path "./weights/PenCL/BioM3_PenCL_epoch20.ckpt" \
     --output_path "outputs/pencl_embeddings.pt"
 
+Example usage (large dataset, cap cross-comparison metrics to avoid OOM):
+
+biom3_PenCL_inference \
+    --input_data_path "data/large_proteins.csv" \
+    --config_path "configs/inference/stage1_PenCL.json" \
+    --model_path "./weights/PenCL/BioM3_PenCL_epoch20.bin" \
+    --output_path "outputs/pencl_embeddings.pt" \
+    --cross_comparison_sample_limit 1000
+
 """
 
 import copy
@@ -85,11 +94,16 @@ def parse_arguments(args):
                         choices=["cpu", "cuda", "xpu"], help="available device")
     parser.add_argument('--batch_size', type=int, default=32, 
                         help="batch size")
-    parser.add_argument('--num_workers', type=int, default=0, 
+    parser.add_argument('--num_workers', type=int, default=0,
                         help="number of dataloading workers")
-    parser.add_argument("--load_from_checkpoint", action="store_true", 
+    parser.add_argument("--load_from_checkpoint", action="store_true",
                         help="Flag to load model_path as a checkpoint. By default, " \
                         "this action is inferred from a .ckpt extension of model_path")
+    parser.add_argument("--cross_comparison_sample_limit", type=int, default=-1,
+                        help="Limit on the number of samples used for cross-comparison "
+                             "metrics (dot-product probabilities, homology matrix). "
+                             "If -1, use all. Cross-comparison results are print-only; "
+                             "saved embeddings are unaffected.")
     
     return parser.parse_args(args)
 
@@ -377,8 +391,18 @@ def main(args, _setup_logging=True):
             'acc_id': acc_id_array,
     }
     
+    # Subsample for O(n^2) cross-comparison metrics (print-only; saved
+    # embeddings above are unaffected).
+    cc_limit = args.cross_comparison_sample_limit
+    if cc_limit is None or cc_limit < 0:
+        k = len(z_p_tensor)
+    else:
+        k = min(cc_limit, len(z_p_tensor))
+    z_p_cc = z_p_tensor[:k]
+    z_t_cc = z_t_tensor[:k]
+
     # Compute Dot Product scores
-    dot_product_scores = torch.matmul(z_p_tensor, z_t_tensor.T)  # Dot product
+    dot_product_scores = torch.matmul(z_p_cc, z_t_cc.T)  # Dot product
 
     # Normalize scores into probabilities
     protein_given_text_probs = F.softmax(dot_product_scores, dim=0)  # Normalize across rows (proteins), for each text
@@ -387,9 +411,9 @@ def main(args, _setup_logging=True):
     # Compute magnitudes (L2 norms) for z_t and z_p
     z_p_magnitude = torch.norm(z_p_tensor, dim=1)  # L2 norm for each protein latent vector
     z_t_magnitude = torch.norm(z_t_tensor, dim=1)  # L2 norm for each text latent vector
-    
+
     # Compute homology probabilities
-    homology_matrix = compute_homology_matrix(z_p_tensor)
+    homology_matrix = compute_homology_matrix(z_p_cc)
 
     # Print results
     logger.info("\n=== Inference Results ===")
@@ -397,6 +421,10 @@ def main(args, _setup_logging=True):
     logger.info("Shape of z_t (text latent): %s", z_t_tensor.shape)
     logger.info("Magnitudes of z_p vectors: %s", z_p_magnitude)
     logger.info("Magnitudes of z_t vectors: %s", z_t_magnitude)
+
+    logger.info(
+        "\n=== Cross-comparison subset: k=%d of %d samples ===", k, len(z_p_tensor)
+    )
 
     logger.info("\n=== Dot Product Scores Matrix ===")
     logger.info("%s", dot_product_scores)

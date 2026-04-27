@@ -11,6 +11,7 @@ cd ${projdir}
 # Configurations to edit
 config_path=./configs/stage2_training/pretrain_scratch_v1.json
 epochs=20
+use_wandb=True                  # set to False to disable wandb (requires WANDB_API_KEY exported when True)
 resume_from_checkpoint=None
 
 # Constant configurations
@@ -34,5 +35,5 @@ source environment.sh
     ${run_id} \
     --epochs ${epochs} \
     --resume_from_checkpoint ${resume_from_checkpoint} \
-    --wandb True \
+    --wandb ${use_wandb} \
 > ${log_fpath} 2>&1

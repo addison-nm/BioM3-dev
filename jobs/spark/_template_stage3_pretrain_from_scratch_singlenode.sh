@@ -11,6 +11,7 @@ cd ${projdir}
 # Configurations to edit
 config_path=./configs/stage3_training/<CONFIG_NAME>.json  # JSON config file
 epochs=5                        # Number of epochs to train
+use_wandb=True                  # set to False to disable wandb (requires WANDB_API_KEY exported when True)
 resume_from_checkpoint=None     # None to train from scratch
 
 # Constant configurations
@@ -35,5 +36,5 @@ source environment.sh
     ${run_id} \
     --epochs ${epochs} \
     --resume_from_checkpoint ${resume_from_checkpoint} \
-    --wandb True \
+    --wandb ${use_wandb} \
 > ${log_fpath} 2>&1

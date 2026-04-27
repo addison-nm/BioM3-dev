@@ -157,3 +157,18 @@ def compare_model_params(
         "differences": max_differences,
         "diff_shape_key": np.inf,
     }
+
+
+def coerce_limit_batches(value):
+    """Coerce a --limit_*_batches value into the form PyTorch Lightning expects.
+
+    PL Trainer accepts int (>=1, absolute batch count) or float (in (0,1],
+    fraction of the loader). Floats >1.0 are rejected. Argparse stores the
+    flag as float (so JSON ints become floats too); this helper restores the
+    int when the value is meant as an absolute count.
+
+    Returns None unchanged. Otherwise: int(value) if value > 1 else float(value).
+    """
+    if value is None:
+        return None
+    return int(value) if value > 1 else float(value)

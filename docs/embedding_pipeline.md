@@ -10,6 +10,8 @@ This document covers two CLI tools for preparing data for Stage 3 ProteoScribe f
 2. **Stage 2 (Facilitator sampling)** -- maps text embeddings into protein embedding space.
 3. **HDF5 compilation** -- packages the Facilitator output into HDF5 format.
 
+> **CLI argument reference:** see [CLI_reference.md#biom3_embedding_pipeline--end-to-end-embedding-pipeline](CLI_reference.md#biom3_embedding_pipeline--end-to-end-embedding-pipeline) for the full argument table.
+
 ### Usage
 
 ```bash

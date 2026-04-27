@@ -1,30 +1,34 @@
 #!/usr/bin/env bash
-# sync_databases.sh - Sync reference databases from a shared directory into a
-# local directory using symlinks.
+# link_weights.sh - Populate a local weights directory with symlinks pointing
+# into a shared canonical weights directory. Mirrors link_data.sh, but with
+# one deliberate behavior difference: link_weights.sh only links the contents
+# of per-component subdirectories (e.g. weights/PenCL/, weights/Facilitator/);
+# it does NOT link top-level files at the source root. Weights are expected to
+# live under per-component subdirectories, not at the root.
 #
-# For each top-level entry (file or directory) inside each subdirectory of
-# SRC_DIR, this script:
+# For each top-level entry (file or directory) inside each shared subdirectory
+# of SRC_DIR, this script:
 #   1. Skips .git* and README* files
 #   2. If the entry does not exist in TGT_DIR, creates a symlink
 #   3. If the entry already exists, compares via md5sum (recursively for dirs)
 #      and reports matches/mismatches
 #
 # Usage:
-#   ./sync_databases.sh <source_dir> <target_dir> [--dry-run]
+#   ./link_weights.sh <source_dir> <target_dir> [--dry-run]
 #
 # Arguments:
-#   source_dir   Directory containing shared databases (e.g.
-#                /data/data-share/BioM3-data-share/databases)
-#   target_dir   Local databases directory to populate with symlinks (e.g.
-#                ./data/databases)
+#   source_dir   Directory containing canonical model weights (e.g.
+#                /data/data-share/BioM3-data-share/data/weights)
+#   target_dir   Local weights directory to populate with symlinks (e.g.
+#                ./weights)
 #   --dry-run    Show what would be done without making changes
 #
 # Examples:
 #   # Preview changes
-#   ./sync_databases.sh /data/data-share/BioM3-data-share/databases data/databases --dry-run
+#   ./link_weights.sh /data/data-share/BioM3-data-share/data/weights weights --dry-run
 #
 #   # Apply symlinks
-#   ./sync_databases.sh /data/data-share/BioM3-data-share/databases data/databases
+#   ./link_weights.sh /data/data-share/BioM3-data-share/data/weights weights
 
 set -euo pipefail
 
@@ -71,6 +75,8 @@ compute_hash() {
     if [ -f "$path" ]; then
         md5sum "$path" | awk '{print $1}'
     elif [ -d "$path" ]; then
+        # Use relative paths so symlinks to the same data produce the same hash.
+        # Combines per-file md5 with its relative path, then hashes the whole list.
         (cd "$path" && find . -type f ! -path '*/.git/*' | sort | while read -r f; do
             md5sum "$f"
         done | md5sum | awk '{print $1}')
@@ -132,34 +138,6 @@ for subdir in "$SRC_DIR"/*/; do
     echo ""
 done
 
-# Also link top-level files (e.g. provenance.tsv)
-for entry in "$SRC_DIR"/*; do
-    [ -d "$entry" ] && continue
-    name="$(basename "$entry")"
-    [[ "$name" == .git* ]] && continue
-    [[ "$name" == README* ]] && continue
-
-    target="$TGT_DIR/$name"
-    if [ -e "$target" ] || [ -L "$target" ]; then
-        src_hash=$(compute_hash "$entry")
-        tgt_hash=$(compute_hash "$target")
-        if [ "$src_hash" = "$tgt_hash" ]; then
-            echo "MATCH:    $name"
-            matched=$((matched + 1))
-        else
-            echo "MISMATCH: $name"
-            mismatched=$((mismatched + 1))
-        fi
-    else
-        echo "LINK:     $name -> $entry"
-        if ! $DRY_RUN; then
-            ln -s "$entry" "$target"
-        fi
-        linked=$((linked + 1))
-    fi
-done
-
-echo ""
 echo "=== Summary ==="
 echo "  Linked:     $linked"
 echo "  Matched:    $matched"
@@ -168,4 +146,7 @@ echo "  Mismatched: $mismatched"
 if [ "$mismatched" -gt 0 ]; then
     echo ""
     echo "WARNING: $mismatched file(s) differ between source and target."
+    echo "  Mismatched files may have identical tensor data but different"
+    echo "  serialization formats (e.g. different torch.save archive prefixes)."
+    echo "  Verify with: python3 -c \"import torch; s=torch.load('SRC', map_location='cpu', weights_only=True); t=torch.load('TGT', map_location='cpu', weights_only=True); print(all(torch.equal(s[k],t[k]) for k in s))\""
 fi

@@ -1,30 +1,38 @@
 #!/usr/bin/env bash
-# sync_weights.sh - Sync model weights from a source directory into a target
-# directory using symlinks.
+# link_data.sh - Populate a local data directory with symlinks pointing into a
+# shared source directory. Source-agnostic: works for any data tree (e.g.
+# reference databases under data/databases/, prepared datasets under
+# data/datasets/, or any other shared data root).
 #
-# For each top-level entry (file or directory) inside each shared subdirectory
-# of SRC_DIR, this script:
+# For each top-level entry (file or directory) inside each subdirectory of
+# SRC_DIR, this script:
 #   1. Skips .git* and README* files
 #   2. If the entry does not exist in TGT_DIR, creates a symlink
 #   3. If the entry already exists, compares via md5sum (recursively for dirs)
 #      and reports matches/mismatches
+# In addition, top-level files at the root of SRC_DIR (e.g. provenance.tsv)
+# are also linked into the root of TGT_DIR. (This is the key behavior
+# difference from link_weights.sh, which only links subdirectory contents.)
 #
 # Usage:
-#   ./sync_weights.sh <source_dir> <target_dir> [--dry-run]
+#   ./link_data.sh <source_dir> <target_dir> [--dry-run]
 #
 # Arguments:
-#   source_dir   Directory containing canonical model weights (e.g.
-#                /data/data-share/BioM3-data-share/data/weights)
-#   target_dir   Local weights directory to populate with symlinks (e.g.
-#                ./weights)
+#   source_dir   Shared source directory (e.g. /data/share/databases or
+#                /data/share/datasets)
+#   target_dir   Local directory to populate with symlinks (e.g.
+#                ./data/databases or ./data/datasets)
 #   --dry-run    Show what would be done without making changes
 #
 # Examples:
-#   # Preview changes
-#   ./sync_weights.sh /data/data-share/BioM3-data-share/data/weights weights --dry-run
+#   # Preview changes (databases)
+#   ./link_data.sh /data/data-share/BioM3-data-share/databases data/databases --dry-run
 #
-#   # Apply symlinks
-#   ./sync_weights.sh /data/data-share/BioM3-data-share/data/weights weights
+#   # Apply symlinks (databases)
+#   ./link_data.sh /data/data-share/BioM3-data-share/databases data/databases
+#
+#   # Apply symlinks (datasets — same script, different source/target)
+#   ./link_data.sh /data/data-share/BioM3-data-share/datasets data/datasets
 
 set -euo pipefail
 
@@ -71,8 +79,6 @@ compute_hash() {
     if [ -f "$path" ]; then
         md5sum "$path" | awk '{print $1}'
     elif [ -d "$path" ]; then
-        # Use relative paths so symlinks to the same data produce the same hash.
-        # Combines per-file md5 with its relative path, then hashes the whole list.
         (cd "$path" && find . -type f ! -path '*/.git/*' | sort | while read -r f; do
             md5sum "$f"
         done | md5sum | awk '{print $1}')
@@ -134,6 +140,34 @@ for subdir in "$SRC_DIR"/*/; do
     echo ""
 done
 
+# Also link top-level files (e.g. provenance.tsv)
+for entry in "$SRC_DIR"/*; do
+    [ -d "$entry" ] && continue
+    name="$(basename "$entry")"
+    [[ "$name" == .git* ]] && continue
+    [[ "$name" == README* ]] && continue
+
+    target="$TGT_DIR/$name"
+    if [ -e "$target" ] || [ -L "$target" ]; then
+        src_hash=$(compute_hash "$entry")
+        tgt_hash=$(compute_hash "$target")
+        if [ "$src_hash" = "$tgt_hash" ]; then
+            echo "MATCH:    $name"
+            matched=$((matched + 1))
+        else
+            echo "MISMATCH: $name"
+            mismatched=$((mismatched + 1))
+        fi
+    else
+        echo "LINK:     $name -> $entry"
+        if ! $DRY_RUN; then
+            ln -s "$entry" "$target"
+        fi
+        linked=$((linked + 1))
+    fi
+done
+
+echo ""
 echo "=== Summary ==="
 echo "  Linked:     $linked"
 echo "  Matched:    $matched"
@@ -142,7 +176,4 @@ echo "  Mismatched: $mismatched"
 if [ "$mismatched" -gt 0 ]; then
     echo ""
     echo "WARNING: $mismatched file(s) differ between source and target."
-    echo "  Mismatched files may have identical tensor data but different"
-    echo "  serialization formats (e.g. different torch.save archive prefixes)."
-    echo "  Verify with: python3 -c \"import torch; s=torch.load('SRC', map_location='cpu', weights_only=True); t=torch.load('TGT', map_location='cpu', weights_only=True); print(all(torch.equal(s[k],t[k]) for k in s))\""
 fi

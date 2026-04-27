@@ -50,7 +50,7 @@ from biom3.Stage3.DSEma import moving_average, clone_zero_model  # EMA implement
 import biom3.Stage3.transformer_training_helper as trainer_tools
 import biom3.Stage3.eval_metrics as eval_funcs
 import biom3.Stage3.preprocess as prep
-from biom3.backend.device import print_gpu_initialization, setup_logger, device_sync
+from biom3.backend.device import print_gpu_initialization, setup_logger
 
 logger = setup_logger(__name__)
 
@@ -284,15 +284,6 @@ class PL_ProtARDM(pl.LightningModule):
         Returns:
             dict: Dictionary containing the computed loss
         """
-        # Diagnostic: per-rank batch-size trace.  If different ranks see
-        # different bs values for the same idx (or some ranks reach an idx
-        # that others don't), we have an uneven DistributedSampler shard
-        # which is the upstream cause of the DDP gradient-allreduce deadlock.
-        import os
-        _R = int(os.environ.get('PALS_LOCAL_RANKID', os.environ.get('RANK', '?')))
-        _bs = realization[0].shape[0] if isinstance(realization, list) else realization.shape[0]
-        print(f"[r{_R}] BATCH stage={stage} idx={realization_idx} bs={_bs}", flush=True)
-
         if isinstance(realization, list):
 
             # class labels
@@ -399,15 +390,6 @@ class PL_ProtARDM(pl.LightningModule):
             logging.getLogger().info(
                 f"[rank {self.global_rank}] torch.distributed backend = {backend}"
             )
-
-    def on_after_backward(self):
-        # Force the host to wait for all backward kernels (including DDP
-        # gradient-bucket allreduces issued from autograd hooks) to finish
-        # before the next collective is issued. On Aurora xccl, async kernel
-        # completion events have been observed to drop, leaving the autograd
-        # worker thread spinning indefinitely; an explicit synchronize closes
-        # the race window.
-        device_sync()
 
     def on_before_optimizer_step(self, optimizer):
         norms = [p.grad.detach().norm(2) for p in self.parameters() if p.grad is not None]
@@ -727,7 +709,7 @@ class PFamDataModule(pl.LightningDataModule):
         Trainer(use_distributed_sampler=False).
         """
         sampler = _make_distributed_sampler(
-            self.train_dataset, shuffle=True, seed=getattr(self.args, 'seed', 0)
+            self.train_dataset, shuffle=True, seed=self.args.seed
         )
         return DataLoader(
             self.train_dataset,
@@ -742,7 +724,7 @@ class PFamDataModule(pl.LightningDataModule):
         Create a DataLoader for the validation dataset.
         """
         sampler = _make_distributed_sampler(
-            self.val_dataset, shuffle=False, seed=getattr(self.args, 'seed', 0)
+            self.val_dataset, shuffle=False, seed=self.args.seed
         )
         return DataLoader(
             self.val_dataset,

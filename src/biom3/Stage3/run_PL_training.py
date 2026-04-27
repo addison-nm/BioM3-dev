@@ -567,11 +567,19 @@ def save_model(
         same_checkpoint = (last_real == best_real)
 
         # ---------------- BEST MODEL ----------------
-        logger.info('Converting DeepSpeed checkpoint to fp32 (best)...')
-        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-            convert_zero_checkpoint_to_fp32_state_dict(
-                best_ckpt_fpath, best_single_ckpt_fpath
-            )
+        # DeepSpeed Stage 2 in distributed mode writes a sharded checkpoint
+        # directory; under DDP or single-device DeepSpeed it writes a single
+        # .ckpt file. Only the directory form needs the ZeRO→fp32 conversion;
+        # the single-file form is already in pl-loadable format, just copy it.
+        if os.path.isdir(best_ckpt_fpath):
+            logger.info('Converting DeepSpeed checkpoint to fp32 (best)...')
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                convert_zero_checkpoint_to_fp32_state_dict(
+                    best_ckpt_fpath, best_single_ckpt_fpath
+                )
+        else:
+            logger.info('Copying single-file checkpoint (best)...')
+            shutil.copy2(best_ckpt_fpath, best_single_ckpt_fpath)
         logger.info('Save model (best)')
         new_temp_model = mod.get_model(
             args=args,
@@ -607,11 +615,15 @@ def save_model(
             if os.path.exists(best_state_dict_ema_fpath):
                 os.symlink(best_state_dict_ema_fpath, last_state_dict_ema_fpath)
         else:
-            logger.info('Converting DeepSpeed checkpoint to fp32 (last)...')
-            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-                convert_zero_checkpoint_to_fp32_state_dict(
-                    last_ckpt_fpath, last_single_ckpt_fpath
-                )
+            if os.path.isdir(last_ckpt_fpath):
+                logger.info('Converting DeepSpeed checkpoint to fp32 (last)...')
+                with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                    convert_zero_checkpoint_to_fp32_state_dict(
+                        last_ckpt_fpath, last_single_ckpt_fpath
+                    )
+            else:
+                logger.info('Copying single-file checkpoint (last)...')
+                shutil.copy2(last_ckpt_fpath, last_single_ckpt_fpath)
             logger.info('Save model (last)')
             new_temp_model = mod.get_model(
                 args=args,
@@ -1354,7 +1366,7 @@ def train_model(
     if isinstance(early_stopping_metric, str) and early_stopping_metric.lower() == 'none':
         early_stopping_metric = None
 
-    callbacks = checkpoint_callbacks + [lr_monitor]
+    callbacks = checkpoint_callbacks + [lr_monitor, gpu_logger]
     if metrics_cb is not None:
         callbacks.append(metrics_cb)
     if benchmark_cb is not None:
@@ -1406,13 +1418,11 @@ def train_model(
         'devices': gpu_devices,
         'num_nodes': num_nodes,
         'accelerator': args.device,
-        # Plain DDP with static_graph=True (see ddp_strategy above) is the
-        # current default. Swap to deepspeed_strategy if you need ZeRO offload
-        # for larger models. DeepSpeedStrategy showed intermittent
-        # mismatched-collective hangs on Aurora xccl that do not reproduce
-        # under DDP+static_graph in our trials.
-        # ROUND 20: keep DeepSpeed; drop limit_train_batches to capture per-rank
-        # batch divergence at the failure point with BATCH instrumentation.
+        # DeepSpeed Stage 2 is the production default — historical configuration
+        # used by the test suite and prior runs. Swap to ddp_strategy for plain
+        # DDP (verified equivalent under the DistributedSampler(drop_last=True)
+        # fix, but writes a single-file .ckpt rather than a sharded ZeRO dir,
+        # which currently breaks save_model's convert_zero_checkpoint call).
         'strategy': deepspeed_strategy,
         # We construct DistributedSampler(drop_last=True) ourselves in
         # PL_wrapper.{train,val}_dataloader so every rank gets exactly the

@@ -1,0 +1,59 @@
+#!/bin/bash -l
+#PBS -A NLDesignProtein
+#PBS -N <JOB_NAME>
+#PBS -l walltime=02:00:00
+#PBS -l select=1
+#PBS -l place=scatter
+#PBS -l filesystems=home:flare
+#PBS -q <QUEUE>
+#PBS -j oe
+# PBS -M <emailaddress>
+# PBS -m be
+
+
+projdir=${PBS_O_WORKDIR}  # Submit from the BioM3-dev directory
+cd ${projdir}
+
+module load frameworks
+source ./venvs/biom3-env/bin/activate
+
+# Configurations to edit
+config_path=./configs/grpo/<CONFIG_NAME>.json
+steps=200
+num_generations=4               # K — sequences per prompt
+batch_size=1                    # prompts per gradient update
+beta=0.01                       # KL coefficient
+eps=0.20                        # PPO clip
+reward=esmfold_plddt            # esmfold_plddt | stub
+prompts_path=./configs/grpo/prompts/example_prompts.txt
+stage3_init_weights=<STAGE3_WEIGHTS_PATH>  # raw .pt, .ckpt, or DeepSpeed dir
+
+# Constant configurations
+device=xpu                      # device available (cuda, xpu, cpu)
+
+# Pin to one Aurora tile (single-GPU job — see docs/grpo_finetuning.md)
+export ZE_AFFINITY_MASK=0
+
+# Construct the run ID
+datetime=$(date +%Y%m%d_%H%M%S)
+config_name=$(basename "${config_path}" .json)
+run_id=${config_name}_K${num_generations}_b${batch_size}_s${steps}_V${datetime}
+
+# Direct output to log file
+mkdir -p logs
+log_fpath=logs/${run_id}.${PBS_JOBID}.o
+
+source environment.sh
+./scripts/grpo_train_singlenode.sh \
+    ${config_path} \
+    ${run_id} \
+    ${device} \
+    --steps ${steps} \
+    --num_generations ${num_generations} \
+    --batch_size ${batch_size} \
+    --beta ${beta} \
+    --eps ${eps} \
+    --reward ${reward} \
+    --prompts_path ${prompts_path} \
+    --stage3_init_weights ${stage3_init_weights} \
+> ${log_fpath} 2>&1

@@ -298,7 +298,7 @@ def grpo_train(
             step, mean_reward, loss.item(), pg_loss.item(), kl_loss.item(),
             clip_frac, avg_len, dt,
         )
-        log_rows.append({
+        row = {
             "step": step,
             "reward": round(mean_reward, 3),
             "loss": round(loss.item(), 5),
@@ -306,7 +306,22 @@ def grpo_train(
             "kl": round(kl_loss.item(), 5),
             "clip_frac": round(clip_frac, 4),
             "avg_len": round(avg_len, 1),
-        })
+        }
+        # CompositeReward (and any reward exposing the same hook) reports
+        # per-component values. Surface the per-step mean of each so
+        # downstream analysis can see which objective is moving the policy.
+        last_components = getattr(reward_fn, "last_components", None)
+        if callable(last_components):
+            comps = last_components()
+            if comps:
+                row["components"] = {
+                    name: round(float(np.mean(vals)), 3) for name, vals in comps.items()
+                }
+                logger.info(
+                    "  components: %s",
+                    ", ".join(f"{n}={row['components'][n]:.3f}" for n in row["components"]),
+                )
+        log_rows.append(row)
 
         if step % grpo_cfg.save_steps == 0:
             ckpt_path = os.path.join(grpo_cfg.output_dir, f"step{step}.pt")

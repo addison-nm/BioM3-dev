@@ -89,7 +89,108 @@ GRPO hyperparameters (defaults shown):
 | `max_grad_norm` | 1.0 | grad clip |
 | `save_steps` | 50 | checkpoint cadence |
 | `seed` | 42 | torch + numpy |
-| `reward` | `esmfold_plddt` | `esmfold_plddt` \| `stub` |
+| `reward` | `esmfold_plddt` | `esmfold_plddt` \| `stub` \| `tsv_lookup` (see Reward catalog) |
+
+## Reward catalog
+
+A reward is any callable taking `List[str]` of decoded amino-acid
+sequences and returning `List[float]` scalars (one per sequence). The
+``Reward`` ``Protocol`` lives in [src/biom3/rl/rewards.py](../src/biom3/rl/rewards.py).
+
+| Name | Class | What |
+|---|---|---|
+| `esmfold_plddt` | `ESMFoldReward` | Mean pLDDT in [0, 100] from `facebook/esmfold_v1`. Lazy-loaded; needs `[grpo]` extras. |
+| `stub` | `StubReward` | Deterministic length + diversity score in [0, 100]. CPU-friendly; for smoke tests. |
+| `tsv_lookup` | `TsvLookupReward` | Look up a per-sequence scalar from a TSV/CSV file (experimental data). |
+
+A reward MAY also expose `last_components() -> Dict[str, List[float]]`
+returning the per-component values from its most recent call. The
+trainer logs the per-step mean of each component into `train_log.json`
+under `"components"` and the run log when present.
+
+### `tsv_lookup` — using experimental data
+
+For experimental measurements (stability ΔΔG, binding affinity, fitness
+assay readouts) keyed by sequence:
+
+```
+configs/grpo/your_run.json:
+  "reward": "tsv_lookup"
+
+configs/grpo/your_run.json (or CLI):
+  --tsv_lookup_path  path/to/measurements.tsv
+  --tsv_lookup_key   sequence
+  --tsv_lookup_value ddG
+```
+
+(Currently `build_reward("tsv_lookup", ...)` accepts the constructor
+kwargs directly. CLI plumbing for the kwargs above is straightforward
+to add when needed; for now wire them via a custom config with
+`_overwrite_configs`.)
+
+**TSV format:** UTF-8 with a header row.
+
+```
+sequence    ddG
+MNGTEGPNFY...    -2.4
+MNGTEGPNFL...    -1.7
+...
+```
+
+`key_column` (default `sequence`) names the sequence column,
+`value_column` (default `value`) names the scalar column,
+`delimiter` defaults to `\t`. Sequences are cleaned to canonical AAs
+(20-letter alphabet) before lookup unless `clean=False`.
+
+**Misses** (sequence not in the TSV) are unavoidable when the policy
+generates novel sequences — that's the point of generation. Two
+strategies:
+
+- `miss_strategy="penalty"` (default), with `miss_value` (default 0.0):
+  return a constant on miss. Simple, but if *every* sequence in a
+  group misses, the within-group standard deviation is 0 and the
+  group-normalized advantage is undefined (the loop currently uses
+  `clamp(min=1e-8)`, so the gradient just collapses to ~0). Fine for
+  closed-world tasks (ranking N known variants); not what you want
+  for generative exploration.
+- `miss_strategy="skip"`: returns `NaN` on miss. Reserved for a future
+  iteration of `grpo_train` that filters NaN groups. Today this
+  behaves as a `NaN` penalty (still a fixed value).
+
+For novel-sequence work, the right answer is usually a **surrogate
+regressor** trained on the TSV — predict the assay value from
+sequence with a small MLP / sklearn model and use that as the reward.
+Not in this revision; if you need it, train the regressor offline and
+wrap the predictor in a small `Reward`-conforming class.
+
+### `CompositeReward` — multi-objective
+
+Construct in code (not via `build_reward`); pass the assembled
+`CompositeReward` to `grpo_train` as `reward_fn`:
+
+```python
+from biom3.rl.rewards import CompositeReward, ESMFoldReward, TsvLookupReward
+
+reward_fn = CompositeReward(
+    {
+        "plddt":    (ESMFoldReward(device=device), 0.5),
+        "stability": (TsvLookupReward("ddG.tsv", value_column="ddG"), 1.0),
+    },
+    reduction="weighted_sum",   # or "product"
+)
+```
+
+`weighted_sum` is appropriate when components are on similar scales
+(or you've normalized them). `product` is "all of these must be high"
+— a near-zero on any component nukes the score, useful when one
+objective is a hard constraint.
+
+**Scale alignment matters.** pLDDT is [0, 100], a ΔΔG might be
+[-5, +5] kcal/mol, an activity flag is 0/1. Either rescale per
+component before composing, or pick weights that compensate. The
+`"components"` key in `train_log.json` (mean per step) lets you see
+which objective is actually moving the policy — if one component's
+contribution dwarfs the others, your weights are wrong.
 
 ## Prompt file format
 

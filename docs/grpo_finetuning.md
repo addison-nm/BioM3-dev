@@ -101,7 +101,9 @@ sequences and returning `List[float]` scalars (one per sequence). The
 |---|---|---|
 | `esmfold_plddt` | `ESMFoldReward` | Mean pLDDT in [0, 100] from `facebook/esmfold_v1`. Lazy-loaded; needs `[grpo]` extras. |
 | `stub` | `StubReward` | Deterministic length + diversity score in [0, 100]. CPU-friendly; for smoke tests. |
-| `tsv_lookup` | `TsvLookupReward` | Look up a per-sequence scalar from a TSV/CSV file (experimental data). |
+| `tsv_lookup` | `TsvLookupReward` | Look up a per-sequence scalar from a TSV/CSV file (closed-world ranking only — see below). |
+| `aa_fraction` | `AAFractionReward` | Closed-form synthetic ground truth used by the surrogate-in-the-loop demo. Peaks at a target fraction of a chosen AA, falls off linearly. |
+| `surrogate` | `SurrogateReward` | Wraps a fitted regressor (`predictor.predict(features)`) + a `Featurizer`. Constructed in code rather than via `build_reward`; load the joblib + sidecar produced by `train_grpo_surrogate.py`. |
 
 A reward MAY also expose `last_components() -> Dict[str, List[float]]`
 returning the per-component values from its most recent call. The
@@ -157,11 +159,9 @@ strategies:
   iteration of `grpo_train` that filters NaN groups. Today this
   behaves as a `NaN` penalty (still a fixed value).
 
-For novel-sequence work, the right answer is usually a **surrogate
-regressor** trained on the TSV — predict the assay value from
-sequence with a small MLP / sklearn model and use that as the reward.
-Not in this revision; if you need it, train the regressor offline and
-wrap the predictor in a small `Reward`-conforming class.
+For novel-sequence work, the right answer is the **surrogate-in-the-loop
+workflow** described below — train a regressor on the TSV, use the
+regressor as the reward.
 
 ### `CompositeReward` — multi-objective
 
@@ -191,6 +191,94 @@ component before composing, or pick weights that compensate. The
 `"components"` key in `train_log.json` (mean per step) lets you see
 which objective is actually moving the policy — if one component's
 contribution dwarfs the others, your weights are wrong.
+
+## Surrogate-in-the-loop workflow
+
+For real wet-lab use, the policy generates *novel* sequences that won't
+appear in any TSV. The architecturally correct approach is a
+surrogate-regressor reward:
+
+```
+lab measurements (TSV: sequence, scalar)
+    → train surrogate s_φ(sequence) → predicted scalar              (reward proxy)
+    → GRPO fine-tune the policy with s_φ as the reward
+    → sample new candidate sequences
+    → send top-K to the lab → new measurements → retrain, repeat
+```
+
+The pieces you need are already in the repo:
+
+- [`scripts/make_grpo_synthetic_eval.py`](../scripts/make_grpo_synthetic_eval.py) — for development, builds a synthetic 2k-row TSV from `data/datasets/SH3/FINAL_SH3_all_dataset_with_prompts.csv` with `functional_score = AAFractionReward + small noise`.
+- [`scripts/train_grpo_surrogate.py`](../scripts/train_grpo_surrogate.py) — fits an sklearn regressor (Ridge or MLP) on a TSV of (sequence, scalar) using a chosen featurizer (one-hot or ESM-2 mean-pool). Writes a joblib + a small JSON sidecar describing the featurizer config.
+- [`scripts/eval_grpo_checkpoint.py`](../scripts/eval_grpo_checkpoint.py) — samples N sequences per prompt from a Stage 3 checkpoint and scores with a configurable reward (always also computes the `aa_fraction` ground truth, so a fair before/after comparison is always available).
+- [`SurrogateReward(predictor, featurizer)`](../src/biom3/rl/rewards.py) — wraps a fitted regressor + featurizer as a per-sequence reward. Constructed in code; reload via:
+
+  ```python
+  import joblib, json
+  from biom3.rl.featurizers import build_featurizer
+  from biom3.rl.rewards import SurrogateReward
+
+  predictor  = joblib.load("outputs/grpo/surrogate.joblib")
+  cfg        = json.load(open("outputs/grpo/surrogate.joblib.config.json"))
+  featurizer = build_featurizer(cfg["featurizer"], **cfg["featurizer_kwargs"])
+  reward_fn  = SurrogateReward(predictor=predictor, featurizer=featurizer)
+  ```
+
+### Featurizers
+
+| Name | Class | What | Output dim |
+|---|---|---|---|
+| `onehot` | `OneHotFeaturizer(max_length=256)` | Pad/truncate + one-hot over the 20 canonical AAs. CPU-only, no model deps. | `max_length × 20` |
+| `esm2` | `ESM2MeanPoolFeaturizer(model_path, layer=33, ...)` | Mean-pool the per-residue ESM-2 embedding at the chosen layer. Lazy-loaded; same `weights/LLMs/esm2_t33_650M_UR50D.pt` Stage 1 already uses. | `1280` (650M, layer 33) |
+
+### End-to-end synthetic recipe
+
+```bash
+# 1. Build the synthetic TSV (CPU, ~30 s)
+python scripts/make_grpo_synthetic_eval.py \
+    --input data/datasets/SH3/FINAL_SH3_all_dataset_with_prompts.csv \
+    --output_dir data/datasets/SH3/ \
+    --n 2000 --n_test 200 --seed 42
+
+# 2. Train surrogate (one-hot + Ridge ≈ 10 s on CPU; ESM-2 + Ridge ≈ 2-5 min on Aurora)
+python scripts/train_grpo_surrogate.py \
+    --train_tsv data/datasets/SH3/synthetic_train.tsv \
+    --test_tsv  data/datasets/SH3/synthetic_test.tsv \
+    --featurizer onehot --model ridge \
+    --output_path outputs/grpo/surrogate_aa.joblib
+
+# Expect: test R² > 0.7 on the synthetic ground truth.
+
+# 3. Evaluate the BASELINE Stage 3 weights against the GROUND TRUTH reward
+python scripts/eval_grpo_checkpoint.py \
+    --config_path  configs/grpo/example_grpo.json \
+    --checkpoint   ./weights/ProteoScribe/ProteoScribe_SH3_epoch52.ckpt \
+    --prompts_tsv  data/datasets/SH3/synthetic_test.tsv \
+    --n_per_prompt 4 \
+    --reward       aa_fraction \
+    --output_dir   outputs/grpo/eval
+
+# 4. GRPO fine-tune with the SURROGATE as reward (construct SurrogateReward in code,
+#    pass directly to grpo_train; CLI plumbing for surrogate_path through
+#    biom3_grpo_train is a small follow-up if you want it).
+
+# 5. Re-run step 3 against the GRPO-fine-tuned checkpoint. Diff summary.json
+#    "gt_mean" — post-GRPO should be strictly higher.
+```
+
+### What the synthetic demo proves
+
+The ground truth (`AAFractionReward`) is closed-form. The surrogate is
+a regressor fit on noisy samples of that ground truth. We train GRPO
+*using the surrogate as the reward*, then evaluate the resulting policy
+*against the ground truth*. If post-fine-tune ground-truth mean >
+baseline ground-truth mean, the surrogate is transmitting useful signal
+and GRPO is acting on it correctly. That's the gold-standard validation
+of the loop, no lab data required.
+
+In real use, replace step 1 with a TSV produced by your wet-lab assay,
+and skip the ground-truth comparison (you don't have one). The rest of
+the recipe is identical.
 
 ## Prompt file format
 

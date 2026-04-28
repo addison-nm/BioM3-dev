@@ -130,8 +130,91 @@ class ESMFoldReward:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Synthetic / closed-form rewards
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class AAFractionReward:
+    """Score a sequence by how close its target-AA fraction is to a goal.
+
+    .. math::
+        r(s) = \\text{scale} \\cdot \\max\\!\\Big(0,\\; 1 - 2 \\,\\big|\\, f_a(s) - f^* \\,\\big|\\Big)
+
+    where :math:`f_a(s)` is the fraction of canonical AAs equal to
+    ``target_aa`` in ``s``, and :math:`f^*` is ``target_fraction``.
+    Peaks at ``scale`` when :math:`f_a = f^*`, falls linearly to 0 at
+    :math:`f_a = f^* \\pm 0.5`, and clamps to 0 outside that band. Empty
+    cleaned sequences score 0.
+
+    Used as the closed-form ground truth for the synthetic Phase-3.5
+    surrogate-in-the-loop demo (see docs/grpo_finetuning.md). The band
+    avoids the trivial collapse mode where the policy would otherwise
+    learn to emit a constant string of ``target_aa``.
+    """
+
+    def __init__(
+        self,
+        target_aa: str = "A",
+        target_fraction: float = 0.4,
+        scale: float = 100.0,
+    ):
+        if len(target_aa) != 1 or target_aa not in VALID_AA:
+            raise ValueError(f"target_aa must be a single canonical AA, got {target_aa!r}")
+        if not 0.0 <= target_fraction <= 1.0:
+            raise ValueError(f"target_fraction must be in [0, 1], got {target_fraction}")
+        self.target_aa = target_aa
+        self.target_fraction = float(target_fraction)
+        self.scale = float(scale)
+
+    def __call__(self, completions: List[str], **kwargs) -> List[float]:
+        out: List[float] = []
+        for seq in completions:
+            clean = _clean_aa(seq)
+            if not clean:
+                out.append(0.0)
+                continue
+            frac = clean.count(self.target_aa) / len(clean)
+            r = max(0.0, 1.0 - 2.0 * abs(frac - self.target_fraction))
+            out.append(self.scale * r)
+        return out
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Experimental-data rewards
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+class SurrogateReward:
+    """Wrap a fitted regressor + featurizer as a per-sequence reward.
+
+    ``predictor`` is anything with a ``.predict(features) -> np.ndarray``
+    method (sklearn estimators conform; a small wrapper around a torch
+    MLP would too). ``featurizer`` is a ``Featurizer`` (see
+    ``biom3.rl.featurizers``) that turns sequences into a ``(N, D)``
+    array.
+
+    On call, returns a Python ``List[float]`` of length ``len(completions)``.
+
+    Use this for the surrogate-in-the-loop workflow (Phase 3.5):
+
+    1. Train a regressor offline on a TSV of (sequence, scalar) lab
+       measurements via ``scripts/train_grpo_surrogate.py``.
+    2. Reload the joblib + the featurizer config in your GRPO config
+       and pass the assembled ``SurrogateReward`` to ``grpo_train``.
+    """
+
+    def __init__(self, predictor, featurizer):
+        if not hasattr(predictor, "predict"):
+            raise TypeError(
+                f"predictor must expose .predict(features); got {type(predictor).__name__}"
+            )
+        self.predictor = predictor
+        self.featurizer = featurizer
+
+    def __call__(self, completions: List[str], **kwargs) -> List[float]:
+        feats = self.featurizer(list(completions))
+        preds = self.predictor.predict(feats)
+        return [float(x) for x in preds]
 
 
 class TsvLookupReward:
@@ -307,7 +390,10 @@ def build_reward(name: str, device: torch.device, **kwargs):
         return StubReward(**kwargs)
     if name == "tsv_lookup":
         return TsvLookupReward(**kwargs)
+    if name == "aa_fraction":
+        return AAFractionReward(**kwargs)
     raise ValueError(
-        f"Unknown reward '{name}'. Known: esmfold_plddt, stub, tsv_lookup. "
-        "For multi-objective use CompositeReward directly."
+        f"Unknown reward '{name}'. Known: esmfold_plddt, stub, tsv_lookup, "
+        "aa_fraction. For multi-objective use CompositeReward directly; "
+        "for SurrogateReward construct it in code (predictor + featurizer)."
     )

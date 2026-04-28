@@ -1,0 +1,7 @@
+# Example prompts from BioM3 paper — one prompt per line, lines starting with # are ignored.
+
+PROTEIN NAME: SH3 domain. LINEAGE: The organism lineage is cellular organisms; Eukaryota; Opisthokonta; Fungi; Dikarya; Ascomycota; saccharomyceta; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; Saccharomyces; Saccharomyces cerevisiae; Saccharomyces cerevisiae S288C. SH3 PARALOG NAME: SHO1. PARALOG FUNCTION: Transmembrane osmosensor for filamentous growth and HOG pathways; involved in activation of the Cdc42p- and MAP kinase-dependent filamentous growth pathway and the high-osmolarity glycerol (HOG) response pathway; phosphorylated by Hog1p; interacts with Pbs2p, Msb2p, Hkr1p, and Ste11p.
+PROTEIN NAME: SH3 domain. SH3 PARALOG NAME: SHO1. PARALOG FUNCTION: Transmembrane osmosensor for filamentous growth and HOG pathways; involved in activation of the Cdc42p- and MAP kinase-dependent filamentous growth pathway and the high-osmolarity glycerol (HOG) response pathway; phosphorylated by Hog1p; interacts with Pbs2p, Msb2p, Hkr1p, and Ste11p.
+PROTEIN NAME: Src Homolog 3 (SH3) domain in the high osmolarity signaling protein SHO1. FAMILY NAMES: Family names are Src Homolog 3 (SH3) domain.
+Src homology 3 (SH3) domain-containing members of the SHO1 family.
+Key transmembrane SH3 domain protein in osmotic sensing for filamentous growth and HOG pathways, involving Cdc42p/MAP kinase interactions and phosphorylation.

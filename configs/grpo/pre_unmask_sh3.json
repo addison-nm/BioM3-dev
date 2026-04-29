@@ -1,0 +1,5 @@
+{
+  "strategy": "last_k",
+  "fill_with": "PAD",
+  "diffusion_budget": 128
+}

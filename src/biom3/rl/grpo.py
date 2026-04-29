@@ -229,32 +229,68 @@ def grpo_train(
     K = grpo_cfg.num_generations
     BK = B * K
 
+    # Diagnostics: snapshot initial trainable params for a cumulative
+    # weight-drift norm across all of training. We clone once up-front and
+    # again per-step (pre-update) for the per-step delta norm. Cloning
+    # ~86M fp32 params is ~340 MB per snapshot — fine on a single tile.
+    trainable_params = [p for p in s3.parameters() if p.requires_grad]
+    initial_params = [p.detach().clone() for p in trainable_params]
+    reward_sum = 0.0
+
     logger.info(
-        "GRPO start: steps=%d K=%d batch=%d beta=%.4f eps=%.2f",
+        "GRPO start: steps=%d K=%d batch=%d beta=%.4f eps=%.2f | %d trainable params",
         grpo_cfg.steps, K, B, beta, eps,
+        sum(p.numel() for p in trainable_params),
     )
 
     for step in range(1, grpo_cfg.steps + 1):
         t0 = time.time()
+        # Per-step stage timer. Logs "[t] <stage> <s>" so we can pinpoint
+        # hangs between visible log lines (notably the .cpu() sync after
+        # the diffusion tqdm finishes, and ESMFold lazy-load on step 1).
+        _stamp_t = time.perf_counter()
+
+        def _stamp(label):
+            nonlocal _stamp_t
+            now = time.perf_counter()
+            logger.info("  [t] %-12s %5.2fs", label, now - _stamp_t)
+            _stamp_t = now
+
         batch_prompts = [
             prompts[np.random.randint(len(prompts))] for _ in range(B)
         ]
+        logger.info("step=%d batch_prompts:", step)
+        for i, p in enumerate(batch_prompts):
+            logger.info("  [%d] %s", i, p)
 
         s3.eval()
         with torch.no_grad():
             z_cs = torch.cat([encode_prompt(p) for p in batch_prompts], dim=0)
             z_cs_rep = z_cs.repeat_interleave(K, dim=0)             # (BK, emb)
+            _stamp("encode_z_c")
 
             ids_per_prompt = [
                 diffusion_rollout(s3, cfg3, z_cs[i:i + 1], K, device)
                 for i in range(B)
             ]
             ids_all = torch.cat(ids_per_prompt, dim=0)              # (BK, L)
+            _stamp("rollout")
+
             seqs = [decode_tokens(ids_all[i]) for i in range(BK)]
+            logger.info("step=%d generated sequences (B*K=%d):", step, BK)
+            for i, seq in enumerate(seqs):
+                p_idx = i // K
+                logger.info(
+                    "  [prompt %d / replica %d] len=%d %s",
+                    p_idx, i % K, len(seq), seq,
+                )
+            _stamp("decode")
 
             lp_ref_tok = _policy_logprobs(ref_s3, ids_all, z_cs_rep, PAD_ID)
+            _stamp("ref_logprobs")
 
         rewards_raw = reward_fn(seqs)
+        _stamp("reward")
         R = torch.tensor(rewards_raw, dtype=torch.float32, device=device)
         Rg = R.view(B, K)
         adv = (
@@ -281,30 +317,59 @@ def grpo_train(
         kl_loss = (kl_tok * valid).sum() / (valid.sum() + 1e-8)
 
         loss = pg_loss + beta * kl_loss
+        _stamp("new_lp+loss")
+
+        # Snapshot pre-update params for the per-step weight-delta norm.
+        pre_step_params = [p.detach().clone() for p in trainable_params]
 
         optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(s3.parameters(), grpo_cfg.max_grad_norm)
         optimizer.step()
+        _stamp("backward+opt")
+
+        # Frobenius norm of (θ_after - θ_before) for this step, and the
+        # cumulative drift (θ_after - θ_initial). Both are diagnostic only.
+        with torch.no_grad():
+            dw_step = torch.sqrt(sum(
+                ((p - pre) ** 2).sum() for p, pre in zip(trainable_params, pre_step_params)
+            )).item()
+            dw_total = torch.sqrt(sum(
+                ((p - init) ** 2).sum() for p, init in zip(trainable_params, initial_params)
+            )).item()
+        del pre_step_params
+        _stamp("dw_norms")
 
         dt = time.time() - t0
         clip_frac = ((ratio - 1.0).abs() > eps).float().mean().item()
         mean_reward = R.mean().item()
+        reward_sum += mean_reward
+        reward_avg = reward_sum / step
         avg_len = float(np.mean([len(s) for s in seqs]))
+        num_replicas = len(seqs)
+        all_lengths = [len(s) for s in seqs]
+
 
         logger.info(
-            "step=%4d | reward=%5.2f | loss=%.4f | pg=%.4f | kl=%.4f "
-            "| clip=%.2f | len=%.0f | %.1fs",
-            step, mean_reward, loss.item(), pg_loss.item(), kl_loss.item(),
-            clip_frac, avg_len, dt,
+            "step=%4d | reward=%5.2f (avg=%5.2f) | loss=%.4f pg=%.4f kl=%.4f clip=%.2f "
+            "| dw=%.2e (tot=%.2e) | len=%.2f | %.1fs | replicas=%d | all_lengths=%s",
+            step, mean_reward, reward_avg,
+            loss.item(), pg_loss.item(), kl_loss.item(), clip_frac,
+            dw_step, dw_total, avg_len, dt, num_replicas, str(all_lengths)
         )
         row = {
             "step": step,
             "reward": round(mean_reward, 3),
+            "reward_avg": round(reward_avg, 3),
+            # Raw per-replica reward values for downstream plotting
+            # (length BK = batch_size * num_generations).
+            "rewards_per_replica": [float(x) for x in rewards_raw],
             "loss": round(loss.item(), 5),
             "pg": round(pg_loss.item(), 5),
             "kl": round(kl_loss.item(), 5),
             "clip_frac": round(clip_frac, 4),
+            "dw_step": dw_step,
+            "dw_total": dw_total,
             "avg_len": round(avg_len, 1),
         }
         # CompositeReward (and any reward exposing the same hook) reports
@@ -316,6 +381,9 @@ def grpo_train(
             if comps:
                 row["components"] = {
                     name: round(float(np.mean(vals)), 3) for name, vals in comps.items()
+                }
+                row["components_per_replica"] = {
+                    name: [float(x) for x in vals] for name, vals in comps.items()
                 }
                 logger.info(
                     "  components: %s",
@@ -334,4 +402,12 @@ def grpo_train(
     with open(log_path, "w") as f:
         json.dump(log_rows, f, indent=2)
     logger.info("GRPO done. Final checkpoint: %s", final_path)
+
+    # Best-effort end-of-run diagnostic plots.
+    try:
+        from biom3.rl.plotting import plot_train_log
+        plot_train_log(log_path, grpo_cfg.output_dir, algo="grpo")
+    except Exception as e:  # pragma: no cover
+        logger.warning("plot_train_log failed (non-fatal): %s", e)
+
     return log_rows

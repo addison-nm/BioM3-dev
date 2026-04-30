@@ -28,6 +28,9 @@ config1=$5  # configs/inference/stage1_PenCL.json
 config2=$6  # configs/inference/stage2_Facilitator.json
 prefix=$7
 
+# Override the default cuda device with `DEVICE=xpu ./embedding_pipeline.sh ...`
+DEVICE="${DEVICE:-cuda}"
+
 dataset_key=MMD_data
 
 # Create directory for outputs
@@ -39,6 +42,7 @@ biom3_PenCL_inference \
     -c ${config1} \
     -m ${PENCL_WEIGHTS} \
     -o ${outdir}/${prefix}.PenCL_emb.pt \
+    --device ${DEVICE} \
     --batch_size 256
 
 # Run Facilitator for Stage 2 embeddings
@@ -47,7 +51,7 @@ biom3_Facilitator_sample \
     -c ${config2} \
     -m ${FACILITATOR_WEIGHTS} \
     -o ${outdir}/${prefix}.Facilitator_emb.pt \
-    --device cpu \
+    --device ${DEVICE} \
     --mmd_sample_limit 1000
 
 # Compile Stage 1 and 2 data into an hdf5 dataset ready for finetuning

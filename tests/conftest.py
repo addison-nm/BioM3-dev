@@ -67,6 +67,15 @@ def pytest_addoption(parser):
         "--quick", action="store_true", default=False,
         help="skip tests marked slow (entrypoint, training, pipeline)"
     )
+    parser.addoption(
+        "--multinode", action="store", type=int, default=0,
+        help="number of nodes for multinode tests (0 = skip multinode-marked tests)"
+    )
+    parser.addoption(
+        "--multidevice", action="store", type=int, default=0,
+        help="number of devices per node for multinode tests "
+             "(0 = skip multinode-marked tests)"
+    )
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "benchmark: mark test as benchmarking")
@@ -74,6 +83,8 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "database_files: mark test as requiring full database files")
     config.addinivalue_line("markers", "network: mark test as requiring network access")
     config.addinivalue_line("markers", "slow: mark test as slow (skipped under --quick)")
+    config.addinivalue_line("markers",
+        "multinode: mark test as requiring an MPI launcher with --multinode/--multidevice")
 
 def pytest_collection_modifyitems(config, items):
     benchmark_flag_given = False
@@ -91,11 +102,27 @@ def pytest_collection_modifyitems(config, items):
     if config.getoption("--network"):
         network_flag_given = True
     quick_flag_given = config.getoption("--quick")
+    multinode_n = int(config.getoption("--multinode"))
+    multidevice_n = int(config.getoption("--multidevice"))
+    expected_world = multinode_n * multidevice_n
+    # Resolve actual world size from the launcher's env vars. PALS / PMI /
+    # OpenMPI don't set WORLD_SIZE — fall back to the same scan used by
+    # biom3.core.distributed.get_world_size so the gate works under mpiexec.
+    try:
+        from biom3.core.distributed import get_world_size as _get_world_size
+        actual_world = _get_world_size()
+    except Exception:
+        actual_world = int(os.environ.get("WORLD_SIZE", 1))
     skip_benchmark = pytest.mark.skip(reason="need --benchmark option to run")
     skip_use_gpu = pytest.mark.skip(reason="need --use_gpu option to run")
     skip_database_files = pytest.mark.skip(reason="need --database_files option to run")
     skip_network = pytest.mark.skip(reason="need --network option to run")
     skip_slow = pytest.mark.skip(reason="skipped under --quick; remove flag to run slow tests")
+    skip_multinode = pytest.mark.skip(
+        reason=f"multinode test needs --multinode N --multidevice M with "
+               f"WORLD_SIZE=N*M (got --multinode={multinode_n} "
+               f"--multidevice={multidevice_n} WORLD_SIZE={actual_world})"
+    )
     for item in items:
         if "benchmark" in item.keywords and not benchmark_flag_given:
             item.add_marker(skip_benchmark)
@@ -107,3 +134,6 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(skip_network)
         if "slow" in item.keywords and quick_flag_given:
             item.add_marker(skip_slow)
+        if "multinode" in item.keywords:
+            if expected_world == 0 or actual_world != expected_world:
+                item.add_marker(skip_multinode)

@@ -169,6 +169,54 @@ def _forward_logits(
     )
 
 
+def _diffusion_tqdm_desc(args) -> str | None:
+    """Return a tqdm `desc` for the diffusion loop, or ``None`` to fall
+    back to bare tqdm when the run is single-process.
+
+    Format: ``"diffuse rank=R/W dev=DEVICE host=HOST"`` — emitted only
+    when ``args._world_size > 1`` so single-rank runs keep the original
+    minimal progress bar.
+    """
+    world_size = int(getattr(args, "_world_size", 1))
+    if world_size <= 1:
+        return None
+    rank = int(getattr(args, "_rank", 0))
+    device = getattr(args, "device", "?")
+    import socket
+    host = socket.gethostname().split(".")[0]
+    return f"diffuse rank={rank}/{world_size} dev={device} host={host}"
+
+
+def _fill_gumbel_buffer(buffer: torch.Tensor, sample_seeds, step: int = 0) -> None:
+    """In-place fill ``buffer`` with Exp(1) noise.
+
+    Without ``sample_seeds`` the call uses the global RNG (legacy path).
+    With one seed per row, each row's noise is drawn from a per-row
+    generator seeded from ``(seed, step)`` — per-sample reproducibility
+    independent of batch packing or world size. The generator is built
+    on the buffer's device when supported, falling back to CPU random
+    + cross-device copy otherwise.
+    """
+    if sample_seeds is None:
+        buffer.exponential_()
+        return
+    if len(sample_seeds) != buffer.size(0):
+        raise ValueError(
+            f"sample_seeds length {len(sample_seeds)} != batch size {buffer.size(0)}"
+        )
+    device = buffer.device
+    for i, seed in enumerate(sample_seeds):
+        per_step_seed = (int(seed) ^ (int(step) * 0x9E3779B1)) & 0xFFFFFFFF
+        try:
+            gen = torch.Generator(device=device).manual_seed(per_step_seed)
+            buffer[i].exponential_(generator=gen)
+        except (RuntimeError, TypeError):
+            cpu_gen = torch.Generator().manual_seed(per_step_seed)
+            cpu_noise = torch.empty(buffer.shape[1:], dtype=buffer.dtype)
+            cpu_noise.exponential_(generator=cpu_gen)
+            buffer[i].copy_(cpu_noise)
+
+
 def _drain_sampling_state(state: _SamplingState):
     """Convert pre-allocated GPU buffers to the public return shape.
 
@@ -192,11 +240,17 @@ def batch_generate_denoised_sampled(
         extract_digit_label: torch.Tensor,
         sampling_path: torch.Tensor,
         store_probabilities: bool = False,
+        sample_seeds: Optional[list] = None,
     ) -> tuple[list, list, np.ndarray | None]:
     """Random-path unmasking: at each step, unmask the position selected by
     the per-batch sampling permutation. Token selection is governed by
     ``args.token_strategy`` (``'argmax'`` deterministic, ``'sample'``
     stochastic via Gumbel-max).
+
+    When ``sample_seeds`` is provided (one int per row of the batch), the
+    Gumbel noise for each row is drawn from a per-row generator seeded
+    from ``(seed, step)`` — per-(prompt, replica) sampling is
+    reproducible independently of world size or batch packing.
     """
 
     # Ensure batch dimension consistency across input tensors
@@ -212,9 +266,13 @@ def batch_generate_denoised_sampled(
         store_probabilities,
     )
     temp_sampling_path = sampling_path.to(args.device)
+    # Per-step device_synchronize is only useful for tqdm progress accuracy.
+    # It serialises kernel launches and can stall ranks under heavy
+    # collectives, so we skip it whenever the run is distributed.
+    sync_per_step = int(getattr(args, "_world_size", 1)) <= 1
 
     with _inference_autocast(args.device):
-        for ii in tqdm(range(state.max_diffusion_step)):
+        for ii in tqdm(range(state.max_diffusion_step), desc=_diffusion_tqdm_desc(args)):
             logits = _forward_logits(
                 model, state.temp_mask_realization, state.temp_idx, state.temp_y_c,
             )
@@ -227,7 +285,7 @@ def batch_generate_denoised_sampled(
             if state.token_strategy == "argmax":
                 next_temp_realization = logits.argmax(dim=-1)
             else:
-                state.gumbel_buffer.exponential_()
+                _fill_gumbel_buffer(state.gumbel_buffer, sample_seeds, step=ii)
                 next_temp_realization = (logits - state.gumbel_buffer.log()).argmax(dim=-1)
 
             # Update temp_mask_realization per sample (advanced indexing)
@@ -244,8 +302,10 @@ def batch_generate_denoised_sampled(
             # Sync each iteration so tqdm reflects actual GPU progress, not
             # async kernel-launch rate. Without this the loop returns at
             # Python-launch speed and the .cpu() at the end becomes a
-            # multi-second hang that looks like a bug.
-            _device_synchronize(args.device)
+            # multi-second hang that looks like a bug. Skipped under
+            # distributed runs (see sync_per_step above).
+            if sync_per_step:
+                _device_synchronize(args.device)
 
     return _drain_sampling_state(state)
 
@@ -258,6 +318,7 @@ def batch_generate_denoised_sampled_confidence(
         extract_digit_label: torch.Tensor,
         store_probabilities: bool = False,
         skip_pad: bool = False,
+        sample_seeds: Optional[list] = None,
     ) -> tuple[list, list, np.ndarray | None]:
     """Confidence-based unmasking: at each step, unmask the position where the
     model's max class probability is highest among still-masked positions.
@@ -275,9 +336,10 @@ def batch_generate_denoised_sampled_confidence(
         args, extract_digit_samples, extract_time, extract_digit_label,
         store_probabilities,
     )
+    sync_per_step = int(getattr(args, "_world_size", 1)) <= 1
 
     with _inference_autocast(args.device):
-        for ii in tqdm(range(state.max_diffusion_step)):
+        for ii in tqdm(range(state.max_diffusion_step), desc=_diffusion_tqdm_desc(args)):
             logits = _forward_logits(
                 model, state.temp_mask_realization, state.temp_idx, state.temp_y_c,
             )
@@ -309,7 +371,7 @@ def batch_generate_denoised_sampled_confidence(
             if state.token_strategy == "argmax":
                 chosen_tokens = max_classes[state.batch_idx, current_location]
             else:
-                state.gumbel_buffer.exponential_()
+                _fill_gumbel_buffer(state.gumbel_buffer, sample_seeds, step=ii)
                 sampled = (logits - state.gumbel_buffer.log()).argmax(dim=-1)
                 chosen_tokens = sampled[state.batch_idx, current_location]
 
@@ -321,8 +383,9 @@ def batch_generate_denoised_sampled_confidence(
             state.temp_idx += 1
 
             # See note in batch_generate_denoised_sampled — sync per step so
-            # tqdm reflects actual GPU progress.
-            _device_synchronize(args.device)
+            # tqdm reflects actual GPU progress. Skipped under distributed runs.
+            if sync_per_step:
+                _device_synchronize(args.device)
 
     return _drain_sampling_state(state)
 

@@ -142,10 +142,13 @@ def load_proteoscribe_trainable(
     weights_path: Optional[str],
     device: Optional[str] = None,
 ) -> nn.Module:
-    return prepare_model_ProteoScribe(
+    model = prepare_model_ProteoScribe(
         config_args=cfg,
         model_fpath=weights_path,
         device=device,
-        strict=False,
+        strict=True,
         eval=False,
+        attempt_correction=True,
+        verbosity=2
     )
+    return model

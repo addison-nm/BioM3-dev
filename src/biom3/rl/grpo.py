@@ -46,6 +46,14 @@ END_ID = TOK2ID["<END>"]
 NUM_CLASSES = len(TOKENS)
 VALID_AA = set("ACDEFGHIKLMNPQRSTVWY")
 
+# Mask / absorbing-state token id used by the diffusion model. NOT
+# the PAD id. transformer_training_helper.mask_realizations writes 0
+# at masked positions; sampling_analysis.batch_generate_denoised_sampled
+# initializes the rollout with torch.zeros(...) ⇒ all-mask ⇒ id 0.
+# Earlier revisions of this file mistakenly used PAD_ID (=23) as the
+# fully-masked input to ``_policy_logprobs``; that has been corrected.
+MASK_ID = 0
+
 
 @dataclass
 class GRPOConfig:
@@ -60,6 +68,11 @@ class GRPOConfig:
     save_steps: int = 50
     max_grad_norm: float = 1.0
     seed: int = 42
+
+    # Per-step verbose dump (sequences, prompts, per-replica scalar
+    # table) appended to {output_dir}/debug.out. Mirrors the GDPO
+    # debug_log option for parity in side-by-side analysis.
+    debug_log: bool = True
 
 
 def load_prompts(path: str) -> List[str]:
@@ -170,16 +183,107 @@ def _policy_logprobs(
     s3: torch.nn.Module,
     ids: torch.Tensor,             # (BK, L)
     z_c_rep: torch.Tensor,         # (BK, emb_dim)
-    pad_id: int,
+    mask_id: int = MASK_ID,
 ) -> torch.Tensor:
     """Per-token log-probs at the chosen ids under ``s3`` with input fully
-    masked at ``t = 0``. Returns shape ``(BK, L)``."""
+    masked at ``t = 0``. Returns shape ``(BK, L)``.
+
+    The fill token must be the diffusion model's MASK / absorbing-state
+    token (id 0), NOT PAD (id 23). Earlier revisions of this file
+    incorrectly used PAD; the model treats PAD as a real protein-tail
+    token, not as "predict me", so the resulting log-probs were off-
+    distribution. ``mask_id`` defaults to ``MASK_ID`` for safety; the
+    parameter is kept (rather than hardcoded) so callers can opt into a
+    different fill in tests.
+    """
     BK, L = ids.shape
-    x_masked = torch.full_like(ids, pad_id)
+    x_masked = torch.full_like(ids, mask_id)
     t_steps = torch.zeros(BK, dtype=torch.long, device=ids.device)
     logits = s3(x_masked, t_steps, z_c_rep).float().permute(0, 2, 1)  # (BK, L, V)
     lp = F.log_softmax(logits, dim=-1)
     return lp.gather(-1, ids.unsqueeze(-1)).squeeze(-1)
+
+
+def _write_debug_step(
+    debug_path: str,
+    step: int,
+    batch_prompts: List[str],
+    ids_all: torch.Tensor,           # (BK, L)
+    seqs: List[str],                 # decoded, special-stripped
+    rewards_raw,                     # list[float] or array, len BK
+    adv: torch.Tensor,               # (BK,)
+    log_ratio_per_replica: torch.Tensor,  # (BK,) — token-mean log-ratio per sequence
+    ratio_per_replica: torch.Tensor,      # (BK,)
+    log_ratio_max_per_replica: torch.Tensor,  # (BK,) — token-max |log-ratio|
+    valid_lengths: torch.Tensor,     # (BK,) — count of non-PAD tokens
+    components_per_replica,          # dict[str, list[float]] | None
+    K: int,
+) -> None:
+    """Append one stanza per training step to GRPO's ``debug.out``.
+
+    GRPO is token-level (no SDMC corruptions) so this is a leaner
+    cousin of the GDPO debug dump — no per-corruption mask
+    visualization. The all-MASK input fed to ``_policy_logprobs`` is
+    constant across steps (token id 0 at every position) so we don't
+    log it; what varies are the rolled-out sequences and the per-token
+    log-prob ratios, which we summarize per replica.
+    """
+    BK, L = ids_all.shape
+    rewards_list = [float(x) for x in rewards_raw]
+    adv_list = adv.detach().cpu().tolist()
+    lr_list = log_ratio_per_replica.detach().cpu().tolist()
+    r_list = ratio_per_replica.detach().cpu().tolist()
+    lr_max_list = log_ratio_max_per_replica.detach().cpu().tolist()
+    seqlen_list = [int(x) for x in valid_lengths.detach().cpu().tolist()]
+
+    bar = "=" * 100
+    lines: List[str] = []
+    lines.append(bar)
+    lines.append(f"step={step:>5d}   B*K={BK}   L={L}   algo=GRPO (diffu-GRPO, single-step all-MASK)")
+    lines.append(bar)
+    lines.append("prompts:")
+    for i, p in enumerate(batch_prompts):
+        lines.append(f"  [{i}] {p}")
+    lines.append("")
+
+    lines.append("per-replica:")
+    header = (
+        f"  {'k':>3}  {'p':>3}  {'len':>4}  {'reward':>10}  {'advantage':>10}  "
+        f"{'log_ratio':>10}  {'ratio':>8}  {'|lr|max':>9}"
+    )
+    lines.append(header)
+    for i in range(BK):
+        p_idx = i // K
+        k_idx = i % K
+        lines.append(
+            f"  {k_idx:>3d}  {p_idx:>3d}  {seqlen_list[i]:>4d}  "
+            f"{rewards_list[i]:>10.4f}  {adv_list[i]:>+10.4f}  "
+            f"{lr_list[i]:>+10.4f}  {r_list[i]:>8.4f}  {lr_max_list[i]:>9.4f}"
+        )
+    if components_per_replica:
+        lines.append("")
+        lines.append("components per replica:")
+        for name, vals in components_per_replica.items():
+            vals_s = ", ".join(f"{float(v):.3f}" for v in vals)
+            lines.append(f"  {name}: [{vals_s}]")
+
+    lines.append("")
+    lines.append("generated sequences (decoded, special tokens stripped):")
+    for i in range(BK):
+        p_idx = i // K
+        k_idx = i % K
+        lines.append(f"  [k={k_idx} p={p_idx}] len={len(seqs[i])} {seqs[i]}")
+
+    lines.append("")
+    lines.append("raw token-id sequences (full L, before decoding; '_' = MASK):")
+    for i in range(BK):
+        ids_str = "".join(TOKENS[int(t)] if int(t) != MASK_ID else "_"
+                          for t in ids_all[i].tolist())
+        lines.append(f"  [k={i % K} p={i // K}] {ids_str}")
+
+    lines.append("")
+    with open(debug_path, "a") as f:
+        f.write("\n".join(lines) + "\n")
 
 
 def grpo_train(
@@ -222,6 +326,12 @@ def grpo_train(
 
     os.makedirs(grpo_cfg.output_dir, exist_ok=True)
     log_rows = []
+    log_path = os.path.join(grpo_cfg.output_dir, "train_log.json")
+    debug_path = os.path.join(grpo_cfg.output_dir, "debug.out")
+    if grpo_cfg.debug_log and os.path.exists(debug_path):
+        # Truncate any previous run's debug log so we don't accumulate
+        # across re-runs of the same output_dir.
+        open(debug_path, "w").close()
     L = cfg3.diffusion_steps
     eps = grpo_cfg.eps
     beta = grpo_cfg.beta
@@ -242,6 +352,25 @@ def grpo_train(
         grpo_cfg.steps, K, B, beta, eps,
         sum(p.numel() for p in trainable_params),
     )
+
+    # Snapshot the algorithm config as the first row of the log so that
+    # downstream analysis can recover what was actually run. Mirrors the
+    # GDPO _meta row schema where applicable.
+    log_rows.append({
+        "_meta": True,
+        "algo": "grpo",
+        "diffu_grpo_style": True,            # single-step all-MASK token-level estimator
+        "num_generations": int(K),
+        "batch_size": int(B),
+        "beta": float(beta),
+        "eps": float(eps),
+        "diffusion_steps": int(L),
+        "advantage_normalize": True,         # GRPO's classic (R-μ)/σ
+    })
+    # Flush the meta-only log so that crashes during weight loading or
+    # the very first step still leave a parseable train_log.json behind.
+    from biom3.rl.plotting import write_train_log_atomic
+    write_train_log_atomic(log_path, log_rows)
 
     for step in range(1, grpo_cfg.steps + 1):
         t0 = time.time()
@@ -286,7 +415,7 @@ def grpo_train(
                 )
             _stamp("decode")
 
-            lp_ref_tok = _policy_logprobs(ref_s3, ids_all, z_cs_rep, PAD_ID)
+            lp_ref_tok = _policy_logprobs(ref_s3, ids_all, z_cs_rep, MASK_ID)
             _stamp("ref_logprobs")
 
         rewards_raw = reward_fn(seqs)
@@ -299,7 +428,7 @@ def grpo_train(
         ).view(BK)
 
         s3.train()
-        lp_new_tok = _policy_logprobs(s3, ids_all, z_cs_rep, PAD_ID)
+        lp_new_tok = _policy_logprobs(s3, ids_all, z_cs_rep, MASK_ID)
 
         valid = (ids_all != PAD_ID).float()
         log_ratio = lp_new_tok - lp_ref_tok.detach()
@@ -349,12 +478,27 @@ def grpo_train(
         num_replicas = len(seqs)
         all_lengths = [len(s) for s in seqs]
 
+        # Token-level log-ratio diagnostics. For GRPO the ratio is per
+        # (replica, position); summarize over the valid (non-PAD)
+        # positions of each replica for both the trainer log and the
+        # debug.out per-replica table.
+        with torch.no_grad():
+            valid_count = valid.sum(dim=1).clamp(min=1.0)
+            log_ratio_per_replica = (log_ratio.detach() * valid).sum(dim=1) / valid_count
+            ratio_per_replica = (ratio.detach() * valid).sum(dim=1) / valid_count
+            log_ratio_max_per_replica = (log_ratio.detach().abs() * valid).max(dim=1).values
+            log_ratio_tok_mean = float(((log_ratio.detach() * valid).sum() / valid.sum().clamp(min=1.0)).item())
+            log_ratio_tok_max_abs = float(log_ratio.detach().abs().max().item())
+            ratio_tok_mean = float(((ratio.detach() * valid).sum() / valid.sum().clamp(min=1.0)).item())
+            valid_lengths = valid.sum(dim=1)
 
         logger.info(
             "step=%4d | reward=%5.2f (avg=%5.2f) | loss=%.4f pg=%.4f kl=%.4f clip=%.2f "
+            "| lr_tok=%.4f (|max|=%.4f) "
             "| dw=%.2e (tot=%.2e) | len=%.2f | %.1fs | replicas=%d | all_lengths=%s",
             step, mean_reward, reward_avg,
             loss.item(), pg_loss.item(), kl_loss.item(), clip_frac,
+            log_ratio_tok_mean, log_ratio_tok_max_abs,
             dw_step, dw_total, avg_len, dt, num_replicas, str(all_lengths)
         )
         row = {
@@ -368,6 +512,12 @@ def grpo_train(
             "pg": round(pg_loss.item(), 5),
             "kl": round(kl_loss.item(), 5),
             "clip_frac": round(clip_frac, 4),
+            # Token-level log-ratio diagnostics (GRPO is token-level so
+            # these are aggregated over (BK, L) valid positions). Mirrors
+            # GDPO's sequence-level log_ratio_seq fields in spirit.
+            "log_ratio_tok": round(log_ratio_tok_mean, 4),
+            "log_ratio_tok_max_abs": round(log_ratio_tok_max_abs, 4),
+            "ratio_tok": round(ratio_tok_mean, 4),
             "dw_step": dw_step,
             "dw_total": dw_total,
             "avg_len": round(avg_len, 1),
@@ -375,6 +525,7 @@ def grpo_train(
         # CompositeReward (and any reward exposing the same hook) reports
         # per-component values. Surface the per-step mean of each so
         # downstream analysis can see which objective is moving the policy.
+        components_per_replica = None
         last_components = getattr(reward_fn, "last_components", None)
         if callable(last_components):
             comps = last_components()
@@ -382,14 +533,42 @@ def grpo_train(
                 row["components"] = {
                     name: round(float(np.mean(vals)), 3) for name, vals in comps.items()
                 }
-                row["components_per_replica"] = {
+                components_per_replica = {
                     name: [float(x) for x in vals] for name, vals in comps.items()
                 }
+                row["components_per_replica"] = components_per_replica
                 logger.info(
                     "  components: %s",
                     ", ".join(f"{n}={row['components'][n]:.3f}" for n in row["components"]),
                 )
         log_rows.append(row)
+        # Atomic per-step flush so a job hitting walltime or crashing
+        # leaves behind a fully-parseable train_log.json with every
+        # step recorded up to that point.
+        try:
+            write_train_log_atomic(log_path, log_rows)
+        except Exception as e:  # pragma: no cover
+            logger.warning("train_log.json flush failed (non-fatal): %s", e)
+
+        if grpo_cfg.debug_log:
+            try:
+                _write_debug_step(
+                    debug_path=debug_path,
+                    step=step,
+                    batch_prompts=batch_prompts,
+                    ids_all=ids_all,
+                    seqs=seqs,
+                    rewards_raw=rewards_raw,
+                    adv=adv,
+                    log_ratio_per_replica=log_ratio_per_replica,
+                    ratio_per_replica=ratio_per_replica,
+                    log_ratio_max_per_replica=log_ratio_max_per_replica,
+                    valid_lengths=valid_lengths,
+                    components_per_replica=components_per_replica,
+                    K=K,
+                )
+            except Exception as e:  # pragma: no cover
+                logger.warning("debug.out write failed (non-fatal): %s", e)
 
         if step % grpo_cfg.save_steps == 0:
             ckpt_path = os.path.join(grpo_cfg.output_dir, f"step{step}.pt")
@@ -398,9 +577,10 @@ def grpo_train(
 
     final_path = os.path.join(grpo_cfg.output_dir, "final.pt")
     torch.save({"step": grpo_cfg.steps, "model_state": s3.state_dict()}, final_path)
-    log_path = os.path.join(grpo_cfg.output_dir, "train_log.json")
-    with open(log_path, "w") as f:
-        json.dump(log_rows, f, indent=2)
+    # train_log.json was already flushed after every step; this final
+    # rewrite is a no-op safety net in case any exception path skipped
+    # the in-loop flush.
+    write_train_log_atomic(log_path, log_rows)
     logger.info("GRPO done. Final checkpoint: %s", final_path)
 
     # Best-effort end-of-run diagnostic plots.

@@ -34,6 +34,23 @@ from biom3.backend.device import setup_logger
 logger = setup_logger(__name__)
 
 
+def write_train_log_atomic(log_path: str, log_rows: List[Dict[str, Any]]) -> None:
+    """Write ``log_rows`` to ``log_path`` atomically via a tmp file +
+    ``os.replace``.
+
+    Used by both trainers after each step's row is appended, so the
+    on-disk ``train_log.json`` is always a valid, fully-consistent
+    snapshot of the run-so-far. If the job is killed mid-write the
+    previous good copy is preserved (``os.replace`` is atomic on
+    POSIX). At ~50 KB after 100 steps the per-step rewrite cost is
+    negligible relative to a multi-minute-per-step training loop.
+    """
+    tmp_path = log_path + ".tmp"
+    with open(tmp_path, "w") as f:
+        json.dump(log_rows, f, indent=2)
+    os.replace(tmp_path, log_path)
+
+
 def _load_rows(log_path: str) -> Tuple[List[Dict[str, Any]], Optional[Dict[str, Any]]]:
     """Return ``(step_rows, meta_row)`` from ``train_log.json``.
 
@@ -112,8 +129,21 @@ def plot_train_log(log_path: str, out_dir: str, algo: str = "grpo") -> List[str]
     written: List[str] = []
     is_gdpo = algo.lower() == "gdpo"
 
+    # GRPO grew a token-level log-ratio panel after the PAD-vs-MASK fix
+    # — older logs predating that change won't have the fields, in which
+    # case we keep the original 6-panel layout.
+    has_grpo_logratio = (
+        not is_gdpo
+        and any("log_ratio_tok" in r and "log_ratio_tok_max_abs" in r for r in rows)
+    )
+
     # ─── Main diagnostics figure ─────────────────────────────────────────
-    n_panels = 6 if not is_gdpo else 8
+    if is_gdpo:
+        n_panels = 8
+    elif has_grpo_logratio:
+        n_panels = 7
+    else:
+        n_panels = 6
     n_cols = 2
     n_rows = (n_panels + n_cols - 1) // n_cols
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(12, 3.0 * n_rows), squeeze=False)
@@ -209,6 +239,18 @@ def plot_train_log(log_path: str, out_dir: str, algo: str = "grpo") -> List[str]
         ax.set_xlabel("step")
         ax.set_ylabel("log r_g")
         ax.set_title("Sequence-level log importance ratio")
+        ax.legend(loc="best", fontsize=8)
+    elif has_grpo_logratio:
+        # 7. Token-level log-ratio (GRPO analogue of GDPO's panel 8).
+        ax = flat_axes[6]
+        ax.plot(steps, [r["log_ratio_tok"] for r in rows], color="C0", linewidth=1.4,
+                label="log_ratio_tok (mean)")
+        ax.plot(steps, [r["log_ratio_tok_max_abs"] for r in rows], color="C3",
+                linewidth=1.0, alpha=0.85, label="|log_ratio_tok| (max)")
+        ax.axhline(0.0, color="k", linewidth=0.5, alpha=0.5)
+        ax.set_xlabel("step")
+        ax.set_ylabel("log r_tok")
+        ax.set_title("Token-level log importance ratio")
         ax.legend(loc="best", fontsize=8)
 
     # Hide any unused axes (only if n_panels < n_rows*n_cols)

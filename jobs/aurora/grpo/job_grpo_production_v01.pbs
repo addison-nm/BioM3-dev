@@ -1,0 +1,107 @@
+#!/bin/bash -l
+#PBS -A gpu_hack
+#PBS -N grpo_production_v01
+#PBS -l walltime=08:00:00
+#PBS -l select=1
+#PBS -l place=scatter
+#PBS -l filesystems=home:flare
+#PBS -q gpu_hack_large
+#PBS -j oe
+# PBS -M <emailaddress>
+# PBS -m be
+
+# GRPO Stage 3 fine-tuning (diffu-GRPO style) — 100 steps, K=8, B=1,
+# β=0.01, ε=0.20, ESMFold pLDDT reward. Single-tile.
+#
+# Pairs with the post-fix GRPO infrastructure:
+#   - PAD-vs-MASK token-id bug at grpo.py:178 has been corrected; the
+#     fully-masked prefix at t=0 is now the diffusion model's MASK
+#     token (id 0) rather than PAD (id 23). All numbers in this run
+#     are fresh; do NOT compare reward trajectories against GRPO logs
+#     produced before this fix.
+#   - train_log.json now includes per-replica rewards, token-level
+#     log-ratio diagnostics (log_ratio_tok, log_ratio_tok_max_abs),
+#     and a leading _meta row with the algorithm config.
+#   - {output_dir}/debug.out gets a per-step plaintext dump (prompts,
+#     per-replica scalar table, decoded sequences, raw token IDs).
+#   - {output_dir}/train_diagnostics.png is auto-rendered at end-of-run
+#     with a 7-panel layout: reward + per-replica scatter, loss
+#     components, clip frac, weight drift, sequence length, reward
+#     histogram, and the new token-level log-ratio panel.
+#
+# Compute note: GRPO does NOT use pre_unmask, so the rollout runs the
+# full L = cfg3.diffusion_steps (1024) iterations per replica per step.
+# Expected per-step time at K=8: ~7-8 min (rollout) + ~22s (ESMFold) +
+# overhead ≈ ~8 min/step. 100 steps ≈ ~13 h ⇒ over the 6h walltime here.
+# Pick one before submitting:
+#   (a) reduce ${steps} to 25-40 to fit walltime; the GDPO ablation
+#       showed reward saturating well before step 50 anyway.
+#   (b) keep steps=100 and bump walltime to 14:00:00 (queue dependent).
+#   (c) reduce ${num_generations} to 4 (matches the smoke job; cuts
+#       per-step time roughly in half via smaller batch dim).
+# Default below is option (a) — steps=40 — for the safest fit.
+#
+# All other settings inherited from configs/grpo/production_grpo.json
+# (which inherits from _base_grpo.json: lr 1e-5, AdamW wd 1e-6,
+# max_grad_norm 1.0, seed 42, esmfold_plddt reward, example prompts).
+#
+# PREREQUISITES:
+#   source environment.sh
+#   source ./venvs/biom3-env/bin/activate
+#   pip install -e '.[grpo]'    # fair-esm
+#   facebook/esmfold_v1 reachable (cached or downloadable)
+
+projdir=${PBS_O_WORKDIR}
+cd ${projdir}
+
+module load frameworks
+source ./venvs/biom3-env/bin/activate
+
+# Configurations to edit
+config_path=./configs/grpo/production_grpo.json
+prompts_path=./configs/grpo/prompts/example_prompts.txt
+stage1_weights=./weights/PenCL/PenCL_V09152023_last.ckpt
+stage2_weights=./weights/Facilitator/Facilitator_MMD15.ckpt/last.ckpt
+stage3_init_weights=./weights/ProteoScribe/ProteoScribe_SH3_epoch52.ckpt/single_model.pth
+
+# Production knobs (override JSON for explicitness in the log header)
+steps=50                        # see "Compute note" — option (a)
+save_steps=5
+num_generations=8
+batch_size=1
+beta=0.01
+eps=0.20
+reward=esmfold_plddt
+
+# Constant configurations
+device=xpu
+
+# Pin to one Aurora tile
+export ZE_AFFINITY_MASK=0
+
+# Construct the run ID
+datetime=$(date +%Y%m%d_%H%M%S)
+config_name=$(basename "${config_path}" .json)
+run_id=${config_name}_K${num_generations}_b${batch_size}_s${steps}_V${datetime}
+
+# Direct output to log file
+mkdir -p logs
+log_fpath=logs/${run_id}.${PBS_JOBID}.o
+
+source environment.sh
+./scripts/grpo_train_singlenode.sh \
+    ${config_path} \
+    ${run_id} \
+    ${device} \
+    --steps ${steps} \
+    --save_steps ${save_steps} \
+    --num_generations ${num_generations} \
+    --batch_size ${batch_size} \
+    --beta ${beta} \
+    --eps ${eps} \
+    --reward ${reward} \
+    --prompts_path ${prompts_path} \
+    --stage1_weights ${stage1_weights} \
+    --stage2_weights ${stage2_weights} \
+    --stage3_init_weights ${stage3_init_weights} \
+> ${log_fpath} 2>&1

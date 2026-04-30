@@ -39,6 +39,7 @@ from biom3.Stage3.run_ProteoScribe_sample import (
     load_pre_unmask_config,
 )
 from biom3.backend.device import setup_logger
+from biom3.rl.rollout import RolloutPool
 from biom3.rl.grpo import (
     NUM_CLASSES,
     PAD_ID,
@@ -129,6 +130,14 @@ class GDPOConfig:
     pre_unmask: bool = False
     pre_unmask_config: Optional[str] = None  # path to JSON with
                                              # strategy/fill_with/diffusion_budget
+
+    # Multi-device rollout: replicate the trainable policy onto each
+    # device in this list, dispatch rollout chunks in parallel via
+    # threads, gather to devices[0]. ``None`` (default) preserves the
+    # single-device behavior. ``["auto"]`` selects all visible XPU
+    # tiles via torch.xpu.device_count(). ELBO and gradient updates
+    # remain single-device on devices[0].
+    rollout_devices: Optional[List[str]] = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -368,6 +377,52 @@ def _tokenwise_k3_kl(
     delta = lp_ref - lp_new
     kl = (torch.exp(delta) - delta - 1.0)
     return (kl * valid).sum() / (valid.sum() + 1e-8)
+
+
+def _resolve_rollout_devices(
+    requested: Optional[List[str]],
+    master: torch.device,
+) -> List[torch.device]:
+    """Resolve ``rollout_devices`` config to concrete torch.device objects.
+
+    - ``None`` → ``[master]`` (single-device, current behavior).
+    - ``["auto"]`` → all visible XPU/CUDA tiles, with the master device
+      placed first. Falls back to ``[master]`` if no multi-device
+      runtime is available.
+    - explicit list → parsed as-is, with the master moved to position 0
+      if present (so devices[0] is always the master tile).
+    """
+    if not requested:
+        return [master]
+    if len(requested) == 1 and str(requested[0]).lower() == "auto":
+        n = 0
+        if master.type == "xpu" and hasattr(torch, "xpu"):
+            try:
+                n = int(torch.xpu.device_count())
+            except Exception:
+                n = 0
+        elif master.type == "cuda":
+            try:
+                n = int(torch.cuda.device_count())
+            except Exception:
+                n = 0
+        if n <= 1:
+            logger.warning(
+                "rollout_devices='auto' but device_count=%d; falling back to single device", n,
+            )
+            return [master]
+        # Master at index 0; rest in ascending tile order, skipping master.
+        master_idx = master.index if master.index is not None else 0
+        out = [master] + [
+            torch.device(f"{master.type}:{i}") for i in range(n) if i != master_idx
+        ]
+        return out
+    parsed = [torch.device(s) for s in requested]
+    # Ensure devices[0] is the master.
+    if master not in parsed:
+        return [master] + parsed
+    parsed = [master] + [d for d in parsed if d != master]
+    return parsed
 
 
 def _gdpo_rollout(
@@ -612,6 +667,7 @@ def gdpo_train(
 
     os.makedirs(gdpo_cfg.output_dir, exist_ok=True)
     log_rows: list = []
+    log_path = os.path.join(gdpo_cfg.output_dir, "train_log.json")
     debug_path = os.path.join(gdpo_cfg.output_dir, "debug.out")
     if gdpo_cfg.debug_log and os.path.exists(debug_path):
         # Truncate any previous run's debug log so we don't accumulate
@@ -631,6 +687,24 @@ def gdpo_train(
         idx_grid.numel(), t_floats.tolist(), weights.tolist(),
         idx_grid.tolist(), D, L_total, gdpo_cfg.inner_mc, gdpo_cfg.kl_estimator,
     )
+
+    # Multi-device rollout pool. devices[0] is the master (gradient
+    # updates, ELBO under π_new, KL all live here); the rest hold
+    # frozen replicas used for parallel rollout only.
+    rollout_devs = _resolve_rollout_devices(gdpo_cfg.rollout_devices, device)
+    if len(rollout_devs) > 1:
+        rollout_pool = RolloutPool(
+            s3_master=s3,
+            cfg3=cfg3,
+            rollout_fn=_gdpo_rollout,
+            devices=rollout_devs,
+        )
+        logger.info(
+            "Multi-device rollout enabled: %d tiles → %s",
+            len(rollout_devs), [str(d) for d in rollout_devs],
+        )
+    else:
+        rollout_pool = None
 
     trainable_params = [p for p in s3.parameters() if p.requires_grad]
     initial_params = [p.detach().clone() for p in trainable_params]
@@ -660,6 +734,10 @@ def gdpo_train(
         "pre_unmask": bool(cfg3.pre_unmask),
         "pre_unmask_fill_with": getattr(cfg3, 'pre_unmask_fill_with', None),
     })
+    # Flush the meta-only log so that crashes during weight loading or
+    # the very first step still leave a parseable train_log.json behind.
+    from biom3.rl.plotting import write_train_log_atomic
+    write_train_log_atomic(log_path, log_rows)
 
     for step in range(1, gdpo_cfg.steps + 1):
         t0 = time.time()
@@ -694,10 +772,19 @@ def gdpo_train(
             _stamp("encode_z_c")
 
             # Rollout under π_old (honors pre_unmask via _build_initial_mask_state).
-            ids_per_prompt = [
-                _gdpo_rollout(old_s3, cfg3, z_cs[i:i + 1], G, device)
-                for i in range(B)
-            ]
+            if rollout_pool is not None:
+                # Broadcast π_old's weights to all replica tiles, then
+                # dispatch G rollouts per prompt across the pool.
+                rollout_pool.sync_from(old_s3)
+                ids_per_prompt = [
+                    rollout_pool.rollout(z_cs[i:i + 1], G)
+                    for i in range(B)
+                ]
+            else:
+                ids_per_prompt = [
+                    _gdpo_rollout(old_s3, cfg3, z_cs[i:i + 1], G, device)
+                    for i in range(B)
+                ]
             ids_all = torch.cat(ids_per_prompt, dim=0)              # (BG, L_total)
             _stamp("rollout")
 
@@ -882,6 +969,13 @@ def gdpo_train(
                     ", ".join(f"{n}={row['components'][n]:.3f}" for n in row["components"]),
                 )
         log_rows.append(row)
+        # Atomic per-step flush so a job hitting walltime or crashing
+        # leaves behind a fully-parseable train_log.json with every
+        # step recorded up to that point.
+        try:
+            write_train_log_atomic(log_path, log_rows)
+        except Exception as e:  # pragma: no cover
+            logger.warning("train_log.json flush failed (non-fatal): %s", e)
 
         if gdpo_cfg.debug_log:
             try:
@@ -912,9 +1006,10 @@ def gdpo_train(
 
     final_path = os.path.join(gdpo_cfg.output_dir, "final.pt")
     torch.save({"step": gdpo_cfg.steps, "model_state": s3.state_dict()}, final_path)
-    log_path = os.path.join(gdpo_cfg.output_dir, "train_log.json")
-    with open(log_path, "w") as f:
-        json.dump(log_rows, f, indent=2)
+    # train_log.json was already flushed after every step; this final
+    # rewrite is a no-op safety net in case any exception path skipped
+    # the in-loop flush.
+    write_train_log_atomic(log_path, log_rows)
     logger.info("GDPO done. Final checkpoint: %s", final_path)
 
     # Best-effort end-of-run diagnostic plots.
@@ -923,5 +1018,8 @@ def gdpo_train(
         plot_train_log(log_path, gdpo_cfg.output_dir, algo="gdpo")
     except Exception as e:  # pragma: no cover
         logger.warning("plot_train_log failed (non-fatal): %s", e)
+
+    if rollout_pool is not None:
+        rollout_pool.shutdown()
 
     return log_rows

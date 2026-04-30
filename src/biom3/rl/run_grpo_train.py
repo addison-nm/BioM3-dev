@@ -69,6 +69,11 @@ def get_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument("--reward", type=str, default="esmfold_plddt",
                         choices=["esmfold_plddt", "stub"])
 
+    # Debug log
+    parser.add_argument("--no_debug_log", dest="debug_log", action="store_false",
+                        help="Disable per-step debug.out dump (sequences, ratios).")
+    parser.set_defaults(debug_log=True)
+
     # Device
     parser.add_argument("--device", type=str, default=None,
                         help="Device override; defaults to backend.get_device().")
@@ -125,6 +130,7 @@ def main(args):
         save_steps=args.save_steps,
         max_grad_norm=args.max_grad_norm,
         seed=args.seed,
+        debug_log=args.debug_log,
     )
 
     reward_fn = build_reward(args.reward, device=device)

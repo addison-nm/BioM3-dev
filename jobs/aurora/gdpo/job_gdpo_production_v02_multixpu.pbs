@@ -1,0 +1,83 @@
+#!/bin/bash -l
+#PBS -A gpu_hack
+#PBS -N gdpo_production_v02_multixpu
+#PBS -l walltime=8:00:00
+#PBS -l select=1
+#PBS -l place=scatter
+#PBS -l filesystems=home:flare
+#PBS -q gpu_hack_large
+#PBS -j oe
+# PBS -M <emailaddress>
+# PBS -m be
+
+# GDPO Stage 3 fine-tuning — multi-XPU rollout variant of v01.
+# Replicates the trainable policy onto all 12 Aurora tiles (6 GPUs × 2
+# tiles per GPU) and dispatches rollout chunks in parallel via threads;
+# gathers to xpu:0 for ELBO + gradient updates. Expected wall-clock per
+# step drops from ~75s (single-tile) to ~25–40s, with most of the
+# savings coming from the 128-step diffusion rollout (52s → ~5–15s).
+# Realistic speedup is ~3–5× rather than 12× because PyTorch holds the
+# GIL during kernel-launch dispatch — see docs/gdpo_finetuning.md.
+#
+# Bumps G from 8 → 24 (2 sequences/tile across 12 tiles) to use the
+# multi-tile compute budget for larger group statistics rather than
+# just speedup. Better-conditioned advantages and reduced
+# mode-collapse pressure. Bump higher (G=48 → 4 seq/tile) once this
+# validates.
+#
+# All other settings identical to v01 (production_gdpo.json with
+# pre_unmask D=128, N=4, β=0.01, ESMFold pLDDT reward, same .ckpt set).
+#
+# PREREQUISITES — see job_gdpo_production_v01.pbs.
+
+projdir=${PBS_O_WORKDIR}
+cd ${projdir}
+
+module load frameworks
+source ./venvs/biom3-env/bin/activate
+
+# Configurations to edit
+config_path=./configs/grpo/production_gdpo.json
+prompts_path=./configs/grpo/prompts/example_prompts.txt
+stage1_weights=./weights/PenCL/PenCL_V09152023_last.ckpt
+stage2_weights=./weights/Facilitator/Facilitator_MMD15.ckpt/last.ckpt
+stage3_init_weights=./weights/ProteoScribe/ProteoScribe_SH3_epoch52.ckpt/single_model.pth
+
+# Multi-tile knobs
+num_generations=48
+rollout_devices=auto
+steps=100
+save_steps=5
+
+# Constant configurations
+device=xpu
+
+# IMPORTANT: do NOT pin ZE_AFFINITY_MASK — we want the process to see
+# all 12 tiles via torch.xpu.device_count() so --rollout_devices auto
+# resolves to xpu:0..11.
+unset ZE_AFFINITY_MASK || true
+
+
+# Construct the run ID
+datetime=$(date +%Y%m%d_%H%M%S)
+config_name=$(basename "${config_path}" .json)
+run_id=${config_name}_multixpu_G${num_generations}_V${datetime}
+
+# Direct output to log file
+mkdir -p logs
+log_fpath=logs/${run_id}.${PBS_JOBID}.o
+
+source environment.sh
+./scripts/gdpo_train_singlenode.sh \
+    ${config_path} \
+    ${run_id} \
+    ${device} \
+    --num_generations ${num_generations} \
+    --rollout_devices ${rollout_devices} \
+    --prompts_path ${prompts_path} \
+    --stage1_weights ${stage1_weights} \
+    --stage2_weights ${stage2_weights} \
+    --stage3_init_weights ${stage3_init_weights} \
+    --steps ${steps} \
+    --save_steps ${save_steps} \
+> ${log_fpath}

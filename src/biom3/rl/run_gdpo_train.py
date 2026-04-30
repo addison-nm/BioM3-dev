@@ -43,6 +43,22 @@ def _parse_float_list(s: Optional[str]) -> Optional[List[float]]:
     return [float(x) for x in s.split(",")]
 
 
+def _parse_device_list(s) -> Optional[List[str]]:
+    """Parse ``--rollout_devices`` into a list of device strings.
+
+    Accepts ``None``, an already-parsed list (when set via JSON config),
+    a single token like ``"auto"``, or a comma-separated string.
+    """
+    if s is None:
+        return None
+    if isinstance(s, list):
+        return [str(x) for x in s]
+    s = str(s).strip()
+    if not s:
+        return None
+    return [tok.strip() for tok in s.split(",") if tok.strip()]
+
+
 def get_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument("--config_path", type=str, default=None,
                         help="GDPO experiment config JSON.")
@@ -115,6 +131,14 @@ def get_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
                              "[D, sequence_length) with the configured fill token.")
     parser.add_argument("--pre_unmask_config", type=str, default=None,
                         help="Path to JSON with {strategy, fill_with, diffusion_budget}.")
+
+    # Multi-device rollout (single process, threaded). Gradient updates
+    # stay on the master device; replicas exist only for parallel
+    # diffusion rollout. ``auto`` picks all visible XPU/CUDA tiles.
+    parser.add_argument("--rollout_devices", type=str, default=None,
+                        help="Comma-separated devices for parallel rollout "
+                             "(e.g. 'xpu:0,xpu:1,xpu:2,xpu:3,xpu:4,xpu:5'), "
+                             "or 'auto' for all visible tiles. Default: single device.")
 
     # Reward
     parser.add_argument("--reward", type=str, default="esmfold_plddt",
@@ -189,6 +213,7 @@ def main(args):
         gradient_checkpoint=args.gradient_checkpoint,
         pre_unmask=args.pre_unmask,
         pre_unmask_config=args.pre_unmask_config,
+        rollout_devices=_parse_device_list(args.rollout_devices),
     )
 
     reward_fn = build_reward(args.reward, device=device)

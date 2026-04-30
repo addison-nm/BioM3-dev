@@ -17,6 +17,7 @@ from tests.conftest import DATDIR
 from biom3.core.helpers import convert_to_namespace, load_json_config
 from biom3.Stage3.io import build_model_ProteoScribe
 from biom3.rl.grpo import (
+    MASK_ID,
     NUM_CLASSES,
     PAD_ID,
     TOKENS,
@@ -104,10 +105,27 @@ def test_policy_logprobs_shape_and_negativity(mini_s3):
     BK, L = 3, cfg.diffusion_steps
     ids = torch.randint(0, cfg.num_classes, (BK, L), dtype=torch.int64)
     z_c = torch.randn(BK, cfg.text_emb_dim)
-    lp = _policy_logprobs(s3, ids, z_c, PAD_ID)
+    lp = _policy_logprobs(s3, ids, z_c, MASK_ID)
     assert lp.shape == (BK, L)
     assert torch.isfinite(lp).all()
     assert (lp <= 0).all()
+
+
+def test_policy_logprobs_default_uses_mask_id(mini_s3):
+    """Calling _policy_logprobs without mask_id must use MASK_ID (=0),
+    not PAD_ID (=23). Otherwise we feed the model an off-distribution
+    all-PAD prefix at t=0 — the original diffu-GRPO bug."""
+    s3, cfg = mini_s3
+    s3.eval()
+    BK, L = 2, cfg.diffusion_steps
+    ids = torch.randint(0, cfg.num_classes, (BK, L), dtype=torch.int64)
+    z_c = torch.randn(BK, cfg.text_emb_dim)
+    lp_default = _policy_logprobs(s3, ids, z_c)
+    lp_explicit_mask = _policy_logprobs(s3, ids, z_c, MASK_ID)
+    assert torch.equal(lp_default, lp_explicit_mask)
+    # And a PAD-fill must give a *different* result (proves the fix is load-bearing).
+    lp_pad = _policy_logprobs(s3, ids, z_c, PAD_ID)
+    assert not torch.allclose(lp_default, lp_pad)
 
 
 def test_grpo_inner_step_updates_params(mini_s3):
@@ -131,7 +149,7 @@ def test_grpo_inner_step_updates_params(mini_s3):
     with torch.no_grad():
         ids_all = diffusion_rollout(s3, cfg, z_cs[0:1], K, device)
         seqs = [decode_tokens(ids_all[i]) for i in range(BK)]
-        lp_ref_tok = _policy_logprobs(ref_s3, ids_all, z_cs_rep, PAD_ID)
+        lp_ref_tok = _policy_logprobs(ref_s3, ids_all, z_cs_rep, MASK_ID)
 
     R = torch.tensor(reward_fn(seqs), dtype=torch.float32)
     Rg = R.view(B, K)
@@ -140,7 +158,7 @@ def test_grpo_inner_step_updates_params(mini_s3):
         / (Rg.std(dim=-1, keepdim=True).clamp(min=1e-8))
     ).view(BK)
 
-    lp_new_tok = _policy_logprobs(s3, ids_all, z_cs_rep, PAD_ID)
+    lp_new_tok = _policy_logprobs(s3, ids_all, z_cs_rep, MASK_ID)
     valid = (ids_all != PAD_ID).float()
     log_ratio = lp_new_tok - lp_ref_tok.detach()
     ratio = torch.exp(log_ratio)

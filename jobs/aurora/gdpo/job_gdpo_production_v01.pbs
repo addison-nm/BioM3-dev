@@ -1,0 +1,66 @@
+#!/bin/bash -l
+#PBS -A gpu_hack
+#PBS -N gdpo_production_v01
+#PBS -l walltime=02:00:00
+#PBS -l select=1
+#PBS -l place=scatter
+#PBS -l filesystems=home:flare
+#PBS -q gpu_hack
+#PBS -j oe
+# PBS -M <emailaddress>
+# PBS -m be
+
+# GDPO Stage 3 fine-tuning — replica of the interactive production run
+# at outputs/gdpo/production_v01_20260429_202953/. Single-tile, 100
+# steps, G=8, N=4, pre_unmask D=128 (SH3), tokenwise k3 KL with
+# β = 0.01. ESMFold pLDDT reward against the matched .ckpt set:
+#   Stage 1  PenCL_V09152023_last.ckpt
+#   Stage 2  Facilitator_MMD15.ckpt
+#   Stage 3  ProteoScribe_SH3_epoch52.ckpt   (init for fine-tune)
+#
+# PREREQUISITES (run once before submitting):
+#   source environment.sh
+#   source ./venvs/biom3-env/bin/activate
+#   pip install -e '.[grpo]'   # pulls fair-esm
+#   # First run will also download facebook/esmfold_v1 (~600 MB) into
+#   # the HF cache. Do this from a login node before qsub if your
+#   # queue has no outbound network.
+
+projdir=${PBS_O_WORKDIR}
+cd ${projdir}
+
+module load frameworks
+source ./venvs/biom3-env/bin/activate
+
+# Configurations to edit
+config_path=./configs/grpo/production_gdpo.json
+prompts_path=./configs/grpo/prompts/example_prompts.txt
+stage1_weights=./weights/PenCL/PenCL_V09152023_last.ckpt
+stage2_weights=./weights/Facilitator/Facilitator_MMD15.ckpt/last.ckpt
+stage3_init_weights=./weights/ProteoScribe/ProteoScribe_SH3_epoch52.ckpt/single_model.pth
+
+# Constant configurations
+device=xpu
+
+# Pin to one Aurora tile
+export ZE_AFFINITY_MASK=0
+
+# Construct the run ID
+datetime=$(date +%Y%m%d_%H%M%S)
+config_name=$(basename "${config_path}" .json)
+run_id=${config_name}_V${datetime}
+
+# Direct output to log file
+mkdir -p logs
+log_fpath=logs/${run_id}.${PBS_JOBID}.o
+
+source environment.sh
+./scripts/gdpo_train_singlenode.sh \
+    ${config_path} \
+    ${run_id} \
+    ${device} \
+    --prompts_path ${prompts_path} \
+    --stage1_weights ${stage1_weights} \
+    --stage2_weights ${stage2_weights} \
+    --stage3_init_weights ${stage3_init_weights} \
+> ${log_fpath} 2>&1

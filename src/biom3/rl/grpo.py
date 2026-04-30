@@ -24,6 +24,7 @@ import biom3.Stage1.preprocess as S1prep
 import biom3.Stage3.animation_tools as S3ani
 import biom3.Stage3.sampling_analysis as S3sample
 from biom3.backend.device import setup_logger
+from biom3.rl.diversity import diversity_stats
 from biom3.rl.io import (
     load_facilitator_frozen,
     load_pencl_frozen,
@@ -218,6 +219,7 @@ def _write_debug_step(
     valid_lengths: torch.Tensor,     # (BK,) — count of non-PAD tokens
     components_per_replica,          # dict[str, list[float]] | None
     K: int,
+    per_replica_diversity: List[float],   # length BK, in [0,1]
 ) -> None:
     """Append one stanza per training step to GRPO's ``debug.out``.
 
@@ -249,15 +251,18 @@ def _write_debug_step(
     lines.append("per-replica:")
     header = (
         f"  {'k':>3}  {'p':>3}  {'len':>4}  {'reward':>10}  {'advantage':>10}  "
+        f"{'diversity':>9}  "
         f"{'log_ratio':>10}  {'ratio':>8}  {'|lr|max':>9}"
     )
     lines.append(header)
     for i in range(BK):
         p_idx = i // K
         k_idx = i % K
+        div_i = float(per_replica_diversity[i]) if i < len(per_replica_diversity) else 0.0
         lines.append(
             f"  {k_idx:>3d}  {p_idx:>3d}  {seqlen_list[i]:>4d}  "
             f"{rewards_list[i]:>10.4f}  {adv_list[i]:>+10.4f}  "
+            f"{div_i:>9.4f}  "
             f"{lr_list[i]:>+10.4f}  {r_list[i]:>8.4f}  {lr_max_list[i]:>9.4f}"
         )
     if components_per_replica:
@@ -415,6 +420,12 @@ def grpo_train(
                 )
             _stamp("decode")
 
+            # Within-batch sequence diversity. Same diagnostic as GDPO;
+            # surfaced unconditionally so mode collapse is visible from
+            # train_log.json without instrumentation downstream.
+            div_stats = diversity_stats(seqs, group_size=K)
+            _stamp("diversity")
+
             lp_ref_tok = _policy_logprobs(ref_s3, ids_all, z_cs_rep, MASK_ID)
             _stamp("ref_logprobs")
 
@@ -495,10 +506,14 @@ def grpo_train(
         logger.info(
             "step=%4d | reward=%5.2f (avg=%5.2f) | loss=%.4f pg=%.4f kl=%.4f clip=%.2f "
             "| lr_tok=%.4f (|max|=%.4f) "
+            "| div=%.3f (worst_pair=%.3f, uniq=%d) "
             "| dw=%.2e (tot=%.2e) | len=%.2f | %.1fs | replicas=%d | all_lengths=%s",
             step, mean_reward, reward_avg,
             loss.item(), pg_loss.item(), kl_loss.item(), clip_frac,
             log_ratio_tok_mean, log_ratio_tok_max_abs,
+            float(div_stats["diversity_mean"]),
+            float(div_stats["diversity_min_pair"]),
+            int(div_stats["unique_count"]),
             dw_step, dw_total, avg_len, dt, num_replicas, str(all_lengths)
         )
         row = {
@@ -521,6 +536,10 @@ def grpo_train(
             "dw_step": dw_step,
             "dw_total": dw_total,
             "avg_len": round(avg_len, 1),
+            "diversity_mean": round(float(div_stats["diversity_mean"]), 4),
+            "diversity_min_pair": round(float(div_stats["diversity_min_pair"]), 4),
+            "unique_count": int(div_stats["unique_count"]),
+            "per_replica_diversity": [float(x) for x in div_stats["per_replica_diversity"]],
         }
         # CompositeReward (and any reward exposing the same hook) reports
         # per-component values. Surface the per-step mean of each so
@@ -566,6 +585,7 @@ def grpo_train(
                     valid_lengths=valid_lengths,
                     components_per_replica=components_per_replica,
                     K=K,
+                    per_replica_diversity=div_stats["per_replica_diversity"],
                 )
             except Exception as e:  # pragma: no cover
                 logger.warning("debug.out write failed (non-fatal): %s", e)

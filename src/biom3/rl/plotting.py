@@ -136,6 +136,9 @@ def plot_train_log(log_path: str, out_dir: str, algo: str = "grpo") -> List[str]
         not is_gdpo
         and any("log_ratio_tok" in r and "log_ratio_tok_max_abs" in r for r in rows)
     )
+    # Diversity panel is added when the log carries the new fields. Older
+    # logs without diversity_mean simply skip the panel.
+    has_diversity = any("diversity_mean" in r for r in rows)
 
     # ─── Main diagnostics figure ─────────────────────────────────────────
     if is_gdpo:
@@ -144,6 +147,8 @@ def plot_train_log(log_path: str, out_dir: str, algo: str = "grpo") -> List[str]
         n_panels = 7
     else:
         n_panels = 6
+    if has_diversity:
+        n_panels += 1
     n_cols = 2
     n_rows = (n_panels + n_cols - 1) // n_cols
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(12, 3.0 * n_rows), squeeze=False)
@@ -252,6 +257,31 @@ def plot_train_log(log_path: str, out_dir: str, algo: str = "grpo") -> List[str]
         ax.set_ylabel("log r_tok")
         ax.set_title("Token-level log importance ratio")
         ax.legend(loc="best", fontsize=8)
+
+    if has_diversity:
+        # Last panel: within-group diversity. Surfacing the v01
+        # mode-collapse failure mode at a glance.
+        div_idx = n_panels - 1
+        ax = flat_axes[div_idx]
+        _scatter_with_band(
+            ax, rows, "per_replica_diversity", "diversity_mean", "diversity", "C8",
+        )
+        # Worst-pair identity on a twin axis — when this asymptotes near
+        # 1.0 the group has collapsed even if mean diversity looks OK.
+        if any("diversity_min_pair" in r for r in rows):
+            ax2 = ax.twinx()
+            ax2.plot(
+                steps,
+                [r.get("diversity_min_pair", float("nan")) for r in rows],
+                color="C3", linestyle="--", linewidth=1.0, alpha=0.85,
+                label="worst-pair identity",
+            )
+            ax2.set_ylabel("worst-pair identity", color="C3")
+            ax2.tick_params(axis="y", labelcolor="C3")
+            ax2.set_ylim(-0.02, 1.02)
+        ax.set_ylabel("1 - mean identity (per replica)")
+        ax.set_ylim(-0.02, 1.02)
+        ax.set_title("Within-group sequence diversity")
 
     # Hide any unused axes (only if n_panels < n_rows*n_cols)
     for ax in flat_axes[n_panels:]:

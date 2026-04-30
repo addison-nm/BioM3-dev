@@ -25,7 +25,7 @@ import torch
 from biom3.backend.device import get_device, setup_logger
 from biom3.core.helpers import convert_to_namespace, load_json_config
 from biom3.rl.grpo import GRPOConfig, grpo_train, load_prompts
-from biom3.rl.rewards import build_reward
+from biom3.rl.rewards import CompositeReward, DiversityReward, build_reward
 
 logger = setup_logger(__name__)
 
@@ -68,6 +68,19 @@ def get_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     # Reward
     parser.add_argument("--reward", type=str, default="esmfold_plddt",
                         choices=["esmfold_plddt", "stub"])
+
+    # Diversity reward (composite). When --diversity_weight > 0 the base
+    # reward is wrapped in CompositeReward({reward: 1, diversity: w}); the
+    # combined scalar feeds the trainer's group-relative advantage.
+    parser.add_argument("--diversity_weight", type=float, default=0.0,
+                        help="Weight on the diversity component of the composite "
+                             "reward. 0 disables (default).")
+    parser.add_argument("--diversity_mode", type=str, default="monotone",
+                        choices=["monotone", "targeted"],
+                        help="'monotone' rewards higher diversity linearly; "
+                             "'targeted' peaks at --diversity_target.")
+    parser.add_argument("--diversity_target", type=float, default=0.5,
+                        help="Target divergence for --diversity_mode=targeted.")
 
     # Debug log
     parser.add_argument("--no_debug_log", dest="debug_log", action="store_false",
@@ -134,6 +147,25 @@ def main(args):
     )
 
     reward_fn = build_reward(args.reward, device=device)
+    if args.diversity_weight > 0:
+        base_reward = reward_fn
+        div_reward = DiversityReward(
+            group_size=args.num_generations,
+            scale=100.0,
+            mode=args.diversity_mode,
+            target=args.diversity_target,
+        )
+        reward_fn = CompositeReward(
+            {
+                args.reward: (base_reward, 1.0),
+                "diversity": (div_reward, float(args.diversity_weight)),
+            },
+            reduction="weighted_sum",
+        )
+        logger.info(
+            "Composite reward enabled: %s (w=1.0) + diversity (w=%.3f, mode=%s, target=%.3f)",
+            args.reward, args.diversity_weight, args.diversity_mode, args.diversity_target,
+        )
 
     grpo_train(
         grpo_cfg=grpo_cfg,

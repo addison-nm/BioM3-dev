@@ -39,6 +39,7 @@ from biom3.Stage3.run_ProteoScribe_sample import (
     load_pre_unmask_config,
 )
 from biom3.backend.device import setup_logger
+from biom3.rl.diversity import diversity_stats
 from biom3.rl.rollout import RolloutPool
 from biom3.rl.grpo import (
     NUM_CLASSES,
@@ -497,6 +498,7 @@ def _write_debug_step(
     components_per_replica,          # dict[str, list[float]] | None
     corruptions: list,
     G: int,
+    per_replica_diversity: List[float],  # length BG, in [0,1]
 ) -> None:
     """Append one stanza per training step to ``debug.out``.
 
@@ -538,15 +540,18 @@ def _write_debug_step(
     lines.append("per-replica:")
     header = (
         f"  {'g':>3}  {'p':>3}  {'len':>4}  {'reward':>10}  {'advantage':>10}  "
+        f"{'diversity':>9}  "
         f"{'elbo_old':>11}  {'elbo_new':>11}  {'log_ratio':>10}  {'ratio':>8}"
     )
     lines.append(header)
     for i in range(BG):
         p_idx = i // G
         g_idx = i % G
+        div_i = float(per_replica_diversity[i]) if i < len(per_replica_diversity) else 0.0
         lines.append(
             f"  {g_idx:>3d}  {p_idx:>3d}  {seqlen_list[i]:>4d}  "
             f"{rewards_list[i]:>10.4f}  {adv_list[i]:>+10.4f}  "
+            f"{div_i:>9.4f}  "
             f"{elbo_old_list[i]:>11.4f}  {elbo_new_list[i]:>11.4f}  "
             f"{lr_list[i]:>+10.4f}  {r_list[i]:>8.4f}"
         )
@@ -798,6 +803,15 @@ def gdpo_train(
                 )
             _stamp("decode")
 
+            # Within-batch sequence-diversity diagnostics. Cheap (LRU
+            # caches collapsed pairs) and worth logging unconditionally
+            # — the v01 mode-collapse failure mode is invisible without
+            # this. DiversityReward, when in use, recomputes the same
+            # quantities through the cache so this incurs no extra
+            # alignment work in the composite-reward path.
+            div_stats = diversity_stats(seqs, group_size=G)
+            _stamp("diversity")
+
             # Shared SDMC corruptions — used by π_old, π_new, optionally π_ref.
             corruptions = _build_shared_corruptions(
                 ids=ids_all,
@@ -927,10 +941,14 @@ def gdpo_train(
         logger.info(
             "step=%4d | reward=%5.2f (avg=%5.2f) | loss=%.4f pg=%.4f kl=%.4f clip=%.2f "
             "| elbo_new=%.3f elbo_old=%.3f lr_seq=%.3f (|max|=%.3f) "
+            "| div=%.3f (worst_pair=%.3f, uniq=%d) "
             "| dw=%.2e (tot=%.2e) | len=%.2f | %.1fs | replicas=%d | all_lengths=%s",
             step, mean_reward, reward_avg,
             loss.item(), pg_loss.item(), kl_loss.item(), clip_frac,
             elbo_new_mean, elbo_old_mean, log_ratio_mean, log_ratio_max_abs,
+            float(div_stats["diversity_mean"]),
+            float(div_stats["diversity_min_pair"]),
+            int(div_stats["unique_count"]),
             dw_step, dw_total, avg_len, dt, len(seqs), str(all_lengths),
         )
         row = {
@@ -951,6 +969,10 @@ def gdpo_train(
             "dw_step": dw_step,
             "dw_total": dw_total,
             "avg_len": round(avg_len, 1),
+            "diversity_mean": round(float(div_stats["diversity_mean"]), 4),
+            "diversity_min_pair": round(float(div_stats["diversity_min_pair"]), 4),
+            "unique_count": int(div_stats["unique_count"]),
+            "per_replica_diversity": [float(x) for x in div_stats["per_replica_diversity"]],
         }
         components_per_replica = None
         last_components = getattr(reward_fn, "last_components", None)
@@ -995,6 +1017,7 @@ def gdpo_train(
                     components_per_replica=components_per_replica,
                     corruptions=corruptions,
                     G=G,
+                    per_replica_diversity=div_stats["per_replica_diversity"],
                 )
             except Exception as e:  # pragma: no cover
                 logger.warning("debug.out write failed (non-fatal): %s", e)

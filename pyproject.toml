@@ -22,6 +22,7 @@ app = [
 ]
 grpo = [
   "fair-esm",
+  "biopython",
 ]
 
 [tool.setuptools.dynamic]

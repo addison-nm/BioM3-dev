@@ -21,7 +21,9 @@
 set -euo pipefail
 
 NGPU="${NGPU:?NGPU env var required}"
-CPU_BIND="verbose,list:1-8:9-16:17-24:25-32:33-40:41-48:53-60:61-68:69-76:77-84:85-92:93-100"
+
+CPU_BIND_SCHEME="--cpu-bind=list:1-8:9-16:17-24:25-32:33-40:41-48:53-60:61-68:69-76:77-84:85-92:93-100"
+GPU_BIND_SCHEME="--gpu-bind=list:0.0:0.1:1.0:1.1:2.0:2.1:3.0:3.1:4.0:4.1:5.0:5.1"
 
 if [ "${NGPU}" != "12" ]; then
     echo "WARNING (aurora_singlenode.sh): NGPU=${NGPU} but the CPU_BIND list" \
@@ -33,5 +35,6 @@ exec mpiexec \
     --envall \
     -n "${NGPU}" \
     --ppn "${NGPU}" \
-    --cpu-bind "${CPU_BIND}" \
+    ${CPU_BIND_SCHEME} \
+    ${GPU_BIND_SCHEME} \
     "$@"

@@ -26,7 +26,7 @@ set -euo pipefail
 # Configurations to edit
 config_path=./configs/grpo/example_grpo.json
 steps=5
-num_generations=4
+num_generations=8
 batch_size=1
 beta=0.01
 eps=0.20
@@ -34,7 +34,7 @@ reward=esmfold_plddt
 prompts_path=./configs/grpo/prompts/example_prompts.txt
 stage1_weights=./weights/PenCL/PenCL_V09152023_last.ckpt
 stage2_weights=./weights/Facilitator/Facilitator_MMD15.ckpt/last.ckpt
-stage3_init_weights=./weights/ProteoScribe/ProteoScribe_SH3_epoch52.ckpt
+stage3_init_weights=./weights/ProteoScribe/ProteoScribe_SH3_epoch52.ckpt/single_model.pth
 
 device=xpu
 

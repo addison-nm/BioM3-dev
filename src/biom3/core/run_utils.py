@@ -84,11 +84,11 @@ def setup_file_logging(outdir, logger_prefix="biom3", log_filename="run.log"):
     Returns (log_path, file_handler).  Pass the handler to
     ``teardown_file_logging`` when done.
     """
-    from biom3.backend.device import get_rank
+    from biom3.core.distributed import get_global_rank
 
     log_path = os.path.join(outdir, log_filename)
 
-    if get_rank() != 0:
+    if get_global_rank() != 0:
         return log_path, None
 
     file_handler = logging.FileHandler(log_path)

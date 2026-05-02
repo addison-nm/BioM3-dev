@@ -2,16 +2,21 @@
 
 """
 
-import os
 import logging
+import os
 import platform
 import socket
 import sys
+
+import psutil
 import torch
+
+from biom3.core._dist_env import get_global_rank
 
 _CPU = "cpu"
 _CUDA = "cuda"
 _XPU = "xpu"
+
 
 def get_backend_name() -> str:
     if torch.cuda.is_available():
@@ -20,13 +25,15 @@ def get_backend_name() -> str:
         return _XPU
     return _CPU
 
+
+# Computed once at import time. The active backend never changes within a
+# process, so every helper below references this constant directly instead
+# of recomputing it on each call.
+BACKEND_NAME = get_backend_name()
+
+
 def get_device():
-    backend = get_backend_name()
-    if backend == _CUDA:
-        return torch.device("cuda")
-    if backend == _XPU:
-        return torch.device("xpu")
-    return torch.device(_CPU)
+    return torch.device(BACKEND_NAME)
 
 
 def reset_peak_memory_stats():
@@ -34,10 +41,9 @@ def reset_peak_memory_stats():
 
     No-op on CPU.  CUDA and XPU expose the same-named function.
     """
-    backend = get_backend_name()
-    if backend == _CUDA:
+    if BACKEND_NAME == _CUDA:
         torch.cuda.reset_peak_memory_stats()
-    elif backend == _XPU:
+    elif BACKEND_NAME == _XPU:
         torch.xpu.reset_peak_memory_stats()
 
 
@@ -47,11 +53,10 @@ def get_peak_memory_stats():
     Returns ``(None, None)`` on CPU or if the backend does not expose the
     relevant APIs.  CUDA and XPU expose identical function names.
     """
-    backend = get_backend_name()
-    if backend == _CUDA:
+    if BACKEND_NAME == _CUDA:
         return (torch.cuda.max_memory_allocated(),
                 torch.cuda.max_memory_reserved())
-    if backend == _XPU:
+    if BACKEND_NAME == _XPU:
         try:
             return (torch.xpu.max_memory_allocated(),
                     torch.xpu.max_memory_reserved())
@@ -66,10 +71,9 @@ def device_sync():
     Intended for benchmark timing — wrap before ``perf_counter`` reads so
     asynchronous kernel launches are accounted for.  No-op on CPU.
     """
-    backend = get_backend_name()
-    if backend == _CUDA:
+    if BACKEND_NAME == _CUDA:
         torch.cuda.synchronize()
-    elif backend == _XPU:
+    elif BACKEND_NAME == _XPU:
         torch.xpu.synchronize()
 
 
@@ -79,15 +83,14 @@ def get_device_name(index: int = 0) -> str:
     CUDA → ``torch.cuda.get_device_name``; XPU → ``torch.xpu.get_device_name``;
     CPU → ``platform.processor()`` (falls back to ``platform.machine()``).
     """
-    backend = get_backend_name()
-    if backend == _CUDA:
+    if BACKEND_NAME == _CUDA:
         return torch.cuda.get_device_name(index)
-    if backend == _XPU:
+    if BACKEND_NAME == _XPU:
         try:
             return torch.xpu.get_device_name(index)
         except AttributeError:
-            return "xpu"
-    return platform.processor() or platform.machine() or "cpu"
+            return _XPU
+    return platform.processor() or platform.machine() or _CPU
 
 
 def get_device_info(index: int = 0) -> dict:
@@ -96,16 +99,15 @@ def get_device_info(index: int = 0) -> dict:
     Suitable for serialising alongside benchmark results so runs on different
     machines (Spark / Polaris / Aurora / CPU) remain distinguishable.
     """
-    backend = get_backend_name()
     info = {
-        "backend": backend,
+        "backend": BACKEND_NAME,
         "device_name": get_device_name(index),
         "hostname": socket.gethostname(),
         "torch_version": torch.__version__,
         "python_version": sys.version.split()[0],
         "platform": platform.platform(),
     }
-    if backend == _CUDA:
+    if BACKEND_NAME == _CUDA:
         info["device_count"] = torch.cuda.device_count()
         try:
             cap = torch.cuda.get_device_capability(index)
@@ -113,7 +115,7 @@ def get_device_info(index: int = 0) -> dict:
         except Exception:
             pass
         info["cuda_version"] = torch.version.cuda
-    elif backend == _XPU:
+    elif BACKEND_NAME == _XPU:
         try:
             info["device_count"] = torch.xpu.device_count()
         except AttributeError:
@@ -121,25 +123,6 @@ def get_device_info(index: int = 0) -> dict:
     else:
         info["device_count"] = 0
     return info
-
-def get_rank() -> int:
-    """Get the global rank from environment variables set by the launcher.
-
-    Checks variables from multiple launchers:
-    - torchrun / deepspeed: RANK, LOCAL_RANK
-    - PALS (Aurora mpiexec): PALS_RANKID, PALS_LOCAL_RANKID
-    - PMI (Cray MPICH): PMI_RANK
-    - Open MPI: OMPI_COMM_WORLD_RANK
-
-    Returns 0 when running without a launcher (single-process).
-    """
-    for var in ("RANK", "PALS_RANKID", "PMI_RANK", "OMPI_COMM_WORLD_RANK",
-                "LOCAL_RANK", "PALS_LOCAL_RANKID"):
-        val = os.environ.get(var)
-        if val is not None:
-            return int(val)
-    return 0
-
 
 def setup_logger(name: str = "biom3", level: int = logging.INFO) -> logging.Logger:
     """Return a rank-aware logger that only emits on rank 0.
@@ -155,7 +138,7 @@ def setup_logger(name: str = "biom3", level: int = logging.INFO) -> logging.Logg
     """
     logger = logging.getLogger(name)
     logger.propagate = False  # prevent duplicate output via root logger
-    rank = get_rank()
+    rank = get_global_rank()
     if rank == 0:
         logger.setLevel(level)
         if not logger.handlers:
@@ -170,10 +153,24 @@ def setup_logger(name: str = "biom3", level: int = logging.INFO) -> logging.Logg
     return logger
 
 
-# Set the backend name for import convenience
-BACKEND_NAME = get_backend_name()
+_logger = setup_logger(__name__)
 
-# Import from device-specific module
+
+def print_memory_usage() -> float:
+    """Log and return this Python process's resident-set size in MB.
+
+    Backend-agnostic: measures the host process, not the device. Useful
+    on every machine including CPU. Logs via the rank-aware logger so
+    only rank 0 prints.
+    """
+    mb = psutil.Process(os.getpid()).memory_info().rss / (1024 ** 2)
+    _logger.info("CPU memory used by this script: %.2f MB", mb)
+    return mb
+
+
+# Pull in the active backend's symbols (DIST_BACKEND, resolve_/set_device_for_local_rank,
+# print_gpu_initialization, print_gpu_utilization, etc.). BACKEND_NAME was
+# computed near the top of this module.
 if BACKEND_NAME == _CUDA:
     from .cuda import *
 elif BACKEND_NAME == _XPU:

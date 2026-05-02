@@ -46,7 +46,8 @@ from biom3.core.helpers import coerce_limit_batches, load_json_config
 from biom3.core.run_utils import (
     backup_if_exists, setup_file_logging, teardown_file_logging, write_manifest,
 )
-from biom3.backend.device import print_gpu_initialization, get_rank
+from biom3.backend.device import print_gpu_initialization
+from biom3.core.distributed import get_global_rank
 
 logger = setup_logger(__name__)
 
@@ -427,7 +428,7 @@ def train_model(args, PL_model, data_module):
     run_dir = os.path.join(output_root, args.runs_folder, run_id)
     logs_dir = os.path.join(run_dir, _LOGS_SUBDIR)
     artifacts_dir = os.path.join(run_dir, _ARTIFACTS_SUBDIR)
-    if get_rank() == 0:
+    if get_global_rank() == 0:
         os.makedirs(checkpoint_dir, exist_ok=True)
         os.makedirs(logs_dir, exist_ok=True)
         os.makedirs(artifacts_dir, exist_ok=True)
@@ -555,7 +556,7 @@ def train_model(args, PL_model, data_module):
         logger.info("Resume from checkpoint: %s", args.resume_from_checkpoint)
         trainer.fit(PL_model, data_module, ckpt_path=args.resume_from_checkpoint)
 
-    if get_rank() == 0:
+    if get_global_rank() == 0:
         print_gpu_initialization()
 
     save_model(
@@ -579,7 +580,7 @@ def main(args):
     logs_dir = os.path.join(run_dir, _LOGS_SUBDIR)
     artifacts_dir = os.path.join(run_dir, _ARTIFACTS_SUBDIR)
     checkpoint_dir = os.path.join(args.output_root, args.checkpoints_folder, args.run_id)
-    if get_rank() == 0:
+    if get_global_rank() == 0:
         os.makedirs(logs_dir, exist_ok=True)
         os.makedirs(artifacts_dir, exist_ok=True)
     log_path, file_handler = setup_file_logging(artifacts_dir)
@@ -605,7 +606,7 @@ def main(args):
     trainer, artifacts_dir = train_model(args, PL_model, data_module)
 
     # ---- Final predict pass + save transformed embeddings ----
-    if get_rank() == 0:
+    if get_global_rank() == 0:
         if args.swissprot_data_path_sentinel != 'None' and data_module.all_swiss_dataloader is not None:
             logger.info("Infer SwissProt dataset...")
             preds = get_final_embeddings(
@@ -629,7 +630,7 @@ def main(args):
                 )
 
     # ---- Manifest + args.json ----
-    if get_rank() == 0:
+    if get_global_rank() == 0:
         elapsed = datetime.now() - start_time
         args_path = os.path.join(artifacts_dir, "args.json")
         backup_if_exists(args_path)

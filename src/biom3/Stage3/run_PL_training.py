@@ -112,7 +112,8 @@ from biom3.core.helpers import coerce_limit_batches, load_json_config
 from biom3.core.run_utils import (
     backup_if_exists, setup_file_logging, teardown_file_logging, write_manifest,
 )
-from biom3.backend.device import print_gpu_initialization, get_device, get_rank
+from biom3.backend.device import print_gpu_initialization, get_device
+from biom3.core.distributed import get_global_rank
 
 logger = setup_logger(__name__)
 
@@ -972,7 +973,7 @@ def retrieve_all_args(args):
     args.benchmark_all_ranks_memory = str_to_bool(args.benchmark_all_ranks_memory)
     args.benchmark_per_step = str_to_bool(args.benchmark_per_step)
     args.early_stopping_metric = nonestr_to_none(args.early_stopping_metric)
-    args.checkpoint_every_n_steps = nonestr_to_none(args.checkpoint_every_n_steps)
+    args.checkpoint_every_n_steps = nonestr_to_none(args.checkpoint_every_n_steps)  # TODO: BUG FIX ISSUE
     args.checkpoint_every_n_epochs = nonestr_to_none(args.checkpoint_every_n_epochs)
     args.artifact_sync_on_best = str_to_bool(args.artifact_sync_on_best)
 
@@ -1058,7 +1059,7 @@ def load_model(
     # Ensure diffusion steps are sufficient for data dimensions
     if diffusion_steps < int(w*h):
         logger.warning('Make sure that the number of diffusion steps is equal to or greather than the data cardinality')
-    if get_rank() == 0:
+    if get_global_rank() == 0:
         print_gpu_initialization()
     # Compile model architecture
     PL_model = compile_model(
@@ -1591,11 +1592,11 @@ def train_model(
             logger.info('Continue training ProteoScribe from checkpoint ...')
             trainer.fit(PL_model, data_module, ckpt_path=resume_from_checkpoint)
 
-    if get_rank() == 0:
+    if get_global_rank() == 0:
         print_gpu_initialization()
 
     # Save dataset split indices
-    if get_rank() == 0 and hasattr(data_module, 'split_info'):
+    if get_global_rank() == 0 and hasattr(data_module, 'split_info'):
         splits_path = os.path.join(artifacts_dir, "dataset_splits.pt")
         torch.save(data_module.split_info, splits_path)
         logger.info("Saved dataset splits to %s", splits_path)
@@ -1631,7 +1632,7 @@ def main(args, use_hydra=False, ds_config=None,):
     checkpoint_dir = os.path.join(
         args.output_root, args.checkpoints_folder, args.run_id,
     )
-    if get_rank() == 0:
+    if get_global_rank() == 0:
         os.makedirs(logs_dir, exist_ok=True)
         os.makedirs(artifacts_dir, exist_ok=True)
     log_path, file_handler = setup_file_logging(artifacts_dir)
@@ -1737,7 +1738,7 @@ def main(args, use_hydra=False, ds_config=None,):
     )
 
     # ----- Write args.json and build manifest (rank 0 only) -----
-    if get_rank() == 0:
+    if get_global_rank() == 0:
         elapsed = datetime.now() - start_time
 
         # Save args.json

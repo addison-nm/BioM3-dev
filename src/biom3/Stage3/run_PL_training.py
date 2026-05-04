@@ -859,14 +859,8 @@ def str_to_bool(s):
 
 def nonestr_to_none(s):
     if isinstance(s, str):
-        if s.lower() == 'none':
-            return None
-        else:
-            return s
-    elif s is None:
-        return None
-    else:
-        raise ValueError("Input must be string or 'None'")
+        return None if s.lower() == 'none' else s
+    return s
 
 
 # === main functions ===
@@ -973,7 +967,7 @@ def retrieve_all_args(args):
     args.benchmark_all_ranks_memory = str_to_bool(args.benchmark_all_ranks_memory)
     args.benchmark_per_step = str_to_bool(args.benchmark_per_step)
     args.early_stopping_metric = nonestr_to_none(args.early_stopping_metric)
-    args.checkpoint_every_n_steps = nonestr_to_none(args.checkpoint_every_n_steps)  # TODO: BUG FIX ISSUE
+    args.checkpoint_every_n_steps = nonestr_to_none(args.checkpoint_every_n_steps)
     args.checkpoint_every_n_epochs = nonestr_to_none(args.checkpoint_every_n_epochs)
     args.artifact_sync_on_best = str_to_bool(args.artifact_sync_on_best)
 

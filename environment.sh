@@ -43,6 +43,12 @@ elif [[ "$_hostname" == x4* ]] || [[ "$_hostname" == aurora-uan* ]]; then
     # Avoid `AF_UNIX path too long` on Lightning DataLoader workers
     # (known-issues.md #7).
     export TMPDIR=/tmp
+    # Raise oneCCL's Level-Zero IPC-handle cache cap (default 1000). Long
+    # DeepSpeed runs churn through grad-bucket IPC handles; once the cache
+    # evicts, oneCCL can hit a Level-Zero `pidfd_getfd` failure mid-allreduce
+    # and crash the job ("Sender cache limit is reached" warning seen 8h into
+    # a 300-epoch finetune on 2026-05-04).
+    export CCL_ZE_CACHE_GET_IPC_HANDLES_THRESHOLD=16384
 
     echo "[environment.sh] Detected Aurora"
 

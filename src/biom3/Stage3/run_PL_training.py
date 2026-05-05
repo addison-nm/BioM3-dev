@@ -54,7 +54,6 @@ import io
 import json
 import shutil
 import contextlib
-import socket
 import logging
 import warnings
 import numpy as np
@@ -108,9 +107,11 @@ import biom3.Stage3.preprocess as prep
 import biom3.Stage3.cond_diff_transformer_layer as mod
 import biom3.Stage3.PL_wrapper as PL_mod
 from biom3.Stage3.io import prepare_model_ProteoScribe
+from biom3.core.dry_run import coerce_dry_run_output, run_dry_run
 from biom3.core.helpers import coerce_limit_batches, load_json_config
 from biom3.core.run_utils import (
-    backup_if_exists, setup_file_logging, teardown_file_logging, write_manifest,
+    backup_if_exists, collect_training_env, resolve_devices_per_node,
+    setup_file_logging, teardown_file_logging, write_manifest,
 )
 from biom3.backend.device import print_gpu_initialization, get_device
 from biom3.core.distributed import get_global_rank
@@ -342,6 +343,17 @@ def get_args(parser):
                         help='Write per-step wall-clock timing to '
                              'benchmark_steps.jsonl (rank 0 only)')
 
+    # Dry-run preview (no training executed)
+    parser.add_argument('--dry_run', default='False', type=str,
+                        help='Print effective config (with provenance), output '
+                             'paths, distributed/batch math, and an a-priori '
+                             'memory estimate, then exit without training.')
+    parser.add_argument('--dry_run_output', default='False', type=str,
+                        help="Where to write the JSON dry-run report. 'False' "
+                             "(default) prints to stdout only; 'True' writes "
+                             "to <artifacts_dir>/dry_run_report.json; any "
+                             "other string is treated as a filepath.")
+
     return parser
 
 
@@ -371,8 +383,11 @@ def get_model_args(parser):
             help='Choose optimizer for training')
     parser.add_argument('--acc_grad_batches', default=4, type=int,
             help='Choose how many gradient steps to accumulate')
-    parser.add_argument('--gpu_devices', default=1, type=int,
-            help='Number of gpus to used for training')
+    parser.add_argument('--devices_per_node', default=None, type=int,
+            help='Number of GPUs (CUDA) or tiles (XPU) per node. Default 1.')
+    parser.add_argument('--gpu_devices', default=None, type=int,
+            help='(deprecated, use --devices_per_node) preserved for '
+                 'backward compatibility with older configs and scripts.')
     parser.add_argument('--num_nodes', default=1, type=int,
             help='Number of nodes to used for training')
     def float_or_str(value):
@@ -971,6 +986,11 @@ def retrieve_all_args(args):
     args.checkpoint_every_n_epochs = nonestr_to_none(args.checkpoint_every_n_epochs)
     args.artifact_sync_on_best = str_to_bool(args.artifact_sync_on_best)
 
+    resolve_devices_per_node(args)
+
+    args.dry_run = str_to_bool(args.dry_run)
+    args.dry_run_output = coerce_dry_run_output(args.dry_run_output)
+
     return args
 
 
@@ -1035,19 +1055,19 @@ def load_model(
     Returns:
         A configured PyTorch Lightning model ready for training
     """
-    gpu_devices = args.gpu_devices
+    devices_per_node = args.devices_per_node
     acc_grad_batches = args.acc_grad_batches
     diffusion_steps = args.diffusion_steps
     image_size = args.image_size
     num_nodes = args.num_nodes
     batch_size = args.batch_size
 
-    args.traindata_len = len(data_module.train_dataloader()) // gpu_devices // acc_grad_batches
+    args.traindata_len = len(data_module.train_dataloader()) // devices_per_node // acc_grad_batches
     logger.info('Length of dataloader: %s', len(data_module.train_dataloader()))
-    logger.info('Numer of devices: %s', gpu_devices)
+    logger.info('Numer of devices: %s', devices_per_node)
     logger.info('Number of nodes: %s', num_nodes)
     logger.info('Batch size: %s', batch_size)
-    logger.info('Length of dataloader per device: %s', len(data_module.train_dataloader()) // gpu_devices)
+    logger.info('Length of dataloader per device: %s', len(data_module.train_dataloader()) // devices_per_node)
     logger.info('Length of a training epoch in batch gradient updates: %s', args.traindata_len)
     w, h = image_size, image_size
     # Ensure diffusion steps are sufficient for data dimensions
@@ -1208,34 +1228,6 @@ def freeze_except_last_n_blocks_and_layers(
     return PL_model
 
 
-_TRAINING_ENV_PREFIXES = (
-    "CUDA_", "NCCL_", "TORCH_", "DEEPSPEED_", "WANDB_",
-    "MASTER_", "WORLD_SIZE", "RANK", "LOCAL_RANK",
-    "SLURM_", "PBS_", "COBALT_", "PALS_", "PMI_", "OMPI_",
-    "OMP_NUM_THREADS", "MKL_NUM_THREADS",
-)
-
-_SENSITIVE_ENV_SUBSTRINGS = (
-    "KEY", "SECRET", "TOKEN", "PASSWORD", "CREDENTIAL", "AUTH",
-)
-
-
-def _collect_training_env():
-    """Collect environment variables relevant to distributed training and HPC.
-
-    Variables whose names contain sensitive substrings (API keys, tokens, etc.)
-    are excluded.
-    """
-    env = {"hostname": socket.gethostname()}
-    for key, val in sorted(os.environ.items()):
-        if key.startswith(_TRAINING_ENV_PREFIXES):
-            upper = key.upper()
-            if any(s in upper for s in _SENSITIVE_ENV_SUBSTRINGS):
-                continue
-            env[key] = val
-    return env
-
-
 ###########################
 ##  Training Entrypoint  ##
 ###########################
@@ -1283,7 +1275,7 @@ def train_model(
         logger.info("Clamped log_every_n_steps to %d (number of training batches)",
                      log_every_n_steps)
     training_strategy = args.training_strategy
-    gpu_devices = args.gpu_devices
+    devices_per_node = args.devices_per_node
     num_nodes = args.num_nodes
     acc_grad_batches = args.acc_grad_batches
     epochs = args.epochs
@@ -1303,9 +1295,9 @@ def train_model(
 
     # Scale the learning rate with number of total devices
     if args.scale_learning_rate:
-        n = num_nodes * gpu_devices
+        n = num_nodes * devices_per_node
         logger.info("Scaling learning rate with effective batch size: "
-                     "num_nodes x gpu_devices = %s x %s = %s", num_nodes, gpu_devices, n)
+                     "num_nodes x devices_per_node = %s x %s = %s", num_nodes, devices_per_node, n)
         args.lr = args.lr * n
     logger.info("Effective learning rate: %s", args.lr)
     
@@ -1426,7 +1418,7 @@ def train_model(
             output_dir=artifacts_dir,
             batch_size=args.batch_size,
             acc_grad_batches=acc_grad_batches,
-            gpu_devices=gpu_devices,
+            devices_per_node=devices_per_node,
             num_nodes=num_nodes,
             precision=precision,
             training_strategy=training_strategy,
@@ -1517,7 +1509,7 @@ def train_model(
         'enable_progress_bar': True,
         'enable_model_summary': True,
         'enable_checkpointing': True,
-        'devices': gpu_devices,
+        'devices': devices_per_node,
         'num_nodes': num_nodes,
         'accelerator': args.device,
         # DeepSpeed Stage 2 is the production default — historical configuration
@@ -1618,6 +1610,15 @@ def main(args, use_hydra=False, ds_config=None,):
     warnings.filterwarnings("ignore", message=".*isinstance.*treespec.*")
     warnings.filterwarnings("ignore", message=".*TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD.*")
     logging.getLogger("tensorboardX.x2num").setLevel(logging.ERROR)
+
+    # ----- Dry-run preview (no training executed) -----
+    if getattr(args, 'dry_run', False):
+        return run_dry_run(
+            args,
+            stage="stage3",
+            dataset_probe=lambda: _stage3_dataset_probe(args),
+            model_probe=lambda: _stage3_model_probe(args),
+        )
 
     # ----- Set up output directories and file logging -----
     run_dir = os.path.join(args.output_root, args.runs_folder, args.run_id)
@@ -1754,7 +1755,7 @@ def main(args, use_hydra=False, ds_config=None,):
             "batch_size": args.batch_size,
             "effective_lr": args.lr,
             "precision": args.precision,
-            "gpu_devices": args.gpu_devices,
+            "devices_per_node": args.devices_per_node,
             "num_nodes": args.num_nodes,
             "acc_grad_batches": args.acc_grad_batches,
             "deepspeed_stage": "2",
@@ -1796,12 +1797,42 @@ def main(args, use_hydra=False, ds_config=None,):
             args, artifacts_dir, start_time, elapsed,
             outputs=outputs,
             resolved_paths=resolved_paths,
-            environment=_collect_training_env(),
+            environment=collect_training_env(),
         )
         logger.info("Build manifest written to %s", manifest_path)
 
     # ----- Clean up -----
     teardown_file_logging("biom3", file_handler)
+
+
+def _stage3_dataset_probe(args):
+    """CPU-only data-module probe for the dry-run report.
+
+    Returns ``(train_len, val_len, sample_batch)``. Failures are
+    surfaced as exceptions and rendered as notes in the report.
+    """
+    data_module = load_data(
+        args=args,
+        primary_data_path=args.primary_data_path,
+        secondary_data_paths=args.secondary_data_paths,
+        facilitator=args.facilitator,
+    )
+    train_dl = data_module.train_dataloader()
+    val_dl = data_module.val_dataloader()
+    train_len = len(train_dl.dataset) if hasattr(train_dl.dataset, '__len__') else None
+    val_len = len(val_dl.dataset) if hasattr(val_dl.dataset, '__len__') else None
+    sample = next(iter(train_dl), None)
+    return train_len, val_len, sample
+
+
+def _stage3_model_probe(args):
+    """CPU-only model probe for the dry-run report."""
+    args.device = 'cpu'
+    return mod.get_model(
+        args=args,
+        data_shape=(args.image_size, args.image_size),
+        num_classes=args.num_classes,
+    )
 
 
 def parse_arguments(args):
@@ -1810,4 +1841,4 @@ def parse_arguments(args):
 
 if __name__ == '__main__':
     args = parse_arguments(sys.argv[1:])
-    main(args)    
+    main(args)

@@ -25,7 +25,8 @@ def _resolve_config_paths(paths: list[str], base_dir: str) -> list[str]:
     return resolved
 
 
-def load_json_config(json_path: str, _visited=None) -> dict:
+def load_json_config(json_path: str, _visited=None, *,
+                     track_provenance: bool = False):
     """Load JSON configuration with optional config composition.
 
     Two special keys control composition:
@@ -44,6 +45,10 @@ def load_json_config(json_path: str, _visited=None) -> dict:
     Paths are resolved relative to the directory containing the JSON file.
     Both keys are removed from the returned dict.  Circular references
     raise ``ValueError``.
+
+    When ``track_provenance=True`` returns a tuple ``(merged, provenance)``
+    where ``provenance[key]`` is the absolute path of the file that
+    supplied that key's final value.
     """
     if _visited is None:
         _visited = set()
@@ -60,20 +65,31 @@ def load_json_config(json_path: str, _visited=None) -> dict:
     base_configs_list = config.pop("_base_configs", None)
     overwrite_configs_list = config.pop("_overwrite_configs", None)
 
-    # Start from bases (earlier < later)
     merged: dict = {}
+    provenance: dict = {}
+
     if base_configs_list:
         for bp in _resolve_config_paths(base_configs_list, base_dir):
-            merged.update(load_json_config(bp, _visited=_visited))
+            sub_merged, sub_prov = load_json_config(
+                bp, _visited=_visited, track_provenance=True,
+            )
+            merged.update(sub_merged)
+            provenance.update(sub_prov)
 
-    # Current file overrides bases
     merged.update(config)
+    for k in config:
+        provenance[k] = real_path
 
-    # Overwrite configs override current file (earlier < later)
     if overwrite_configs_list:
         for op in _resolve_config_paths(overwrite_configs_list, base_dir):
-            merged.update(load_json_config(op, _visited=_visited))
+            sub_merged, sub_prov = load_json_config(
+                op, _visited=_visited, track_provenance=True,
+            )
+            merged.update(sub_merged)
+            provenance.update(sub_prov)
 
+    if track_provenance:
+        return merged, provenance
     return merged
 
 

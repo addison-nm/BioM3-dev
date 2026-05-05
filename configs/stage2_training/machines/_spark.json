@@ -1,4 +1,4 @@
 {
   "device": "cuda",
-  "gpu_devices": 1
+  "devices_per_node": 1
 }

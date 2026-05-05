@@ -212,7 +212,7 @@ The argparser declares ~50 flags. Highlights below; run `biom3_train_stage1 --he
 | `--pfam_data_path` | str | `'None'` | Path to Pfam CSV (required when `dataset_type=pfam`). |
 | `--dataset_type` | str | `default` | One of `default`, `masked`, `pfam`, `pfam_ablated`. |
 | `--device` | str | `cuda` | One of `cuda`, `xpu`, `cpu`. |
-| `--gpu_devices` | int | 1 | GPUs (CUDA) or tiles (XPU) per node. |
+| `--devices_per_node` | int | 1 | GPUs (CUDA) or tiles (XPU) per node. (Deprecated alias: `--gpu_devices` — still accepted, emits a warning.) |
 | `--num_nodes` | int | 1 | Nodes participating in training. |
 | `--batch_size` | int | 8 | Per-device mini-batch size. |
 | `--epochs` | int | 20 | Training epochs. |
@@ -261,7 +261,7 @@ None positional.
 | `--output_swissprot_dict_path` | str | None | Where to save Stage 2 SwissProt embeddings dict. |
 | `--output_pfam_dict_path` | str | None | Where to save Stage 2 Pfam embeddings dict. |
 | `--device` | str | `cuda` | One of `cuda`, `xpu`, `cpu`. |
-| `--gpu_devices` | int | 1 | GPUs/tiles per node. |
+| `--devices_per_node` | int | 1 | GPUs/tiles per node. (Deprecated alias: `--gpu_devices`.) |
 | `--num_nodes` | int | 1 | Nodes. |
 | `--batch_size` | int | 32 | Per-device batch size. |
 | `--epochs` | int | 20 | Training epochs. |
@@ -306,7 +306,7 @@ The argparser is the largest in the project (70+ flags across `get_args`, `get_m
 | `--scale_learning_rate` | str | `'True'` | Scale LR by world size. |
 | `--precision` | str | `no` | One of `no`, `fp16`, `bf16`, `32`. |
 | `--device` | str | `cuda` | One of `cpu`, `cuda`, `xpu`. |
-| `--gpu_devices` | int | 1 | GPUs/tiles per node. |
+| `--devices_per_node` | int | 1 | GPUs/tiles per node. (Deprecated alias: `--gpu_devices`.) |
 | `--num_nodes` | int | 1 | Nodes. |
 | `--resume_from_checkpoint` | str | `'None'` | Path to a Lightning `.ckpt` to resume from. |
 | `--pretrained_weights` | str | `'None'` | Path to raw weights to load before training. |
@@ -346,6 +346,36 @@ biom3_train_stage3 \
 ```
 
 See [stage3_training.md](stage3_training.md) for resumption, secondary-data continuation, and per-machine submission examples.
+
+---
+
+## Pre-flight dry-run (`--dry_run`)
+
+All three training entrypoints (`biom3_train_stage{1,2,3}`) accept a `--dry_run` flag that parses everything (CLI + `--config_path` JSON + `_base_configs`/`_overwrite_configs` composition + argparse defaults), prints a side-effect-free pre-flight report, and exits without training.
+
+The report has four sections:
+
+1. **Effective configuration** — every arg with its source: `CLI`, `JSON: <path>` (the specific file in the composition chain), or `default`.
+2. **Output paths the run would create** — `run_dir`, `logs_dir`, `artifacts_dir`, `checkpoint_dir`, `args.json`, `build_manifest.json`, `run.log` (resolved to absolute paths; nothing is created on disk).
+3. **Distributed / batch math** — `num_nodes`, `devices_per_node`, `world_size`, `micro_batch_size`, `acc_grad_batches`, `effective_batch_size`, `train_dataset_len`, `val_dataset_len`, `batches_per_epoch_per_rank`, `steps_per_epoch`, plus stage-relevant fields (`epochs` or `max_steps`/`val_check_interval`).
+4. **Memory estimate** — strategy-aware: full-replication (`ddp` / `single_device`) or DeepSpeed ZeRO-2 sharded (Stage 3 default). Reports `total_params`, `per_rank_param_gb`, `per_rank_grad_gb`, `per_rank_optimizer_gb`, and the `per_minibatch_input_gb` for one micro-batch on device. Activation memory is **not** included (requires a forward pass).
+
+| Flag | Type | Description |
+|---|---|---|
+| `--dry_run True\|False` | str-bool | Enable the dry-run preview. Default `False`. |
+| `--dry_run_output False\|True\|<path>` | str | Where to write `dry_run_report.json`. `False` (default): stdout only. `True`: write to `<artifacts_dir>/dry_run_report.json`. Any other string: treated as a filepath. |
+
+```bash
+# stdout only
+biom3_train_stage3 --config_path configs/stage3_training/pretrain_scratch_v2.json \
+    --run_id smoke_001 --dry_run True
+
+# also persist the JSON report alongside the run's artifacts
+biom3_train_stage3 ... --dry_run True --dry_run_output True
+
+# write to an arbitrary path
+biom3_train_stage3 ... --dry_run True --dry_run_output ./preflight.json
+```
 
 ---
 

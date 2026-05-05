@@ -136,13 +136,13 @@ configs/stage3_training/
   "_overwrite_configs": ["./machines/_polaris.json"],
 
   "device": "cpu",
-  "gpu_devices": 1,
+  "devices_per_node": 1,
   "lr": 1e-4,
   ...
 }
 ```
 
-Here `device` and `gpu_devices` in the file body serve as local-testing defaults, but the Polaris machine config overrides them with `cuda` / `4`. CLI args still win over everything.
+Here `device` and `devices_per_node` in the file body serve as local-testing defaults, but the Polaris machine config overrides them with `cuda` / `4`. CLI args still win over everything.
 
 ### Choosing `limit_val_batches` and `limit_train_batches`
 
@@ -175,7 +175,7 @@ The primary config example is `configs/stage3_training/pretrain_scratch_v2.json`
 | `max_steps` | `100000` | Max training steps (used in `combine` mode) |
 | `batch_size` | `16` | Mini-batch size per device |
 | `lr` | `3e-4` | Base learning rate |
-| `scale_learning_rate` | `true` | Multiply LR by `num_nodes * gpu_devices` |
+| `scale_learning_rate` | `true` | Multiply LR by `num_nodes * devices_per_node` |
 | `scheduler_gamma` | `null` | LR scheduler (`"coswarmup"` or a float gamma for StepLR) |
 | `warmup_steps` | `500` | LR warmup steps (for cosine warmup scheduler) |
 | `weight_decay` | `1e-6` | AdamW weight decay |

@@ -43,7 +43,7 @@
 
   "device": "cuda",
   "precision": "bf16",
-  "gpu_devices": 4,
+  "devices_per_node": 4,
   "num_nodes": 1,
   "acc_grad_batches": 1,
 

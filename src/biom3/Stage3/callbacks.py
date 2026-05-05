@@ -377,7 +377,7 @@ class TrainingBenchmarkCallback(pl.Callback):
         Per-device micro-batch size.
     acc_grad_batches : int
         Gradient accumulation steps.
-    gpu_devices : int
+    devices_per_node : int
         Number of GPU devices per node.
     num_nodes : int
         Number of nodes.
@@ -403,7 +403,7 @@ class TrainingBenchmarkCallback(pl.Callback):
     STEP_JSONL = "benchmark_steps.jsonl"
 
     def __init__(self, output_dir, *, batch_size, acc_grad_batches,
-                 gpu_devices, num_nodes, precision="32",
+                 devices_per_node, num_nodes, precision="32",
                  training_strategy="primary_only", num_workers=0,
                  skip_first_epoch=True, all_ranks_memory=False,
                  per_step=False):
@@ -411,10 +411,10 @@ class TrainingBenchmarkCallback(pl.Callback):
         self.output_dir = output_dir
         self.batch_size = batch_size
         self.acc_grad_batches = acc_grad_batches
-        self.gpu_devices = gpu_devices
+        self.devices_per_node = devices_per_node
         self.num_nodes = num_nodes
         self.effective_batch_size = (
-            batch_size * acc_grad_batches * gpu_devices * num_nodes
+            batch_size * acc_grad_batches * devices_per_node * num_nodes
         )
         self.precision = precision
         self.training_strategy = training_strategy
@@ -686,7 +686,7 @@ class TrainingBenchmarkCallback(pl.Callback):
             "config": {
                 "batch_size": self.batch_size,
                 "acc_grad_batches": self.acc_grad_batches,
-                "gpu_devices": self.gpu_devices,
+                "devices_per_node": self.devices_per_node,
                 "num_nodes": self.num_nodes,
                 "effective_batch_size": self.effective_batch_size,
                 "num_workers": self.num_workers,

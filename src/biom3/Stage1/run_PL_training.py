@@ -331,7 +331,9 @@ def retrieve_all_args(args):
         json_config = load_json_config(pre_args.config_path)
         parser.set_defaults(**json_config)
 
+    argv = list(args)
     args = parser.parse_args(args)
+    args._argv = argv  # consumed by core.dry_run for CLI provenance attribution
 
     # Type conversions (idempotent)
     args.pretrained_seq = str_to_bool(args.pretrained_seq)
@@ -701,7 +703,8 @@ def main(args):
         args_path = os.path.join(artifacts_dir, "args.json")
         backup_if_exists(args_path)
         with open(args_path, "w") as f:
-            json.dump(vars(args), f, indent=2, default=str)
+            json.dump({k: v for k, v in vars(args).items() if not k.startswith("_")},
+                      f, indent=2, default=str)
         logger.info("Args written to %s", args_path)
 
         total_params = sum(p.numel() for p in PL_model.model.parameters())

@@ -211,7 +211,14 @@ def get_args(parser):
     
     parser.add_argument('--scale_learning_rate', default='True', type=str,
                         help='scale the specified learning rate by the number of devices')
-    
+
+    parser.add_argument('--distributed_strategy', default='deepspeed_zero2', type=str,
+                        choices=['deepspeed_zero2', 'ddp'],
+                        help='Lightning trainer strategy. deepspeed_zero2 (default): '
+                             'DeepSpeed ZeRO Stage 2 with CPU offload. ddp: plain DDP '
+                             'with static_graph=True. Distinct from --training_strategy '
+                             '(which selects primary_only vs combine *data* mixing).')
+
     # Finetuning
     parser.add_argument('--finetune', default='False', type=str,
                         help='flag to run finetuning')
@@ -939,7 +946,9 @@ def retrieve_all_args(args):
         json_config = load_json_config(pre_args.config_path)
         parser.set_defaults(**json_config)
 
+    argv = list(args)
     args = parser.parse_args(args)
+    args._argv = argv  # consumed by core.dry_run for CLI provenance attribution
 
     # Type conversions (idempotent — pass through values already of the target type)
     args.resume_from_checkpoint = nonestr_to_none(args.resume_from_checkpoint)
@@ -1505,6 +1514,17 @@ def train_model(
         static_graph=True,
         gradient_as_bucket_view=True,
     )
+    # Strategy is selected by --distributed_strategy. DeepSpeed Stage 2 is
+    # the production default; 'ddp' selects plain DDP with static_graph=True.
+    # save_model handles both the sharded ZeRO checkpoint dir and the
+    # single-file DDP .ckpt via the os.path.isdir() guard in
+    # _convert_or_copy_checkpoint.
+    if args.distributed_strategy == 'ddp':
+        strategy = ddp_strategy
+    else:
+        strategy = deepspeed_strategy
+    logger.info("Using distributed_strategy=%s", args.distributed_strategy)
+
     trainer_params = {
         'enable_progress_bar': True,
         'enable_model_summary': True,
@@ -1512,12 +1532,7 @@ def train_model(
         'devices': devices_per_node,
         'num_nodes': num_nodes,
         'accelerator': args.device,
-        # DeepSpeed Stage 2 is the production default — historical configuration
-        # used by the test suite and prior runs. Swap to ddp_strategy for plain
-        # DDP (verified equivalent under the DistributedSampler(drop_last=True)
-        # fix, but writes a single-file .ckpt rather than a sharded ZeRO dir,
-        # which currently breaks save_model's convert_zero_checkpoint call).
-        'strategy': deepspeed_strategy,
+        'strategy': strategy,
         # We construct DistributedSampler(drop_last=True) ourselves in
         # PL_wrapper.{train,val}_dataloader so every rank gets exactly the
         # same number of samples; see PL_wrapper._make_distributed_sampler.
@@ -1740,7 +1755,8 @@ def main(args, use_hydra=False, ds_config=None,):
         args_path = os.path.join(artifacts_dir, "args.json")
         backup_if_exists(args_path)
         with open(args_path, "w") as f:
-            json.dump(vars(args), f, indent=2, default=str)
+            json.dump({k: v for k, v in vars(args).items() if not k.startswith("_")},
+                      f, indent=2, default=str)
         logger.info("Args written to %s", args_path)
 
         total_params = sum(p.numel() for p in PL_model.model.parameters())
@@ -1758,8 +1774,10 @@ def main(args, use_hydra=False, ds_config=None,):
             "devices_per_node": args.devices_per_node,
             "num_nodes": args.num_nodes,
             "acc_grad_batches": args.acc_grad_batches,
-            "deepspeed_stage": "2",
+            "distributed_strategy": args.distributed_strategy,
         }
+        if args.distributed_strategy == "deepspeed_zero2":
+            outputs["deepspeed_stage"] = "2"
         outputs["training_strategy"] = args.training_strategy
         if args.training_strategy == 'combine':
             outputs["max_steps"] = args.max_steps

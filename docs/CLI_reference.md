@@ -308,6 +308,7 @@ The argparser is the largest in the project (70+ flags across `get_args`, `get_m
 | `--device` | str | `cuda` | One of `cpu`, `cuda`, `xpu`. |
 | `--devices_per_node` | int | 1 | GPUs/tiles per node. (Deprecated alias: `--gpu_devices`.) |
 | `--num_nodes` | int | 1 | Nodes. |
+| `--distributed_strategy` | str | `deepspeed_zero2` | One of `deepspeed_zero2` (DeepSpeed ZeRO-2 + CPU offload, sharded checkpoint dir) or `ddp` (plain DDP with `static_graph=True`, single-file checkpoint). Distinct from `--training_strategy` which selects `primary_only` vs `combine` *data* mixing. |
 | `--resume_from_checkpoint` | str | `'None'` | Path to a Lightning `.ckpt` to resume from. |
 | `--pretrained_weights` | str | `'None'` | Path to raw weights to load before training. |
 | `--finetune` | str | `'False'` | `'True'`/`'False'`. Enable finetuning mode. |

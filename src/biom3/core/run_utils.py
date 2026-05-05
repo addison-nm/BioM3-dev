@@ -224,7 +224,7 @@ def write_manifest(args, outdir, start_time, elapsed,
         "timestamp": start_time.isoformat(),
         "elapsed_seconds": elapsed.total_seconds(),
         "command": " ".join(sys.argv),
-        "args": {k: v for k, v in vars(args).items()},
+        "args": {k: v for k, v in vars(args).items() if not k.startswith("_")},
         "python_version": sys.version,
     }
     if resolved_paths is not None:

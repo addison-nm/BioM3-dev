@@ -97,7 +97,7 @@ def build_args_table(
       - ``"JSON: <abs path>"``
       - ``"default"``
     """
-    dest_names = list(vars(args).keys())
+    dest_names = [k for k in vars(args) if not k.startswith("_")]
     cli_keys = detect_cli_keys(dest_names, argv)
     if config_path:
         try:
@@ -112,6 +112,8 @@ def build_args_table(
 
     rows = []
     for k, v in sorted(vars(args).items()):
+        if k.startswith("_"):
+            continue
         if k in cli_keys:
             src = "CLI"
         elif k in json_provenance:
@@ -200,7 +202,7 @@ def infer_strategy(args, stage: str) -> str:
     Returns one of: ``'ddp'``, ``'single_device'``, ``'deepspeed_zero2'``.
     """
     if stage == "stage3":
-        return "deepspeed_zero2"
+        return getattr(args, "distributed_strategy", None) or "deepspeed_zero2"
     device = getattr(args, "device", "cpu")
     devices_per_node = int(getattr(args, "devices_per_node", 1) or 1)
     num_nodes = int(getattr(args, "num_nodes", 1) or 1)
@@ -425,7 +427,11 @@ def run_dry_run(
     may be None (the corresponding sections degrade gracefully).
     """
     if argv is None:
-        argv = sys.argv[1:]
+        # Prefer argv stashed on args by retrieve_all_args; fall back to
+        # sys.argv when invoked via the binary entrypoint without stashing.
+        argv = getattr(args, "_argv", None)
+        if argv is None:
+            argv = sys.argv[1:]
 
     result = DryRunResult()
     result._stage = stage  # type: ignore[attr-defined]

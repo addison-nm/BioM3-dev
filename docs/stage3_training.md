@@ -193,6 +193,19 @@ The primary config example is `configs/stage3_training/pretrain_scratch_v2.json`
 
 ---
 
+## Distributed strategy
+
+Stage 3's Lightning trainer strategy is chosen via `--distributed_strategy`:
+
+- `deepspeed_zero2` (default): DeepSpeed ZeRO Stage 2 with CPU offload of optimizer states and parameters. Memory-efficient for large models — optimizer states are sharded across the world size, gradients are sharded, params stay replicated. Writes a sharded checkpoint *directory* (one file per shard) which `save_model` automatically converts to a single fp32 `state_dict.pth` at the end of training.
+- `ddp`: plain DDP with `static_graph=True` and `gradient_as_bucket_view=True`. Full replication — every rank holds full params, grads, and optimizer state. Lower comm overhead per step but higher per-rank memory. Writes a single-file `last.ckpt` which `save_model` materializes into `state_dict.pth` via a copy (no ZeRO conversion needed).
+
+Pick `ddp` when (a) the model is small enough that ZeRO-2's CPU offload latency is the bottleneck, (b) you're chasing an Aurora/xccl hang and want plain-DDP semantics for triage, or (c) downstream tooling needs a single-file `.ckpt`.
+
+Both strategies produce identical `state_dict.best.pth` artifacts in `artifacts_dir`, so downstream sampling and evaluation paths are unaffected by the choice.
+
+This flag is distinct from `--training_strategy`, which selects `primary_only` vs `combine` data mixing.
+
 ## Per-Machine Instructions
 
 Each machine has a job template in `jobs/` that sets machine-specific constants (device count, modules, filesystem mounts) and delegates to the shared training scripts in `scripts/`. The templates construct a `run_id` automatically from the config name, node count, device count, epoch count, and a timestamp.

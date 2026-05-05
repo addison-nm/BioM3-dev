@@ -147,9 +147,22 @@ def test_batch_footprint_bytes_handles_none():
 
 # ---------- infer_strategy ----------
 
-def test_infer_strategy_stage3_is_zero2():
+def test_infer_strategy_stage3_default_is_zero2():
     args = SimpleNamespace(device="cuda", devices_per_node=1, num_nodes=1)
+    # No distributed_strategy attr → falls back to deepspeed_zero2
     assert infer_strategy(args, "stage3") == "deepspeed_zero2"
+
+
+def test_infer_strategy_stage3_explicit_zero2():
+    args = SimpleNamespace(device="cuda", devices_per_node=1, num_nodes=1,
+                           distributed_strategy="deepspeed_zero2")
+    assert infer_strategy(args, "stage3") == "deepspeed_zero2"
+
+
+def test_infer_strategy_stage3_ddp():
+    args = SimpleNamespace(device="cuda", devices_per_node=1, num_nodes=1,
+                           distributed_strategy="ddp")
+    assert infer_strategy(args, "stage3") == "ddp"
 
 
 def test_infer_strategy_stage1_multi_gpu_is_ddp():

@@ -80,6 +80,33 @@ def test_dry_run_stage3_writes_to_artifacts(tmp_path):
     assert data["memory_estimate"]["strategy"] == "deepspeed_zero2"
 
 
+def test_dry_run_stage3_distributed_strategy_ddp(tmp_path):
+    """Selecting --distributed_strategy ddp flips the report's strategy
+    field and the per-rank memory math to full replication (no
+    world_size sharding for optimizer states)."""
+    argv = _stage3_argv() + [
+        "--dry_run", "True",
+        "--dry_run_output", "True",
+        "--distributed_strategy", "ddp",
+        "--devices_per_node", "4",
+        "--num_nodes", "2",
+        "--output_root", str(tmp_path / "outputs"),
+        "--run_id", "stage3_dryrun_ddp",
+    ]
+    args = parse_arguments(argv)
+    rc = main(args)
+    assert rc == 0
+    report = tmp_path / "outputs" / "runs" / "stage3_dryrun_ddp" \
+        / "artifacts" / "dry_run_report.json"
+    data = json.loads(report.read_text())
+    mem = data["memory_estimate"]
+    assert mem["strategy"] == "ddp"
+    # DDP: optimizer state is replicated, not sharded across world_size=8.
+    assert mem["per_rank_optimizer_gb"] == pytest.approx(
+        (mem["total_params"] * 8) / (1024 ** 3)
+    )
+
+
 def test_dry_run_stage3_writes_to_custom_path(tmp_path):
     custom = tmp_path / "preflight.json"
     argv = _stage3_argv() + [

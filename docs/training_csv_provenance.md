@@ -23,7 +23,7 @@ entries without any `DR Pfam;` cross-reference and stamps their `pfam_label`
 as `['nan']` for legacy parity. Pass `--require_pfam` to filter them out
 (~31K entries removed).
 
-### Column mapping (4 columns)
+### Column mapping (5 columns)
 
 | CSV Column | Source | Derivation |
 |---|---|---|
@@ -31,14 +31,32 @@ as `['nan']` for legacy parity. Pass `--require_pfam` to filter them out
 | `protein_sequence` | `SQ` block in `.dat` | Full amino acid sequence (whitespace stripped) |
 | `pfam_label` | `DR   Pfam;` lines in `.dat` | All Pfam accessions as a stringified Python list (e.g., `"['PF13676']"`). Entries with no `DR Pfam;` lines get `"['nan']"` unless filtered via `--require_pfam`. |
 | `[final]text_caption` | `DE`, `CC`, `DR GO`, `OC`/`OX` lines + Pfam metadata | Composed by `biom3.dbio.caption.compose_row_caption` using `SWISSPROT_SPEC` (ALL-CAPS labels, PubMed + `{ECO:…}` tags stripped) |
+| `annot_ec_numbers` | `DE   … EC=N.N.N.N` lines and `CC -!- CATALYTIC ACTIVITY` EC xrefs in `.dat` | Stringified Python list of EC numbers (deduplicated, e.g., `"['3.1.1.74']"`) extracted by `_extract_ec_numbers_from_lines` in `swissprot_dat.py`. Empty list when no EC numbers are present. |
+
+**Note:** `annot_ec_numbers` is **not** present in the legacy
+`fully_annotated_swiss_prot.csv` (which had 6 columns: 4 above plus the two
+intermediate caption variants below). It was added in 2026-04-18 to feed the
+ExPASy/BRENDA EC-based enrichment joins natively without re-parsing the
+`.dat` file. The legacy CSV's `annot_catalytic_activity` field preserved
+reaction prose but stripped the EC xrefs, so this column closes that gap.
+
+Pass `--no_emit_ec_numbers` to drop the column for byte-compatibility with
+the legacy 4/6-column schema. Default is `--emit_ec_numbers` (column on);
+the flag pair is mutually exclusive. With the column dropped, ExPASy/BRENDA
+enrichment joins fall back to caption-text EC extraction and typically hit
+at 0% (since `annot_catalytic_activity` strips EC xrefs in this builder's
+output, just as the legacy CSV did).
 
 Legacy distributions of this CSV also shipped with intermediate `text_caption`
 (raw, with `(PubMed:…)` refs and `{ECO:…}` tags) and `[clean]text_caption`
 (evidence-stripped) columns showing progressive cleanup. By default the
 in-package builder emits only `[final]text_caption` — the cleaning is applied
 directly by `CaptionSpec` and the intermediate strings are not persisted. Pass
-`--keep_intermediate_captions` to recover the legacy 6-column schema
-(`text_caption` / `[clean]text_caption` / `[final]text_caption`).
+`--keep_intermediate_captions` to recover the legacy intermediate caption
+columns; combined with `annot_ec_numbers`, this produces a 7-column schema
+(`text_caption` / `[clean]text_caption` / `[final]text_caption` plus
+`annot_ec_numbers`), one column wider than the original legacy 6-column
+layout.
 
 ### Caption field sources
 
@@ -132,12 +150,12 @@ the `biom3_build_source_*` CLIs:
 biom3_build_source_swissprot \
     --dat data/databases/swissprot/uniprot_sprot.dat.gz \
     --pfam_metadata data/databases/pfam/Pfam-A.full.gz \
-    -o data/datasets/fully_annotated_swiss_prot.csv
+    -o demos/outputs/source_datasets/fully_annotated_swiss_prot.csv
 
 biom3_build_source_pfam \
     --fasta data/databases/pfam/Pfam-A.fasta.gz \
     --pfam_metadata data/databases/pfam/Pfam-A.full.gz \
-    -o data/datasets/Pfam_protein_text_dataset.csv
+    -o demos/outputs/source_datasets/Pfam_protein_text_dataset.csv
 ```
 
 Caption formatting for either CSV is controlled by a `CaptionSpec`
@@ -145,3 +163,17 @@ Caption formatting for either CSV is controlled by a `CaptionSpec`
 [building_datasets_with_dbio.md](building_datasets_with_dbio.md#rebuilding-the-source-csvs-from-raw-databases)
 for details and [demos/custom_caption_format.py](../demos/custom_caption_format.py)
 for overriding the defaults.
+
+### Note on Pfam scope
+
+`biom3_build_source_pfam` parses `Pfam-A.fasta.gz`, which Pfam ships as a
+**90% non-redundant** FASTA scoped to UniProt Reference Proteomes (since
+release 37.1). PF00018 (SH3) yields 26,468 rows in Pfam 38.1 — that is the
+complete figure for this release, not a builder bug. For full reference-proteome
+coverage of selected families (e.g., 176,301 rows for PF00018) use
+[`biom3_build_annotated_pfam_subsets`](../src/biom3/dbio/build_annotated_pfam_subsets.py),
+which streams `Pfam-A.full.gz` directly and emits an 11-column CSV with
+`family_type` / `family_clan` / `family_wikipedia` / `family_references`
+side fields. See
+[building_datasets_with_dbio.md](building_datasets_with_dbio.md) for the
+full table comparing the two builders.

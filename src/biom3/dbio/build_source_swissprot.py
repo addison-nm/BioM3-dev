@@ -77,6 +77,22 @@ OUTPUT_COLUMNS_WITH_INTERMEDIATES = [
     "annot_ec_numbers",
 ]
 
+OUTPUT_COLUMNS_LEGACY = [
+    "primary_Accession",
+    "protein_sequence",
+    "[final]text_caption",
+    "pfam_label",
+]
+
+OUTPUT_COLUMNS_WITH_INTERMEDIATES_LEGACY = [
+    "primary_Accession",
+    "protein_sequence",
+    "text_caption",
+    "[clean]text_caption",
+    "[final]text_caption",
+    "pfam_label",
+]
+
 
 def _format_pfam_label(pfam_ids, require_pfam=False):
     """Format Pfam IDs as a Python list string like the original CSV.
@@ -105,7 +121,8 @@ def _read_release_version(filepath, pattern):
 def build_swissprot_csv(dat_path, pfam_metadata, output_path,
                         caption_spec=None, taxonomy_tree=None,
                         taxonomy_ranks=None, chunk_size=10_000,
-                        require_pfam=False, keep_intermediate_captions=False):
+                        require_pfam=False, keep_intermediate_captions=False,
+                        emit_ec_numbers=True):
     """Build fully_annotated_swiss_prot.csv from raw Swiss-Prot .dat file.
 
     Args:
@@ -128,6 +145,11 @@ def build_swissprot_csv(dat_path, pfam_metadata, output_path,
             (raw, with PubMed refs and ECO tags intact) and
             ``[clean]text_caption`` (ECO tags stripped, PubMed refs kept)
             columns alongside ``[final]text_caption``. Default: False.
+        emit_ec_numbers: if True (default), append the structured
+            ``annot_ec_numbers`` column. Pass ``emit_ec_numbers=False`` to
+            produce a CSV byte-compatible with the legacy 4/6-column schema
+            (no EC column); enrichment joins keyed on EC numbers will then
+            fall back to caption-text extraction and typically hit at 0%.
 
     Returns:
         int: number of rows written.
@@ -138,11 +160,17 @@ def build_swissprot_csv(dat_path, pfam_metadata, output_path,
     if keep_intermediate_captions:
         raw_spec = replace(caption_spec, strip_pubmed=False, strip_evidence=False)
         clean_spec = replace(caption_spec, strip_pubmed=False, strip_evidence=True)
-        output_columns = OUTPUT_COLUMNS_WITH_INTERMEDIATES
+        if emit_ec_numbers:
+            output_columns = OUTPUT_COLUMNS_WITH_INTERMEDIATES
+        else:
+            output_columns = OUTPUT_COLUMNS_WITH_INTERMEDIATES_LEGACY
     else:
         raw_spec = None
         clean_spec = None
-        output_columns = OUTPUT_COLUMNS
+        if emit_ec_numbers:
+            output_columns = OUTPUT_COLUMNS
+        else:
+            output_columns = OUTPUT_COLUMNS_LEGACY
 
     annotation_fields = [field for (_, field) in caption_spec.fields]
     stats_builder = IncrementalStatsBuilder(
@@ -192,7 +220,7 @@ def build_swissprot_csv(dat_path, pfam_metadata, output_path,
                 annotations, caption_spec, pfam_family_names=family_names,
             )
 
-            ec_numbers = annotations.get("annot_ec_numbers", "")
+            ec_numbers = annotations.get("annot_ec_numbers", "") if emit_ec_numbers else None
 
             if keep_intermediate_captions:
                 raw_caption = compose_row_caption(
@@ -208,16 +236,18 @@ def build_swissprot_csv(dat_path, pfam_metadata, output_path,
                     clean_caption,
                     final_caption,
                     _format_pfam_label(pfam_ids, require_pfam=require_pfam),
-                    ec_numbers,
                 ]
+                if emit_ec_numbers:
+                    row.append(ec_numbers)
             else:
                 row = [
                     accession,
                     entry["sequence"],
                     final_caption,
                     _format_pfam_label(pfam_ids, require_pfam=require_pfam),
-                    ec_numbers,
                 ]
+                if emit_ec_numbers:
+                    row.append(ec_numbers)
 
             stats_builder.update({
                 "sequence": entry["sequence"],
@@ -302,6 +332,22 @@ def parse_arguments(args):
              "(evidence-stripped only) columns alongside [final]text_caption "
              "for auditing the PubMed/ECO stripping passes.",
     )
+
+    ec_group = parser.add_mutually_exclusive_group()
+    ec_group.add_argument(
+        "--emit_ec_numbers", dest="emit_ec_numbers", action="store_true",
+        help="Append the structured annot_ec_numbers column (default). "
+             "Required for ExPASy/BRENDA EC-based enrichment joins.",
+    )
+    ec_group.add_argument(
+        "--no_emit_ec_numbers", dest="emit_ec_numbers", action="store_false",
+        help="Drop the annot_ec_numbers column for byte-compatibility with "
+             "the legacy 4/6-column SwissProt CSV schema. Enrichment joins "
+             "keyed on EC numbers will fall back to caption-text extraction "
+             "and typically hit at 0%%.",
+    )
+    parser.set_defaults(emit_ec_numbers=True)
+
     return parser.parse_args(args)
 
 
@@ -318,6 +364,7 @@ def main(args):
         chunk_size=args.chunk_size,
         require_pfam=args.require_pfam,
         keep_intermediate_captions=args.keep_intermediate_captions,
+        emit_ec_numbers=args.emit_ec_numbers,
     )
 
     elapsed = datetime.now() - start_time

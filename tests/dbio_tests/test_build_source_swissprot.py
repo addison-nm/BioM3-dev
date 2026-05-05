@@ -277,10 +277,50 @@ class TestKeepIntermediateCaptions:
         rows = _read_csv(output_path)
         cut = next(r for r in rows if r["primary_Accession"] == "A0A024SC78")
         raw = cut["text_caption"]
-        # The mini fixture for A0A024SC78 has PubMed refs — they should be
-        # retained in the raw column and stripped in the final column.
         assert "(PubMed:" in raw
         assert "(PubMed:" not in cut["[final]text_caption"]
+
+
+class TestEmitEcNumbersToggle:
+
+    def test_no_emit_ec_drops_column_from_default_schema(self, dat_path, pfam_metadata, output_path):
+        build_swissprot_csv(
+            dat_path, pfam_metadata, output_path, emit_ec_numbers=False,
+        )
+        with open(output_path) as f:
+            header = next(csv.reader(f))
+        assert header == [
+            "primary_Accession",
+            "protein_sequence",
+            "[final]text_caption",
+            "pfam_label",
+        ]
+
+    def test_no_emit_ec_drops_column_from_intermediate_schema(self, dat_path, pfam_metadata, output_path):
+        build_swissprot_csv(
+            dat_path, pfam_metadata, output_path,
+            keep_intermediate_captions=True, emit_ec_numbers=False,
+        )
+        with open(output_path) as f:
+            header = next(csv.reader(f))
+        assert header == [
+            "primary_Accession",
+            "protein_sequence",
+            "text_caption",
+            "[clean]text_caption",
+            "[final]text_caption",
+            "pfam_label",
+        ]
+
+    def test_no_emit_ec_row_widths_match_header(self, dat_path, pfam_metadata, output_path):
+        build_swissprot_csv(
+            dat_path, pfam_metadata, output_path, emit_ec_numbers=False,
+        )
+        with open(output_path) as f:
+            reader = csv.reader(f)
+            header = next(reader)
+            for row in reader:
+                assert len(row) == len(header) == 4
 
     def test_clean_text_caption_strips_eco_only(self, dat_path, pfam_metadata, output_path):
         build_swissprot_csv(

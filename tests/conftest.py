@@ -76,6 +76,12 @@ def pytest_addoption(parser):
         help="number of devices per node for multinode tests "
              "(0 = skip multinode-marked tests)"
     )
+    parser.addoption(
+        "--skip_devices", action="store", default="",
+        help="comma-separated parametrize device values to skip (e.g. 'cpu' or "
+             "'cpu,xpu'). Drops any test variant whose @parametrize includes "
+             "the listed value. Useful on Spark to skip slow cpu redundancies."
+    )
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "benchmark: mark test as benchmarking")
@@ -102,6 +108,11 @@ def pytest_collection_modifyitems(config, items):
     if config.getoption("--network"):
         network_flag_given = True
     quick_flag_given = config.getoption("--quick")
+    skip_devices = {
+        d.strip().lower()
+        for d in str(config.getoption("--skip_devices") or "").split(",")
+        if d.strip()
+    }
     multinode_n = int(config.getoption("--multinode"))
     multidevice_n = int(config.getoption("--multidevice"))
     expected_world = multinode_n * multidevice_n
@@ -137,3 +148,17 @@ def pytest_collection_modifyitems(config, items):
         if "multinode" in item.keywords:
             if expected_world == 0 or actual_world != expected_world:
                 item.add_marker(skip_multinode)
+        if skip_devices:
+            # Drop any parametrize variant whose values include a string
+            # listed in --skip_devices. Matches against the rendered test
+            # id (e.g. "test_foo[cpu-arg2]") so we cover @parametrize
+            # over "device" or any other arg containing the literal name.
+            params = getattr(item, "callspec", None)
+            param_values = list(params.params.values()) if params else []
+            if any(
+                isinstance(v, str) and v.lower() in skip_devices
+                for v in param_values
+            ):
+                item.add_marker(pytest.mark.skip(
+                    reason=f"--skip_devices={','.join(sorted(skip_devices))}"
+                ))

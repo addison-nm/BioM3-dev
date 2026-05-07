@@ -9,7 +9,7 @@ Covers two groups:
 - **Integrated** — raw files under `data/databases/` with a `build_source_*` script (or concrete plan for one).
 - **Planned** — raw files not yet on disk, but whose linkage scheme is locked so future integration is straightforward.
 
-Out of scope: downloaded-only artifacts (BLAST indices, FASTA-only mirrors) that carry no annotation beyond sequences. See [docs/setup_databases.md](setup_databases.md) for download instructions.
+Out of scope: downloaded-only artifacts (BLAST indices, FASTA-only mirrors) that carry no annotation beyond sequences. See [docs/setup/setup_databases.md](../setup/setup_databases.md) for download instructions.
 
 ## Canonical identifiers
 

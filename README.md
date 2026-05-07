@@ -65,16 +65,16 @@ source environment.sh
 **Note:** *Some tests require pretrained weights that are too large to commit to git. These tests
 are skipped automatically when the weights are absent. To run the full test suite, populate the
 `weights/` directory using the shared weights sync script — see
-[docs/setup_shared_weights.md](./docs/setup_shared_weights.md) for machine-specific paths, the
+[docs/setup_shared_weights.md](./docs/setup/setup_shared_weights.md) for machine-specific paths, the
 list of required files, and setup instructions.*
 
 For installation and setup instructions on the following machines, refer to the setup instructions located in the `docs/` folder.
 
 | Machine | Instructions |
 | ------- | ------------ |
-| Polaris (ALCF) | [setup_polaris.md](./docs/setup_polaris.md) |
-| Aurora (ALCF) | [setup_aurora.md](./docs/setup_aurora.md) |
-| DGX Spark | [setup_spark.md](./docs/setup_spark.md) |
+| Polaris (ALCF) | [setup_polaris.md](./docs/setup/setup_polaris.md) |
+| Aurora (ALCF) | [setup_aurora.md](./docs/setup/setup_aurora.md) |
+| DGX Spark | [setup_spark.md](./docs/setup/setup_spark.md) |
 
 
 ## Reference databases
@@ -114,7 +114,7 @@ biom3_build_dataset -p PF00018 --enrich_pfam -o outputs/SH3_dataset
 biom3_build_dataset -p PF00018 --enrich_pfam --add_taxonomy --taxonomy_filter "superkingdom=Bacteria" -o outputs/SH3_bacteria
 ```
 
-See [docs/setup_databases.md](./docs/setup_databases.md) for machine-specific shared paths, the full list of databases, and configuration details.
+See [docs/setup_databases.md](./docs/setup/setup_databases.md) for machine-specific shared paths, the full list of databases, and configuration details.
 
 ## Usage
 

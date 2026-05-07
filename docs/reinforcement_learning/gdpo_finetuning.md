@@ -212,14 +212,14 @@ under AdamW.
 
 ## Side note: known GRPO bug
 
-[`src/biom3/rl/grpo.py:178`](../src/biom3/rl/grpo.py#L178) builds the
+[`src/biom3/rl/grpo.py:178`](../../src/biom3/rl/grpo.py#L178) builds the
 fully-masked input for `_policy_logprobs` as `torch.full_like(ids,
 pad_id)` with `pad_id = 23`, but the mask/absorbing-state token id is
 **0**. GRPO has been feeding the model an all-`<PAD>` prefix at `t=0`
 rather than all-MASK whenever it computes per-token log-probs (used for
 both the PPO ratio and the KL term). The new GDPO module uses
 `MASK_ID = 0` correctly via the helpers in
-[`Stage3/transformer_training_helper.py`](../src/biom3/Stage3/transformer_training_helper.py).
+[`Stage3/transformer_training_helper.py`](../../src/biom3/Stage3/transformer_training_helper.py).
 A deep audit confirmed the bug is isolated to that single helper —
 Stage 3 training, sampling, the pre-unmask feature, and the new GDPO
 module all use 0 (MASK) correctly. Fix is one line; tracked separately.

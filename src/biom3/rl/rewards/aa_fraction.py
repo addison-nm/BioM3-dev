@@ -18,7 +18,7 @@ class AAFractionReward:
     cleaned sequences score 0.
 
     Used as the closed-form ground truth for the synthetic Phase-3.5
-    surrogate-in-the-loop demo (see docs/grpo_finetuning.md). The band
+    surrogate-in-the-loop demo (see docs/reinforcement_learning/grpo_finetuning.md). The band
     avoids the trivial collapse mode where the policy would otherwise
     learn to emit a constant string of ``target_aa``.
     """

@@ -29,7 +29,7 @@ class TsvLookupReward:
     Closed-world tasks (ranking known variants) are the natural fit for
     pure lookup. For novel-sequence generation where most rollouts will
     miss, train a regressor on the TSV and use ``SurrogateReward``
-    instead (not in this revision — see docs/grpo_finetuning.md).
+    instead (not in this revision — see docs/reinforcement_learning/grpo_finetuning.md).
     """
 
     def __init__(

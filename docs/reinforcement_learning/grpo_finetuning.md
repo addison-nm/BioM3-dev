@@ -95,7 +95,7 @@ GRPO hyperparameters (defaults shown):
 
 A reward is any callable taking `List[str]` of decoded amino-acid
 sequences and returning `List[float]` scalars (one per sequence). The
-``Reward`` ``Protocol`` lives in [src/biom3/rl/rewards.py](../src/biom3/rl/rewards.py).
+``Reward`` ``Protocol`` lives in [src/biom3/rl/rewards.py](../../src/biom3/rl/rewards.py).
 
 | Name | Class | What |
 |---|---|---|
@@ -208,10 +208,10 @@ lab measurements (TSV: sequence, scalar)
 
 The pieces you need are already in the repo:
 
-- [`scripts/make_grpo_synthetic_eval.py`](../scripts/make_grpo_synthetic_eval.py) — for development, builds a synthetic 2k-row TSV from `data/datasets/SH3/FINAL_SH3_all_dataset_with_prompts.csv` with `functional_score = AAFractionReward + small noise`.
-- [`scripts/train_grpo_surrogate.py`](../scripts/train_grpo_surrogate.py) — fits an sklearn regressor (Ridge or MLP) on a TSV of (sequence, scalar) using a chosen featurizer (one-hot or ESM-2 mean-pool). Writes a joblib + a small JSON sidecar describing the featurizer config.
-- [`scripts/eval_grpo_checkpoint.py`](../scripts/eval_grpo_checkpoint.py) — samples N sequences per prompt from a Stage 3 checkpoint and scores with a configurable reward (always also computes the `aa_fraction` ground truth, so a fair before/after comparison is always available).
-- [`SurrogateReward(predictor, featurizer)`](../src/biom3/rl/rewards.py) — wraps a fitted regressor + featurizer as a per-sequence reward. Constructed in code; reload via:
+- [`scripts/make_grpo_synthetic_eval.py`](../../scripts/make_grpo_synthetic_eval.py) — for development, builds a synthetic 2k-row TSV from `data/datasets/SH3/FINAL_SH3_all_dataset_with_prompts.csv` with `functional_score = AAFractionReward + small noise`.
+- [`scripts/train_grpo_surrogate.py`](../../scripts/train_grpo_surrogate.py) — fits an sklearn regressor (Ridge or MLP) on a TSV of (sequence, scalar) using a chosen featurizer (one-hot or ESM-2 mean-pool). Writes a joblib + a small JSON sidecar describing the featurizer config.
+- [`scripts/eval_grpo_checkpoint.py`](../../scripts/eval_grpo_checkpoint.py) — samples N sequences per prompt from a Stage 3 checkpoint and scores with a configurable reward (always also computes the `aa_fraction` ground truth, so a fair before/after comparison is always available).
+- [`SurrogateReward(predictor, featurizer)`](../../src/biom3/rl/rewards.py) — wraps a fitted regressor + featurizer as a per-sequence reward. Constructed in code; reload via:
 
   ```python
   import joblib, json
@@ -358,7 +358,7 @@ end-to-end inner GRPO update on the mini Stage 3 fixture
   (note: re-installing affects sibling worktrees too).
 - **BERT padding.** Stage 1 must use `padding="max_length"`,
   `max_length=512`. The `_PromptEncoder` in
-  [src/biom3/rl/grpo.py](../src/biom3/rl/grpo.py) routes through
+  [src/biom3/rl/grpo.py](../../src/biom3/rl/grpo.py) routes through
   `Stage1.preprocess.TextSeqPairing_Dataset` which already does this —
   don't bypass it.
 - **`strict=False` on weight load.** Inherited from the donor and the

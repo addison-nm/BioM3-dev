@@ -17,7 +17,7 @@
 # step drops from ~75s (single-tile) to ~25–40s, with most of the
 # savings coming from the 128-step diffusion rollout (52s → ~5–15s).
 # Realistic speedup is ~3–5× rather than 12× because PyTorch holds the
-# GIL during kernel-launch dispatch — see docs/gdpo_finetuning.md.
+# GIL during kernel-launch dispatch — see docs/reinforcement_learning/gdpo_finetuning.md.
 #
 # Bumps G from 8 → 24 (2 sequences/tile across 12 tiles) to use the
 # multi-tile compute budget for larger group statistics rather than

@@ -157,7 +157,7 @@ biom3_build_annotation_cache \
     -o data/databases/trembl/trembl_annotations.parquet
 ```
 
-Then use `--annotation_cache` instead of `--uniprot_dat` for instant enrichment. See [building_datasets_with_dbio.md](building_datasets_with_dbio.md) for details.
+Then use `--annotation_cache` instead of `--uniprot_dat` for instant enrichment. See [building_datasets_with_dbio.md](../dbio/building_datasets_with_dbio.md) for details.
 
 ## Provenance tracking
 

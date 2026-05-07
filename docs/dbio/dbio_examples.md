@@ -21,7 +21,7 @@ Source databases symlinked under `data/databases/` via
 ```
 
 Default paths used by every example below are resolved from
-[configs/dbio_config.json](../configs/dbio_config.json). Override any
+[configs/dbio_config.json](../../configs/dbio_config.json). Override any
 of them with explicit CLI flags if the local layout differs.
 
 ## Part 1 — building the source CSVs

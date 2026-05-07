@@ -31,7 +31,7 @@ stage3_init_weights=<STAGE3_WEIGHTS_PATH>  # raw .pt, .ckpt, or DeepSpeed dir
 # Constant configurations
 device=xpu                      # device available (cuda, xpu, cpu)
 
-# Pin to one Aurora tile (single-GPU job — see docs/grpo_finetuning.md)
+# Pin to one Aurora tile (single-GPU job — see docs/reinforcement_learning/grpo_finetuning.md)
 export ZE_AFFINITY_MASK=0
 
 # Construct the run ID

@@ -24,7 +24,7 @@ To run the demo showing different enrichment options:
 bash demos/build_sh3_dataset.sh
 ```
 
-For real datasets, you need the database files. See [setup_databases.md](setup_databases.md)
+For real datasets, you need the database files. See [setup_databases.md](../setup/setup_databases.md)
 for shared paths per machine. Sync them with:
 
 ```bash
@@ -92,10 +92,10 @@ The Swiss-Prot builder has two legacy-parity flags:
 
 **Caption formatting** is controlled by a `CaptionSpec` in each builder module.
 Defaults reproduce the legacy CSVs: ALL-CAPS labels for Swiss-Prot (`SWISSPROT_SPEC`
-in [src/biom3/dbio/builders/source_swissprot.py](../src/biom3/dbio/builders/source_swissprot.py)),
+in [src/biom3/dbio/builders/source_swissprot.py](../../src/biom3/dbio/builders/source_swissprot.py)),
 lowercase labels for Pfam (`PFAM_SPEC` in
-[src/biom3/dbio/builders/source_pfam.py](../src/biom3/dbio/builders/source_pfam.py)).
-See [demos/custom_caption_format.py](../demos/custom_caption_format.py) for
+[src/biom3/dbio/builders/source_pfam.py](../../src/biom3/dbio/builders/source_pfam.py)).
+See [demos/custom_caption_format.py](../../demos/custom_caption_format.py) for
 swapping fields or relabeling.
 
 **Row ordering.** `biom3_build_source_swissprot` emits rows in the order they

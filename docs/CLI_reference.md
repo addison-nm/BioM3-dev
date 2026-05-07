@@ -2,7 +2,7 @@
 
 Reference for the seven user-facing entrypoints declared in [pyproject.toml](../pyproject.toml). Each section gives the synopsis, required and optional arguments, the canonical config file (where applicable), and a representative example. For per-stage prose context (output layouts, metrics, per-machine job submission), see the deeper docs linked from each section.
 
-dbio entrypoints (`biom3_build_dataset`, `biom3_build_taxid_index`, `biom3_convert_to_parquet`, `biom3_build_source_*`, `biom3_build_annotation_cache`, `biom3_build_annotated_pfam_subsets`) are documented separately in [dbio_examples.md](dbio_examples.md). Benchmark and Streamlit-app entrypoints (`biom3_benchmark_*`, `biom3_app`, `biom3_plot_benchmark`, `biom3_compile_hdf5`) are not covered here — invoke them with `--help` for current options.
+dbio entrypoints (`biom3_build_dataset`, `biom3_build_taxid_index`, `biom3_convert_to_parquet`, `biom3_build_source_*`, `biom3_build_annotation_cache`, `biom3_build_annotated_pfam_subsets`) are documented separately in [dbio_examples.md](dbio/dbio_examples.md). Benchmark and Streamlit-app entrypoints (`biom3_benchmark_*`, `biom3_app`, `biom3_plot_benchmark`, `biom3_compile_hdf5`) are not covered here — invoke them with `--help` for current options.
 
 > All entrypoints accept `--help`. The tables below mirror the source-of-truth `add_argument` declarations; if behavior diverges, the source wins.
 

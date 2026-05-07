@@ -54,12 +54,12 @@ the API.
 
 ## Cross-cutting modules
 
-### [`__init__.py`](../src/biom3/dbio/__init__.py) (0 lines)
+### [`__init__.py`](../../src/biom3/dbio/__init__.py) (0 lines)
 
 Empty. Follows the repo convention that subpackage `__init__.py` files
 don't re-export.
 
-### [`__main__.py`](../src/biom3/dbio/__main__.py) (90 lines)
+### [`__main__.py`](../../src/biom3/dbio/__main__.py) (90 lines)
 
 Pure dispatch table for the CLI entry points registered in
 `pyproject.toml`. Each `run_*()` function lazily imports the relevant
@@ -76,7 +76,7 @@ are wired here:
 - `run_build_annotated_pfam_subsets` → `biom3_build_annotated_pfam_subsets`
 - `run_build_annotation_cache` → `biom3_build_annotation_cache`
 
-### [`config.py`](../src/biom3/dbio/config.py) (86 lines)
+### [`config.py`](../../src/biom3/dbio/config.py) (86 lines)
 
 Database path resolution. Three layers of priority, low → high:
 
@@ -90,7 +90,7 @@ Public functions: `get_databases_root()`,
 `get_training_data_path(dataset_name)`. Lets the same code run on
 Spark / Polaris / Aurora without hard-coded paths.
 
-### [`caption.py`](../src/biom3/dbio/caption.py) (135 lines)
+### [`caption.py`](../../src/biom3/dbio/caption.py) (135 lines)
 
 Configurable caption composition — the data-augmentation surface area.
 Two pieces:
@@ -109,7 +109,7 @@ Also exports `strip_pubmed_refs()`, `strip_evidence_tags()`,
 `build_lineage_string()` (for taxonomic prefixes), and a canonical
 `TAXONOMY_RANKS` ordering.
 
-### [`stats.py`](../src/biom3/dbio/stats.py) (379 lines)
+### [`stats.py`](../../src/biom3/dbio/stats.py) (379 lines)
 
 Coverage-stats infrastructure. Every builder calls into this to emit a
 `<stem>.stats.md` next to the CSV and embed the same dict under
@@ -127,7 +127,7 @@ top-N Pfam families. The `_EMPTY_SENTINELS` set explicitly handles
 `pd.NA` stringified to `"<na>"`, plus `"['nan']"` (the legacy
 SwissProt sentinel for Pfam-less rows).
 
-### [`enrich.py`](../src/biom3/dbio/enrich.py) (~580 lines)
+### [`enrich.py`](../../src/biom3/dbio/enrich.py) (~580 lines)
 
 The two-step enrichment pipeline that turns a thin `(accession,
 sequence, pfam_label)` row into a fully-captioned training example.
@@ -167,7 +167,7 @@ Pure parsers — they read a file and yield structured records. Zero
 pandas, zero IO orchestration, zero opinions about output shape. File
 naming: `<dbname>_<format>` (e.g., `swissprot_dat`, `pfam_stockholm`).
 
-### [`parsers/swissprot_dat.py`](../src/biom3/dbio/parsers/swissprot_dat.py) (628 lines)
+### [`parsers/swissprot_dat.py`](../../src/biom3/dbio/parsers/swissprot_dat.py) (628 lines)
 
 The workhorse. Parses UniProt SwissProt/TrEMBL `.dat` flat files. Handles
 all the quirks:
@@ -192,7 +192,7 @@ all the quirks:
   `DR InterPro;` / `DR PDB;` into `xref_smart_ids` /
   `xref_interpro_ids` / `xref_pdb_ids` for the enrichment join layer.
 
-### [`parsers/pfam_stockholm.py`](../src/biom3/dbio/parsers/pfam_stockholm.py) (168 lines)
+### [`parsers/pfam_stockholm.py`](../../src/biom3/dbio/parsers/pfam_stockholm.py) (168 lines)
 
 Parses `Pfam-A.full.gz` (Stockholm) or `Pfam-A.hmm.gz` for **family-level
 metadata only** — not per-protein hits. Returns a `PF_ID → {short_id,
@@ -201,7 +201,7 @@ family_wikipedia, family_references}` dict. Stockholm is preferred
 because it carries `#=GF CC` (description) and `#=GF TP/CL/WK/RT` lines
 that the HMM file lacks.
 
-### [`parsers/expasy_dat.py`](../src/biom3/dbio/parsers/expasy_dat.py) (148 lines)
+### [`parsers/expasy_dat.py`](../../src/biom3/dbio/parsers/expasy_dat.py) (148 lines)
 
 Streaming parser for `enzyme.dat`. Yields `EnzymeEntry` dataclass
 instances with `ec`, `name`, `alternative_names`, `catalytic_activities`,
@@ -211,14 +211,14 @@ line codes (`ID`, `DE`, `AN`, `CA`, `CF`, `CC`, `DR`). Detects
 "Transferred entry: X.Y.Z.W" / "Deleted entry" markers in the DE
 field.
 
-### [`parsers/smart_tsv.py`](../src/biom3/dbio/parsers/smart_tsv.py) (44 lines)
+### [`parsers/smart_tsv.py`](../../src/biom3/dbio/parsers/smart_tsv.py) (44 lines)
 
 Trivial TSV reader for `SMART_domains.txt`. `SmartReader.iter_domains()`
 yields dicts with `domain_name`, `accession`, `definition`,
 `description`. Skips header line and dashed separator. Smallest parser
 in the package.
 
-### [`parsers/brenda_flatfile.py`](../src/biom3/dbio/parsers/brenda_flatfile.py) (241 lines)
+### [`parsers/brenda_flatfile.py`](../../src/biom3/dbio/parsers/brenda_flatfile.py) (241 lines)
 
 Parser for the BRENDA flatfile. Section-delimited per EC, with the most
 complex format in dbio (40+ section codes, per-organism record fanout
@@ -237,7 +237,7 @@ per-organism dicts for the kinetic fields.
 source builders, not the raw databases. File naming: `<dbname>_csv`
 for CSV/Parquet readers.
 
-### [`readers/base.py`](../src/biom3/dbio/readers/base.py) (26 lines)
+### [`readers/base.py`](../../src/biom3/dbio/readers/base.py) (26 lines)
 
 Defines the `DatabaseReader` ABC: `name` property + abstract
 `query_by_pfam(pfam_ids, **kwargs)`. Provides extensibility for future
@@ -247,7 +247,7 @@ readers (PDB / SCOPe / CATH per
 (BRENDA, ExPASy, SMART) don't because they're consumed via the join
 layer rather than `query_by_pfam`.
 
-### [`readers/swissprot_csv.py`](../src/biom3/dbio/readers/swissprot_csv.py) (84 lines)
+### [`readers/swissprot_csv.py`](../../src/biom3/dbio/readers/swissprot_csv.py) (84 lines)
 
 `SwissProtReader.query_by_pfam(pfam_ids)`. Loads the entire
 `fully_annotated_swiss_prot.csv` (~570K rows) into memory once, then
@@ -258,7 +258,7 @@ lets newer 5-column CSVs flow through `query_by_pfam` while older
 4-column CSVs still load — this is what makes the `--no_emit_ec_numbers`
 toggle (commit `46106f3`) backward compatible.
 
-### [`readers/pfam_csv.py`](../src/biom3/dbio/readers/pfam_csv.py) (124 lines)
+### [`readers/pfam_csv.py`](../../src/biom3/dbio/readers/pfam_csv.py) (124 lines)
 
 `PfamReader.query_by_pfam(pfam_ids, keep_family_cols=False)`. Reads
 the much-larger `Pfam_protein_text_dataset.csv` (~63M rows). Two
@@ -272,7 +272,7 @@ paths:
 The `keep_family_cols` flag is for the enrichment pipeline, which
 needs `family_name`/`family_description` to compose Pfam captions.
 
-### [`readers/taxonomy.py`](../src/biom3/dbio/readers/taxonomy.py) (282 lines)
+### [`readers/taxonomy.py`](../../src/biom3/dbio/readers/taxonomy.py) (282 lines)
 
 NCBI taxonomy. Two classes — splitting these into separate files is
 deferred:
@@ -299,7 +299,7 @@ Per-database CLI builders. Each writes a CSV plus
 `caption.py`. File naming: `source_<dbname>` for primary (whole-DB)
 builders; bare names for selective per-family builders.
 
-### [`builders/source_swissprot.py`](../src/biom3/dbio/builders/source_swissprot.py) (399 lines)
+### [`builders/source_swissprot.py`](../../src/biom3/dbio/builders/source_swissprot.py) (399 lines)
 
 Foundational builder #1. Streams `uniprot_sprot.dat.gz` via
 `SwissProtDatParser.parse_all()`, joins family names from
@@ -311,7 +311,7 @@ Foundational builder #1. Streams `uniprot_sprot.dat.gz` via
 | **off** (default) | 5 cols (modern) | 4 cols (legacy parity) |
 | **on** | 7 cols | 6 cols (full legacy parity) |
 
-### [`builders/source_pfam.py`](../src/biom3/dbio/builders/source_pfam.py) (289 lines)
+### [`builders/source_pfam.py`](../../src/biom3/dbio/builders/source_pfam.py) (289 lines)
 
 Foundational builder #2. Streams `Pfam-A.fasta.gz` (90%-NR, RP-scoped
 since Pfam 37.1), parses the FASTA header (3 whitespace-separated
@@ -321,7 +321,7 @@ parts), joins family metadata from `Pfam-A.full.gz`, composes a
 no PubMed/ECO stripping). Always emits 8 columns. ~63M rows, ~52 GB
 on Pfam 38.1.
 
-### [`builders/source_trembl.py`](../src/biom3/dbio/builders/source_trembl.py) (339 lines)
+### [`builders/source_trembl.py`](../../src/biom3/dbio/builders/source_trembl.py) (339 lines)
 
 Same schema as the SwissProt builder, but parses
 `uniprot_trembl.dat.gz` (~250M entries). Adds `--evidence_filter
@@ -331,7 +331,7 @@ definitions) dominate the file. Default `lenient` drops entries whose
 only evidence codes are those two. `--strict` requires
 `ECO:0000269` (`EXPERIMENTAL_ECO_CODE`); `--any` keeps all rows.
 
-### [`builders/source_expasy.py`](../src/biom3/dbio/builders/source_expasy.py) (203 lines)
+### [`builders/source_expasy.py`](../../src/biom3/dbio/builders/source_expasy.py) (203 lines)
 
 Builds `expasy_enzyme.csv` from `enzyme.dat`. Per-row schema: EC,
 name, reactions, cofactors, UniProt cross-refs. Has
@@ -339,12 +339,12 @@ name, reactions, cofactors, UniProt cross-refs. Has
 "Transferred entry" / "Deleted entry" rows. ~8,441 rows on the current
 ExPASy release.
 
-### [`builders/source_smart.py`](../src/biom3/dbio/builders/source_smart.py) (126 lines)
+### [`builders/source_smart.py`](../../src/biom3/dbio/builders/source_smart.py) (126 lines)
 
 Builds `smart_domains.csv` from `SMART_domains.txt`. ~1,405 rows, 100%
 domain-name coverage, 85% definition coverage. Smallest builder.
 
-### [`builders/source_brenda.py`](../src/biom3/dbio/builders/source_brenda.py) (260 lines)
+### [`builders/source_brenda.py`](../../src/biom3/dbio/builders/source_brenda.py) (260 lines)
 
 Builds `brenda_kinetics.csv` — per-organism kinetic data joined from
 each EC entry. Output is rows of `(ec, organism_id, organism_name,
@@ -353,7 +353,7 @@ temperature_optimum)`. ~111,854 rows (6,910 ECs × ~16 organisms each).
 Truncates oversized join cells via `_truncate_join` to keep CSV cells
 under a char cap.
 
-### [`builders/pfam_subsets.py`](../src/biom3/dbio/builders/pfam_subsets.py) (324 lines)
+### [`builders/pfam_subsets.py`](../../src/biom3/dbio/builders/pfam_subsets.py) (324 lines)
 
 Streams `Pfam-A.full.gz` (the **non-NR** Stockholm alignment) directly,
 extracts only requested families. Unlocks ~6.7× more rows per family
@@ -378,7 +378,7 @@ indirectly — `pipelines/build_dataset.py` uses `--annotation_cache`
 paths the first one writes, and the readers in Layer 2 auto-detect
 Parquet siblings the second one writes.
 
-### [`helpers/annotation_cache.py`](../src/biom3/dbio/helpers/annotation_cache.py) (204 lines)
+### [`helpers/annotation_cache.py`](../../src/biom3/dbio/helpers/annotation_cache.py) (204 lines)
 
 Writes a Parquet annotation cache from a `.dat` file. Schema:
 `primary_Accession` + 19 `annot_*` columns (sparse, `pa.string()`
@@ -389,7 +389,7 @@ predicate-pushdown reads. The point is amortizing the multi-hour TrEMBL
 Pfam-row enrichment without re-streaming TrEMBL. Tightly coupled to
 `SwissProtDatParser` and the `enrich.ANNOTATION_COLUMNS` schema.
 
-### [`helpers/csv_to_parquet.py`](../src/biom3/dbio/helpers/csv_to_parquet.py) (108 lines)
+### [`helpers/csv_to_parquet.py`](../../src/biom3/dbio/helpers/csv_to_parquet.py) (108 lines)
 
 Generic CSV → Parquet converter (`biom3_convert_to_parquet`). Reads
 the CSV in chunks, writes a single Parquet file with row groups for
@@ -404,7 +404,7 @@ will happily convert any CSV. Used to turn the 35 GB
 
 ## Layer 4 — `pipelines/` (the dataset orchestrator)
 
-### [`pipelines/build_dataset.py`](../src/biom3/dbio/pipelines/build_dataset.py) (~660 lines)
+### [`pipelines/build_dataset.py`](../../src/biom3/dbio/pipelines/build_dataset.py) (~660 lines)
 
 The CLI most users actually invoke (`biom3_build_dataset`). Stitches
 everything above into a finetuning dataset:
@@ -515,6 +515,6 @@ they cover. 245 tests pass under `--quick`.
   `Pfam_protein_text_dataset.csv`.
 - [database_linkage.md](database_linkage.md) — cross-reference spec
   and identifier-family map across DBs.
-- [setup_databases.md](setup_databases.md) — database download and
+- [setup_databases.md](../setup/setup_databases.md) — database download and
   symlink layout per cluster.
 - [dbio_examples.md](dbio_examples.md) — concrete recipe gallery.

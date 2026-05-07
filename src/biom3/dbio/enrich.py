@@ -72,161 +72,6 @@ _EC_NUMBER_RE = re.compile(
 
 
 # ---------------------------------------------------------------------------
-# UniProt JSON parsers
-# ---------------------------------------------------------------------------
-
-def parse_protein_name(entry):
-    pd_field = entry.get("proteinDescription", {})
-    rec = pd_field.get("recommendedName")
-    if rec:
-        val = rec.get("fullName", {}).get("value")
-        if val:
-            return val
-    subs = pd_field.get("submissionNames", [])
-    if subs:
-        val = subs[0].get("fullName", {}).get("value")
-        if val:
-            return val
-    return None
-
-
-def parse_gene_ontology(entry):
-    go_terms = []
-    for xref in entry.get("uniProtKBCrossReferences", []):
-        if xref.get("database") != "GO":
-            continue
-        for prop in xref.get("properties", []):
-            if prop.get("key") == "GoTerm":
-                val = prop.get("value", "")
-                if len(val) > 2 and val[1] == ":":
-                    val = val[2:]
-                go_terms.append(val)
-    return ", ".join(go_terms) if go_terms else ""
-
-
-def parse_lineage(entry):
-    lineage = entry.get("organism", {}).get("lineage", [])
-    if not lineage:
-        return None
-    return "The organism lineage is " + ", ".join(lineage)
-
-
-def parse_texts_comment(entry, comment_type):
-    for comment in entry.get("comments", []):
-        if comment.get("commentType") == comment_type:
-            texts = comment.get("texts", [])
-            if texts:
-                return texts[0].get("value")
-    return None
-
-
-def parse_catalytic_activity(entry):
-    parts = []
-    for comment in entry.get("comments", []):
-        if comment.get("commentType") == "CATALYTIC ACTIVITY":
-            reaction = comment.get("reaction", {})
-            name = reaction.get("name")
-            if name:
-                parts.append(f"Reaction={name}")
-    return ". ".join(parts) if parts else None
-
-
-def parse_cofactor(entry):
-    for comment in entry.get("comments", []):
-        if comment.get("commentType") == "COFACTOR":
-            cofactors = comment.get("cofactors", [])
-            names = [c.get("name") for c in cofactors if c.get("name")]
-            if names:
-                return ", ".join(names)
-    return None
-
-
-def parse_subcellular_location(entry):
-    for comment in entry.get("comments", []):
-        if comment.get("commentType") == "SUBCELLULAR LOCATION":
-            locs = comment.get("subcellularLocations", [])
-            values = []
-            for loc in locs:
-                val = loc.get("location", {}).get("value")
-                if val:
-                    values.append(val)
-            if values:
-                return ", ".join(values)
-    return None
-
-
-def extract_annotations(entry):
-    """Parse a full UniProt JSON entry into a dict of column_name -> text."""
-    annotations = {}
-
-    val = parse_protein_name(entry)
-    if val:
-        annotations["annot_protein_name"] = val
-
-    val = parse_texts_comment(entry, "FUNCTION")
-    if val:
-        annotations["annot_function"] = val
-
-    val = parse_catalytic_activity(entry)
-    if val:
-        annotations["annot_catalytic_activity"] = val
-
-    val = parse_cofactor(entry)
-    if val:
-        annotations["annot_cofactor"] = val
-
-    val = parse_texts_comment(entry, "ACTIVITY REGULATION")
-    if val:
-        annotations["annot_activity_regulation"] = val
-
-    val = parse_texts_comment(entry, "BIOPHYSICOCHEMICAL PROPERTIES")
-    if val:
-        annotations["annot_biophysicochemical_properties"] = val
-
-    val = parse_texts_comment(entry, "PATHWAY")
-    if val:
-        annotations["annot_pathway"] = val
-
-    val = parse_texts_comment(entry, "SUBUNIT")
-    if val:
-        annotations["annot_subunit"] = val
-
-    val = parse_subcellular_location(entry)
-    if val:
-        annotations["annot_subcellular_location"] = val
-
-    val = parse_texts_comment(entry, "PTM")
-    if val:
-        annotations["annot_ptm"] = val
-
-    val = parse_texts_comment(entry, "SIMILARITY")
-    if val:
-        annotations["annot_similarity"] = val
-
-    val = parse_texts_comment(entry, "DOMAIN")
-    if val:
-        annotations["annot_domain"] = val
-
-    val = parse_texts_comment(entry, "MISCELLANEOUS")
-    if val:
-        annotations["annot_miscellaneous"] = val
-
-    val = parse_texts_comment(entry, "INDUCTION")
-    if val:
-        annotations["annot_induction"] = val
-
-    go = parse_gene_ontology(entry)
-    if go:
-        annotations["annot_gene_ontology"] = go
-
-    val = parse_lineage(entry)
-    if val:
-        annotations["annot_lineage"] = val
-
-    return annotations
-
-
-# ---------------------------------------------------------------------------
 # Source-CSV lookup loaders (used by enrich_dataframe to join ExPASy/BRENDA/SMART)
 # ---------------------------------------------------------------------------
 
@@ -577,11 +422,11 @@ def _join_smart(df, smart_lookup):
 # DataFrame enrichment (Step 1: populate annotation columns)
 # ---------------------------------------------------------------------------
 
-def enrich_dataframe(df, local_annotations=None, uniprot_data=None,
+def enrich_dataframe(df, local_annotations=None,
                      taxonomy_tree=None, accession_taxid_map=None,
                      expasy_lookup=None, brenda_lookup=None,
                      smart_lookup=None, organism_match="strict"):
-    """Populate individual annotation columns from local .dat, UniProt API,
+    """Populate individual annotation columns from local .dat
     and/or NCBI taxonomy, and optionally join ExPASy/BRENDA/SMART source CSVs.
 
     Adds columns named annot_family_name, annot_family_description,
@@ -595,8 +440,8 @@ def enrich_dataframe(df, local_annotations=None, uniprot_data=None,
             and family_description columns (for Pfam-sourced rows).
         local_annotations: optional dict mapping accession -> annotation dict
             (annot_* keys plus optional xref_smart_ids/xref_interpro_ids/
-            xref_pdb_ids lists), as returned by SwissProtDatParser.parse().
-        uniprot_data: optional dict mapping accession -> UniProt JSON entry.
+            xref_pdb_ids lists), as returned by SwissProtDatParser.parse()
+            or load_annotation_cache().
         taxonomy_tree: optional TaxonomyTree instance.
         accession_taxid_map: optional dict mapping accession -> tax_id (int).
         expasy_lookup: dict from load_expasy_lookup(); enables EC-based join.
@@ -647,16 +492,6 @@ def enrich_dataframe(df, local_annotations=None, uniprot_data=None,
                 _apply_annotations(idx, annots)
                 enriched_count += 1
 
-    # UniProt API annotations (fallback when --use-api is set)
-    if uniprot_data:
-        for idx, row in df.iterrows():
-            acc = str(row.get("primary_Accession", ""))
-            entry = uniprot_data.get(acc)
-            if entry:
-                annotations = extract_annotations(entry)
-                _apply_annotations(idx, annotations)
-                enriched_count += 1
-
     if taxonomy_tree and accession_taxid_map:
         for idx, row in df.iterrows():
             acc = str(row.get("primary_Accession", ""))
@@ -665,7 +500,7 @@ def enrich_dataframe(df, local_annotations=None, uniprot_data=None,
                 lineage_str = taxonomy_tree.get_lineage_string(tax_id)
                 if lineage_str:
                     df.at[idx, "annot_lineage"] = lineage_str
-                    if not (uniprot_data or local_annotations):
+                    if not local_annotations:
                         enriched_count += 1
 
     logger.info("Enriched %s/%s rows with annotation columns",

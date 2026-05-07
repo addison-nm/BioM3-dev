@@ -145,14 +145,17 @@ def parse_arguments(args):
     )
     parser.add_argument(
         "--enrich_pfam", action="store_true", default=False,
-        help="Enrich Pfam captions with UniProt annotations (API by default)",
+        help="Enrich Pfam captions with UniProt annotations. Requires "
+             "either --annotation_cache or --uniprot_dat to supply the "
+             "annotation source.",
     )
     parser.add_argument(
         "--uniprot_dat", type=str, nargs="+", default=None,
         metavar="PATH",
-        help="Use local UniProt .dat.gz file(s) instead of API for enrichment. "
-             "Accepts one or more paths (e.g. uniprot_sprot.dat.gz uniprot_trembl.dat.gz). "
-             "For full Pfam coverage, include the TrEMBL file.",
+        help="Use local UniProt .dat.gz file(s) for enrichment. Accepts "
+             "one or more paths (e.g. uniprot_sprot.dat.gz "
+             "uniprot_trembl.dat.gz). For full Pfam coverage, include the "
+             "TrEMBL file.",
     )
     parser.add_argument(
         "--annotation_cache", type=str, nargs="+", default=None,
@@ -179,15 +182,6 @@ def parse_arguments(args):
         help="Filename for the output dataset CSV (default: dataset.csv). "
              "The annotations file will be named with an '_annotations' suffix.",
     )
-    parser.add_argument(
-        "--uniprot_cache_dir", type=str, default=".uniprot_cache",
-        help="Directory for caching UniProt API responses",
-    )
-    parser.add_argument(
-        "--uniprot_batch_size", type=int, default=100,
-        help="Batch size for UniProt API requests",
-    )
-
     # Source-CSV join layer (opt-in). Each flag enables an additional
     # join against a per-database source CSV produced by the matching
     # biom3_build_source_* builder.
@@ -321,7 +315,6 @@ def main(args):
     from biom3.dbio.enrich import enrich_dataframe
 
     local_annotations = None
-    uniprot_data = None
     taxonomy_tree = None
     accession_taxid_map = None
 
@@ -330,6 +323,14 @@ def main(args):
         accession_set = set(accessions)
 
         if args.enrich_pfam:
+            if not args.annotation_cache and not args.uniprot_dat:
+                raise ValueError(
+                    "--enrich_pfam requires --annotation_cache or "
+                    "--uniprot_dat. The legacy UniProt REST API path was "
+                    "removed in v0.1.0a7; build a TrEMBL annotation cache "
+                    "via biom3_build_annotation_cache instead."
+                )
+
             local_annotations = {}
 
             # Priority 1: Parquet annotation cache (instant lookup)
@@ -360,20 +361,6 @@ def main(args):
                     logger.info("Local enrichment total: %s/%s accessions found",
                                 f"{len(local_annotations):,}",
                                 f"{len(accessions):,}")
-
-            # Priority 3: UniProt REST API (fallback)
-            if not local_annotations and not args.uniprot_dat and not args.annotation_cache:
-                from biom3.dbio.uniprot_client import UniProtClient
-
-                logger.info("Enriching Pfam rows via UniProt REST API...")
-                logger.info("Fetching annotations for %s unique accessions",
-                             f"{len(accessions):,}")
-                client = UniProtClient(
-                    cache_dir=args.uniprot_cache_dir, use_cache=True,
-                )
-                uniprot_data = client.fetch_all(
-                    accessions, batch_size=args.uniprot_batch_size,
-                )
 
             local_annotations = local_annotations or None
 
@@ -423,7 +410,6 @@ def main(args):
     df_pfam, join_stats = enrich_dataframe(
         df_pfam,
         local_annotations=local_annotations,
-        uniprot_data=uniprot_data,
         taxonomy_tree=taxonomy_tree,
         accession_taxid_map=accession_taxid_map,
         expasy_lookup=expasy_lookup,

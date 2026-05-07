@@ -1,8 +1,8 @@
 """Local parser for UniProt Swiss-Prot .dat flat files.
 
-Replaces the UniProt REST API for annotation extraction. Parses
-uniprot_sprot.dat.gz and produces the same annotation dict as
-enrich.extract_annotations(), keyed by accession.
+Parses uniprot_sprot.dat.gz (or uniprot_trembl.dat.gz) into annotation
+dicts keyed by accession, with annot_* keys aligned to the schema
+consumed by biom3.dbio.enrich.enrich_dataframe.
 
 Two usage modes:
   1. parse(accessions) — targeted extraction for a set of accessions

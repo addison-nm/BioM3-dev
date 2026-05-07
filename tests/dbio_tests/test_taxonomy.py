@@ -3,7 +3,7 @@
 import os
 import pytest
 
-from biom3.dbio.taxonomy import TaxonomyTree, AccessionTaxidMapper
+from biom3.dbio.readers.taxonomy import TaxonomyTree, AccessionTaxidMapper
 
 DATDIR = os.path.join("tests", "_data", "dbio")
 TAXONOMY_DIR = DATDIR  # mini .dmp files live here

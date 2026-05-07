@@ -34,10 +34,10 @@ from biom3.dbio.caption import (
     build_lineage_string,
     compose_row_caption,
 )
-from biom3.dbio.pfam_metadata import PfamMetadataParser
-from biom3.dbio.swissprot_dat import SwissProtDatParser
-from biom3.dbio.taxonomy import TaxonomyTree, AccessionTaxidMapper
-from biom3.dbio.build_source_pfam import iter_pfam_fasta, _parse_fasta_header
+from biom3.dbio.parsers.pfam_stockholm import PfamMetadataParser
+from biom3.dbio.parsers.swissprot_dat import SwissProtDatParser
+from biom3.dbio.readers.taxonomy import TaxonomyTree, AccessionTaxidMapper
+from biom3.dbio.builders.source_pfam import iter_pfam_fasta, _parse_fasta_header
 
 logger = setup_logger(__name__)
 

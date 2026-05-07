@@ -5,8 +5,8 @@ import pytest
 
 import pandas as pd
 
-from biom3.dbio.build_dataset import parse_arguments, main
-from biom3.dbio.swissprot import OUTPUT_COLS
+from biom3.dbio.pipelines.build_dataset import parse_arguments, main
+from biom3.dbio.readers.swissprot_csv import OUTPUT_COLS
 
 DATDIR = os.path.join("tests", "_data", "dbio")
 SWISSPROT_PATH = os.path.join(DATDIR, "mini_swissprot.csv")

@@ -3,13 +3,13 @@ import os
 import pyarrow.parquet as pq
 import pytest
 
-from biom3.dbio.build_annotation_cache import (
+from biom3.dbio.helpers.annotation_cache import (
     CACHE_ANNOTATION_COLUMNS,
     CACHE_SCHEMA,
     build_annotation_cache,
     load_annotation_cache,
 )
-from biom3.dbio.swissprot_dat import SwissProtDatParser
+from biom3.dbio.parsers.swissprot_dat import SwissProtDatParser
 
 DATDIR = os.path.join(os.path.dirname(__file__), "..", "_data", "dbio")
 TMPDIR = os.path.join(os.path.dirname(__file__), "..", "_tmp")

@@ -4,14 +4,14 @@ import os
 
 import pytest
 
-from biom3.dbio.build_source_swissprot import (
+from biom3.dbio.builders.source_swissprot import (
     SWISSPROT_SPEC,
     build_swissprot_csv,
     main,
     parse_arguments,
 )
 from biom3.dbio.caption import compose_row_caption
-from biom3.dbio.pfam_metadata import PfamMetadataParser
+from biom3.dbio.parsers.pfam_stockholm import PfamMetadataParser
 
 DATDIR = os.path.join(os.path.dirname(__file__), "..", "_data", "dbio")
 TMPDIR = os.path.join(os.path.dirname(__file__), "..", "_tmp")

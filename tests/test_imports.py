@@ -30,13 +30,13 @@ def test_stage3_imports():
 def test_dbio_imports():
     import biom3.dbio
     import biom3.dbio.config
-    import biom3.dbio.base
-    import biom3.dbio.swissprot
-    import biom3.dbio.pfam
-    import biom3.dbio.taxonomy
+    import biom3.dbio.readers.base
+    import biom3.dbio.readers.swissprot_csv
+    import biom3.dbio.readers.pfam_csv
+    import biom3.dbio.readers.taxonomy
     import biom3.dbio.enrich
     import biom3.dbio.uniprot_client
-    import biom3.dbio.build_dataset
+    import biom3.dbio.pipelines.build_dataset
 
 
 def test_viz_imports():

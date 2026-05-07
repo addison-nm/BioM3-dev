@@ -4,7 +4,7 @@ import textwrap
 
 import pytest
 
-from biom3.dbio.expasy import ExPASyEnzymeParser
+from biom3.dbio.parsers.expasy_dat import ExPASyEnzymeParser
 
 
 HEADER = textwrap.dedent("""\

@@ -4,7 +4,7 @@ import textwrap
 
 import pytest
 
-from biom3.dbio.smart import SmartReader
+from biom3.dbio.parsers.smart_tsv import SmartReader
 
 
 FIXTURE = textwrap.dedent("""\

@@ -3,7 +3,7 @@
 import os
 import pytest
 
-from biom3.dbio.swissprot import SwissProtReader, OUTPUT_COLS
+from biom3.dbio.readers.swissprot_csv import SwissProtReader, OUTPUT_COLS
 
 DATDIR = os.path.join("tests", "_data", "dbio")
 SWISSPROT_PATH = os.path.join(DATDIR, "mini_swissprot.csv")

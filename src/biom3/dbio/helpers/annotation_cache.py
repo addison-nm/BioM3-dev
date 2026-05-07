@@ -67,7 +67,7 @@ def build_annotation_cache(
         chunk_size: rows buffered before writing a row group.
         require_annotation: if True, skip entries with zero annotations.
     """
-    from biom3.dbio.swissprot_dat import SwissProtDatParser
+    from biom3.dbio.parsers.swissprot_dat import SwissProtDatParser
 
     logger.info("Building annotation cache: %s -> %s", dat_path, output_path)
 

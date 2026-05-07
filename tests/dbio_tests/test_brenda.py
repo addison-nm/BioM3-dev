@@ -4,7 +4,7 @@ import textwrap
 
 import pytest
 
-from biom3.dbio.brenda import BrendaParser
+from biom3.dbio.parsers.brenda_flatfile import BrendaParser
 
 
 FIXTURE = textwrap.dedent("""\

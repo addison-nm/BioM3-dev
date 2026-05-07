@@ -23,8 +23,8 @@ from biom3.dbio.config import (
     get_database_path,
     get_training_data_path,
 )
-from biom3.dbio.swissprot import SwissProtReader, OUTPUT_COLS
-from biom3.dbio.pfam import PfamReader
+from biom3.dbio.readers.swissprot_csv import SwissProtReader, OUTPUT_COLS
+from biom3.dbio.readers.pfam_csv import PfamReader
 from biom3.dbio.enrich import compose_caption
 from biom3.dbio.stats import (
     compute_coverage_stats,
@@ -334,7 +334,7 @@ def main(args):
 
             # Priority 1: Parquet annotation cache (instant lookup)
             if args.annotation_cache:
-                from biom3.dbio.build_annotation_cache import load_annotation_cache
+                from biom3.dbio.helpers.annotation_cache import load_annotation_cache
 
                 local_annotations = load_annotation_cache(
                     args.annotation_cache, accession_set,
@@ -347,7 +347,7 @@ def main(args):
             if args.uniprot_dat:
                 remaining = accession_set - set(local_annotations.keys())
                 if remaining:
-                    from biom3.dbio.swissprot_dat import SwissProtDatParser
+                    from biom3.dbio.parsers.swissprot_dat import SwissProtDatParser
 
                     for dat_path in args.uniprot_dat:
                         logger.info("Parsing local .dat file: %s", dat_path)
@@ -560,7 +560,7 @@ def _write_dataset_outputs(df, outdir, pfam_ids, args, *,
 
 def _load_taxonomy(args, accessions):
     """Load taxonomy tree and look up accessions."""
-    from biom3.dbio.taxonomy import TaxonomyTree, AccessionTaxidMapper
+    from biom3.dbio.readers.taxonomy import TaxonomyTree, AccessionTaxidMapper
 
     taxonomy_dir = str(get_database_path("ncbi_taxonomy", args.config))
     taxonomy_tree = TaxonomyTree(taxonomy_dir)
@@ -602,7 +602,7 @@ def _apply_taxonomy_filters(df, args):
     matching). Accessions not in the NCBI index fall back to checking whether
     the filter value appears anywhere in the annot_lineage string.
     """
-    from biom3.dbio.taxonomy import TaxonomyTree, AccessionTaxidMapper
+    from biom3.dbio.readers.taxonomy import TaxonomyTree, AccessionTaxidMapper
 
     filters = _parse_taxonomy_filters(args.taxonomy_filter)
     taxonomy_dir = str(get_database_path("ncbi_taxonomy", args.config))

@@ -26,7 +26,7 @@ from biom3.core.run_utils import (
     write_manifest,
 )
 from biom3.dbio.caption import CaptionSpec, compose_row_caption
-from biom3.dbio.pfam_metadata import PfamMetadataParser
+from biom3.dbio.parsers.pfam_stockholm import PfamMetadataParser
 from biom3.dbio.stats import IncrementalStatsBuilder, write_stats_markdown
 
 logger = setup_logger(__name__)

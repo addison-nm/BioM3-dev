@@ -3,7 +3,7 @@
 import os
 import pytest
 
-from biom3.dbio.pfam import PfamReader, OUTPUT_COLS
+from biom3.dbio.readers.pfam_csv import PfamReader, OUTPUT_COLS
 
 DATDIR = os.path.join("tests", "_data", "dbio")
 PFAM_PATH = os.path.join(DATDIR, "mini_pfam.csv")
@@ -60,7 +60,7 @@ class TestPfamReader:
 
     def test_parquet_roundtrip(self, tmp_path):
         """Parquet file should produce identical results to CSV."""
-        from biom3.dbio.convert import csv_to_parquet
+        from biom3.dbio.helpers.csv_to_parquet import csv_to_parquet
 
         parquet_path = str(tmp_path / "mini_pfam.parquet")
         csv_to_parquet(PFAM_PATH, parquet_path, chunk_size=10)
@@ -77,7 +77,7 @@ class TestPfamReader:
     def test_parquet_auto_detect(self, tmp_path):
         """PfamReader should auto-detect .parquet alongside .csv."""
         import shutil
-        from biom3.dbio.convert import csv_to_parquet
+        from biom3.dbio.helpers.csv_to_parquet import csv_to_parquet
 
         # Copy CSV to tmp and create Parquet alongside it
         csv_copy = str(tmp_path / "test.csv")

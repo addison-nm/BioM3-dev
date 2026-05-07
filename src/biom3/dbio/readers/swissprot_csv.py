@@ -5,7 +5,7 @@ import os
 import pandas as pd
 
 from biom3.backend.device import setup_logger
-from biom3.dbio.base import DatabaseReader
+from biom3.dbio.readers.base import DatabaseReader
 
 logger = setup_logger(__name__)
 

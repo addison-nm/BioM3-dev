@@ -27,7 +27,7 @@ from biom3.core.run_utils import (
     get_file_metadata,
     write_manifest,
 )
-from biom3.dbio.build_source_swissprot import (
+from biom3.dbio.builders.source_swissprot import (
     OUTPUT_COLUMNS,
     OUTPUT_COLUMNS_WITH_INTERMEDIATES,
     SWISSPROT_SPEC,
@@ -35,9 +35,9 @@ from biom3.dbio.build_source_swissprot import (
     _read_release_version,
 )
 from biom3.dbio.caption import build_lineage_string, compose_row_caption
-from biom3.dbio.pfam_metadata import PfamMetadataParser
+from biom3.dbio.parsers.pfam_stockholm import PfamMetadataParser
 from biom3.dbio.stats import IncrementalStatsBuilder, write_stats_markdown
-from biom3.dbio.swissprot_dat import SwissProtDatParser
+from biom3.dbio.parsers.swissprot_dat import SwissProtDatParser
 
 logger = setup_logger(__name__)
 

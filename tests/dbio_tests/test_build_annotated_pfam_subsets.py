@@ -5,7 +5,7 @@ import os
 
 import pytest
 
-from biom3.dbio.build_annotated_pfam_subsets import (
+from biom3.dbio.builders.pfam_subsets import (
     OUTPUT_COLUMNS,
     _clean_sequence,
     build_annotated_pfam_subsets_csv,
@@ -104,7 +104,7 @@ class TestIterAnnotatedPfamRows:
         # biom3's logger has propagate=False (rank-aware StreamHandler).
         # Temporarily flip propagate so caplog can intercept the warning.
         import logging
-        mod_logger = logging.getLogger("biom3.dbio.build_annotated_pfam_subsets")
+        mod_logger = logging.getLogger("biom3.dbio.builders.pfam_subsets")
         monkeypatch.setattr(mod_logger, "propagate", True)
         caplog.set_level(logging.WARNING, logger=mod_logger.name)
 

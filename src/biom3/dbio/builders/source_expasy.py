@@ -21,7 +21,7 @@ import pandas as pd
 from biom3.backend.device import setup_logger
 from biom3.core.run_utils import get_file_metadata, write_manifest
 from biom3.dbio.caption import CaptionSpec, compose_row_caption
-from biom3.dbio.expasy import ExPASyEnzymeParser
+from biom3.dbio.parsers.expasy_dat import ExPASyEnzymeParser
 from biom3.dbio.stats import compute_coverage_stats, write_stats_markdown
 
 logger = setup_logger(__name__)

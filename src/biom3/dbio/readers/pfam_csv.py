@@ -33,7 +33,7 @@ class PfamReader(DatabaseReader):
 
     Supports two file formats:
     - **Parquet** (preferred): uses pyarrow predicate pushdown for instant
-      filtering by pfam_label. Convert with ``biom3_convert_to_parquet``.
+      filtering by pfam_label. Convert with ``biom3_csv_to_parquet``.
     - **CSV** (fallback): reads in chunks with tqdm progress bar.
 
     If the data_path points to a CSV and a corresponding .parquet file exists

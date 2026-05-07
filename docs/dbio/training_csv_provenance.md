@@ -171,7 +171,7 @@ for overriding the defaults.
 release 37.1). PF00018 (SH3) yields 26,468 rows in Pfam 38.1 — that is the
 complete figure for this release, not a builder bug. For full reference-proteome
 coverage of selected families (e.g., 176,301 rows for PF00018) use
-[`biom3_build_annotated_pfam_subsets`](../../src/biom3/dbio/builders/pfam_subsets.py),
+[`biom3_build_pfam_subsets`](../../src/biom3/dbio/builders/pfam_subsets.py),
 which streams `Pfam-A.full.gz` directly and emits an 11-column CSV with
 `family_type` / `family_clan` / `family_wikipedia` / `family_references`
 side fields. See

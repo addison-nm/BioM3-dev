@@ -8,7 +8,7 @@ more than Pfam-A.fasta's 26K — because Pfam-A.fasta is clustered at 90%
 identity while Pfam-A.full contains every reference-proteome hit.
 
 Usage:
-    biom3_build_annotated_pfam_subsets \\
+    biom3_build_pfam_subsets \\
         -p PF00018 PF07714 \\
         --pfam_full data/databases/pfam/Pfam-A.full.gz \\
         -o outputs/SH3_kinase_full.csv

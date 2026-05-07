@@ -70,10 +70,10 @@ are wired here:
 - `run_build_dataset` → `biom3_build_dataset`
 - `run_build_taxid_index` → `biom3_build_taxid_index` (inlined rather
   than delegating)
-- `run_convert_to_parquet` → `biom3_convert_to_parquet`
+- `run_csv_to_parquet` → `biom3_csv_to_parquet`
 - `run_build_source_{swissprot,pfam,trembl,expasy,smart,brenda}` —
   six per-database source-CSV builders
-- `run_build_annotated_pfam_subsets` → `biom3_build_annotated_pfam_subsets`
+- `run_build_pfam_subsets` → `biom3_build_pfam_subsets`
 - `run_build_annotation_cache` → `biom3_build_annotation_cache`
 
 ### [`config.py`](../../src/biom3/dbio/config.py) (86 lines)
@@ -391,7 +391,7 @@ Pfam-row enrichment without re-streaming TrEMBL. Tightly coupled to
 
 ### [`helpers/csv_to_parquet.py`](../../src/biom3/dbio/helpers/csv_to_parquet.py) (108 lines)
 
-Generic CSV → Parquet converter (`biom3_convert_to_parquet`). Reads
+Generic CSV → Parquet converter (`biom3_csv_to_parquet`). Reads
 the CSV in chunks, writes a single Parquet file with row groups for
 partial reads. Database-agnostic at its core; auto-detects the Pfam
 CSV by checking for `family_description` in the header and forces it

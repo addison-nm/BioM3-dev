@@ -129,7 +129,7 @@ Stockholm alignment carries every reference-proteome hit (176,301 rows
 for PF00018 in 38.1) but isn't materialized as a CSV by the main builder.
 
 For finetuning datasets that want the full RP coverage, use
-`biom3_build_annotated_pfam_subsets`. It streams `Pfam-A.full.gz`
+`biom3_build_pfam_subsets`. It streams `Pfam-A.full.gz`
 directly, extracts only the requested families, strips Stockholm gap
 characters (`.` / `-`), uppercases insertion residues, and emits a CSV
 enriched with Pfam-level annotations beyond what the main builder
@@ -137,7 +137,7 @@ captures: `family_type`, `family_clan`, `family_wikipedia`, and
 `family_references` (all `#=GF` header fields joined per row).
 
 ```bash
-biom3_build_annotated_pfam_subsets \
+biom3_build_pfam_subsets \
     -p PF00018 PF07714 \
     --pfam_full data/databases/pfam/Pfam-A.full.gz \
     -o outputs/SH3_Pkinase_full.csv
@@ -146,7 +146,7 @@ biom3_build_annotated_pfam_subsets \
 | CLI | Source file | Scope | PF00018 row count |
 |-----|-------------|-------|-------------------|
 | `biom3_build_source_pfam` | `Pfam-A.fasta.gz` | RP, 90% non-redundant | 26,468 |
-| `biom3_build_annotated_pfam_subsets` | `Pfam-A.full.gz` | RP, **non-redundant** | **176,301** |
+| `biom3_build_pfam_subsets` | `Pfam-A.full.gz` | RP, **non-redundant** | **176,301** |
 
 Output schema (11 columns): `id, range, pfam_label, sequence,
 family_name, family_description, family_type, family_clan,

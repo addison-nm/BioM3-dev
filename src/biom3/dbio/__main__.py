@@ -32,7 +32,7 @@ def run_build_taxid_index():
     mapper.build_sqlite_index(args.output)
 
 
-def run_convert_to_parquet():
+def run_csv_to_parquet():
     from biom3.dbio.helpers.csv_to_parquet import parse_arguments, main
     args = parse_arguments(sys.argv[1:])
     main(args)
@@ -74,7 +74,7 @@ def run_build_source_brenda():
     main(args)
 
 
-def run_build_annotated_pfam_subsets():
+def run_build_pfam_subsets():
     from biom3.dbio.builders.pfam_subsets import parse_arguments, main
     args = parse_arguments(sys.argv[1:])
     main(args)

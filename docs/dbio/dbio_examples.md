@@ -367,8 +367,8 @@ biom3_build_source_brenda \
 ### "Convert source CSVs to Parquet for faster build_dataset"
 
 ```bash
-biom3_convert_to_parquet data/datasets/fully_annotated_swiss_prot.csv
-biom3_convert_to_parquet data/datasets/Pfam_protein_text_dataset.csv
+biom3_csv_to_parquet data/datasets/fully_annotated_swiss_prot.csv
+biom3_csv_to_parquet data/datasets/Pfam_protein_text_dataset.csv
 ```
 
 `SwissProtReader` and `PfamReader` auto-detect the `.parquet`

@@ -13,7 +13,7 @@ from biom3.dbio.builders.pfam_subsets import (
     main,
 )
 
-DATDIR = os.path.join(os.path.dirname(__file__), "..", "_data", "dbio")
+DATDIR = os.path.join(os.path.dirname(__file__), "..", "..", "_data", "dbio")
 STO_PATH = os.path.join(DATDIR, "mini_pfam_full.sto")
 
 

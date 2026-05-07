@@ -4,7 +4,7 @@ import pytest
 
 from biom3.dbio.parsers.pfam_stockholm import PfamMetadataParser
 
-DATDIR = os.path.join(os.path.dirname(__file__), "..", "_data", "dbio")
+DATDIR = os.path.join(os.path.dirname(__file__), "..", "..", "_data", "dbio")
 
 
 @pytest.fixture

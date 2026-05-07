@@ -13,8 +13,8 @@ from biom3.dbio.builders.source_swissprot import (
 from biom3.dbio.caption import compose_row_caption
 from biom3.dbio.parsers.pfam_stockholm import PfamMetadataParser
 
-DATDIR = os.path.join(os.path.dirname(__file__), "..", "_data", "dbio")
-TMPDIR = os.path.join(os.path.dirname(__file__), "..", "_tmp")
+DATDIR = os.path.join(os.path.dirname(__file__), "..", "..", "_data", "dbio")
+TMPDIR = os.path.join(os.path.dirname(__file__), "..", "..", "_tmp")
 
 
 @pytest.fixture(autouse=True)

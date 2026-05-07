@@ -11,8 +11,8 @@ from biom3.dbio.helpers.annotation_cache import (
 )
 from biom3.dbio.parsers.swissprot_dat import SwissProtDatParser
 
-DATDIR = os.path.join(os.path.dirname(__file__), "..", "_data", "dbio")
-TMPDIR = os.path.join(os.path.dirname(__file__), "..", "_tmp")
+DATDIR = os.path.join(os.path.dirname(__file__), "..", "..", "_data", "dbio")
+TMPDIR = os.path.join(os.path.dirname(__file__), "..", "..", "_tmp")
 
 
 @pytest.fixture(autouse=True)

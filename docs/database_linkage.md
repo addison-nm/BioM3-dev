@@ -34,8 +34,8 @@ Every join in `biom3.dbio` uses one of these identifier families. Tags match the
 ### SwissProt (UniProtKB reviewed)
 
 - **Raw file:** `data/databases/swissprot/uniprot_sprot.dat.gz`
-- **Version:** `reldate.txt` in same directory; regex `Release\s+(\S+)` via [_collect_database_versions()](src/biom3/dbio/build_source_swissprot.py#L223-L242)
-- **Reader / parser:** [SwissProtDatParser](src/biom3/dbio/swissprot_dat.py)
+- **Version:** `reldate.txt` in same directory; regex `Release\s+(\S+)` via [_collect_database_versions()](src/biom3/dbio/builders/source_swissprot.py#L223-L242)
+- **Reader / parser:** [SwissProtDatParser](src/biom3/dbio/parsers/swissprot_dat.py)
 - **Built CSV:** `fully_annotated_swiss_prot.csv` + `fully_annotated_swiss_prot.build_manifest.json`
 - **Primary key:** `primary_Accession` (UniProt accession)
 - **Cross-refs captured today:**
@@ -53,7 +53,7 @@ Every join in `biom3.dbio` uses one of these identifier families. Tags match the
 
 - **Raw file:** `data/databases/trembl/uniprot_trembl.dat.gz` (~199 GB)
 - **Version:** `reldate.txt` in same directory (shared release line with SwissProt)
-- **Reader / parser:** reuses [SwissProtDatParser](src/biom3/dbio/swissprot_dat.py) unchanged
+- **Reader / parser:** reuses [SwissProtDatParser](src/biom3/dbio/parsers/swissprot_dat.py) unchanged
 - **Built CSV:** `fully_annotated_trembl.csv` (auto-convert to Parquet when > 10 GB)
 - **Primary key:** `primary_Accession`
 - **Quality caveat:** TrEMBL annotations are largely auto-propagated. The builder defaults to `--evidence_filter experimental` to keep only records with manual or experimental evidence codes.
@@ -65,7 +65,7 @@ Every join in `biom3.dbio` uses one of these identifier families. Tags match the
   - `data/databases/pfam/Pfam-A.full.gz` (Stockholm-format alignments; source of family name/description)
   - `data/databases/pfam/Pfam-A.hmm.gz` (HMM profiles; alternative metadata source)
   - `data/databases/pfam/relnotes.txt` (version)
-- **Readers / parsers:** [PfamReader](src/biom3/dbio/pfam.py), [PfamMetadataParser](src/biom3/dbio/pfam_metadata.py)
+- **Readers / parsers:** [PfamReader](src/biom3/dbio/readers/pfam_csv.py), [PfamMetadataParser](src/biom3/dbio/parsers/pfam_stockholm.py)
 - **Built CSV:** `Pfam_protein_text_dataset.csv` + `Pfam_protein_text_dataset.build_manifest.json`
 - **Primary keys:** `id` (UniProt accession) + `range` (domain span) + `pfam_label` (PF ID)
 - **Cross-refs out:** UniProt accession, Pfam family ID. Stockholm metadata carries InterPro equivalents (`#=GF DR INTERPRO`) and SMART equivalents (`#=GF DR SMART`) — not currently captured, candidate for future.
@@ -74,7 +74,7 @@ Every join in `biom3.dbio` uses one of these identifier families. Tags match the
 
 - **Raw files:** `data/databases/ncbi_taxonomy/` (14 `.dmp` files + `prot.accession2taxid.gz`)
 - **Version:** mtime of `new_taxdump.tar.gz`; no formal release string
-- **Readers:** [TaxonomyTree](src/biom3/dbio/taxonomy.py) (in-memory ~2.7 M nodes), [AccessionTaxidMapper](src/biom3/dbio/taxonomy.py) (SQLite-backed)
+- **Readers:** [TaxonomyTree](src/biom3/dbio/readers/taxonomy.py) (in-memory ~2.7 M nodes), [AccessionTaxidMapper](src/biom3/dbio/readers/taxonomy.py) (SQLite-backed)
 - **Built index:** `accession2taxid.sqlite` via `biom3_build_taxid_index`
 - **Primary keys:** `tax_id` (node-keyed); accession-keyed via `prot.accession2taxid.gz`
 - **Cross-refs in:** UniProt `OX NCBI_TaxID=…`, UniProt accession via `prot.accession2taxid.gz`
@@ -83,7 +83,7 @@ Every join in `biom3.dbio` uses one of these identifier families. Tags match the
 
 - **Raw file:** `data/databases/expasy/enzyme.dat` (~9 MB)
 - **Version:** header line `CC Release of <DD-Mon-YYYY>`
-- **Parser:** `ExPASyEnzymeParser` (new, [src/biom3/dbio/expasy.py](src/biom3/dbio/expasy.py))
+- **Parser:** `ExPASyEnzymeParser` (new, [src/biom3/dbio/parsers/expasy_dat.py](src/biom3/dbio/parsers/expasy_dat.py))
 - **Built CSV:** `expasy_enzyme.csv` + `expasy_enzyme.build_manifest.json`
 - **Primary key:** `ec` (EC number)
 - **Format:** section-delimited flatfile; `ID`=EC, `DE`=description, `AN`=alternative names, `CA`=catalytic activity (reaction), `CF`=cofactor, `DR`=UniProt accession cross-refs, `//`=record separator
@@ -93,17 +93,17 @@ Every join in `biom3.dbio` uses one of these identifier families. Tags match the
 
 - **Raw file:** `data/databases/smart/SMART_domains.txt` (~350 KB; TSV)
 - **Version:** file mtime (no formal release string)
-- **Parser:** `SmartReader` (new, [src/biom3/dbio/smart.py](src/biom3/dbio/smart.py))
+- **Parser:** `SmartReader` (new, [src/biom3/dbio/parsers/smart_tsv.py](src/biom3/dbio/parsers/smart_tsv.py))
 - **Built CSV:** `smart_domains.csv` + `smart_domains.build_manifest.json`
 - **Primary key:** `domain_id` (SMART accession, `SMxxxxx`)
 - **Format:** header `DOMAIN\tACC\tDEFINITION\tDESCRIPTION`, one row per domain
-- **Cross-refs in:** UniProt `DR SMART;` lines (requires extending [SwissProtDatParser](src/biom3/dbio/swissprot_dat.py) to capture these — see Phase 5)
+- **Cross-refs in:** UniProt `DR SMART;` lines (requires extending [SwissProtDatParser](src/biom3/dbio/parsers/swissprot_dat.py) to capture these — see Phase 5)
 
 ### BRENDA (enzyme kinetics) — planned Phase 4
 
 - **Raw file:** `data/databases/brenda/brenda_2026_1.txt` (~278 MB)
 - **Version:** header `BR\t<version>` on line 1 (e.g. `BR\t2026.1`)
-- **Parser:** `BrendaParser` (new, [src/biom3/dbio/brenda.py](src/biom3/dbio/brenda.py))
+- **Parser:** `BrendaParser` (new, [src/biom3/dbio/parsers/brenda_flatfile.py](src/biom3/dbio/parsers/brenda_flatfile.py))
 - **Built CSV:** `brenda_kinetics.csv` + `brenda_kinetics.build_manifest.json`
 - **Primary keys:** `ec` + `organism` (one row per enzyme-organism pair)
 - **Format:** section-delimited flatfile; each entry starts with `ID\t<EC>`, contains sections `PROTEIN` (per-organism refs), `RECOMMENDED_NAME` (`RN`), `SYSTEMATIC_NAME` (`SN`), `REACTION` (`RE`), `KM_VALUE`, `TURNOVER_NUMBER`, etc. Multi-line records use indented continuation; `///` separates entries.
@@ -137,7 +137,7 @@ SwissProt.DR SMART;   ─SMxxxxx──►  SmartReader.domain_id  ─►  descri
 SwissProt.DR PDB;     ─4-char ID──►  PDB.pdb_id  ─chain──►  SCOPe / CATH classification
 ```
 
-Note: `DR SMART;`, `DR InterPro;`, `DR PDB;` are **present in the raw UniProt `.dat`** but not captured by the current [SwissProtDatParser](src/biom3/dbio/swissprot_dat.py#L445-L460). Extending the parser is part of Phase 5 in the integration plan.
+Note: `DR SMART;`, `DR InterPro;`, `DR PDB;` are **present in the raw UniProt `.dat`** but not captured by the current [SwissProtDatParser](src/biom3/dbio/parsers/swissprot_dat.py#L445-L460). Extending the parser is part of Phase 5 in the integration plan.
 
 ---
 
@@ -158,7 +158,7 @@ All CSVs emitted by `biom3.dbio` obey one contract. Downstream consumers (Stage 
 1. `annot_*` columns will remain the structured source of truth. Composed captions may be reformatted across versions; `annot_*` schemas are append-only (new fields added; existing fields never renamed without a migration).
 2. `[final]text_caption` will remain present and named as-is — Stage 1 reads it at [Stage1/preprocess.py:39](src/biom3/Stage1/preprocess.py#L39).
 3. Every output CSV is accompanied by:
-   - `<stem>.build_manifest.json` — input paths, mtimes, sizes, upstream release versions, row counts, elapsed wall time, and a structured `stats` dict. See [build_source_swissprot.py:312-318](src/biom3/dbio/build_source_swissprot.py#L312-L318).
+   - `<stem>.build_manifest.json` — input paths, mtimes, sizes, upstream release versions, row counts, elapsed wall time, and a structured `stats` dict. See [build_source_swissprot.py:312-318](src/biom3/dbio/builders/source_swissprot.py#L312-L318).
    - `<stem>.stats.md` — human-readable coverage report showing row count, sequence-length distribution, per-`annot_*` column coverage (% populated, mean character length), `pfam_label` distinct-family count with top-N, and (for `build_dataset`) per-source row breakdown + per-join hit rates.
 
 ---
@@ -188,14 +188,14 @@ These are next in line. They will follow the same `build_source_*` + `<stem>.bui
 - **Linkage in:** via PDB ID → CATH domain → hierarchy label
 - **Annotation value:** class / architecture / topology / homologous superfamily names.
 
-All three share the **PDB ID as the required bridge**. Integrating any one of them requires, at minimum, the `DR PDB;` parser extension in [SwissProtDatParser](src/biom3/dbio/swissprot_dat.py).
+All three share the **PDB ID as the required bridge**. Integrating any one of them requires, at minimum, the `DR PDB;` parser extension in [SwissProtDatParser](src/biom3/dbio/parsers/swissprot_dat.py).
 
 ---
 
 ## When to revise this doc
 
 - When a new `build_source_*` script lands, add its database section here.
-- When [SwissProtDatParser](src/biom3/dbio/swissprot_dat.py) starts capturing a new `DR` cross-ref type, update the "Cross-refs captured today" list for SwissProt.
+- When [SwissProtDatParser](src/biom3/dbio/parsers/swissprot_dat.py) starts capturing a new `DR` cross-ref type, update the "Cross-refs captured today" list for SwissProt.
 - When a join helper is added to [enrich.py](src/biom3/dbio/enrich.py), add the hop to the cheat sheet.
 - When a planned database gets downloaded and a parser starts, move its section up from "Planned" into "Integrated".
 - When the canonical CSV contract changes, update the table and bump a version note on the consumer side (Stage 1 preprocess).

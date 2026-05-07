@@ -93,7 +93,7 @@ UniProt/Swiss-Prot release 2026_01 (January 2026). Manually curated protein sequ
 | `uniprot_sprot.fasta.gz` | 90 MB | Swiss-Prot FASTA sequences (~568K entries) |
 | `uniprot_sprot.dat.gz` | 661 MB | Full flat-file with annotations, GO terms, cross-references |
 
-The `uniprot_sprot.dat.gz` file is used by `--enrich_pfam` to extract protein annotations (protein name, function, catalytic activity, GO terms, lineage, etc.) locally, without requiring UniProt API access.
+The `uniprot_sprot.dat.gz` file is used by `--enrich_pfam` to extract protein annotations (protein name, function, catalytic activity, GO terms, lineage, etc.) locally. Pair it with the larger `uniprot_trembl.dat.gz` for full Pfam-row coverage, or use a pre-built annotation Parquet cache (`--annotation_cache`) for instant lookup.
 
 ### SMART (`smart/`)
 
@@ -131,11 +131,12 @@ Optional flags require additional database files to be synced in `data/databases
 
 | Flag | Required files |
 |------|----------------|
-| `--enrich_pfam` | None (uses UniProt REST API; results are cached in `--uniprot_cache_dir`) |
-| `--enrich_pfam --annotation_cache <paths>` | Pre-built annotation Parquet cache(s) — fastest option |
-| `--enrich_pfam --uniprot_dat <paths>` | One or more local `.dat.gz` files (no API needed) |
+| `--enrich_pfam --annotation_cache <paths>` | Pre-built annotation Parquet cache(s) — fastest option, recommended |
+| `--enrich_pfam --uniprot_dat <paths>` | One or more local `.dat.gz` files |
 | `--add_taxonomy` | `ncbi_taxonomy/rankedlineage.dmp`, `ncbi_taxonomy/prot.accession2taxid.gz` |
 | `--taxonomy_filter` | Same as `--add_taxonomy` |
+
+`--enrich_pfam` requires either `--annotation_cache` or `--uniprot_dat`. The legacy UniProt REST API path was removed in v0.1.0a7.
 
 **Note on local enrichment**: Pfam domain accessions are overwhelmingly from TrEMBL (unreviewed UniProt), not Swiss-Prot (reviewed). Using `--uniprot_dat` with only `uniprot_sprot.dat.gz` will match very few Pfam accessions. For full local coverage, also include the TrEMBL flat file:
 

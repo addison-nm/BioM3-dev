@@ -92,9 +92,9 @@ The Swiss-Prot builder has two legacy-parity flags:
 
 **Caption formatting** is controlled by a `CaptionSpec` in each builder module.
 Defaults reproduce the legacy CSVs: ALL-CAPS labels for Swiss-Prot (`SWISSPROT_SPEC`
-in [src/biom3/dbio/build_source_swissprot.py](../src/biom3/dbio/build_source_swissprot.py)),
+in [src/biom3/dbio/builders/source_swissprot.py](../src/biom3/dbio/builders/source_swissprot.py)),
 lowercase labels for Pfam (`PFAM_SPEC` in
-[src/biom3/dbio/build_source_pfam.py](../src/biom3/dbio/build_source_pfam.py)).
+[src/biom3/dbio/builders/source_pfam.py](../src/biom3/dbio/builders/source_pfam.py)).
 See [demos/custom_caption_format.py](../demos/custom_caption_format.py) for
 swapping fields or relabeling.
 
@@ -366,23 +366,6 @@ as a fallback — only accessions not found in the cache are looked up via the
 raw `.dat` file. This lets you combine a pre-built cache with a freshly
 downloaded `.dat` for maximum coverage.
 
-### UniProt REST API enrichment (fallback)
-
-When local `.dat` files are not available, fetch annotations via the UniProt
-REST API (with disk caching and rate limiting):
-
-```python
-from biom3.dbio.uniprot_client import UniProtClient
-from biom3.dbio.enrich import enrich_dataframe, compose_caption
-
-client = UniProtClient(cache_dir=".uniprot_cache")
-accessions = df_pfam["primary_Accession"].dropna().unique().tolist()
-uniprot_data = client.fetch_all(accessions, batch_size=25)
-
-df_enriched = enrich_dataframe(df_pfam, uniprot_data=uniprot_data)
-df_enriched = compose_caption(df_enriched)
-```
-
 ### Caption format
 
 The enrichment adds up to 18 annotation columns. `compose_caption()` assembles
@@ -445,17 +428,14 @@ biom3_build_dataset -p PF00018 -o output/sh3_dataset
 # Multiple families at once
 biom3_build_dataset -p PF00018 PF07714 -o output/sh3_kinase_dataset
 
-# With UniProt enrichment (via REST API)
-biom3_build_dataset -p PF00018 -o output/sh3_enriched --enrich_pfam
+# With pre-built annotation cache (recommended — see "Annotation cache" section)
+biom3_build_dataset -p PF00018 -o output/sh3_enriched --enrich_pfam \
+    --annotation_cache data/databases/trembl/trembl_annotations.parquet
 
-# With offline enrichment from local .dat files
+# With offline enrichment from local .dat files (slower, hours-long parse)
 biom3_build_dataset -p PF00018 -o output/sh3_enriched --enrich_pfam \
     --uniprot_dat data/databases/swissprot/uniprot_sprot.dat.gz \
                   data/databases/trembl/uniprot_trembl.dat.gz
-
-# With pre-built annotation cache (fastest — see "Annotation cache" section)
-biom3_build_dataset -p PF00018 -o output/sh3_enriched --enrich_pfam \
-    --annotation_cache data/databases/trembl/trembl_annotations.parquet
 
 # With taxonomy lineage
 biom3_build_dataset -p PF00018 -o output/sh3_taxonomy --add_taxonomy
@@ -481,13 +461,11 @@ biom3_build_dataset -p PF00018 -o output/sh3_dataset \
 | `--databases_root` | from config | Override database root path |
 | `--config` | `configs/dbio_config.json` | Path to config JSON |
 | `--chunk_size` | `500000` | Chunk size for Pfam CSV reading |
-| `--enrich_pfam` | off | Enrich captions with UniProt annotations (API by default) |
+| `--enrich_pfam` | off | Enrich captions with UniProt annotations. Requires `--annotation_cache` or `--uniprot_dat` |
 | `--annotation_cache` | none | Pre-built annotation Parquet cache(s) for fast enrichment (see above) |
-| `--uniprot_dat` | none | Use local `.dat.gz` file(s) instead of API (accepts multiple paths) |
+| `--uniprot_dat` | none | Local `.dat.gz` file(s) for enrichment (accepts multiple paths) |
 | `--add_taxonomy` | off | Add NCBI taxonomy lineage |
 | `--taxonomy_filter` | none | Filter by rank (e.g., `"superkingdom=Bacteria"`) |
-| `--uniprot_cache_dir` | `.uniprot_cache` | Cache directory for API responses |
-| `--uniprot_batch_size` | `25` | Batch size for UniProt API requests |
 
 ### Output files
 

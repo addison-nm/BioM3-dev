@@ -5,8 +5,8 @@ by parsing raw protein database files. This document traces each CSV column back
 its source.
 
 Both CSVs can now be regenerated in-package via
-[`biom3_build_source_swissprot`](../src/biom3/dbio/build_source_swissprot.py) and
-[`biom3_build_source_pfam`](../src/biom3/dbio/build_source_pfam.py) — see
+[`biom3_build_source_swissprot`](../src/biom3/dbio/builders/source_swissprot.py) and
+[`biom3_build_source_pfam`](../src/biom3/dbio/builders/source_pfam.py) — see
 [building_datasets_with_dbio.md](building_datasets_with_dbio.md#rebuilding-the-source-csvs-from-raw-databases)
 for CLI usage. The column mappings below describe what those builders (and the
 legacy CSVs they replace) produce.
@@ -61,7 +61,7 @@ layout.
 ### Caption field sources
 
 `[final]text_caption` is composed in the field order defined by `SWISSPROT_SPEC`
-(see [build_source_swissprot.py](../src/biom3/dbio/build_source_swissprot.py)),
+(see [build_source_swissprot.py](../src/biom3/dbio/builders/source_swissprot.py)),
 with ALL-CAPS labels as prefixes:
 
 | Caption Field | `annot_*` column | `.dat` Line Code | Parsing Notes |
@@ -100,7 +100,7 @@ with ALL-CAPS labels as prefixes:
 - `Pfam-A.full.gz` *(preferred)* or `Pfam-A.hmm.gz` — Family metadata only
   (`family_name`, `family_description`), parsed once into an in-memory
   `PF_ID → metadata` lookup by
-  [`PfamMetadataParser`](../src/biom3/dbio/pfam_metadata.py). The Stockholm
+  [`PfamMetadataParser`](../src/biom3/dbio/parsers/pfam_stockholm.py). The Stockholm
   file is preferred because it carries family-description `#=GF CC` lines,
   which the HMM file lacks.
 
@@ -171,7 +171,7 @@ for overriding the defaults.
 release 37.1). PF00018 (SH3) yields 26,468 rows in Pfam 38.1 — that is the
 complete figure for this release, not a builder bug. For full reference-proteome
 coverage of selected families (e.g., 176,301 rows for PF00018) use
-[`biom3_build_annotated_pfam_subsets`](../src/biom3/dbio/build_annotated_pfam_subsets.py),
+[`biom3_build_annotated_pfam_subsets`](../src/biom3/dbio/builders/pfam_subsets.py),
 which streams `Pfam-A.full.gz` directly and emits an 11-column CSV with
 `family_type` / `family_clan` / `family_wikipedia` / `family_references`
 side fields. See

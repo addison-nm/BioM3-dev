@@ -11,6 +11,7 @@ from biom3.dbio.readers.swissprot_csv import OUTPUT_COLS
 DATDIR = os.path.join("tests", "_data", "dbio")
 SWISSPROT_PATH = os.path.join(DATDIR, "mini_swissprot.csv")
 PFAM_PATH = os.path.join(DATDIR, "mini_pfam.csv")
+PFAM_ALT_PATH = os.path.join(DATDIR, "mini_pfam_alt.csv")
 
 
 class TestBuildDataset:
@@ -241,3 +242,108 @@ class TestTaxonomyDirOverride:
         assert args.taxonomy_dir is None
         resolved = _resolve_taxonomy_dir(args)
         assert resolved.endswith("ncbi_taxonomy")
+
+
+class TestPfamMultiInput:
+    """--pfam accepts multiple paths; concat + dedupe semantics."""
+
+    @pytest.fixture
+    def outdir(self, tmp_path):
+        return str(tmp_path / "test_output")
+
+    def test_single_pfam_path_still_works(self, outdir):
+        """Regression: one --pfam path produces the same output as before."""
+        args = parse_arguments([
+            "-p", "PF00018",
+            "--swissprot", SWISSPROT_PATH,
+            "--pfam", PFAM_PATH,
+            "-o", outdir,
+        ])
+        # nargs="+" wraps a single path in a 1-element list
+        assert args.pfam == [PFAM_PATH]
+        main(args)
+        df = pd.read_csv(os.path.join(outdir, "dataset.csv"))
+        assert len(df) == 9  # same as the basic single-path test
+
+    def test_multi_pfam_paths_concatenate_with_dedupe_default(self, outdir):
+        """Two --pfam paths with one overlapping row → deduped on (acc, pfam_label)."""
+        args = parse_arguments([
+            "-p", "PF00018", "PF07714",
+            "--swissprot", SWISSPROT_PATH,
+            "--pfam", PFAM_PATH, PFAM_ALT_PATH,
+            "-o", outdir,
+        ])
+        assert args.pfam == [PFAM_PATH, PFAM_ALT_PATH]
+        assert args.no_dedupe_pfam is False
+        main(args)
+        df = pd.read_csv(os.path.join(outdir, "dataset.csv"))
+        # The Pfam side must have unique (primary_Accession, pfam_label).
+        # mini_pfam.csv contributes PF00018 rows for A0A001..A0A005 and
+        # mini_pfam_alt.csv contributes A0A001 (overlap), A0A100, A0A101.
+        # After dedupe the Pfam side has the 5 originals + 2 new (A0A100,
+        # A0A101) = 7 unique Pfam rows. SwissProt contributes 4. Total: 11.
+        pfam_side = df[df["primary_Accession"].str.startswith("A0A")]
+        accs = list(pfam_side["primary_Accession"])
+        assert "A0A001" in accs
+        assert "A0A100" in accs
+        assert "A0A101" in accs
+        # Only one A0A001 row despite appearing in both inputs:
+        assert accs.count("A0A001") == 1
+
+    def test_no_dedupe_pfam_preserves_duplicates(self, outdir):
+        """--no_dedupe_pfam: A0A001 appears twice (once per input)."""
+        args = parse_arguments([
+            "-p", "PF00018", "PF07714",
+            "--swissprot", SWISSPROT_PATH,
+            "--pfam", PFAM_PATH, PFAM_ALT_PATH,
+            "--no_dedupe_pfam",
+            "-o", outdir,
+        ])
+        assert args.no_dedupe_pfam is True
+        main(args)
+        df = pd.read_csv(os.path.join(outdir, "dataset.csv"))
+        accs = list(df[df["primary_Accession"].str.startswith("A0A")]["primary_Accession"])
+        # A0A001 appears in both fixtures, multiset preserves both
+        assert accs.count("A0A001") == 2
+
+    def test_manifest_records_list_of_pfam_paths(self, outdir):
+        """Manifest's pfam_csv resolved_paths and database_versions are lists."""
+        import json
+        args = parse_arguments([
+            "-p", "PF00018", "PF07714",
+            "--swissprot", SWISSPROT_PATH,
+            "--pfam", PFAM_PATH, PFAM_ALT_PATH,
+            "-o", outdir,
+        ])
+        main(args)
+        manifest = json.load(open(os.path.join(outdir, "build_manifest.json")))
+        assert isinstance(manifest["resolved_paths"]["pfam_csv"], list)
+        assert len(manifest["resolved_paths"]["pfam_csv"]) == 2
+        assert isinstance(manifest["database_versions"]["pfam_csv"], list)
+        assert len(manifest["database_versions"]["pfam_csv"]) == 2
+
+    def test_resolve_pfam_paths_returns_list_in_config_fallback(
+        self, monkeypatch, tmp_path,
+    ):
+        """Without --pfam, the resolver returns a 1-element list."""
+        from biom3.dbio.pipelines.build_dataset import _resolve_pfam_paths
+
+        # Build a minimal fake databases_root with a writable pfam_csv
+        fake_root = tmp_path / "databases"
+        (fake_root / "datasets").mkdir(parents=True)
+        fake_pfam = fake_root / "datasets" / "Pfam_protein_text_dataset.csv"
+        fake_pfam.write_text("id,range,description,pfam_label,sequence\n")
+        monkeypatch.setenv("BIOM3_DATABASES_ROOT", str(fake_root))
+
+        # Trick config: training_data_root defaults to databases_root if no
+        # config; the resolver calls get_training_data_path which under the
+        # hood uses get_training_data_root → falls back to databases_root.
+        args = parse_arguments([
+            "-p", "PF00018",
+            "--swissprot", SWISSPROT_PATH,
+            "-o", str(tmp_path / "out"),
+        ])
+        assert args.pfam is None
+        resolved = _resolve_pfam_paths(args)
+        assert isinstance(resolved, list)
+        assert len(resolved) == 1

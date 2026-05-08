@@ -65,10 +65,10 @@ def _get_database_versions(args):
     versions = {}
 
     swissprot_path = _resolve_swissprot_path(args)
-    pfam_path = _resolve_pfam_path(args)
+    pfam_paths = _resolve_pfam_paths(args)
 
     versions["swissprot_csv"] = get_file_metadata(swissprot_path)
-    versions["pfam_csv"] = get_file_metadata(pfam_path)
+    versions["pfam_csv"] = [get_file_metadata(p) for p in pfam_paths]
 
     # UniProt release version from reldate.txt
     try:
@@ -128,8 +128,21 @@ def parse_arguments(args):
         help="Path to fully_annotated_swiss_prot.csv (default: from config)",
     )
     parser.add_argument(
-        "--pfam", type=str, default=None,
-        help="Path to Pfam_protein_text_dataset.csv (default: from config)",
+        "--pfam", type=str, nargs="+", default=None, metavar="PATH",
+        help="One or more paths to Pfam protein-text CSVs/Parquets. "
+             "Single path: the foundational Pfam_protein_text_dataset.csv "
+             "(legacy default). Multiple paths: typically per-family "
+             "pfam_full_subsets_*.csv artifacts produced by "
+             "biom3_build_pfam_subsets, all sharing the same 11-column "
+             "schema. Paths are concatenated before --pfam_ids "
+             "filtering. Default: from config.",
+    )
+    parser.add_argument(
+        "--no_dedupe_pfam", action="store_true", default=False,
+        help="When --pfam is given multiple paths, preserve duplicate "
+             "(primary_Accession, pfam_label) rows instead of dropping "
+             "them. Only meaningful with multi-path --pfam; ignored for "
+             "single-path inputs.",
     )
     parser.add_argument(
         "--databases_root", type=str, default=None,
@@ -263,10 +276,17 @@ def _resolve_swissprot_path(args):
     return str(get_training_data_path("swissprot_csv", args.config))
 
 
-def _resolve_pfam_path(args):
+def _resolve_pfam_paths(args):
+    """Resolve Pfam input paths.
+
+    Returns a list of one or more paths. When --pfam is set on the
+    CLI, returns the user-provided list verbatim. When unset, falls
+    back to the single config-discovered pfam_csv path wrapped in a
+    1-element list so callers can iterate uniformly.
+    """
     if args.pfam:
-        return args.pfam
-    return str(get_training_data_path("pfam_csv", args.config))
+        return list(args.pfam)
+    return [str(get_training_data_path("pfam_csv", args.config))]
 
 
 def _resolve_source_csv(args, attr_name, dataset_key):
@@ -318,19 +338,51 @@ def main(args):
 
     # Resolve paths
     swissprot_path = _resolve_swissprot_path(args)
-    pfam_path = _resolve_pfam_path(args)
+    pfam_paths = _resolve_pfam_paths(args)
 
     # Extract from SwissProt
     logger.info("Extracting from SwissProt...")
     sp_reader = SwissProtReader(swissprot_path)
     df_sp = sp_reader.query_by_pfam(args.pfam_ids)
 
-    # Extract from Pfam (always keep family columns for annotation/caption)
-    logger.info("Extracting from Pfam (chunked)...")
-    pfam_reader = PfamReader(pfam_path, chunk_size=args.chunk_size)
-    df_pfam = pfam_reader.query_by_pfam(
-        args.pfam_ids, keep_family_cols=True,
-    )
+    # Extract from Pfam input(s). For multi-path runs, query each in
+    # turn and concatenate. Dedupe on (primary_Accession, pfam_label)
+    # by default; --no_dedupe_pfam preserves the union as a multiset.
+    logger.info("Extracting from Pfam (%d input(s))...", len(pfam_paths))
+    per_path_dfs = []
+    for i, path in enumerate(pfam_paths, 1):
+        reader = PfamReader(path, chunk_size=args.chunk_size)
+        df_i = reader.query_by_pfam(
+            args.pfam_ids, keep_family_cols=True,
+        )
+        logger.info(
+            "Pfam input %d/%d (%s): %s rows",
+            i, len(pfam_paths), os.path.basename(path), f"{len(df_i):,}",
+        )
+        per_path_dfs.append(df_i)
+
+    if per_path_dfs:
+        df_pfam = pd.concat(per_path_dfs, ignore_index=True)
+    else:
+        from biom3.dbio.readers.pfam_csv import OUTPUT_COLS as _PFAM_COLS
+        df_pfam = pd.DataFrame(
+            columns=_PFAM_COLS + ["family_name", "family_description"],
+        )
+
+    if not args.no_dedupe_pfam and len(pfam_paths) > 1:
+        pre = len(df_pfam)
+        df_pfam = df_pfam.drop_duplicates(
+            subset=["primary_Accession", "pfam_label"], keep="first",
+        ).reset_index(drop=True)
+        logger.info(
+            "Pfam (combined, deduped): %s → %s rows from %d input(s)",
+            f"{pre:,}", f"{len(df_pfam):,}", len(pfam_paths),
+        )
+    else:
+        logger.info(
+            "Pfam (combined): %s rows from %d input(s)",
+            f"{len(df_pfam):,}", len(pfam_paths),
+        )
 
     # Step 1: Populate annotation columns on Pfam rows
     from biom3.dbio.enrich import enrich_dataframe
@@ -458,7 +510,7 @@ def main(args):
     # Precompute common build_manifest fields
     resolved_paths = {
         "swissprot_csv": os.path.abspath(_resolve_swissprot_path(args)),
-        "pfam_csv": os.path.abspath(_resolve_pfam_path(args)),
+        "pfam_csv": [os.path.abspath(p) for p in _resolve_pfam_paths(args)],
     }
     if args.use_expasy and args.expasy_csv:
         resolved_paths["expasy_csv"] = os.path.abspath(args.expasy_csv)

@@ -465,7 +465,9 @@ biom3_build_dataset -p PF00018 -o output/sh3_dataset \
 | `--annotation_cache` | none | Pre-built annotation Parquet cache(s) for fast enrichment (see above) |
 | `--uniprot_dat` | none | Local `.dat.gz` file(s) for enrichment (accepts multiple paths) |
 | `--add_taxonomy` | off | Add NCBI taxonomy lineage |
-| `--taxonomy_filter` | none | Filter by rank (e.g., `"superkingdom=Bacteria"`) |
+| `--taxonomy_filter` | none | Filter by rank (e.g., `"superkingdom=Bacteria"`). Literal `None` elements are dropped; an all-`None` list is treated as if the flag were not passed. |
+| `--taxid_index` | none | Path to a pre-built SQLite accession→taxid index (built via `biom3_build_taxid_index`). When set, replaces the streaming scan of `prot.accession2taxid.gz`. |
+| `--taxonomy_dir` | from config | Directory containing `rankedlineage.dmp` (and optionally `prot.accession2taxid.gz` when `--taxid_index` is not set). When set, overrides the `ncbi_taxonomy` path resolved from `BIOM3_DATABASES_ROOT` or `configs/dbio_config.json`. Use this when running `biom3_build_dataset` with all paths supplied explicitly (no `databases_root` config / env var). |
 
 ### Output files
 

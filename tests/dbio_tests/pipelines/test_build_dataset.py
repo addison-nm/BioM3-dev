@@ -153,3 +153,91 @@ class TestBuildDataset:
         assert manifest["outputs"]["row_counts"]["swissprot"] == 4
         assert manifest["outputs"]["row_counts"]["pfam"] == 5
         assert manifest["outputs"]["row_counts"]["combined"] == 9
+
+
+class TestTaxonomyFilterNormalization:
+    """parse_arguments should treat literal 'None' values as not-set."""
+
+    def test_filter_none_string_normalized_to_none(self):
+        args = parse_arguments([
+            "-p", "PF00018",
+            "--swissprot", SWISSPROT_PATH,
+            "--pfam", PFAM_PATH,
+            "-o", "/tmp/x",
+            "--taxonomy_filter", "None",
+        ])
+        assert args.taxonomy_filter is None
+
+    def test_filter_mixed_drops_only_none(self):
+        args = parse_arguments([
+            "-p", "PF00018",
+            "--swissprot", SWISSPROT_PATH,
+            "--pfam", PFAM_PATH,
+            "-o", "/tmp/x",
+            "--taxonomy_filter", "superkingdom=Bacteria", "None",
+        ])
+        assert args.taxonomy_filter == ["superkingdom=Bacteria"]
+
+    def test_filter_real_value_unchanged(self):
+        args = parse_arguments([
+            "-p", "PF00018",
+            "--swissprot", SWISSPROT_PATH,
+            "--pfam", PFAM_PATH,
+            "-o", "/tmp/x",
+            "--taxonomy_filter", "phylum=Pseudomonadota",
+        ])
+        assert args.taxonomy_filter == ["phylum=Pseudomonadota"]
+
+    def test_filter_unset_remains_none(self):
+        args = parse_arguments([
+            "-p", "PF00018",
+            "--swissprot", SWISSPROT_PATH,
+            "--pfam", PFAM_PATH,
+            "-o", "/tmp/x",
+        ])
+        assert args.taxonomy_filter is None
+
+
+class TestTaxonomyDirOverride:
+    """--taxonomy_dir should bypass get_database_path('ncbi_taxonomy', ...)."""
+
+    def test_flag_parsed(self):
+        args = parse_arguments([
+            "-p", "PF00018",
+            "--swissprot", SWISSPROT_PATH,
+            "--pfam", PFAM_PATH,
+            "-o", "/tmp/x",
+            "--taxonomy_dir", "/some/explicit/path",
+        ])
+        assert args.taxonomy_dir == "/some/explicit/path"
+
+    def test_resolve_uses_explicit_path_when_set(self):
+        from biom3.dbio.pipelines.build_dataset import _resolve_taxonomy_dir
+        args = parse_arguments([
+            "-p", "PF00018",
+            "--swissprot", SWISSPROT_PATH,
+            "--pfam", PFAM_PATH,
+            "-o", "/tmp/x",
+            "--taxonomy_dir", "/explicit/ncbi_taxonomy",
+        ])
+        assert _resolve_taxonomy_dir(args) == "/explicit/ncbi_taxonomy"
+
+    def test_resolve_falls_through_to_config_when_unset(self, monkeypatch, tmp_path):
+        """Without --taxonomy_dir, _resolve_taxonomy_dir should reach for config."""
+        from biom3.dbio.pipelines.build_dataset import _resolve_taxonomy_dir
+
+        # Point BIOM3_DATABASES_ROOT at a tmp dir so the config path
+        # resolves cleanly without depending on the host env.
+        fake_root = tmp_path / "databases"
+        (fake_root / "ncbi_taxonomy").mkdir(parents=True)
+        monkeypatch.setenv("BIOM3_DATABASES_ROOT", str(fake_root))
+
+        args = parse_arguments([
+            "-p", "PF00018",
+            "--swissprot", SWISSPROT_PATH,
+            "--pfam", PFAM_PATH,
+            "-o", "/tmp/x",
+        ])
+        assert args.taxonomy_dir is None
+        resolved = _resolve_taxonomy_dir(args)
+        assert resolved.endswith("ncbi_taxonomy")

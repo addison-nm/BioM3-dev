@@ -171,11 +171,22 @@ def parse_arguments(args):
     )
     parser.add_argument(
         "--taxonomy_filter", type=str, nargs="*", default=None,
-        help='Filter by taxonomy rank (e.g. "superkingdom=Bacteria")',
+        help='Filter by taxonomy rank (e.g. "superkingdom=Bacteria"). '
+             'Literal "None" elements are dropped; an all-"None" list '
+             'is treated as if the flag were not passed.',
     )
     parser.add_argument(
         "--taxid_index", type=str, default=None,
         help="Path to pre-built SQLite accession2taxid index (built via biom3_build_taxid_index)",
+    )
+    parser.add_argument(
+        "--taxonomy_dir", type=str, default=None,
+        help="Directory containing rankedlineage.dmp (and optionally "
+             "prot.accession2taxid.gz when --taxid_index is not set). "
+             "When set, overrides the ncbi_taxonomy path resolved from "
+             "BIOM3_DATABASES_ROOT or configs/dbio_config.json. Use this "
+             "when running biom3_build_dataset with all paths supplied "
+             "explicitly (no databases_root config / env var).",
     )
     parser.add_argument(
         "--output_filename", type=str, default="dataset.csv",
@@ -233,7 +244,17 @@ def parse_arguments(args):
              "dataset is written in this mode. Default: a single "
              "combined dataset at --outdir.",
     )
-    return parser.parse_args(args)
+    parsed = parser.parse_args(args)
+
+    # Normalize --taxonomy_filter: drop literal "None" / "none" elements
+    # (commonly produced by unsubstituted shell template variables like
+    # `--taxonomy_filter $TAXONOMY_FILTER` when the var is unset). If the
+    # surviving list is empty, treat the flag as unset.
+    if parsed.taxonomy_filter:
+        cleaned = [f for f in parsed.taxonomy_filter if f.strip().lower() != "none"]
+        parsed.taxonomy_filter = cleaned if cleaned else None
+
+    return parsed
 
 
 def _resolve_swissprot_path(args):
@@ -544,11 +565,24 @@ def _write_dataset_outputs(df, outdir, pfam_ids, args, *,
     logger.info("Saved build manifest to %s", manifest_path)
 
 
+def _resolve_taxonomy_dir(args):
+    """Resolve the NCBI taxonomy directory.
+
+    Priority: explicit --taxonomy_dir flag > config-resolved
+    get_database_path("ncbi_taxonomy", ...). Lets callers run
+    biom3_build_dataset with all paths supplied on the CLI without
+    requiring BIOM3_DATABASES_ROOT or configs/dbio_config.json.
+    """
+    if getattr(args, "taxonomy_dir", None):
+        return args.taxonomy_dir
+    return str(get_database_path("ncbi_taxonomy", args.config))
+
+
 def _load_taxonomy(args, accessions):
     """Load taxonomy tree and look up accessions."""
     from biom3.dbio.readers.taxonomy import TaxonomyTree, AccessionTaxidMapper
 
-    taxonomy_dir = str(get_database_path("ncbi_taxonomy", args.config))
+    taxonomy_dir = _resolve_taxonomy_dir(args)
     taxonomy_tree = TaxonomyTree(taxonomy_dir)
     taxonomy_tree.load()
 
@@ -591,7 +625,7 @@ def _apply_taxonomy_filters(df, args):
     from biom3.dbio.readers.taxonomy import TaxonomyTree, AccessionTaxidMapper
 
     filters = _parse_taxonomy_filters(args.taxonomy_filter)
-    taxonomy_dir = str(get_database_path("ncbi_taxonomy", args.config))
+    taxonomy_dir = _resolve_taxonomy_dir(args)
     taxonomy_tree = TaxonomyTree(taxonomy_dir)
     taxonomy_tree.load()
 

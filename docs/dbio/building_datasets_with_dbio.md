@@ -136,12 +136,29 @@ enriched with Pfam-level annotations beyond what the main builder
 captures: `family_type`, `family_clan`, `family_wikipedia`, and
 `family_references` (all `#=GF` header fields joined per row).
 
+Two output modes, mutually exclusive:
+
 ```bash
+# Single concatenated CSV across all --pfam_ids
 biom3_build_pfam_subsets \
     -p PF00018 PF07714 \
     --pfam_full data/databases/pfam/Pfam-A.full.gz \
     -o outputs/SH3_Pkinase_full.csv
+
+# One CSV per Pfam ID under --outdir (single Stockholm pass)
+biom3_build_pfam_subsets \
+    -p PF00018 PF07714 \
+    --pfam_full data/databases/pfam/Pfam-A.full.gz \
+    --per_pfam_output \
+    --outdir outputs/pfam_full_subsets_split/
+# Produces outputs/pfam_full_subsets_split/PF00018.csv,
+# PF07714.csv, plus matching <pfam_id>.build_manifest.json and
+# <pfam_id>.stats.md sidecars per file.
 ```
+
+The per-Pfam mode pairs naturally with `biom3_build_dataset --pfam`
+multi-input — split once on the way out, recombine selectively on
+the way in.
 
 | CLI | Source file | Scope | PF00018 row count |
 |-----|-------------|-------|-------------------|
@@ -448,6 +465,15 @@ biom3_build_dataset -p PF00018 -o output/sh3_bacteria \
 biom3_build_dataset -p PF00018 -o output/sh3_dataset \
     --swissprot /path/to/fully_annotated_swiss_prot.csv \
     --pfam /path/to/Pfam_protein_text_dataset.csv
+
+# Combine multiple per-family pfam_full_subsets_*.csv artifacts as
+# one virtual --pfam input (concatenated before --pfam_ids filtering;
+# duplicates on (primary_Accession, pfam_label) deduped by default,
+# earlier paths win):
+biom3_build_dataset -p PF00018 PF07714 -o output/sh3_kinase \
+    --swissprot /path/to/fully_annotated_swiss_prot.csv \
+    --pfam /path/to/pfam_full_subsets_PF00018_v20260507.csv \
+            /path/to/pfam_full_subsets_PF07714_v20260507.csv
 ```
 
 ### Full argument reference
@@ -457,7 +483,8 @@ biom3_build_dataset -p PF00018 -o output/sh3_dataset \
 | `-p`, `--pfam_ids` | *(required)* | One or more Pfam IDs (e.g., `PF00018 PF07714`) |
 | `-o`, `--outdir` | *(required)* | Output directory |
 | `--swissprot` | from config | Path to SwissProt CSV |
-| `--pfam` | from config | Path to Pfam CSV |
+| `--pfam` | from config | One or more paths to Pfam protein-text CSVs/Parquets. Single path: foundational `Pfam_protein_text_dataset.csv` (legacy default). Multiple paths: typically per-family `pfam_full_subsets_*.csv` artifacts produced by `biom3_build_pfam_subsets` — concatenated before `--pfam_ids` filtering. |
+| `--no_dedupe_pfam` | off | When `--pfam` has multiple paths, preserve duplicate `(primary_Accession, pfam_label)` rows instead of dropping them (default behavior dedupes; earlier paths win on collision). Ignored for single-path inputs. |
 | `--databases_root` | from config | Override database root path |
 | `--config` | `configs/dbio_config.json` | Path to config JSON |
 | `--chunk_size` | `500000` | Chunk size for Pfam CSV reading |

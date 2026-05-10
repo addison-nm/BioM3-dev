@@ -197,6 +197,34 @@ context) at the cost of organism specificity.
 Added columns: `annot_brenda_substrates`, `annot_brenda_km_values`,
 `annot_brenda_ph_optimum`, `annot_brenda_temperature_optimum`.
 
+### Mix-and-match Pfam inputs
+
+`--pfam` accepts multiple paths and concatenates them before the
+`--pfam_ids` filter. This lets you reuse per-family
+`pfam_full_subsets_*.csv` artifacts already on disk instead of
+re-running `biom3_build_pfam_subsets` over the union of all desired
+IDs (a multi-minute Stockholm scan).
+
+```bash
+biom3_build_dataset \
+    --pfam_ids PF00018 PF07714 \
+    --pfam out/pfam_full_subsets_PF00018_v20260507.csv \
+            out/pfam_full_subsets_PF07714_v20260507.csv \
+    --outdir out/sh3_kinase_v20260508
+```
+
+By default rows duplicated across inputs (matching on
+`(primary_Accession, pfam_label)`) are deduped, with earlier paths
+winning on collision — same precedence semantics as
+`--annotation_cache`. Pass `--no_dedupe_pfam` to preserve the union
+as a multiset.
+
+The natural pairing: build per-family artifacts once with
+`biom3_build_pfam_subsets --per_pfam_output`, then mix-and-match
+selectively into `biom3_build_dataset --pfam <p1> <p2> ...`. One
+slow Stockholm scan per source release, fast recombination at FT
+build time.
+
 ### Multi-Pfam, per-Pfam output
 
 ```bash

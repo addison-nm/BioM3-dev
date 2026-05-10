@@ -353,7 +353,7 @@ temperature_optimum)`. ~111,854 rows (6,910 ECs × ~16 organisms each).
 Truncates oversized join cells via `_truncate_join` to keep CSV cells
 under a char cap.
 
-### [`builders/pfam_subsets.py`](../../src/biom3/dbio/builders/pfam_subsets.py) (324 lines)
+### [`builders/pfam_subsets.py`](../../src/biom3/dbio/builders/pfam_subsets.py) (~440 lines)
 
 Streams `Pfam-A.full.gz` (the **non-NR** Stockholm alignment) directly,
 extracts only requested families. Unlocks ~6.7× more rows per family
@@ -365,6 +365,18 @@ augmentation can subsample them independently). Single-pass streaming,
 multi-family requests share one scan, early-exits when all targets
 are found. The bare name (vs. `source_*` prefix) marks this as a
 selective builder rather than a whole-DB one.
+
+Two output modes (mutually exclusive at the CLI):
+
+- **`-o/--output`**: single concatenated CSV across all requested
+  IDs. Original behavior.
+- **`--per_pfam_output --outdir <dir>`**: one CSV per Pfam ID under
+  `<dir>` (`PF00018.csv`, `PF07714.csv`, …) with matching
+  `<pfam_id>.build_manifest.json` and `<pfam_id>.stats.md` sidecars
+  per file. Same single-pass streaming cost as the concatenated
+  mode. Pairs with `pipelines/build_dataset.py`'s `--pfam` accepting
+  multiple paths (added 2026-05-08) so users can split once on
+  build, recombine selectively at orchestrator time.
 
 ---
 
@@ -412,7 +424,12 @@ everything above into a finetuning dataset:
 1. Parse args; resolve SwissProt / Pfam / ExPASy / BRENDA / SMART CSV
    paths via `config.py`.
 2. Subset SwissProt and Pfam by Pfam IDs (`SwissProtReader.query_by_pfam`
-   + `PfamReader.query_by_pfam`).
+   + `PfamReader.query_by_pfam`). `--pfam` accepts one or more paths
+   (added 2026-05-08); when multiple, each is queried with a fresh
+   `PfamReader`, results are `pd.concat`'d, and duplicates on
+   `(primary_Accession, pfam_label)` are deduped by default
+   (earlier paths win on collision; `--no_dedupe_pfam` preserves
+   the multiset).
 3. Optionally enrich Pfam rows via `enrich.enrich_dataframe()` using
    the `--annotation_cache` → `--uniprot_dat` chain.
    (`--enrich_pfam` without either of those raises a clear `ValueError`

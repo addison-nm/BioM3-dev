@@ -233,6 +233,117 @@ def build_annotated_pfam_subsets_csv(full_gz_path, target_pfam_ids,
     return total, stats_builder
 
 
+def build_per_pfam_subsets_csvs(full_gz_path, target_pfam_ids, outdir,
+                                caption_spec=None, chunk_size=10_000):
+    """Build one CSV per Pfam ID in a single pass over `full_gz_path`.
+
+    Writes ``outdir/<pfam_id>.csv`` per requested family. Uses the same
+    row-iteration as the single-output builder; routes each yielded row
+    to the writer matching ``row["pfam_label"]``. Stats are tracked
+    per-family so each output gets its own ``<pfam_id>.stats.md``.
+
+    Args:
+        full_gz_path: path to Pfam-A.full.gz (Stockholm format).
+        target_pfam_ids: list of unversioned Pfam IDs.
+        outdir: directory for the per-family CSVs (created if absent).
+        caption_spec: CaptionSpec; defaults to PFAM_SPEC.
+        chunk_size: rows buffered per family before writing.
+
+    Returns:
+        dict with keys:
+          - 'row_counts': {pfam_id: row_count}
+          - 'stats_builders': {pfam_id: IncrementalStatsBuilder}
+    """
+    if caption_spec is None:
+        caption_spec = PFAM_SPEC
+
+    annotation_fields = [field for (_, field) in caption_spec.fields]
+
+    os.makedirs(outdir, exist_ok=True)
+
+    writers = {}        # pfam_id -> (file, csv.writer)
+    buffers = {}        # pfam_id -> [row_lists]
+    totals = {pid: 0 for pid in target_pfam_ids}
+    stats_builders = {
+        pid: IncrementalStatsBuilder(
+            annotation_fields=annotation_fields,
+            seq_field="sequence",
+            pfam_field="pfam_ids",
+            caption_field="caption",
+        )
+        for pid in target_pfam_ids
+    }
+
+    try:
+        for pid in target_pfam_ids:
+            f = open(os.path.join(outdir, f"{pid}.csv"), "w", newline="")
+            w = csv.writer(f)
+            w.writerow(OUTPUT_COLUMNS)
+            writers[pid] = (f, w)
+            buffers[pid] = []
+
+        for row in iter_annotated_pfam_rows(full_gz_path, target_pfam_ids):
+            pid = row["pfam_label"]
+            if pid not in writers:
+                # Defensive: shouldn't happen since iter_annotated_pfam_rows
+                # filters by target_pfam_ids, but skip cleanly if it does.
+                continue
+
+            caption = compose_row_caption(
+                {
+                    "family_name": row["family_name"],
+                    "family_description": row["family_description"],
+                },
+                caption_spec,
+            )
+
+            buffers[pid].append([
+                row["id"],
+                row["range"],
+                row["pfam_label"],
+                row["sequence"],
+                row["family_name"],
+                row["family_description"],
+                row["family_type"],
+                row["family_clan"],
+                row["family_wikipedia"],
+                row["family_references"],
+                caption,
+            ])
+
+            stats_builders[pid].update({
+                "sequence": row["sequence"],
+                "pfam_ids": [row["pfam_label"]] if row["pfam_label"] else [],
+                "caption": caption,
+                **{f: row.get(f, "") for f in annotation_fields},
+            })
+
+            if len(buffers[pid]) >= chunk_size:
+                writers[pid][1].writerows(buffers[pid])
+                totals[pid] += len(buffers[pid])
+                buffers[pid] = []
+                logger.info(
+                    "%s: %s rows", pid, f"{totals[pid]:,}",
+                )
+
+        for pid, rows in buffers.items():
+            if rows:
+                writers[pid][1].writerows(rows)
+                totals[pid] += len(rows)
+    finally:
+        for f, _ in writers.values():
+            f.close()
+
+    for pid in target_pfam_ids:
+        logger.info(
+            "Build complete: %s — %s rows → %s",
+            pid, f"{totals[pid]:,}",
+            os.path.join(outdir, f"{pid}.csv"),
+        )
+
+    return {"row_counts": totals, "stats_builders": stats_builders}
+
+
 def _read_release_version(filepath, pattern):
     try:
         with open(filepath) as f:
@@ -266,15 +377,35 @@ def parse_arguments(args):
         "--pfam_full", type=str, required=True,
         help="Path to Pfam-A.full.gz (Stockholm format, gzipped)",
     )
-    parser.add_argument(
-        "-o", "--output", type=str, required=True,
-        help="Output CSV path",
+
+    output_group = parser.add_mutually_exclusive_group(required=True)
+    output_group.add_argument(
+        "-o", "--output", type=str, default=None,
+        help="Output CSV path (single concatenated file across all "
+             "--pfam_ids). Mutually exclusive with --per_pfam_output.",
     )
+    output_group.add_argument(
+        "--per_pfam_output", action="store_true", default=False,
+        help="Write one CSV per Pfam ID under --outdir (single pass over "
+             "Pfam-A.full.gz). Requires --outdir.",
+    )
+    parser.add_argument(
+        "--outdir", type=str, default=None,
+        help="Output directory for --per_pfam_output mode. Files are "
+             "named '<pfam_id>.csv' (e.g. PF00018.csv) with matching "
+             "<pfam_id>.build_manifest.json and <pfam_id>.stats.md "
+             "sidecars per file.",
+    )
+
     parser.add_argument(
         "--chunk_size", type=int, default=10_000,
         help="Rows to buffer before writing (default: 10000)",
     )
-    return parser.parse_args(args)
+
+    parsed = parser.parse_args(args)
+    if parsed.per_pfam_output and not parsed.outdir:
+        parser.error("--per_pfam_output requires --outdir")
+    return parsed
 
 
 def main(args):
@@ -283,6 +414,14 @@ def main(args):
     target_ids = [str(p).strip() for p in args.pfam_ids if str(p).strip()]
     logger.info("Extracting %s Pfam families from %s", len(target_ids), args.pfam_full)
 
+    if args.per_pfam_output:
+        _run_per_pfam_output(args, target_ids, start_time)
+    else:
+        _run_single_output(args, target_ids, start_time)
+
+
+def _run_single_output(args, target_ids, start_time):
+    """Original single concatenated-CSV path."""
     row_count, stats_builder = build_annotated_pfam_subsets_csv(
         full_gz_path=args.pfam_full,
         target_pfam_ids=target_ids,
@@ -318,6 +457,50 @@ def main(args):
         manifest_filename=f"{stem}.build_manifest.json",
     )
     logger.info("Saved build manifest to %s", manifest_path)
+
+
+def _run_per_pfam_output(args, target_ids, start_time):
+    """Per-Pfam mode: one CSV + manifest + stats sidecar per family."""
+    result = build_per_pfam_subsets_csvs(
+        full_gz_path=args.pfam_full,
+        target_pfam_ids=target_ids,
+        outdir=args.outdir,
+        chunk_size=args.chunk_size,
+    )
+    elapsed = datetime.now() - start_time
+
+    outdir_abs = os.path.abspath(args.outdir)
+    database_versions = _collect_database_versions(args.pfam_full)
+
+    # Emit one manifest + stats per output. Database-version metadata is
+    # identical across the N manifests (same source .full.gz).
+    for pid in target_ids:
+        row_count = result["row_counts"][pid]
+        stats = result["stats_builders"][pid].finalize()
+
+        csv_path = os.path.join(outdir_abs, f"{pid}.csv")
+        stats_path = os.path.join(outdir_abs, f"{pid}.stats.md")
+        write_stats_markdown(
+            stats, stats_path, title=f"{pid} — coverage stats",
+        )
+
+        resolved_paths = {
+            "pfam_full": os.path.abspath(args.pfam_full),
+            "output": csv_path,
+            "stats_markdown": stats_path,
+        }
+        manifest_path = write_manifest(
+            args, outdir_abs, start_time, elapsed,
+            outputs={
+                "row_counts": {"pfam_annotated_subsets": row_count},
+                "pfam_ids": [pid],
+            },
+            resolved_paths=resolved_paths,
+            database_versions=database_versions,
+            stats=stats,
+            manifest_filename=f"{pid}.build_manifest.json",
+        )
+        logger.info("Saved build manifest to %s", manifest_path)
 
 
 if __name__ == "__main__":

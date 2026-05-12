@@ -60,7 +60,7 @@ import numpy as np
 import random
 import gc
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import pandas as pd
 import h5py
@@ -120,6 +120,8 @@ logger = setup_logger(__name__)
 
 _LOGS_SUBDIR = "logs"
 _ARTIFACTS_SUBDIR = "artifacts"
+
+_BACKUP_HISTORY: dict[str, str] = {}
 
 
 def get_args(parser):
@@ -329,6 +331,16 @@ def get_args(parser):
                              'if the DeepSpeed→fp32 conversion is too costly.')
     parser.add_argument('--artifact_sync_every_n_val', default=1, type=int,
                         help='Throttle: sync at most every Nth validation epoch.')
+    parser.add_argument('--backup_artifacts', default='False', type=str,
+                        help='When True, rolling backup of best/summary files: '
+                             'each mid-training sync renames the existing file '
+                             'to <name>.bak.<timestamp>, and the next sync '
+                             'deletes the previous backup it created. Only one '
+                             'prior version on disk at a time, and only backups '
+                             'this run created are ever deleted. Default False: '
+                             'overwrite in place, no backups. Raw Lightning '
+                             '.ckpt files (save_top_k) remain the authoritative '
+                             'recovery surface either way.')
 
     # Multi-metric checkpoint monitors (JSON config only)
     parser.add_argument('--checkpoint_monitors', default=None, type=str,
@@ -349,6 +361,13 @@ def get_args(parser):
     parser.add_argument('--benchmark_per_step', default='False', type=str,
                         help='Write per-step wall-clock timing to '
                              'benchmark_steps.jsonl (rank 0 only)')
+
+    # Progress bar
+    parser.add_argument('--progress_bar', default='auto', type=str,
+                        help="Show Lightning's tqdm progress bar. 'True' "
+                             "forces on, 'False' forces off, 'auto' (default) "
+                             "enables it only when stdout is a TTY (off under "
+                             "PBS / redirected output to avoid log spam).")
 
     # Dry-run preview (no training executed)
     parser.add_argument('--dry_run', default='False', type=str,
@@ -644,6 +663,20 @@ def _sync_best_artifact(
         )
         return {}
 
+    def _maybe_backup(fpath):
+        if not getattr(args, 'backup_artifacts', False):
+            return
+        prior = _BACKUP_HISTORY.get(fpath)
+        if prior is not None:
+            try:
+                os.remove(prior)
+            except FileNotFoundError:
+                pass
+            _BACKUP_HISTORY.pop(fpath, None)
+        new_backup = backup_if_exists(fpath)
+        if new_backup is not None:
+            _BACKUP_HISTORY[fpath] = new_backup
+
     best_single_ckpt_fpath = os.path.join(checkpoint_path, 'single_model.best.pth')
     best_state_dict_fpath = os.path.join(checkpoint_path, 'state_dict.best.pth')
     best_state_dict_ema_fpath = os.path.join(checkpoint_path, 'state_dict_ema.best.pth')
@@ -651,7 +684,7 @@ def _sync_best_artifact(
     for fpath in (best_single_ckpt_fpath, best_state_dict_fpath,
                   best_state_dict_ema_fpath,
                   os.path.join(checkpoint_path, 'params.csv')):
-        backup_if_exists(fpath)
+        _maybe_backup(fpath)
 
     _convert_or_copy_checkpoint(best_ckpt_fpath, best_single_ckpt_fpath, "best")
     logger.info('Save model (best)')
@@ -677,7 +710,7 @@ def _sync_best_artifact(
     # Copy best state_dict to artifacts directory
     os.makedirs(artifacts_path, exist_ok=True)
     artifact_best = os.path.join(artifacts_path, 'state_dict.best.pth')
-    backup_if_exists(artifact_best)
+    _maybe_backup(artifact_best)
     shutil.copy2(best_state_dict_fpath, artifact_best)
     logger.info("Copied best state_dict to %s", artifact_best)
 
@@ -700,8 +733,8 @@ def _sync_best_artifact(
         extra_single_fpath = os.path.join(
             checkpoint_path, f"single_model.best_{metric_slug}.pth"
         )
-        backup_if_exists(extra_sd_fpath)
-        backup_if_exists(extra_single_fpath)
+        _maybe_backup(extra_sd_fpath)
+        _maybe_backup(extra_single_fpath)
         _convert_or_copy_checkpoint(cb.best_model_path, extra_single_fpath, cb.monitor)
         extra_temp_model = mod.get_model(
             args=args, data_shape=(image_size, image_size), num_classes=num_classes,
@@ -711,7 +744,7 @@ def _sync_best_artifact(
         )
         torch.save(extra_loaded.model.state_dict(), extra_sd_fpath)
         artifact_extra = os.path.join(artifacts_path, extra_sd_fname)
-        backup_if_exists(artifact_extra)
+        _maybe_backup(artifact_extra)
         shutil.copy2(extra_sd_fpath, artifact_extra)
         logger.info("Saved best state_dict for %s to %s", cb.monitor, artifact_extra)
         checkpoint_summary["additional"].append({
@@ -723,7 +756,7 @@ def _sync_best_artifact(
         })
 
     summary_path = os.path.join(artifacts_path, 'checkpoint_summary.json')
-    backup_if_exists(summary_path)
+    _maybe_backup(summary_path)
     with open(summary_path, 'w') as f:
         json.dump(checkpoint_summary, f, indent=2)
     logger.info("Checkpoint summary written to %s", summary_path)
@@ -994,11 +1027,17 @@ def retrieve_all_args(args):
     args.checkpoint_every_n_steps = nonestr_to_none(args.checkpoint_every_n_steps)
     args.checkpoint_every_n_epochs = nonestr_to_none(args.checkpoint_every_n_epochs)
     args.artifact_sync_on_best = str_to_bool(args.artifact_sync_on_best)
+    args.backup_artifacts = str_to_bool(args.backup_artifacts)
 
     resolve_devices_per_node(args)
 
     args.dry_run = str_to_bool(args.dry_run)
     args.dry_run_output = coerce_dry_run_output(args.dry_run_output)
+
+    if isinstance(args.progress_bar, str) and args.progress_bar.lower() == 'auto':
+        args.progress_bar = None
+    elif args.progress_bar is not None:
+        args.progress_bar = str_to_bool(args.progress_bar)
 
     return args
 
@@ -1525,8 +1564,12 @@ def train_model(
         strategy = deepspeed_strategy
     logger.info("Using distributed_strategy=%s", args.distributed_strategy)
 
+    progress_bar = getattr(args, 'progress_bar', None)
+    if progress_bar is None:
+        progress_bar = sys.stdout.isatty()
+
     trainer_params = {
-        'enable_progress_bar': True,
+        'enable_progress_bar': progress_bar,
         'enable_model_summary': True,
         'enable_checkpointing': True,
         'devices': devices_per_node,
@@ -1616,14 +1659,113 @@ def train_model(
     )
 
 
+def _write_build_manifest(args, artifacts_dir, checkpoint_dir, PL_model,
+                          start_time):
+    if get_global_rank() != 0:
+        return
+
+    args_path = os.path.join(artifacts_dir, "args.json")
+    backup_if_exists(args_path)
+    with open(args_path, "w") as f:
+        json.dump({k: v for k, v in vars(args).items() if not k.startswith("_")},
+                  f, indent=2, default=str)
+    logger.info("Args written to %s", args_path)
+
+    total_params = sum(p.numel() for p in PL_model.model.parameters())
+    trainable_params = sum(
+        p.numel() for p in PL_model.model.parameters() if p.requires_grad
+    )
+
+    outputs = {
+        "seed": args.seed,
+        "total_params": total_params,
+        "trainable_params": trainable_params,
+        "batch_size": args.batch_size,
+        "effective_lr": args.lr,
+        "precision": args.precision,
+        "devices_per_node": args.devices_per_node,
+        "num_nodes": args.num_nodes,
+        "acc_grad_batches": args.acc_grad_batches,
+        "distributed_strategy": args.distributed_strategy,
+    }
+    if args.distributed_strategy == "deepspeed_zero2":
+        outputs["deepspeed_stage"] = "2"
+    outputs["training_strategy"] = args.training_strategy
+    if args.training_strategy == 'combine':
+        outputs["max_steps"] = args.max_steps
+        outputs["val_check_interval"] = args.val_check_interval
+    else:
+        outputs["epochs"] = args.epochs
+
+    if args.finetune:
+        outputs["finetune"] = True
+        outputs["finetune_last_n_blocks"] = args.finetune_last_n_blocks
+        outputs["finetune_last_n_layers"] = args.finetune_last_n_layers
+
+    resolved_paths = {
+        "checkpoint_dir": os.path.abspath(checkpoint_dir),
+        "artifacts_dir": os.path.abspath(artifacts_dir),
+    }
+    if args.primary_data_path is not None:
+        resolved_paths["primary_data_path"] = os.path.abspath(
+            args.primary_data_path
+        )
+    if args.secondary_data_paths is not None:
+        resolved_paths["secondary_data_paths"] = [
+            os.path.abspath(p) for p in args.secondary_data_paths
+        ]
+    if args.pretrained_weights is not None:
+        resolved_paths["pretrained_weights"] = os.path.abspath(
+            args.pretrained_weights
+        )
+    if args.resume_from_checkpoint is not None:
+        resolved_paths["resume_from_checkpoint"] = os.path.abspath(
+            args.resume_from_checkpoint
+        )
+
+    manifest_path = write_manifest(
+        args, artifacts_dir, start_time, timedelta(0),
+        outputs=outputs,
+        resolved_paths=resolved_paths,
+        environment=collect_training_env(),
+    )
+    logger.info("Build manifest written to %s", manifest_path)
+
+
+def _write_run_summary(artifacts_dir, start_time, exit_reason, exception=None):
+    if get_global_rank() != 0:
+        return
+    elapsed = datetime.now() - start_time
+    summary = {
+        "exit_reason": exit_reason,
+        "elapsed_seconds": elapsed.total_seconds(),
+        "end_time": datetime.now().isoformat(),
+    }
+    if exception is not None:
+        summary["exception"] = {
+            "type": type(exception).__name__,
+            "message": str(exception),
+        }
+    summary_path = os.path.join(artifacts_dir, "run_summary.json")
+    backup_if_exists(summary_path)
+    with open(summary_path, "w") as f:
+        json.dump(summary, f, indent=2, default=str)
+    logger.info("Run summary written to %s", summary_path)
+
+
 def main(args, use_hydra=False, ds_config=None,):
 
     start_time = datetime.now()
+    _BACKUP_HISTORY.clear()
 
     # ----- Suppress noisy library warnings -----
     warnings.filterwarnings("ignore", message=".*LeafSpec.*is deprecated.*")
     warnings.filterwarnings("ignore", message=".*isinstance.*treespec.*")
     warnings.filterwarnings("ignore", message=".*TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD.*")
+    warnings.filterwarnings(
+        "once",
+        message=r".*barrier\(\): using the device under current context.*",
+    )
     logging.getLogger("tensorboardX.x2num").setLevel(logging.ERROR)
 
     # ----- Dry-run preview (no training executed) -----
@@ -1645,6 +1787,7 @@ def main(args, use_hydra=False, ds_config=None,):
     if get_global_rank() == 0:
         os.makedirs(logs_dir, exist_ok=True)
         os.makedirs(artifacts_dir, exist_ok=True)
+        os.makedirs(checkpoint_dir, exist_ok=True)
     log_path, file_handler = setup_file_logging(artifacts_dir)
 
     # ----- Process passed parameters -----
@@ -1739,85 +1882,40 @@ def main(args, use_hydra=False, ds_config=None,):
     else:
         pass
 
-    # ----- Train Model -----
-    train_model(
+    # ----- Write build manifest before training (rank 0 only) -----
+    _write_build_manifest(
         args=args,
+        artifacts_dir=artifacts_dir,
+        checkpoint_dir=checkpoint_dir,
         PL_model=PL_model,
-        data_module=data_module,
-        ds_config=ds_config,
+        start_time=start_time,
     )
 
-    # ----- Write args.json and build manifest (rank 0 only) -----
-    if get_global_rank() == 0:
-        elapsed = datetime.now() - start_time
-
-        # Save args.json
-        args_path = os.path.join(artifacts_dir, "args.json")
-        backup_if_exists(args_path)
-        with open(args_path, "w") as f:
-            json.dump({k: v for k, v in vars(args).items() if not k.startswith("_")},
-                      f, indent=2, default=str)
-        logger.info("Args written to %s", args_path)
-
-        total_params = sum(p.numel() for p in PL_model.model.parameters())
-        trainable_params = sum(
-            p.numel() for p in PL_model.model.parameters() if p.requires_grad
+    # ----- Train Model -----
+    exit_reason = "completed"
+    exception = None
+    try:
+        train_model(
+            args=args,
+            PL_model=PL_model,
+            data_module=data_module,
+            ds_config=ds_config,
         )
-
-        outputs = {
-            "seed": args.seed,
-            "total_params": total_params,
-            "trainable_params": trainable_params,
-            "batch_size": args.batch_size,
-            "effective_lr": args.lr,
-            "precision": args.precision,
-            "devices_per_node": args.devices_per_node,
-            "num_nodes": args.num_nodes,
-            "acc_grad_batches": args.acc_grad_batches,
-            "distributed_strategy": args.distributed_strategy,
-        }
-        if args.distributed_strategy == "deepspeed_zero2":
-            outputs["deepspeed_stage"] = "2"
-        outputs["training_strategy"] = args.training_strategy
-        if args.training_strategy == 'combine':
-            outputs["max_steps"] = args.max_steps
-            outputs["val_check_interval"] = args.val_check_interval
-        else:
-            outputs["epochs"] = args.epochs
-
-        if args.finetune:
-            outputs["finetune"] = True
-            outputs["finetune_last_n_blocks"] = args.finetune_last_n_blocks
-            outputs["finetune_last_n_layers"] = args.finetune_last_n_layers
-
-        resolved_paths = {
-            "checkpoint_dir": os.path.abspath(checkpoint_dir),
-            "artifacts_dir": os.path.abspath(artifacts_dir),
-        }
-        if args.primary_data_path is not None:
-            resolved_paths["primary_data_path"] = os.path.abspath(
-                args.primary_data_path
-            )
-        if args.secondary_data_paths is not None:
-            resolved_paths["secondary_data_paths"] = [
-                os.path.abspath(p) for p in args.secondary_data_paths
-            ]
-        if args.pretrained_weights is not None:
-            resolved_paths["pretrained_weights"] = os.path.abspath(
-                args.pretrained_weights
-            )
-        if args.resume_from_checkpoint is not None:
-            resolved_paths["resume_from_checkpoint"] = os.path.abspath(
-                args.resume_from_checkpoint
-            )
-
-        manifest_path = write_manifest(
-            args, artifacts_dir, start_time, elapsed,
-            outputs=outputs,
-            resolved_paths=resolved_paths,
-            environment=collect_training_env(),
+    except KeyboardInterrupt as e:
+        exit_reason = "interrupted"
+        exception = e
+        raise
+    except BaseException as e:
+        exit_reason = "exception"
+        exception = e
+        raise
+    finally:
+        _write_run_summary(
+            artifacts_dir=artifacts_dir,
+            start_time=start_time,
+            exit_reason=exit_reason,
+            exception=exception,
         )
-        logger.info("Build manifest written to %s", manifest_path)
 
     # ----- Clean up -----
     teardown_file_logging("biom3", file_handler)

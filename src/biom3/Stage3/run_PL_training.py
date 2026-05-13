@@ -225,9 +225,14 @@ def get_args(parser):
     parser.add_argument('--finetune', default='False', type=str,
                         help='flag to run finetuning')
     parser.add_argument('--finetune_last_n_blocks', default=-2, type=int,
-                        help='Number of last transformer blocks to finetune (-1: finetune all blocks, 0: no blocks)')
+                        help='Number of last transformer blocks to finetune. '
+                             '-1: all blocks, 0: no blocks, -2 (default): '
+                             'unspecified → coerced to -1 (all blocks).')
     parser.add_argument('--finetune_last_n_layers', default=-2, type=int,
-                        help='Number of last transformer layers to finetune (-1: finetune all layers, 0: no layers)')
+                        help='Number of last transformer layers per block to '
+                             'finetune. -1: all layers, 0: no layers, -2 '
+                             '(default): unspecified → coerced to -1 (all '
+                             'layers).')
     parser.add_argument('--finetune_output_layers', default="True", type=str,
                         help='Whether to finetune the transformer output layers (norm and out)')
 
@@ -282,7 +287,7 @@ def get_args(parser):
                         help='Save training/validation metrics history to artifacts dir')
     parser.add_argument('--metrics_history_ranks', type=int, nargs='+', default=[0],
                         help='Rank indices on which to save metrics history')
-    parser.add_argument('--metrics_history_every_n_steps', default=1, type=int,
+    parser.add_argument('--metrics_history_every_n_steps', default=10, type=int,
                         help='Record training metrics every N global steps')
     parser.add_argument('--metrics_history_every_n_epochs', default=None, type=int,
                         help='Also record training metrics at the end of every N epochs '
@@ -1830,12 +1835,12 @@ def main(args, use_hydra=False, ds_config=None,):
         resume_from_checkpoint = args.resume_from_checkpoint
         if finetune_last_n_layers == -2:
             # If flag is set to finetune and layers not specified (default -2)
-            # set to default actionable value 1
-            finetune_last_n_layers = 1
+            # set to -1 (all layers trainable)
+            finetune_last_n_layers = -1
         if finetune_last_n_blocks == -2:
             # If flag is set to finetune and blocks not specified (default -2)
-            # set to default actionable value 1
-            finetune_last_n_blocks = 1
+            # set to -1 (all blocks trainable)
+            finetune_last_n_blocks = -1
         # When resuming, weights (and optimizer state) are restored from the
         # Lightning checkpoint by trainer.fit(ckpt_path=...), so loading
         # pretrained_weights would be wasted work and misleading. Still apply

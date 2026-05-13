@@ -429,9 +429,9 @@ def test_resume_finetune_ignores_pretrained_weights(device):
     [True, 1, 20],  # last block, last 20 layers (more than exist)
     [True, 2, 2],  # last 2 blocks, last 2 layers
     [True, 20, 2],  # last 20 blocks (more than exist), last 2 layers
-    [True, -2, 1],  # unspecified blocks, last layer -> last block, last layer
-    [True, -2, -2],  # unspecified blocks, unspecified layers -> last block, last layer
-    [True, 1, -2],  # last block, unspecified layers -> last block, last layer
+    [True, -2, 1],  # unspecified blocks (-> all blocks), last layer
+    [True, -2, -2],  # unspecified blocks, unspecified layers -> all blocks, all layers
+    [True, 1, -2],  # last block, unspecified layers (-> all layers)
 ])
 @pytest.mark.parametrize("device", ["cuda", "xpu"])
 def test_finetuning(
@@ -480,11 +480,11 @@ def test_finetuning(
     n_trained_blocks = args.finetune_last_n_blocks
     n_trained_layers = args.finetune_last_n_layers
     if n_trained_blocks == -2:
-        n_trained_blocks = 1
+        n_trained_blocks = transformer_blocks
     elif n_trained_blocks == -1:
         n_trained_blocks = transformer_blocks
     if n_trained_layers == -2:
-        n_trained_layers = 1
+        n_trained_layers = transformer_layers
     elif n_trained_layers == -1:
         n_trained_layers = transformer_layers
     

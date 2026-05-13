@@ -559,6 +559,7 @@ class TestMetricsHistoryJsonlStreaming:
             metrics["train_loss"] = torch.tensor(0.5 / step)
             cb.on_train_batch_end(trainer, pl_module, outputs=None,
                                   batch=None, batch_idx=step - 1)
+        cb.on_train_epoch_end(trainer, pl_module)
         cb.on_train_end(trainer, pl_module)
 
         jsonl = os.path.join(tmp_output_dir,
@@ -580,6 +581,7 @@ class TestMetricsHistoryJsonlStreaming:
             trainer.global_step = step
             cb.on_train_batch_end(trainer, pl_module, outputs=None,
                                   batch=None, batch_idx=step - 1)
+        cb.on_train_epoch_end(trainer, pl_module)
         cb.on_train_end(trainer, pl_module)
 
         jsonl = os.path.join(tmp_output_dir,
@@ -588,6 +590,33 @@ class TestMetricsHistoryJsonlStreaming:
             records = [json.loads(l) for l in fh if l.strip()]
         # Only steps 2 and 4 should be recorded (step % 2 == 0, step > 0)
         assert [r["global_step"] for r in records] == [2, 4]
+
+    def test_step_records_buffered_until_epoch_end(self, tmp_output_dir):
+        cb = MetricsHistoryCallback(output_dir=tmp_output_dir, every_n_steps=1)
+        pl_module = _mock_pl_module()
+        metrics = {"train_loss": torch.tensor(0.5)}
+        trainer = _make_metrics_trainer(callback_metrics=metrics)
+        cb.on_train_start(trainer, pl_module)
+        for step in range(1, 4):
+            trainer.global_step = step
+            cb.on_train_batch_end(trainer, pl_module, outputs=None,
+                                  batch=None, batch_idx=step - 1)
+
+        jsonl = os.path.join(tmp_output_dir,
+                             MetricsHistoryCallback.TRAIN_JSONL)
+        # Pre-flush: file may exist (opened in append mode) but contains no
+        # records yet — they're buffered in memory.
+        if os.path.exists(jsonl):
+            with open(jsonl) as fh:
+                pre = [l for l in fh if l.strip()]
+            assert pre == []
+        assert len(cb._pending_train_jsonl) == 3
+
+        cb.on_train_epoch_end(trainer, pl_module)
+        with open(jsonl) as fh:
+            post = [json.loads(l) for l in fh if l.strip()]
+        assert len(post) == 3
+        assert cb._pending_train_jsonl == []
 
     def test_every_n_epochs_writes_source_epoch_records(self, tmp_output_dir):
         cb = MetricsHistoryCallback(
@@ -660,10 +689,8 @@ class TestMetricsHistoryJsonlStreaming:
 
 class TestMetricsHistoryFlush:
 
-    def test_flush_every_n_steps_fsyncs(self, tmp_output_dir):
-        cb = MetricsHistoryCallback(
-            output_dir=tmp_output_dir, flush_every_n_steps=2,
-        )
+    def test_no_fsync_within_epoch(self, tmp_output_dir):
+        cb = MetricsHistoryCallback(output_dir=tmp_output_dir, every_n_steps=1)
         pl_module = _mock_pl_module()
         metrics = {"train_loss": torch.tensor(0.5)}
         trainer = _make_metrics_trainer(callback_metrics=metrics)
@@ -674,24 +701,45 @@ class TestMetricsHistoryFlush:
                 trainer.global_step = step
                 cb.on_train_batch_end(trainer, pl_module, outputs=None,
                                       batch=None, batch_idx=step - 1)
-            # fsync fires on steps 2 and 4 (global_step % 2 == 0)
-            # Each fsync call covers both train and val file handles.
-            assert fsync_mock.call_count >= 4  # 2 events * 2 file handles
-
-    def test_flush_disabled_by_default(self, tmp_output_dir):
-        cb = MetricsHistoryCallback(output_dir=tmp_output_dir)
-        pl_module = _mock_pl_module()
-        metrics = {"train_loss": torch.tensor(0.5)}
-        trainer = _make_metrics_trainer(callback_metrics=metrics)
-
-        with patch("biom3.Stage3.callbacks.os.fsync") as fsync_mock:
-            cb.on_train_start(trainer, pl_module)
-            for step in range(1, 5):
-                trainer.global_step = step
-                cb.on_train_batch_end(trainer, pl_module, outputs=None,
-                                      batch=None, batch_idx=step - 1)
-            # No periodic flushes; only the end-of-train close fsyncs
+            # Mid-epoch must not fsync — that's the whole point of the
+            # buffered-write scheme. Records live in memory until
+            # on_train_epoch_end.
             assert fsync_mock.call_count == 0
+
+    def test_fsync_on_train_epoch_end(self, tmp_output_dir):
+        cb = MetricsHistoryCallback(output_dir=tmp_output_dir, every_n_steps=1)
+        pl_module = _mock_pl_module()
+        metrics = {"train_loss": torch.tensor(0.5)}
+        trainer = _make_metrics_trainer(callback_metrics=metrics)
+
+        cb.on_train_start(trainer, pl_module)
+        for step in range(1, 5):
+            trainer.global_step = step
+            cb.on_train_batch_end(trainer, pl_module, outputs=None,
+                                  batch=None, batch_idx=step - 1)
+        with patch("biom3.Stage3.callbacks.os.fsync") as fsync_mock:
+            cb.on_train_epoch_end(trainer, pl_module)
+            assert fsync_mock.call_count >= 1
+
+    def test_on_exception_flushes_pending(self, tmp_output_dir):
+        cb = MetricsHistoryCallback(output_dir=tmp_output_dir, every_n_steps=1)
+        pl_module = _mock_pl_module()
+        metrics = {"train_loss": torch.tensor(0.5)}
+        trainer = _make_metrics_trainer(callback_metrics=metrics)
+        cb.on_train_start(trainer, pl_module)
+        for step in range(1, 4):
+            trainer.global_step = step
+            cb.on_train_batch_end(trainer, pl_module, outputs=None,
+                                  batch=None, batch_idx=step - 1)
+        # Simulate a crash mid-epoch — on_exception must flush the buffer
+        # so partial-epoch step records aren't lost.
+        cb.on_exception(trainer, pl_module, RuntimeError("boom"))
+
+        jsonl = os.path.join(tmp_output_dir,
+                             MetricsHistoryCallback.TRAIN_JSONL)
+        with open(jsonl) as fh:
+            records = [json.loads(l) for l in fh if l.strip()]
+        assert len(records) == 3
 
 
 class TestRebuildMetricsHistoryPt:

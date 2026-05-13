@@ -55,6 +55,7 @@ import json
 import shutil
 import contextlib
 import logging
+import time
 import warnings
 import numpy as np
 import random
@@ -106,6 +107,15 @@ import wandb
 import biom3.Stage3.preprocess as prep
 import biom3.Stage3.cond_diff_transformer_layer as mod
 import biom3.Stage3.PL_wrapper as PL_mod
+from biom3.Stage3.callbacks import (
+    BestArtifactSyncCallback,
+    EpochProgressCallback,
+    MetricsHistoryCallback,
+    StepProgressCallback,
+    TimeLimitCallback,
+    TrainingBenchmarkCallback,
+    build_checkpoint_callbacks,
+)
 from biom3.Stage3.io import prepare_model_ProteoScribe
 from biom3.core.dry_run import coerce_dry_run_output, run_dry_run
 from biom3.core.helpers import coerce_limit_batches, load_json_config
@@ -122,6 +132,10 @@ _LOGS_SUBDIR = "logs"
 _ARTIFACTS_SUBDIR = "artifacts"
 
 _BACKUP_HISTORY: dict[str, str] = {}
+
+_MAIN_START_MONOTONIC: float | None = None
+
+_LAST_TRAINER = None
 
 
 def get_args(parser):
@@ -274,8 +288,15 @@ def get_args(parser):
                         help='Cap training batches per epoch. Values >1 are an '
                              'absolute batch count; values in (0,1] are a fraction. '
                              'None = use full training dataset.')
-    parser.add_argument('--log_every_n_steps', default=10001, type=float,
-                        help='number of samples to validate on...')
+    parser.add_argument('--log_every_n_steps', default=None, type=int,
+                        help='Trainer(log_every_n_steps=N): cadence in '
+                             'training batches at which Lightning flushes '
+                             'metrics to its attached loggers (TensorBoard, '
+                             'WandB). Also reused as the default '
+                             'periodic-checkpoint cadence under combine '
+                             'training mode. Default: once per epoch '
+                             '(num_training_batches). Explicit values larger '
+                             'than num_training_batches are clamped down.')
     parser.add_argument('--start_secondary', default='False', type=str,
                         help='flag for phase transition: load primary weights then train on primary+secondary')
     # Deprecated alias
@@ -288,14 +309,14 @@ def get_args(parser):
     parser.add_argument('--metrics_history_ranks', type=int, nargs='+', default=[0],
                         help='Rank indices on which to save metrics history')
     parser.add_argument('--metrics_history_every_n_steps', default=10, type=int,
-                        help='Record training metrics every N global steps')
+                        help='Record training metrics every N global steps. '
+                             'Records are buffered in memory and flushed to '
+                             'metrics_history.train.jsonl in one batched '
+                             'write at each train epoch end (and on '
+                             'exception/train end for crash recovery).')
     parser.add_argument('--metrics_history_every_n_epochs', default=None, type=int,
                         help='Also record training metrics at the end of every N epochs '
                              '(captures epoch-averaged values). None disables.')
-    parser.add_argument('--metrics_history_flush_every_n_steps', default=None, type=int,
-                        help='Flush metrics_history.{train,val}.jsonl to disk every N '
-                             'global steps. None flushes only at train end (metrics are '
-                             'lost on timeout/crash).')
     parser.add_argument('--metrics_history_all_ranks_val_loss', default='False',
                         type=str,
                         help='Diagnostic: dump val_loss per rank at epoch end '
@@ -366,6 +387,23 @@ def get_args(parser):
     parser.add_argument('--benchmark_per_step', default='False', type=str,
                         help='Write per-step wall-clock timing to '
                              'benchmark_steps.jsonl (rank 0 only)')
+
+    # Within-epoch progress logging
+    parser.add_argument('--log_progress_fraction', default=0.5, type=float,
+                        help='Fraction-of-epoch cadence for the StepProgress '
+                             'log line. 0.5 (default) fires at 50%% and 100%%; '
+                             '1.0 only at the final step; 0.25 at '
+                             '25/50/75/100. Set to 0 to disable.')
+
+    # Wall-time budget
+    parser.add_argument('--time_limit', default='None', type=str,
+                        help='Optional hh:mm:ss wall-time budget measured '
+                             'from the start of main(). When exceeded, '
+                             'training stops gracefully at the next check '
+                             '(~every 50 train batches on rank 0). All '
+                             'end-of-run artifacts still get written, and '
+                             'run_summary.json records '
+                             'exit_reason=time_limit_exceeded.')
 
     # Progress bar
     parser.add_argument('--progress_bar', default='auto', type=str,
@@ -1044,6 +1082,11 @@ def retrieve_all_args(args):
     elif args.progress_bar is not None:
         args.progress_bar = str_to_bool(args.progress_bar)
 
+    args.time_limit_seconds = None
+    if isinstance(args.time_limit, str) and args.time_limit.lower() != 'none' and args.time_limit:
+        h, m, s = (int(x) for x in args.time_limit.split(':'))
+        args.time_limit_seconds = h * 3600 + m * 60 + s
+
     return args
 
 
@@ -1323,8 +1366,12 @@ def train_model(
     run_id = args.run_id
     log_every_n_steps = args.log_every_n_steps
     num_training_batches = getattr(args, 'traindata_len', None)
-    if num_training_batches and log_every_n_steps > num_training_batches:
-        log_every_n_steps = max(1, int(num_training_batches))
+    if log_every_n_steps is None:
+        log_every_n_steps = max(1, num_training_batches or 1)
+        logger.info("Defaulted log_every_n_steps to %d (once per epoch)",
+                    log_every_n_steps)
+    elif num_training_batches and log_every_n_steps > num_training_batches:
+        log_every_n_steps = max(1, num_training_batches)
         logger.info("Clamped log_every_n_steps to %d (number of training batches)",
                      log_every_n_steps)
     training_strategy = args.training_strategy
@@ -1431,9 +1478,8 @@ def train_model(
     periodic_every_n_steps = getattr(args, 'checkpoint_every_n_steps', None)
     periodic_every_n_epochs = getattr(args, 'checkpoint_every_n_epochs', None)
     if training_strategy == 'combine' and periodic_every_n_steps is None:
-        periodic_every_n_steps = int(log_every_n_steps)
+        periodic_every_n_steps = log_every_n_steps
 
-    from biom3.Stage3.callbacks import build_checkpoint_callbacks
     monitored_callbacks, periodic_callback = build_checkpoint_callbacks(
         checkpoint_dir=checkpoint_dir,
         checkpoint_monitors=getattr(args, 'checkpoint_monitors', None),
@@ -1448,15 +1494,11 @@ def train_model(
 
     # ---- Metrics history ----
     if getattr(args, 'save_metrics_history', True):
-        from biom3.Stage3.callbacks import MetricsHistoryCallback
         metrics_cb = MetricsHistoryCallback(
             output_dir=artifacts_dir,
             save_ranks=getattr(args, 'metrics_history_ranks', [0]),
             every_n_steps=getattr(args, 'metrics_history_every_n_steps', 1),
             every_n_epochs=getattr(args, 'metrics_history_every_n_epochs', None),
-            flush_every_n_steps=getattr(
-                args, 'metrics_history_flush_every_n_steps', None
-            ),
             all_ranks_val_loss=getattr(
                 args, 'metrics_history_all_ranks_val_loss', False
             ),
@@ -1466,7 +1508,6 @@ def train_model(
 
     # ---- Training benchmark ----
     if getattr(args, 'save_benchmark', False):
-        from biom3.Stage3.callbacks import TrainingBenchmarkCallback
         benchmark_cb = TrainingBenchmarkCallback(
             output_dir=artifacts_dir,
             batch_size=args.batch_size,
@@ -1488,19 +1529,25 @@ def train_model(
     if isinstance(early_stopping_metric, str) and early_stopping_metric.lower() == 'none':
         early_stopping_metric = None
 
-    callbacks = checkpoint_callbacks + [lr_monitor, gpu_logger]
+    callbacks = checkpoint_callbacks + [lr_monitor, gpu_logger,
+                                        EpochProgressCallback()]
     if metrics_cb is not None:
         callbacks.append(metrics_cb)
     if benchmark_cb is not None:
         callbacks.append(benchmark_cb)
+    if getattr(args, 'log_progress_fraction', 0) > 0:
+        callbacks.append(StepProgressCallback(fraction=args.log_progress_fraction))
+    if getattr(args, 'time_limit_seconds', None) is not None:
+        callbacks.append(TimeLimitCallback(
+            deadline_seconds=args.time_limit_seconds,
+            start_monotonic=_MAIN_START_MONOTONIC,
+        ))
 
     # ---- Best-artifact mid-training sync (Tier 2/3) ----
     # Re-emits state_dict.best.pth + state_dict.best_<metric>.pth +
     # checkpoint_summary.json each time ModelCheckpoint promotes a new best,
     # so a SIGTERM/timeout leaves a ready-to-use artifact on disk.
     if getattr(args, 'artifact_sync_on_best', True):
-        from biom3.Stage3.callbacks import BestArtifactSyncCallback
-
         def _sync_fn(primary_callback, extra_callbacks):
             _sync_best_artifact(
                 args=args,
@@ -1610,6 +1657,8 @@ def train_model(
     # Initialize trainer with configured parameters
     logger.info('Initializing Trainer...')
     trainer = Trainer(**trainer_params)
+    global _LAST_TRAINER
+    _LAST_TRAINER = trainer
 
     # wrap optimizer and model with intel extension for pytorch 
     # optimizer = torch.optim.AdamW(PL_model.parameters(), lr=lr)
@@ -1640,9 +1689,6 @@ def train_model(
         else:
             logger.info('Continue training ProteoScribe from checkpoint ...')
             trainer.fit(PL_model, data_module, ckpt_path=resume_from_checkpoint)
-
-    if get_global_rank() == 0:
-        print_gpu_initialization()
 
     # Save dataset split indices
     if get_global_rank() == 0 and hasattr(data_module, 'split_info'):
@@ -1737,7 +1783,8 @@ def _write_build_manifest(args, artifacts_dir, checkpoint_dir, PL_model,
     logger.info("Build manifest written to %s", manifest_path)
 
 
-def _write_run_summary(artifacts_dir, start_time, exit_reason, exception=None):
+def _write_run_summary(artifacts_dir, start_time, exit_reason, exception=None,
+                       completed_epochs=None, completed_steps=None):
     if get_global_rank() != 0:
         return
     elapsed = datetime.now() - start_time
@@ -1745,6 +1792,8 @@ def _write_run_summary(artifacts_dir, start_time, exit_reason, exception=None):
         "exit_reason": exit_reason,
         "elapsed_seconds": elapsed.total_seconds(),
         "end_time": datetime.now().isoformat(),
+        "completed_epochs": completed_epochs,
+        "completed_steps": completed_steps,
     }
     if exception is not None:
         summary["exception"] = {
@@ -1760,6 +1809,9 @@ def _write_run_summary(artifacts_dir, start_time, exit_reason, exception=None):
 
 def main(args, use_hydra=False, ds_config=None,):
 
+    global _MAIN_START_MONOTONIC, _LAST_TRAINER
+    _MAIN_START_MONOTONIC = time.perf_counter()
+    _LAST_TRAINER = None
     start_time = datetime.now()
     _BACKUP_HISTORY.clear()
 
@@ -1915,12 +1967,32 @@ def main(args, use_hydra=False, ds_config=None,):
         exception = e
         raise
     finally:
+        time_limit_seconds = getattr(args, 'time_limit_seconds', None)
+        if exit_reason == "completed" and time_limit_seconds is not None:
+            elapsed = time.perf_counter() - _MAIN_START_MONOTONIC
+            if elapsed >= time_limit_seconds:
+                exit_reason = "time_limit_exceeded"
+        completed_epochs = (
+            _LAST_TRAINER.current_epoch if _LAST_TRAINER is not None else None
+        )
+        completed_steps = (
+            _LAST_TRAINER.global_step if _LAST_TRAINER is not None else None
+        )
         _write_run_summary(
             artifacts_dir=artifacts_dir,
             start_time=start_time,
             exit_reason=exit_reason,
             exception=exception,
+            completed_epochs=completed_epochs,
+            completed_steps=completed_steps,
         )
+        if _MAIN_START_MONOTONIC is not None:
+            total = int(time.perf_counter() - _MAIN_START_MONOTONIC)
+            h, rem = divmod(total, 3600)
+            m, s = divmod(rem, 60)
+            logger.info(
+                "Program exiting. Total elapsed time: %d:%02d:%02d", h, m, s,
+            )
 
     # ----- Clean up -----
     teardown_file_logging("biom3", file_handler)

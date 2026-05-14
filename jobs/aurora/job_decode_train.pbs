@@ -1,0 +1,59 @@
+#!/bin/bash -l
+#PBS -A NLDesignProtein
+#PBS -N decode_train
+#PBS -l walltime=30:00:00
+#PBS -l select=1
+#PBS -l place=scatter
+#PBS -l filesystems=home:flare
+#PBS -q capacity
+#PBS -j oe
+# PBS -M <emailaddress>
+# PBS -m be
+
+projdir=${PBS_O_WORKDIR}  # Should submit job from the BioM3-dev directory
+cd ${projdir}
+
+module load frameworks
+source ./venvs/biom3-env/bin/activate
+source environment.sh
+
+# Inputs
+embedding_path=./src/biom3/decode/outputs/swissprotpencl_embeddings.pt
+split_path=./src/biom3/decode/data/splits/decode_split_v1.csv
+config_path=./configs/decoder_training/biogpt_v2_prefix64.json
+output_root=./src/biom3/decode/outputs/train
+
+# Run config
+device=xpu
+num_devices=12
+
+# Resume: set to a Lightning .ckpt to continue an existing run, or "None" to start fresh.
+# When resuming, set resume_run_id to the existing run_id so logs/checkpoints stay together.
+resume_from_checkpoint=None
+resume_run_id=biogpt_v2_prefix64
+
+# construct run_id
+mkdir -p logs
+datetime=$(date +%Y%m%d_%H%M%S)
+config_name=$(basename "${config_path}" .json)
+if [ -n "${resume_run_id}" ] && [ "${resume_run_id}" != "None" ]; then
+    run_id=${resume_run_id}
+else
+    run_id=${config_name}_V${datetime}
+fi
+log_fpath=logs/${run_id}.${PBS_JOBID}.o
+
+export NGPU=${num_devices}
+./scripts/launchers/aurora_singlenode.sh \
+biom3_train_decode \
+    --config_path ${config_path} \
+    --embedding_path ${embedding_path} \
+    --split_path ${split_path} \
+    --output_root ${output_root} \
+    --run_id ${run_id} \
+    --device ${device} \
+    --num_devices ${num_devices} \
+    --num_nodes 1 \
+    --epochs 100 \
+    --checkpoint_every_n_epochs 20 \
+> ${log_fpath} 2>&1

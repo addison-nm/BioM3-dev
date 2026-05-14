@@ -1,0 +1,25 @@
+{
+  "description": "Z_p decoder v1: BioGPT based model (frozen) with 10-token prefix from trained MLP head",
+  "tags": ["decoder", "biogpt", "z_p"],
+  "notes": [],
+
+  "lm_path": "./weights/LLMs/biogpt-base",
+  "z_dim": 512,
+  "prefix_length": 10,
+  "hidden_dim": 2048,
+  "dropout": 0.1,
+  "max_length": 1012, 
+
+  "lr": 5e-4,
+  "weight_decay": 1e-2,
+  "batch_size": 32,
+  "num_workers": 2,
+  "epochs": 10,
+  "seed": 0,
+
+  "device": "xpu",
+  "precision": "32",
+
+  "val_check_interval": 1.0,
+  "early_stopping_patience": 5
+}

@@ -1,0 +1,44 @@
+#!/bin/bash -l
+#PBS -A NLDesignProtein
+#PBS -N pencl_inference_decode
+#PBS -l walltime=10:00:00
+#PBS -l select=1
+#PBS -l place=scatter
+#PBS -l filesystems=home:flare
+#PBS -q capacity
+#PBS -j oe
+# PBS -M <emailaddress>
+# PBS -m be
+
+
+projdir=${PBS_O_WORKDIR}  # Should submit job from the BioM3-dev directory
+cd ${projdir}
+
+module load frameworks
+source ./venvs/biom3-env/bin/activate
+
+# Inputs
+input_data_path=./data/datasets/fully_annotated_swiss_prot_LEGACY_UPDATE_20260417.csv
+config_path=./configs/inference/stage1_PenCL.json
+model_path=./weights/PenCL/PenCL_V09152023_last.ckpt
+output_path=./src/biom3/decode/outputs/swissprotpencl_embeddings.pt
+
+# Run config
+device=xpu                  
+
+# Direct output to log file
+mkdir -p logs
+mkdir -p "$(dirname "${output_path}")"
+datetime=$(date +%Y%m%d_%H%M%S)
+run_id=pencl_inference_decode_V${datetime}
+log_fpath=logs/${run_id}.${PBS_JOBID}.o
+
+source environment.sh
+biom3_PenCL_inference \
+    --input_data_path ${input_data_path} \
+    --config_path ${config_path} \
+    --model_path ${model_path} \
+    --output_path ${output_path} \
+    --device ${device} \
+    --cross_comparison_sample_limit 1000 \
+> ${log_fpath} 2>&1

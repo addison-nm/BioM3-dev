@@ -1,0 +1,51 @@
+#!/bin/bash -l
+#PBS -A NLDesignProtein
+#PBS -N <JOB_NAME>
+#PBS -l walltime=01:00:00
+#PBS -l select=<NUM_NODES>
+#PBS -l place=scatter
+#PBS -l filesystems=home:flare
+#PBS -q <QUEUE>
+#PBS -j oe
+# PBS -M <emailaddress>
+# PBS -m be
+
+
+projdir=${PBS_O_WORKDIR}  # Should submit job from the BioM3-dev directory
+cd ${projdir}
+
+module load frameworks
+source ./venvs/biom3-env/bin/activate
+source environment.sh
+
+# Topology: NUM_NODES nodes x 12 tiles per node = num_ranks
+NUM_NODES=<NUM_NODES>
+
+NGPU_PER_NODE=12
+NGPU_TOTAL=$((NUM_NODES * NGPU_PER_NODE))
+
+datetime=$(date +%Y%m%d_%H%M%S)
+
+# Inputs (edit batch/replica/seed in <run_config>.json)
+INPUT_PATH="</PATH/TO/EMBEDDINGS>"              # Path to embeddings (e.g. prompts.Facilitator_emb.pt)
+WEIGHTS="</PATH/TO/PROTEOSCRIBE/WEIGHTS>"       # Path to ProteoScribe weights
+CONFIG="<run_config>.json"                      # Config file
+OUTPUT_PATH="outputs/my_outputs_${datetime}"    # Path to outputs
+
+mkdir -p "$(dirname "${OUTPUT_PATH}")"
+
+# Direct output to log file
+mkdir -p logs
+log_fpath=logs/stage3_sample${PBS_JOBID}.o      # Log filename
+
+export NGPU_PER_NODE NGPU_TOTAL
+export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=true
+
+./scripts/launchers/aurora_multinode.sh \
+    biom3_ProteoScribe_sample \
+        --input_path  "${INPUT_PATH}" \
+        --config_path "${CONFIG}" \
+        --model_path  "${WEIGHTS}" \
+        --output_path "${OUTPUT_PATH}" \
+        --device xpu \
+> ${log_fpath} 2>&1

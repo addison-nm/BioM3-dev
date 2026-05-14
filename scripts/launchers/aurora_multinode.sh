@@ -19,7 +19,7 @@ NGPU_TOTAL="${NGPU_TOTAL:?NGPU_TOTAL env var required}"
 PBS_NODEFILE="${PBS_NODEFILE:?PBS_NODEFILE env var required (set by PBS)}"
 
 CPU_BIND_SCHEME="--cpu-bind=list:1-8:9-16:17-24:25-32:33-40:41-48:53-60:61-68:69-76:77-84:85-92:93-100"
-GPU_BIND_SCHEME="--gpu-bind=list:0:1:2:3:4:5:6:7:8:9:10:11"
+# GPU_BIND_SCHEME="--gpu-bind=list:0:1:2:3:4:5:6:7:8:9:10:11"
 
 if [ "${NGPU_PER_NODE}" != "12" ]; then
     echo "WARNING (aurora_multinode.sh): NGPU_PER_NODE=${NGPU_PER_NODE} but" \
@@ -33,5 +33,4 @@ exec mpiexec \
     --ppn "${NGPU_PER_NODE}" \
     --hostfile="${PBS_NODEFILE}" \
     ${CPU_BIND_SCHEME} \
-    ${GPU_BIND_SCHEME} \
     "$@"

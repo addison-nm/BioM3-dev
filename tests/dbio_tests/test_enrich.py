@@ -8,61 +8,17 @@ from biom3.dbio.enrich import (
     ANNOTATION_COLUMNS,
     enrich_dataframe,
     compose_caption,
-    extract_annotations,
 )
 
 
-MOCK_UNIPROT_ENTRY = {
-    "primaryAccession": "A0A001",
-    "proteinDescription": {
-        "recommendedName": {
-            "fullName": {"value": "SH3 domain-containing kinase"}
-        }
-    },
-    "comments": [
-        {
-            "commentType": "FUNCTION",
-            "texts": [{"value": "Involved in signal transduction"}],
-        },
-        {
-            "commentType": "CATALYTIC ACTIVITY",
-            "reaction": {"name": "ATP + protein = ADP + phosphoprotein"},
-        },
-        {
-            "commentType": "SUBCELLULAR LOCATION",
-            "subcellularLocations": [
-                {"location": {"value": "Cytoplasm"}},
-                {"location": {"value": "Nucleus"}},
-            ],
-        },
-    ],
-    "uniProtKBCrossReferences": [
-        {
-            "database": "GO",
-            "properties": [{"key": "GoTerm", "value": "F:protein kinase activity"}],
-        },
-    ],
-    "organism": {
-        "lineage": ["Eukaryota", "Metazoa", "Chordata", "Mammalia"],
-    },
+MOCK_LOCAL_ANNOTATIONS = {
+    "annot_protein_name": "SH3 domain-containing kinase",
+    "annot_function": "Involved in signal transduction",
+    "annot_catalytic_activity": "Reaction=ATP + protein = ADP + phosphoprotein",
+    "annot_subcellular_location": "Cytoplasm, Nucleus",
+    "annot_gene_ontology": "protein kinase activity",
+    "annot_lineage": "The organism lineage is Eukaryota, Metazoa, Chordata, Mammalia",
 }
-
-
-class TestExtractAnnotations:
-
-    def test_parses_fields(self):
-        annotations = extract_annotations(MOCK_UNIPROT_ENTRY)
-        assert annotations["annot_protein_name"] == "SH3 domain-containing kinase"
-        assert annotations["annot_function"] == "Involved in signal transduction"
-        assert "Reaction=" in annotations["annot_catalytic_activity"]
-        assert annotations["annot_subcellular_location"] == "Cytoplasm, Nucleus"
-        assert annotations["annot_gene_ontology"] == "protein kinase activity"
-        assert "Eukaryota" in annotations["annot_lineage"]
-
-    def test_missing_fields_omitted(self):
-        annotations = extract_annotations(MOCK_UNIPROT_ENTRY)
-        assert "annot_cofactor" not in annotations
-        assert "annot_pathway" not in annotations
 
 
 class TestEnrichDataframe:
@@ -76,8 +32,8 @@ class TestEnrichDataframe:
             "[final]text_caption": ["old caption", "old caption"],
             "pfam_label": ["PF00018", "PF00018"],
         })
-        uniprot_data = {"A0A001": MOCK_UNIPROT_ENTRY}
-        result, join_stats = enrich_dataframe(df, uniprot_data=uniprot_data)
+        local_annotations = {"A0A001": MOCK_LOCAL_ANNOTATIONS}
+        result, join_stats = enrich_dataframe(df, local_annotations=local_annotations)
         assert join_stats == {}
 
         # Annotation columns should be present
@@ -102,7 +58,9 @@ class TestEnrichDataframe:
             "[final]text_caption": ["original caption"],
             "pfam_label": ["PF00018"],
         })
-        result, _ = enrich_dataframe(df, uniprot_data={"A0A001": MOCK_UNIPROT_ENTRY})
+        result, _ = enrich_dataframe(
+            df, local_annotations={"A0A001": MOCK_LOCAL_ANNOTATIONS},
+        )
         assert result.loc[0, "[final]text_caption"] == "original caption"
 
 

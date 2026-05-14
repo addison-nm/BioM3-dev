@@ -35,14 +35,14 @@ echo ""
 PFAM_PARQUET="${PFAM_CSV%.csv}.parquet"
 if [ ! -f "$PFAM_PARQUET" ]; then
     echo "[0a] Converting Pfam CSV to Parquet (one-time)..."
-    biom3_convert_to_parquet "$PFAM_CSV"
+    biom3_csv_to_parquet "$PFAM_CSV"
     echo ""
 fi
 
 SWISSPROT_PARQUET="${SWISSPROT_CSV%.csv}.parquet"
 if [ ! -f "$SWISSPROT_PARQUET" ]; then
     echo "[0b] Converting SwissProt CSV to Parquet (one-time)..."
-    biom3_convert_to_parquet "$SWISSPROT_CSV"
+    biom3_csv_to_parquet "$SWISSPROT_CSV"
     echo ""
 fi
 

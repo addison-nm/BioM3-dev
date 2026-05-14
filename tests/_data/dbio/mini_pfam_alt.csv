@@ -1,0 +1,4 @@
+id,range,description,pfam_label,sequence,family_name,family_description,[final]text_caption
+A0A001,10-65,A0A001.1 PF00018,PF00018,ALYGRDEETH,SH3 domain,SH3 domains bind proline-rich ligands.,Protein name: SH3 domain.
+A0A100,12-72,A0A100.1 PF00018,PF00018,LMRGYTVKED,SH3 domain,SH3 domains bind proline-rich ligands.,Protein name: SH3 domain.
+A0A101,30-90,A0A101.1 PF07714,PF07714,FGTVCERLPT,Tyrosine kinase,Catalytic domain of tyrosine kinases.,Protein name: Tyrosine kinase.

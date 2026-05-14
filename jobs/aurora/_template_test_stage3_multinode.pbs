@@ -1,0 +1,33 @@
+#!/bin/bash -l
+#PBS -A NLDesignProtein
+#PBS -N <JOB_NAME>
+#PBS -l walltime=00:30:00
+#PBS -l select=<NUM_NODES>
+#PBS -l place=scatter
+#PBS -l filesystems=home:flare
+#PBS -q <QUEUE>
+#PBS -j oe
+# PBS -M <emailaddress>
+# PBS -m be
+
+
+projdir=${PBS_O_WORKDIR}  # Submit from the BioM3-dev directory
+cd ${projdir}
+
+module load frameworks
+source ./venvs/biom3-env/bin/activate
+source environment.sh
+
+# Topology: edit to match `select=<NUM_NODES>` above. NGPU_PER_NODE=12 for
+# a full Aurora node (6 GPUs x 2 tiles).
+NUM_NODES=<NUM_NODES>
+NGPU_PER_NODE=12
+
+# Direct output to log file
+mkdir -p logs
+log_fpath=logs/test_stage3_multinode_${PBS_JOBID}.o
+
+./scripts/test_stage3_multinode.sh \
+    ${NUM_NODES} \
+    ${NGPU_PER_NODE} \
+> ${log_fpath} 2>&1

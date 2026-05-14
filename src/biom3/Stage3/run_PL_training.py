@@ -54,14 +54,14 @@ import io
 import json
 import shutil
 import contextlib
-import socket
 import logging
+import time
 import warnings
 import numpy as np
 import random
 import gc
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import pandas as pd
 import h5py
@@ -107,17 +107,35 @@ import wandb
 import biom3.Stage3.preprocess as prep
 import biom3.Stage3.cond_diff_transformer_layer as mod
 import biom3.Stage3.PL_wrapper as PL_mod
+from biom3.Stage3.callbacks import (
+    BestArtifactSyncCallback,
+    EpochProgressCallback,
+    MetricsHistoryCallback,
+    StepProgressCallback,
+    TimeLimitCallback,
+    TrainingBenchmarkCallback,
+    build_checkpoint_callbacks,
+)
 from biom3.Stage3.io import prepare_model_ProteoScribe
+from biom3.core.dry_run import coerce_dry_run_output, run_dry_run
 from biom3.core.helpers import coerce_limit_batches, load_json_config
 from biom3.core.run_utils import (
-    backup_if_exists, setup_file_logging, teardown_file_logging, write_manifest,
+    backup_if_exists, collect_training_env, resolve_devices_per_node,
+    setup_file_logging, teardown_file_logging, write_manifest,
 )
-from biom3.backend.device import print_gpu_initialization, get_device, get_rank
+from biom3.backend.device import print_gpu_initialization, get_device
+from biom3.core.distributed import get_global_rank
 
 logger = setup_logger(__name__)
 
 _LOGS_SUBDIR = "logs"
 _ARTIFACTS_SUBDIR = "artifacts"
+
+_BACKUP_HISTORY: dict[str, str] = {}
+
+_MAIN_START_MONOTONIC: float | None = None
+
+_LAST_TRAINER = None
 
 
 def get_args(parser):
@@ -209,14 +227,26 @@ def get_args(parser):
     
     parser.add_argument('--scale_learning_rate', default='True', type=str,
                         help='scale the specified learning rate by the number of devices')
-    
+
+    parser.add_argument('--distributed_strategy', default='deepspeed_zero2', type=str,
+                        choices=['deepspeed_zero2', 'ddp'],
+                        help='Lightning trainer strategy. deepspeed_zero2 (default): '
+                             'DeepSpeed ZeRO Stage 2 with CPU offload. ddp: plain DDP '
+                             'with static_graph=True. Distinct from --training_strategy '
+                             '(which selects primary_only vs combine *data* mixing).')
+
     # Finetuning
     parser.add_argument('--finetune', default='False', type=str,
                         help='flag to run finetuning')
     parser.add_argument('--finetune_last_n_blocks', default=-2, type=int,
-                        help='Number of last transformer blocks to finetune (-1: finetune all blocks, 0: no blocks)')
+                        help='Number of last transformer blocks to finetune. '
+                             '-1: all blocks, 0: no blocks, -2 (default): '
+                             'unspecified → coerced to -1 (all blocks).')
     parser.add_argument('--finetune_last_n_layers', default=-2, type=int,
-                        help='Number of last transformer layers to finetune (-1: finetune all layers, 0: no layers)')
+                        help='Number of last transformer layers per block to '
+                             'finetune. -1: all layers, 0: no layers, -2 '
+                             '(default): unspecified → coerced to -1 (all '
+                             'layers).')
     parser.add_argument('--finetune_output_layers', default="True", type=str,
                         help='Whether to finetune the transformer output layers (norm and out)')
 
@@ -258,8 +288,15 @@ def get_args(parser):
                         help='Cap training batches per epoch. Values >1 are an '
                              'absolute batch count; values in (0,1] are a fraction. '
                              'None = use full training dataset.')
-    parser.add_argument('--log_every_n_steps', default=10001, type=float,
-                        help='number of samples to validate on...')
+    parser.add_argument('--log_every_n_steps', default=None, type=int,
+                        help='Trainer(log_every_n_steps=N): cadence in '
+                             'training batches at which Lightning flushes '
+                             'metrics to its attached loggers (TensorBoard, '
+                             'WandB). Also reused as the default '
+                             'periodic-checkpoint cadence under combine '
+                             'training mode. Default: once per epoch '
+                             '(num_training_batches). Explicit values larger '
+                             'than num_training_batches are clamped down.')
     parser.add_argument('--start_secondary', default='False', type=str,
                         help='flag for phase transition: load primary weights then train on primary+secondary')
     # Deprecated alias
@@ -271,15 +308,15 @@ def get_args(parser):
                         help='Save training/validation metrics history to artifacts dir')
     parser.add_argument('--metrics_history_ranks', type=int, nargs='+', default=[0],
                         help='Rank indices on which to save metrics history')
-    parser.add_argument('--metrics_history_every_n_steps', default=1, type=int,
-                        help='Record training metrics every N global steps')
+    parser.add_argument('--metrics_history_every_n_steps', default=10, type=int,
+                        help='Record training metrics every N global steps. '
+                             'Records are buffered in memory and flushed to '
+                             'metrics_history.train.jsonl in one batched '
+                             'write at each train epoch end (and on '
+                             'exception/train end for crash recovery).')
     parser.add_argument('--metrics_history_every_n_epochs', default=None, type=int,
                         help='Also record training metrics at the end of every N epochs '
                              '(captures epoch-averaged values). None disables.')
-    parser.add_argument('--metrics_history_flush_every_n_steps', default=None, type=int,
-                        help='Flush metrics_history.{train,val}.jsonl to disk every N '
-                             'global steps. None flushes only at train end (metrics are '
-                             'lost on timeout/crash).')
     parser.add_argument('--metrics_history_all_ranks_val_loss', default='False',
                         type=str,
                         help='Diagnostic: dump val_loss per rank at epoch end '
@@ -320,6 +357,16 @@ def get_args(parser):
                              'if the DeepSpeed→fp32 conversion is too costly.')
     parser.add_argument('--artifact_sync_every_n_val', default=1, type=int,
                         help='Throttle: sync at most every Nth validation epoch.')
+    parser.add_argument('--backup_artifacts', default='False', type=str,
+                        help='When True, rolling backup of best/summary files: '
+                             'each mid-training sync renames the existing file '
+                             'to <name>.bak.<timestamp>, and the next sync '
+                             'deletes the previous backup it created. Only one '
+                             'prior version on disk at a time, and only backups '
+                             'this run created are ever deleted. Default False: '
+                             'overwrite in place, no backups. Raw Lightning '
+                             '.ckpt files (save_top_k) remain the authoritative '
+                             'recovery surface either way.')
 
     # Multi-metric checkpoint monitors (JSON config only)
     parser.add_argument('--checkpoint_monitors', default=None, type=str,
@@ -340,6 +387,41 @@ def get_args(parser):
     parser.add_argument('--benchmark_per_step', default='False', type=str,
                         help='Write per-step wall-clock timing to '
                              'benchmark_steps.jsonl (rank 0 only)')
+
+    # Within-epoch progress logging
+    parser.add_argument('--log_progress_fraction', default=0.5, type=float,
+                        help='Fraction-of-epoch cadence for the StepProgress '
+                             'log line. 0.5 (default) fires at 50%% and 100%%; '
+                             '1.0 only at the final step; 0.25 at '
+                             '25/50/75/100. Set to 0 to disable.')
+
+    # Wall-time budget
+    parser.add_argument('--time_limit', default='None', type=str,
+                        help='Optional hh:mm:ss wall-time budget measured '
+                             'from the start of main(). When exceeded, '
+                             'training stops gracefully at the next check '
+                             '(~every 50 train batches on rank 0). All '
+                             'end-of-run artifacts still get written, and '
+                             'run_summary.json records '
+                             'exit_reason=time_limit_exceeded.')
+
+    # Progress bar
+    parser.add_argument('--progress_bar', default='auto', type=str,
+                        help="Show Lightning's tqdm progress bar. 'True' "
+                             "forces on, 'False' forces off, 'auto' (default) "
+                             "enables it only when stdout is a TTY (off under "
+                             "PBS / redirected output to avoid log spam).")
+
+    # Dry-run preview (no training executed)
+    parser.add_argument('--dry_run', default='False', type=str,
+                        help='Print effective config (with provenance), output '
+                             'paths, distributed/batch math, and an a-priori '
+                             'memory estimate, then exit without training.')
+    parser.add_argument('--dry_run_output', default='False', type=str,
+                        help="Where to write the JSON dry-run report. 'False' "
+                             "(default) prints to stdout only; 'True' writes "
+                             "to <artifacts_dir>/dry_run_report.json; any "
+                             "other string is treated as a filepath.")
 
     return parser
 
@@ -370,8 +452,11 @@ def get_model_args(parser):
             help='Choose optimizer for training')
     parser.add_argument('--acc_grad_batches', default=4, type=int,
             help='Choose how many gradient steps to accumulate')
-    parser.add_argument('--gpu_devices', default=1, type=int,
-            help='Number of gpus to used for training')
+    parser.add_argument('--devices_per_node', default=None, type=int,
+            help='Number of GPUs (CUDA) or tiles (XPU) per node. Default 1.')
+    parser.add_argument('--gpu_devices', default=None, type=int,
+            help='(deprecated, use --devices_per_node) preserved for '
+                 'backward compatibility with older configs and scripts.')
     parser.add_argument('--num_nodes', default=1, type=int,
             help='Number of nodes to used for training')
     def float_or_str(value):
@@ -621,6 +706,20 @@ def _sync_best_artifact(
         )
         return {}
 
+    def _maybe_backup(fpath):
+        if not getattr(args, 'backup_artifacts', False):
+            return
+        prior = _BACKUP_HISTORY.get(fpath)
+        if prior is not None:
+            try:
+                os.remove(prior)
+            except FileNotFoundError:
+                pass
+            _BACKUP_HISTORY.pop(fpath, None)
+        new_backup = backup_if_exists(fpath)
+        if new_backup is not None:
+            _BACKUP_HISTORY[fpath] = new_backup
+
     best_single_ckpt_fpath = os.path.join(checkpoint_path, 'single_model.best.pth')
     best_state_dict_fpath = os.path.join(checkpoint_path, 'state_dict.best.pth')
     best_state_dict_ema_fpath = os.path.join(checkpoint_path, 'state_dict_ema.best.pth')
@@ -628,7 +727,7 @@ def _sync_best_artifact(
     for fpath in (best_single_ckpt_fpath, best_state_dict_fpath,
                   best_state_dict_ema_fpath,
                   os.path.join(checkpoint_path, 'params.csv')):
-        backup_if_exists(fpath)
+        _maybe_backup(fpath)
 
     _convert_or_copy_checkpoint(best_ckpt_fpath, best_single_ckpt_fpath, "best")
     logger.info('Save model (best)')
@@ -654,7 +753,7 @@ def _sync_best_artifact(
     # Copy best state_dict to artifacts directory
     os.makedirs(artifacts_path, exist_ok=True)
     artifact_best = os.path.join(artifacts_path, 'state_dict.best.pth')
-    backup_if_exists(artifact_best)
+    _maybe_backup(artifact_best)
     shutil.copy2(best_state_dict_fpath, artifact_best)
     logger.info("Copied best state_dict to %s", artifact_best)
 
@@ -677,8 +776,8 @@ def _sync_best_artifact(
         extra_single_fpath = os.path.join(
             checkpoint_path, f"single_model.best_{metric_slug}.pth"
         )
-        backup_if_exists(extra_sd_fpath)
-        backup_if_exists(extra_single_fpath)
+        _maybe_backup(extra_sd_fpath)
+        _maybe_backup(extra_single_fpath)
         _convert_or_copy_checkpoint(cb.best_model_path, extra_single_fpath, cb.monitor)
         extra_temp_model = mod.get_model(
             args=args, data_shape=(image_size, image_size), num_classes=num_classes,
@@ -688,7 +787,7 @@ def _sync_best_artifact(
         )
         torch.save(extra_loaded.model.state_dict(), extra_sd_fpath)
         artifact_extra = os.path.join(artifacts_path, extra_sd_fname)
-        backup_if_exists(artifact_extra)
+        _maybe_backup(artifact_extra)
         shutil.copy2(extra_sd_fpath, artifact_extra)
         logger.info("Saved best state_dict for %s to %s", cb.monitor, artifact_extra)
         checkpoint_summary["additional"].append({
@@ -700,7 +799,7 @@ def _sync_best_artifact(
         })
 
     summary_path = os.path.join(artifacts_path, 'checkpoint_summary.json')
-    backup_if_exists(summary_path)
+    _maybe_backup(summary_path)
     with open(summary_path, 'w') as f:
         json.dump(checkpoint_summary, f, indent=2)
     logger.info("Checkpoint summary written to %s", summary_path)
@@ -858,14 +957,8 @@ def str_to_bool(s):
 
 def nonestr_to_none(s):
     if isinstance(s, str):
-        if s.lower() == 'none':
-            return None
-        else:
-            return s
-    elif s is None:
-        return None
-    else:
-        raise ValueError("Input must be string or 'None'")
+        return None if s.lower() == 'none' else s
+    return s
 
 
 # === main functions ===
@@ -929,7 +1022,9 @@ def retrieve_all_args(args):
         json_config = load_json_config(pre_args.config_path)
         parser.set_defaults(**json_config)
 
+    argv = list(args)
     args = parser.parse_args(args)
+    args._argv = argv  # consumed by core.dry_run for CLI provenance attribution
 
     # Type conversions (idempotent — pass through values already of the target type)
     args.resume_from_checkpoint = nonestr_to_none(args.resume_from_checkpoint)
@@ -975,6 +1070,22 @@ def retrieve_all_args(args):
     args.checkpoint_every_n_steps = nonestr_to_none(args.checkpoint_every_n_steps)
     args.checkpoint_every_n_epochs = nonestr_to_none(args.checkpoint_every_n_epochs)
     args.artifact_sync_on_best = str_to_bool(args.artifact_sync_on_best)
+    args.backup_artifacts = str_to_bool(args.backup_artifacts)
+
+    resolve_devices_per_node(args)
+
+    args.dry_run = str_to_bool(args.dry_run)
+    args.dry_run_output = coerce_dry_run_output(args.dry_run_output)
+
+    if isinstance(args.progress_bar, str) and args.progress_bar.lower() == 'auto':
+        args.progress_bar = None
+    elif args.progress_bar is not None:
+        args.progress_bar = str_to_bool(args.progress_bar)
+
+    args.time_limit_seconds = None
+    if isinstance(args.time_limit, str) and args.time_limit.lower() != 'none' and args.time_limit:
+        h, m, s = (int(x) for x in args.time_limit.split(':'))
+        args.time_limit_seconds = h * 3600 + m * 60 + s
 
     return args
 
@@ -1040,25 +1151,25 @@ def load_model(
     Returns:
         A configured PyTorch Lightning model ready for training
     """
-    gpu_devices = args.gpu_devices
+    devices_per_node = args.devices_per_node
     acc_grad_batches = args.acc_grad_batches
     diffusion_steps = args.diffusion_steps
     image_size = args.image_size
     num_nodes = args.num_nodes
     batch_size = args.batch_size
 
-    args.traindata_len = len(data_module.train_dataloader()) // gpu_devices // acc_grad_batches
+    args.traindata_len = len(data_module.train_dataloader()) // devices_per_node // acc_grad_batches
     logger.info('Length of dataloader: %s', len(data_module.train_dataloader()))
-    logger.info('Numer of devices: %s', gpu_devices)
+    logger.info('Numer of devices: %s', devices_per_node)
     logger.info('Number of nodes: %s', num_nodes)
     logger.info('Batch size: %s', batch_size)
-    logger.info('Length of dataloader per device: %s', len(data_module.train_dataloader()) // gpu_devices)
+    logger.info('Length of dataloader per device: %s', len(data_module.train_dataloader()) // devices_per_node)
     logger.info('Length of a training epoch in batch gradient updates: %s', args.traindata_len)
     w, h = image_size, image_size
     # Ensure diffusion steps are sufficient for data dimensions
     if diffusion_steps < int(w*h):
         logger.warning('Make sure that the number of diffusion steps is equal to or greather than the data cardinality')
-    if get_rank() == 0:
+    if get_global_rank() == 0:
         print_gpu_initialization()
     # Compile model architecture
     PL_model = compile_model(
@@ -1213,34 +1324,6 @@ def freeze_except_last_n_blocks_and_layers(
     return PL_model
 
 
-_TRAINING_ENV_PREFIXES = (
-    "CUDA_", "NCCL_", "TORCH_", "DEEPSPEED_", "WANDB_",
-    "MASTER_", "WORLD_SIZE", "RANK", "LOCAL_RANK",
-    "SLURM_", "PBS_", "COBALT_", "PALS_", "PMI_", "OMPI_",
-    "OMP_NUM_THREADS", "MKL_NUM_THREADS",
-)
-
-_SENSITIVE_ENV_SUBSTRINGS = (
-    "KEY", "SECRET", "TOKEN", "PASSWORD", "CREDENTIAL", "AUTH",
-)
-
-
-def _collect_training_env():
-    """Collect environment variables relevant to distributed training and HPC.
-
-    Variables whose names contain sensitive substrings (API keys, tokens, etc.)
-    are excluded.
-    """
-    env = {"hostname": socket.gethostname()}
-    for key, val in sorted(os.environ.items()):
-        if key.startswith(_TRAINING_ENV_PREFIXES):
-            upper = key.upper()
-            if any(s in upper for s in _SENSITIVE_ENV_SUBSTRINGS):
-                continue
-            env[key] = val
-    return env
-
-
 ###########################
 ##  Training Entrypoint  ##
 ###########################
@@ -1283,12 +1366,16 @@ def train_model(
     run_id = args.run_id
     log_every_n_steps = args.log_every_n_steps
     num_training_batches = getattr(args, 'traindata_len', None)
-    if num_training_batches and log_every_n_steps > num_training_batches:
-        log_every_n_steps = max(1, int(num_training_batches))
+    if log_every_n_steps is None:
+        log_every_n_steps = max(1, num_training_batches or 1)
+        logger.info("Defaulted log_every_n_steps to %d (once per epoch)",
+                    log_every_n_steps)
+    elif num_training_batches and log_every_n_steps > num_training_batches:
+        log_every_n_steps = max(1, num_training_batches)
         logger.info("Clamped log_every_n_steps to %d (number of training batches)",
                      log_every_n_steps)
     training_strategy = args.training_strategy
-    gpu_devices = args.gpu_devices
+    devices_per_node = args.devices_per_node
     num_nodes = args.num_nodes
     acc_grad_batches = args.acc_grad_batches
     epochs = args.epochs
@@ -1308,9 +1395,9 @@ def train_model(
 
     # Scale the learning rate with number of total devices
     if args.scale_learning_rate:
-        n = num_nodes * gpu_devices
+        n = num_nodes * devices_per_node
         logger.info("Scaling learning rate with effective batch size: "
-                     "num_nodes x gpu_devices = %s x %s = %s", num_nodes, gpu_devices, n)
+                     "num_nodes x devices_per_node = %s x %s = %s", num_nodes, devices_per_node, n)
         args.lr = args.lr * n
     logger.info("Effective learning rate: %s", args.lr)
     
@@ -1391,9 +1478,8 @@ def train_model(
     periodic_every_n_steps = getattr(args, 'checkpoint_every_n_steps', None)
     periodic_every_n_epochs = getattr(args, 'checkpoint_every_n_epochs', None)
     if training_strategy == 'combine' and periodic_every_n_steps is None:
-        periodic_every_n_steps = int(log_every_n_steps)
+        periodic_every_n_steps = log_every_n_steps
 
-    from biom3.Stage3.callbacks import build_checkpoint_callbacks
     monitored_callbacks, periodic_callback = build_checkpoint_callbacks(
         checkpoint_dir=checkpoint_dir,
         checkpoint_monitors=getattr(args, 'checkpoint_monitors', None),
@@ -1408,15 +1494,11 @@ def train_model(
 
     # ---- Metrics history ----
     if getattr(args, 'save_metrics_history', True):
-        from biom3.Stage3.callbacks import MetricsHistoryCallback
         metrics_cb = MetricsHistoryCallback(
             output_dir=artifacts_dir,
             save_ranks=getattr(args, 'metrics_history_ranks', [0]),
             every_n_steps=getattr(args, 'metrics_history_every_n_steps', 1),
             every_n_epochs=getattr(args, 'metrics_history_every_n_epochs', None),
-            flush_every_n_steps=getattr(
-                args, 'metrics_history_flush_every_n_steps', None
-            ),
             all_ranks_val_loss=getattr(
                 args, 'metrics_history_all_ranks_val_loss', False
             ),
@@ -1426,12 +1508,11 @@ def train_model(
 
     # ---- Training benchmark ----
     if getattr(args, 'save_benchmark', False):
-        from biom3.Stage3.callbacks import TrainingBenchmarkCallback
         benchmark_cb = TrainingBenchmarkCallback(
             output_dir=artifacts_dir,
             batch_size=args.batch_size,
             acc_grad_batches=acc_grad_batches,
-            gpu_devices=gpu_devices,
+            devices_per_node=devices_per_node,
             num_nodes=num_nodes,
             precision=precision,
             training_strategy=training_strategy,
@@ -1448,19 +1529,25 @@ def train_model(
     if isinstance(early_stopping_metric, str) and early_stopping_metric.lower() == 'none':
         early_stopping_metric = None
 
-    callbacks = checkpoint_callbacks + [lr_monitor, gpu_logger]
+    callbacks = checkpoint_callbacks + [lr_monitor, gpu_logger,
+                                        EpochProgressCallback()]
     if metrics_cb is not None:
         callbacks.append(metrics_cb)
     if benchmark_cb is not None:
         callbacks.append(benchmark_cb)
+    if getattr(args, 'log_progress_fraction', 0) > 0:
+        callbacks.append(StepProgressCallback(fraction=args.log_progress_fraction))
+    if getattr(args, 'time_limit_seconds', None) is not None:
+        callbacks.append(TimeLimitCallback(
+            deadline_seconds=args.time_limit_seconds,
+            start_monotonic=_MAIN_START_MONOTONIC,
+        ))
 
     # ---- Best-artifact mid-training sync (Tier 2/3) ----
     # Re-emits state_dict.best.pth + state_dict.best_<metric>.pth +
     # checkpoint_summary.json each time ModelCheckpoint promotes a new best,
     # so a SIGTERM/timeout leaves a ready-to-use artifact on disk.
     if getattr(args, 'artifact_sync_on_best', True):
-        from biom3.Stage3.callbacks import BestArtifactSyncCallback
-
         def _sync_fn(primary_callback, extra_callbacks):
             _sync_best_artifact(
                 args=args,
@@ -1518,19 +1605,29 @@ def train_model(
         static_graph=True,
         gradient_as_bucket_view=True,
     )
+    # Strategy is selected by --distributed_strategy. DeepSpeed Stage 2 is
+    # the production default; 'ddp' selects plain DDP with static_graph=True.
+    # save_model handles both the sharded ZeRO checkpoint dir and the
+    # single-file DDP .ckpt via the os.path.isdir() guard in
+    # _convert_or_copy_checkpoint.
+    if args.distributed_strategy == 'ddp':
+        strategy = ddp_strategy
+    else:
+        strategy = deepspeed_strategy
+    logger.info("Using distributed_strategy=%s", args.distributed_strategy)
+
+    progress_bar = getattr(args, 'progress_bar', None)
+    if progress_bar is None:
+        progress_bar = sys.stdout.isatty()
+
     trainer_params = {
-        'enable_progress_bar': True,
+        'enable_progress_bar': progress_bar,
         'enable_model_summary': True,
         'enable_checkpointing': True,
-        'devices': gpu_devices,
+        'devices': devices_per_node,
         'num_nodes': num_nodes,
         'accelerator': args.device,
-        # DeepSpeed Stage 2 is the production default — historical configuration
-        # used by the test suite and prior runs. Swap to ddp_strategy for plain
-        # DDP (verified equivalent under the DistributedSampler(drop_last=True)
-        # fix, but writes a single-file .ckpt rather than a sharded ZeRO dir,
-        # which currently breaks save_model's convert_zero_checkpoint call).
-        'strategy': deepspeed_strategy,
+        'strategy': strategy,
         # We construct DistributedSampler(drop_last=True) ourselves in
         # PL_wrapper.{train,val}_dataloader so every rank gets exactly the
         # same number of samples; see PL_wrapper._make_distributed_sampler.
@@ -1560,6 +1657,8 @@ def train_model(
     # Initialize trainer with configured parameters
     logger.info('Initializing Trainer...')
     trainer = Trainer(**trainer_params)
+    global _LAST_TRAINER
+    _LAST_TRAINER = trainer
 
     # wrap optimizer and model with intel extension for pytorch 
     # optimizer = torch.optim.AdamW(PL_model.parameters(), lr=lr)
@@ -1591,11 +1690,8 @@ def train_model(
             logger.info('Continue training ProteoScribe from checkpoint ...')
             trainer.fit(PL_model, data_module, ckpt_path=resume_from_checkpoint)
 
-    if get_rank() == 0:
-        print_gpu_initialization()
-
     # Save dataset split indices
-    if get_rank() == 0 and hasattr(data_module, 'split_info'):
+    if get_global_rank() == 0 and hasattr(data_module, 'split_info'):
         splits_path = os.path.join(artifacts_dir, "dataset_splits.pt")
         torch.save(data_module.split_info, splits_path)
         logger.info("Saved dataset splits to %s", splits_path)
@@ -1614,15 +1710,129 @@ def train_model(
     )
 
 
+def _write_build_manifest(args, artifacts_dir, checkpoint_dir, PL_model,
+                          start_time):
+    if get_global_rank() != 0:
+        return
+
+    args_path = os.path.join(artifacts_dir, "args.json")
+    backup_if_exists(args_path)
+    with open(args_path, "w") as f:
+        json.dump({k: v for k, v in vars(args).items() if not k.startswith("_")},
+                  f, indent=2, default=str)
+    logger.info("Args written to %s", args_path)
+
+    total_params = sum(p.numel() for p in PL_model.model.parameters())
+    trainable_params = sum(
+        p.numel() for p in PL_model.model.parameters() if p.requires_grad
+    )
+
+    outputs = {
+        "seed": args.seed,
+        "total_params": total_params,
+        "trainable_params": trainable_params,
+        "batch_size": args.batch_size,
+        "effective_lr": args.lr,
+        "precision": args.precision,
+        "devices_per_node": args.devices_per_node,
+        "num_nodes": args.num_nodes,
+        "acc_grad_batches": args.acc_grad_batches,
+        "distributed_strategy": args.distributed_strategy,
+    }
+    if args.distributed_strategy == "deepspeed_zero2":
+        outputs["deepspeed_stage"] = "2"
+    outputs["training_strategy"] = args.training_strategy
+    if args.training_strategy == 'combine':
+        outputs["max_steps"] = args.max_steps
+        outputs["val_check_interval"] = args.val_check_interval
+    else:
+        outputs["epochs"] = args.epochs
+
+    if args.finetune:
+        outputs["finetune"] = True
+        outputs["finetune_last_n_blocks"] = args.finetune_last_n_blocks
+        outputs["finetune_last_n_layers"] = args.finetune_last_n_layers
+
+    resolved_paths = {
+        "checkpoint_dir": os.path.abspath(checkpoint_dir),
+        "artifacts_dir": os.path.abspath(artifacts_dir),
+    }
+    if args.primary_data_path is not None:
+        resolved_paths["primary_data_path"] = os.path.abspath(
+            args.primary_data_path
+        )
+    if args.secondary_data_paths is not None:
+        resolved_paths["secondary_data_paths"] = [
+            os.path.abspath(p) for p in args.secondary_data_paths
+        ]
+    if args.pretrained_weights is not None:
+        resolved_paths["pretrained_weights"] = os.path.abspath(
+            args.pretrained_weights
+        )
+    if args.resume_from_checkpoint is not None:
+        resolved_paths["resume_from_checkpoint"] = os.path.abspath(
+            args.resume_from_checkpoint
+        )
+
+    manifest_path = write_manifest(
+        args, artifacts_dir, start_time, timedelta(0),
+        outputs=outputs,
+        resolved_paths=resolved_paths,
+        environment=collect_training_env(),
+    )
+    logger.info("Build manifest written to %s", manifest_path)
+
+
+def _write_run_summary(artifacts_dir, start_time, exit_reason, exception=None,
+                       completed_epochs=None, completed_steps=None):
+    if get_global_rank() != 0:
+        return
+    elapsed = datetime.now() - start_time
+    summary = {
+        "exit_reason": exit_reason,
+        "elapsed_seconds": elapsed.total_seconds(),
+        "end_time": datetime.now().isoformat(),
+        "completed_epochs": completed_epochs,
+        "completed_steps": completed_steps,
+    }
+    if exception is not None:
+        summary["exception"] = {
+            "type": type(exception).__name__,
+            "message": str(exception),
+        }
+    summary_path = os.path.join(artifacts_dir, "run_summary.json")
+    backup_if_exists(summary_path)
+    with open(summary_path, "w") as f:
+        json.dump(summary, f, indent=2, default=str)
+    logger.info("Run summary written to %s", summary_path)
+
+
 def main(args, use_hydra=False, ds_config=None,):
 
+    global _MAIN_START_MONOTONIC, _LAST_TRAINER
+    _MAIN_START_MONOTONIC = time.perf_counter()
+    _LAST_TRAINER = None
     start_time = datetime.now()
+    _BACKUP_HISTORY.clear()
 
     # ----- Suppress noisy library warnings -----
     warnings.filterwarnings("ignore", message=".*LeafSpec.*is deprecated.*")
     warnings.filterwarnings("ignore", message=".*isinstance.*treespec.*")
     warnings.filterwarnings("ignore", message=".*TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD.*")
+    warnings.filterwarnings(
+        "once",
+        message=r".*barrier\(\): using the device under current context.*",
+    )
     logging.getLogger("tensorboardX.x2num").setLevel(logging.ERROR)
+
+    # ----- Dry-run preview (no training executed) -----
+    if getattr(args, 'dry_run', False):
+        return run_dry_run(
+            args,
+            stage="stage3",
+            dataset_probe=lambda: _stage3_dataset_probe(args),
+            model_probe=lambda: _stage3_model_probe(args),
+        )
 
     # ----- Set up output directories and file logging -----
     run_dir = os.path.join(args.output_root, args.runs_folder, args.run_id)
@@ -1631,9 +1841,10 @@ def main(args, use_hydra=False, ds_config=None,):
     checkpoint_dir = os.path.join(
         args.output_root, args.checkpoints_folder, args.run_id,
     )
-    if get_rank() == 0:
+    if get_global_rank() == 0:
         os.makedirs(logs_dir, exist_ok=True)
         os.makedirs(artifacts_dir, exist_ok=True)
+        os.makedirs(checkpoint_dir, exist_ok=True)
     log_path, file_handler = setup_file_logging(artifacts_dir)
 
     # ----- Process passed parameters -----
@@ -1676,12 +1887,12 @@ def main(args, use_hydra=False, ds_config=None,):
         resume_from_checkpoint = args.resume_from_checkpoint
         if finetune_last_n_layers == -2:
             # If flag is set to finetune and layers not specified (default -2)
-            # set to default actionable value 1
-            finetune_last_n_layers = 1
+            # set to -1 (all layers trainable)
+            finetune_last_n_layers = -1
         if finetune_last_n_blocks == -2:
             # If flag is set to finetune and blocks not specified (default -2)
-            # set to default actionable value 1
-            finetune_last_n_blocks = 1
+            # set to -1 (all blocks trainable)
+            finetune_last_n_blocks = -1
         # When resuming, weights (and optimizer state) are restored from the
         # Lightning checkpoint by trainer.fit(ckpt_path=...), so loading
         # pretrained_weights would be wasted work and misleading. Still apply
@@ -1728,85 +1939,93 @@ def main(args, use_hydra=False, ds_config=None,):
     else:
         pass
 
-    # ----- Train Model -----
-    train_model(
+    # ----- Write build manifest before training (rank 0 only) -----
+    _write_build_manifest(
         args=args,
+        artifacts_dir=artifacts_dir,
+        checkpoint_dir=checkpoint_dir,
         PL_model=PL_model,
-        data_module=data_module,
-        ds_config=ds_config,
+        start_time=start_time,
     )
 
-    # ----- Write args.json and build manifest (rank 0 only) -----
-    if get_rank() == 0:
-        elapsed = datetime.now() - start_time
-
-        # Save args.json
-        args_path = os.path.join(artifacts_dir, "args.json")
-        backup_if_exists(args_path)
-        with open(args_path, "w") as f:
-            json.dump(vars(args), f, indent=2, default=str)
-        logger.info("Args written to %s", args_path)
-
-        total_params = sum(p.numel() for p in PL_model.model.parameters())
-        trainable_params = sum(
-            p.numel() for p in PL_model.model.parameters() if p.requires_grad
+    # ----- Train Model -----
+    exit_reason = "completed"
+    exception = None
+    try:
+        train_model(
+            args=args,
+            PL_model=PL_model,
+            data_module=data_module,
+            ds_config=ds_config,
         )
-
-        outputs = {
-            "seed": args.seed,
-            "total_params": total_params,
-            "trainable_params": trainable_params,
-            "batch_size": args.batch_size,
-            "effective_lr": args.lr,
-            "precision": args.precision,
-            "gpu_devices": args.gpu_devices,
-            "num_nodes": args.num_nodes,
-            "acc_grad_batches": args.acc_grad_batches,
-            "deepspeed_stage": "2",
-        }
-        outputs["training_strategy"] = args.training_strategy
-        if args.training_strategy == 'combine':
-            outputs["max_steps"] = args.max_steps
-            outputs["val_check_interval"] = args.val_check_interval
-        else:
-            outputs["epochs"] = args.epochs
-
-        if args.finetune:
-            outputs["finetune"] = True
-            outputs["finetune_last_n_blocks"] = args.finetune_last_n_blocks
-            outputs["finetune_last_n_layers"] = args.finetune_last_n_layers
-
-        resolved_paths = {
-            "checkpoint_dir": os.path.abspath(checkpoint_dir),
-            "artifacts_dir": os.path.abspath(artifacts_dir),
-        }
-        if args.primary_data_path is not None:
-            resolved_paths["primary_data_path"] = os.path.abspath(
-                args.primary_data_path
-            )
-        if args.secondary_data_paths is not None:
-            resolved_paths["secondary_data_paths"] = [
-                os.path.abspath(p) for p in args.secondary_data_paths
-            ]
-        if args.pretrained_weights is not None:
-            resolved_paths["pretrained_weights"] = os.path.abspath(
-                args.pretrained_weights
-            )
-        if args.resume_from_checkpoint is not None:
-            resolved_paths["resume_from_checkpoint"] = os.path.abspath(
-                args.resume_from_checkpoint
-            )
-
-        manifest_path = write_manifest(
-            args, artifacts_dir, start_time, elapsed,
-            outputs=outputs,
-            resolved_paths=resolved_paths,
-            environment=_collect_training_env(),
+    except KeyboardInterrupt as e:
+        exit_reason = "interrupted"
+        exception = e
+        raise
+    except BaseException as e:
+        exit_reason = "exception"
+        exception = e
+        raise
+    finally:
+        time_limit_seconds = getattr(args, 'time_limit_seconds', None)
+        if exit_reason == "completed" and time_limit_seconds is not None:
+            elapsed = time.perf_counter() - _MAIN_START_MONOTONIC
+            if elapsed >= time_limit_seconds:
+                exit_reason = "time_limit_exceeded"
+        completed_epochs = (
+            _LAST_TRAINER.current_epoch if _LAST_TRAINER is not None else None
         )
-        logger.info("Build manifest written to %s", manifest_path)
+        completed_steps = (
+            _LAST_TRAINER.global_step if _LAST_TRAINER is not None else None
+        )
+        _write_run_summary(
+            artifacts_dir=artifacts_dir,
+            start_time=start_time,
+            exit_reason=exit_reason,
+            exception=exception,
+            completed_epochs=completed_epochs,
+            completed_steps=completed_steps,
+        )
+        if _MAIN_START_MONOTONIC is not None:
+            total = int(time.perf_counter() - _MAIN_START_MONOTONIC)
+            h, rem = divmod(total, 3600)
+            m, s = divmod(rem, 60)
+            logger.info(
+                "Program exiting. Total elapsed time: %d:%02d:%02d", h, m, s,
+            )
 
     # ----- Clean up -----
     teardown_file_logging("biom3", file_handler)
+
+
+def _stage3_dataset_probe(args):
+    """CPU-only data-module probe for the dry-run report.
+
+    Returns ``(train_len, val_len, sample_batch)``. Failures are
+    surfaced as exceptions and rendered as notes in the report.
+    """
+    data_module = load_data(
+        args=args,
+        primary_data_path=args.primary_data_path,
+        secondary_data_paths=args.secondary_data_paths,
+        facilitator=args.facilitator,
+    )
+    train_dl = data_module.train_dataloader()
+    val_dl = data_module.val_dataloader()
+    train_len = len(train_dl.dataset) if hasattr(train_dl.dataset, '__len__') else None
+    val_len = len(val_dl.dataset) if hasattr(val_dl.dataset, '__len__') else None
+    sample = next(iter(train_dl), None)
+    return train_len, val_len, sample
+
+
+def _stage3_model_probe(args):
+    """CPU-only model probe for the dry-run report."""
+    args.device = 'cpu'
+    return mod.get_model(
+        args=args,
+        data_shape=(args.image_size, args.image_size),
+        num_classes=args.num_classes,
+    )
 
 
 def parse_arguments(args):
@@ -1815,4 +2034,4 @@ def parse_arguments(args):
 
 if __name__ == '__main__':
     args = parse_arguments(sys.argv[1:])
-    main(args)    
+    main(args)

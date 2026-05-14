@@ -59,6 +59,6 @@ exec "${LAUNCHER}" \
         --run_id "${run_id}" \
         --device "${device}" \
         --num_nodes 1 \
-        --gpu_devices "${NGPU}" \
+        --devices_per_node "${NGPU}" \
         ${wandb_resolved} \
         "$@"

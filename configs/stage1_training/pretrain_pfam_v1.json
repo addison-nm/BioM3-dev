@@ -33,7 +33,7 @@
 
   "device": "cuda",
   "precision": "32",
-  "gpu_devices": 1,
+  "devices_per_node": 1,
   "num_nodes": 1,
   "num_workers": 0,
 

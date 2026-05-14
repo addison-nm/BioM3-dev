@@ -1,10 +1,7 @@
-# from .device import get_device, get_backend_name
+"""Hardware-backend dispatch for BioM3.
 
-# backend = get_backend_name()
-
-# if backend == "cuda":
-#     from .cuda import *
-# elif backend == "xpu":
-#     from .xpu import *
-# else:
-#     from .cpu import *
+Public entry point is ``biom3.backend.device`` — it detects the active
+backend at import time and re-exports the per-backend symbols
+(``DIST_BACKEND``, ``resolve_device_for_local_rank``, etc.) into its own
+namespace via ``from .{cpu,cuda,xpu} import *``.
+"""

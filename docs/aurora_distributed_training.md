@@ -19,7 +19,7 @@ Node
 └── GPU 5:  tile 10 (device 10), tile 11 (device 11)
 ```
 
-Training configs should use `gpu_devices: 12` per node.
+Training configs should use `devices_per_node: 12` per node.
 `ZE_FLAT_DEVICE_HIERARCHY` default already exposes tiles as devices.
 
 ## oneCCL (Intel Collective Communications Library)
@@ -75,7 +75,7 @@ Use a machine override config in `configs/stage3_training/machines/`:
 {
   "device": "xpu",
   "precision": "bf16",
-  "gpu_devices": 12,
+  "devices_per_node": 12,
   "num_nodes": 2,
   "log_every_n_steps": 1
 }

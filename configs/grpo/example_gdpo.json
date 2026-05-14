@@ -1,0 +1,22 @@
+{
+  "_base_configs": ["./_base_grpo.json"],
+  "_overwrite_configs": [],
+
+  "steps": 100,
+  "num_generations": 4,
+  "batch_size": 1,
+  "save_steps": 50,
+
+  "n_quadrature": 3,
+  "quadrature_grid": "uniform",
+  "inner_mc": 1,
+  "eps_t": 1e-3,
+  "kl_estimator": "tokenwise_k3",
+  "use_old_policy_snapshot": true,
+  "advantage_normalize": false,
+
+  "pre_unmask": true,
+  "pre_unmask_config": "./configs/grpo/pre_unmask_sh3.json",
+
+  "output_root": "./outputs/gdpo"
+}

@@ -101,7 +101,7 @@ def artifacts_dir(tmp_path):
         "git_hash": "abc123", "git_branch": "addison-dev", "outputs": {"seed": 42}
     }))
     (artifacts_dir / "benchmark_history.json").write_text(json.dumps({
-        "config": {"batch_size": 16, "gpu_devices": 12, "num_nodes": 8, "backend": "xpu"},
+        "config": {"batch_size": 16, "devices_per_node": 12, "num_nodes": 8, "backend": "xpu"},
         "epochs": [
             {"epoch": 0, "samples_per_sec": 1200.0, "steps_per_sec": 18.0,
              "peak_memory_allocated_gb": 40.1, "peak_memory_reserved_gb": 45.3,
@@ -128,7 +128,7 @@ class TestLoadRunArtifacts:
         assert run["args"]["lr"] == 1e-4
         assert run["checkpoint_summary"]["primary"]["best_score"] == 0.12
         assert run["build_manifest"]["git_hash"] == "abc123"
-        assert run["benchmark_history"]["config"]["gpu_devices"] == 12
+        assert run["benchmark_history"]["config"]["devices_per_node"] == 12
 
     def test_missing_metrics_file_raises(self, tmp_path):
         with pytest.raises(FileNotFoundError):

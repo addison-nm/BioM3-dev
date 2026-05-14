@@ -40,7 +40,7 @@ SWEEP_KEYS = (
     "batch_size",
     "acc_grad_batches",
     "precision",
-    "gpu_devices",
+    "devices_per_node",
     "num_nodes",
     "num_workers",
 )

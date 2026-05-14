@@ -16,7 +16,6 @@ import json
 import logging
 import os
 import random
-import socket
 import sys
 import warnings
 from datetime import datetime
@@ -48,11 +47,14 @@ else:
 import biom3.Stage1.preprocess as prep
 import biom3.Stage1.model as mod
 import biom3.Stage1.PL_wrapper as PL_mod
+from biom3.core.dry_run import coerce_dry_run_output, run_dry_run
 from biom3.core.helpers import coerce_limit_batches, load_json_config
 from biom3.core.run_utils import (
-    backup_if_exists, setup_file_logging, teardown_file_logging, write_manifest,
+    backup_if_exists, collect_training_env, resolve_devices_per_node,
+    setup_file_logging, teardown_file_logging, write_manifest,
 )
-from biom3.backend.device import print_gpu_initialization, get_rank
+from biom3.backend.device import print_gpu_initialization
+from biom3.core.distributed import get_global_rank
 
 logger = setup_logger(__name__)
 
@@ -156,20 +158,23 @@ def get_args(parser):
                         help="Optimizer name (e.g. 'AdamW').")
     parser.add_argument('--scale_learning_rate', type=str, default='False',
                         help="'True'/'False'. When True, scale all learning "
-                             'rates by num_nodes * gpu_devices.')
+                             'rates by num_nodes * devices_per_node.')
 
     parser.add_argument('--precision', type=str, default='32',
                         help="Training precision: '32', '16', 'bf16', 'bf16-mixed'.")
     parser.add_argument('--device', type=str, default='cuda',
                         choices=['cuda', 'xpu', 'cpu'],
                         help='Compute device for training.')
-    parser.add_argument('--gpu_devices', type=int, default=1,
-                        help='Number of GPUs (CUDA) or tiles (XPU) per node.')
+    parser.add_argument('--devices_per_node', type=int, default=None,
+                        help='Number of GPUs (CUDA) or tiles (XPU) per node. Default 1.')
+    parser.add_argument('--gpu_devices', type=int, default=None,
+                        help='(deprecated, use --devices_per_node) preserved for '
+                             'backward compatibility with older configs and scripts.')
     parser.add_argument('--num_nodes', type=int, default=1,
                         help='Number of nodes participating in training.')
     parser.add_argument('--acc_grad_batches', type=int, default=1,
                         help='Gradient accumulation steps. Effective batch size = '
-                             'batch_size * acc_grad_batches * num_nodes * gpu_devices.')
+                             'batch_size * acc_grad_batches * num_nodes * devices_per_node.')
 
     parser.add_argument('--save_metrics_history', type=str, default='True',
                         help="'True'/'False'. Save MetricsHistoryCallback "
@@ -297,6 +302,15 @@ def get_wrapper_args(parser):
                         help='wandb project the run belongs to.')
     parser.add_argument('--wandb_tags', type=str, nargs='*', default=[],
                         help='wandb tags applied to the run.')
+    parser.add_argument('--dry_run', default='False', type=str,
+                        help='Print effective config (with provenance), output '
+                             'paths, distributed/batch math, and an a-priori '
+                             'memory estimate, then exit without training.')
+    parser.add_argument('--dry_run_output', default='False', type=str,
+                        help="Where to write the JSON dry-run report. 'False' "
+                             "(default) prints to stdout only; 'True' writes "
+                             "to <artifacts_dir>/dry_run_report.json; any "
+                             "other string is treated as a filepath.")
     return parser
 
 
@@ -317,7 +331,9 @@ def retrieve_all_args(args):
         json_config = load_json_config(pre_args.config_path)
         parser.set_defaults(**json_config)
 
+    argv = list(args)
     args = parser.parse_args(args)
+    args._argv = argv  # consumed by core.dry_run for CLI provenance attribution
 
     # Type conversions (idempotent)
     args.pretrained_seq = str_to_bool(args.pretrained_seq)
@@ -359,6 +375,11 @@ def retrieve_all_args(args):
         args.pfam_splits_dir = os.path.join(
             args.output_root, args.runs_folder, args.run_id, 'pfam_splits',
         )
+
+    resolve_devices_per_node(args)
+
+    args.dry_run = str_to_bool(args.dry_run)
+    args.dry_run_output = coerce_dry_run_output(args.dry_run_output)
 
     return args
 
@@ -422,30 +443,6 @@ def load_pretrained_weights(PL_model, checkpoint_path: str):
     return PL_model
 
 
-_TRAINING_ENV_PREFIXES = (
-    "CUDA_", "NCCL_", "TORCH_", "WANDB_",
-    "MASTER_", "WORLD_SIZE", "RANK", "LOCAL_RANK",
-    "SLURM_", "PBS_", "COBALT_", "PALS_", "PMI_", "OMPI_",
-    "OMP_NUM_THREADS", "MKL_NUM_THREADS",
-    "ZE_", "CCL_", "ONEAPI_",
-)
-
-_SENSITIVE_ENV_SUBSTRINGS = (
-    "KEY", "SECRET", "TOKEN", "PASSWORD", "CREDENTIAL", "AUTH",
-)
-
-
-def _collect_training_env():
-    env = {"hostname": socket.gethostname()}
-    for key, val in sorted(os.environ.items()):
-        if key.startswith(_TRAINING_ENV_PREFIXES):
-            upper = key.upper()
-            if any(s in upper for s in _SENSITIVE_ENV_SUBSTRINGS):
-                continue
-            env[key] = val
-    return env
-
-
 def save_model(args, checkpoint_path, artifacts_path, PL_model, trainer):
     if not trainer.is_global_zero:
         return
@@ -481,7 +478,7 @@ def train_model(args, PL_model, data_module):
     runs_folder = args.runs_folder
     run_id = args.run_id
     log_every_n_steps = args.log_every_n_steps
-    gpu_devices = args.gpu_devices
+    devices_per_node = args.devices_per_node
     num_nodes = args.num_nodes
     acc_grad_batches = args.acc_grad_batches
     epochs = args.epochs
@@ -492,10 +489,10 @@ def train_model(args, PL_model, data_module):
     use_wandb = args.wandb
 
     if args.scale_learning_rate:
-        n = num_nodes * gpu_devices
+        n = num_nodes * devices_per_node
         logger.info(
-            "Scaling LRs by num_nodes x gpu_devices = %s x %s = %s",
-            num_nodes, gpu_devices, n,
+            "Scaling LRs by num_nodes x devices_per_node = %s x %s = %s",
+            num_nodes, devices_per_node, n,
         )
         args.head_lr *= n
         args.protein_encoder_lr *= n
@@ -505,7 +502,7 @@ def train_model(args, PL_model, data_module):
     run_dir = os.path.join(output_root, runs_folder, run_id)
     logs_dir = os.path.join(run_dir, _LOGS_SUBDIR)
     artifacts_dir = os.path.join(run_dir, _ARTIFACTS_SUBDIR)
-    if get_rank() == 0:
+    if get_global_rank() == 0:
         os.makedirs(checkpoint_dir, exist_ok=True)
         os.makedirs(logs_dir, exist_ok=True)
         os.makedirs(artifacts_dir, exist_ok=True)
@@ -561,7 +558,7 @@ def train_model(args, PL_model, data_module):
             output_dir=artifacts_dir,
             batch_size=args.batch_size,
             acc_grad_batches=acc_grad_batches,
-            gpu_devices=gpu_devices,
+            devices_per_node=devices_per_node,
             num_nodes=num_nodes,
             precision=precision,
             training_strategy='primary_only',
@@ -580,9 +577,9 @@ def train_model(args, PL_model, data_module):
             verbose=True,
         ))
 
-    if args.device == 'cuda' and (gpu_devices > 1 or num_nodes > 1):
+    if args.device == 'cuda' and (devices_per_node > 1 or num_nodes > 1):
         strategy = 'ddp'
-    elif args.device == 'xpu' and gpu_devices == 1 and num_nodes == 1:
+    elif args.device == 'xpu' and devices_per_node == 1 and num_nodes == 1:
         # Aurora Lightning's _choose_strategy() falls back to
         # SingleDeviceStrategy(device="cpu") for XPU because 'xpu' isn't in its
         # CUDA/MPS/GPU branch; that makes trainer.strategy.root_device report
@@ -617,7 +614,7 @@ def train_model(args, PL_model, data_module):
         'enable_progress_bar': True,
         'enable_model_summary': True,
         'enable_checkpointing': True,
-        'devices': gpu_devices,
+        'devices': devices_per_node,
         'num_nodes': num_nodes,
         'accelerator': args.device,
         'strategy': strategy,
@@ -646,7 +643,7 @@ def train_model(args, PL_model, data_module):
         logger.info("Resume from checkpoint: %s", resume_from_checkpoint)
         trainer.fit(PL_model, data_module, ckpt_path=resume_from_checkpoint)
 
-    if get_rank() == 0:
+    if get_global_rank() == 0:
         print_gpu_initialization()
 
     save_model(
@@ -664,11 +661,19 @@ def main(args):
     warnings.filterwarnings("ignore", message=".*TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD.*")
     logging.getLogger("tensorboardX.x2num").setLevel(logging.ERROR)
 
+    if getattr(args, 'dry_run', False):
+        return run_dry_run(
+            args,
+            stage="stage1",
+            dataset_probe=lambda: _stage1_dataset_probe(args),
+            model_probe=lambda: _stage1_model_probe(args),
+        )
+
     run_dir = os.path.join(args.output_root, args.runs_folder, args.run_id)
     logs_dir = os.path.join(run_dir, _LOGS_SUBDIR)
     artifacts_dir = os.path.join(run_dir, _ARTIFACTS_SUBDIR)
     checkpoint_dir = os.path.join(args.output_root, args.checkpoints_folder, args.run_id)
-    if get_rank() == 0:
+    if get_global_rank() == 0:
         os.makedirs(logs_dir, exist_ok=True)
         os.makedirs(artifacts_dir, exist_ok=True)
     log_path, file_handler = setup_file_logging(artifacts_dir)
@@ -692,13 +697,14 @@ def main(args):
 
     train_model(args=args, PL_model=PL_model, data_module=data_module)
 
-    if get_rank() == 0:
+    if get_global_rank() == 0:
         elapsed = datetime.now() - start_time
 
         args_path = os.path.join(artifacts_dir, "args.json")
         backup_if_exists(args_path)
         with open(args_path, "w") as f:
-            json.dump(vars(args), f, indent=2, default=str)
+            json.dump({k: v for k, v in vars(args).items() if not k.startswith("_")},
+                      f, indent=2, default=str)
         logger.info("Args written to %s", args_path)
 
         total_params = sum(p.numel() for p in PL_model.model.parameters())
@@ -715,7 +721,7 @@ def main(args):
             "protein_encoder_lr": args.protein_encoder_lr,
             "text_encoder_lr": args.text_encoder_lr,
             "precision": args.precision,
-            "gpu_devices": args.gpu_devices,
+            "devices_per_node": args.devices_per_node,
             "num_nodes": args.num_nodes,
             "acc_grad_batches": args.acc_grad_batches,
             "epochs": args.epochs,
@@ -740,11 +746,40 @@ def main(args):
             args, artifacts_dir, start_time, elapsed,
             outputs=outputs,
             resolved_paths=resolved_paths,
-            environment=_collect_training_env(),
+            environment=collect_training_env(),
         )
         logger.info("Build manifest written to %s", manifest_path)
 
     teardown_file_logging("biom3", file_handler)
+
+
+_DRY_RUN_CACHE = {}
+
+
+def _stage1_dataset_probe(args):
+    """CPU-only data-module probe for the dry-run report."""
+    if 'pair' not in _DRY_RUN_CACHE:
+        _DRY_RUN_CACHE['pair'] = get_dataloaders_models(args=args)
+    data_module, _ = _DRY_RUN_CACHE['pair']
+    if hasattr(data_module, 'setup'):
+        try:
+            data_module.setup()
+        except Exception:
+            pass
+    train_dl = data_module.train_dataloader()
+    val_dl = data_module.val_dataloader() if hasattr(data_module, 'val_dataloader') else None
+    train_len = len(train_dl.dataset) if hasattr(train_dl, 'dataset') and hasattr(train_dl.dataset, '__len__') else None
+    val_len = len(val_dl.dataset) if val_dl is not None and hasattr(val_dl, 'dataset') and hasattr(val_dl.dataset, '__len__') else None
+    sample = next(iter(train_dl), None)
+    return train_len, val_len, sample
+
+
+def _stage1_model_probe(args):
+    """CPU-only model probe for the dry-run report."""
+    if 'pair' not in _DRY_RUN_CACHE:
+        _DRY_RUN_CACHE['pair'] = get_dataloaders_models(args=args)
+    _, PL_model = _DRY_RUN_CACHE['pair']
+    return PL_model.model
 
 
 def parse_arguments(args):

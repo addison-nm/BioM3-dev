@@ -6,14 +6,14 @@ def main():
 
 
 def run_build_dataset():
-    from biom3.dbio.build_dataset import parse_arguments, main
+    from biom3.dbio.pipelines.build_dataset import parse_arguments, main
     args = parse_arguments(sys.argv[1:])
     main(args)
 
 
 def run_build_taxid_index():
     import argparse
-    from biom3.dbio.taxonomy import AccessionTaxidMapper
+    from biom3.dbio.readers.taxonomy import AccessionTaxidMapper
 
     parser = argparse.ArgumentParser(
         description="Build a SQLite index from prot.accession2taxid.gz for fast lookups."
@@ -32,56 +32,56 @@ def run_build_taxid_index():
     mapper.build_sqlite_index(args.output)
 
 
-def run_convert_to_parquet():
-    from biom3.dbio.convert import parse_arguments, main
+def run_csv_to_parquet():
+    from biom3.dbio.helpers.csv_to_parquet import parse_arguments, main
     args = parse_arguments(sys.argv[1:])
     main(args)
 
 
 def run_build_source_swissprot():
-    from biom3.dbio.build_source_swissprot import parse_arguments, main
+    from biom3.dbio.builders.source_swissprot import parse_arguments, main
     args = parse_arguments(sys.argv[1:])
     main(args)
 
 
 def run_build_source_pfam():
-    from biom3.dbio.build_source_pfam import parse_arguments, main
+    from biom3.dbio.builders.source_pfam import parse_arguments, main
     args = parse_arguments(sys.argv[1:])
     main(args)
 
 
 def run_build_source_trembl():
-    from biom3.dbio.build_source_trembl import parse_arguments, main
+    from biom3.dbio.builders.source_trembl import parse_arguments, main
     args = parse_arguments(sys.argv[1:])
     main(args)
 
 
 def run_build_source_expasy():
-    from biom3.dbio.build_source_expasy import parse_arguments, main
+    from biom3.dbio.builders.source_expasy import parse_arguments, main
     args = parse_arguments(sys.argv[1:])
     main(args)
 
 
 def run_build_source_smart():
-    from biom3.dbio.build_source_smart import parse_arguments, main
+    from biom3.dbio.builders.source_smart import parse_arguments, main
     args = parse_arguments(sys.argv[1:])
     main(args)
 
 
 def run_build_source_brenda():
-    from biom3.dbio.build_source_brenda import parse_arguments, main
+    from biom3.dbio.builders.source_brenda import parse_arguments, main
     args = parse_arguments(sys.argv[1:])
     main(args)
 
 
-def run_build_annotated_pfam_subsets():
-    from biom3.dbio.build_annotated_pfam_subsets import parse_arguments, main
+def run_build_pfam_subsets():
+    from biom3.dbio.builders.pfam_subsets import parse_arguments, main
     args = parse_arguments(sys.argv[1:])
     main(args)
 
 
 def run_build_annotation_cache():
-    from biom3.dbio.build_annotation_cache import parse_arguments, main
+    from biom3.dbio.helpers.annotation_cache import parse_arguments, main
     args = parse_arguments(sys.argv[1:])
     main(args)
 

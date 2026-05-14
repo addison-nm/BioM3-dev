@@ -136,13 +136,13 @@ configs/stage3_training/
   "_overwrite_configs": ["./machines/_polaris.json"],
 
   "device": "cpu",
-  "gpu_devices": 1,
+  "devices_per_node": 1,
   "lr": 1e-4,
   ...
 }
 ```
 
-Here `device` and `gpu_devices` in the file body serve as local-testing defaults, but the Polaris machine config overrides them with `cuda` / `4`. CLI args still win over everything.
+Here `device` and `devices_per_node` in the file body serve as local-testing defaults, but the Polaris machine config overrides them with `cuda` / `4`. CLI args still win over everything.
 
 ### Choosing `limit_val_batches` and `limit_train_batches`
 
@@ -175,7 +175,7 @@ The primary config example is `configs/stage3_training/pretrain_scratch_v2.json`
 | `max_steps` | `100000` | Max training steps (used in `combine` mode) |
 | `batch_size` | `16` | Mini-batch size per device |
 | `lr` | `3e-4` | Base learning rate |
-| `scale_learning_rate` | `true` | Multiply LR by `num_nodes * gpu_devices` |
+| `scale_learning_rate` | `true` | Multiply LR by `num_nodes * devices_per_node` |
 | `scheduler_gamma` | `null` | LR scheduler (`"coswarmup"` or a float gamma for StepLR) |
 | `warmup_steps` | `500` | LR warmup steps (for cosine warmup scheduler) |
 | `weight_decay` | `1e-6` | AdamW weight decay |
@@ -192,6 +192,19 @@ The primary config example is `configs/stage3_training/pretrain_scratch_v2.json`
 | `seed` | `0` | Random seed |
 
 ---
+
+## Distributed strategy
+
+Stage 3's Lightning trainer strategy is chosen via `--distributed_strategy`:
+
+- `deepspeed_zero2` (default): DeepSpeed ZeRO Stage 2 with CPU offload of optimizer states and parameters. Memory-efficient for large models — optimizer states are sharded across the world size, gradients are sharded, params stay replicated. Writes a sharded checkpoint *directory* (one file per shard) which `save_model` automatically converts to a single fp32 `state_dict.pth` at the end of training.
+- `ddp`: plain DDP with `static_graph=True` and `gradient_as_bucket_view=True`. Full replication — every rank holds full params, grads, and optimizer state. Lower comm overhead per step but higher per-rank memory. Writes a single-file `last.ckpt` which `save_model` materializes into `state_dict.pth` via a copy (no ZeRO conversion needed).
+
+Pick `ddp` when (a) the model is small enough that ZeRO-2's CPU offload latency is the bottleneck, (b) you're chasing an Aurora/xccl hang and want plain-DDP semantics for triage, or (c) downstream tooling needs a single-file `.ckpt`.
+
+Both strategies produce identical `state_dict.best.pth` artifacts in `artifacts_dir`, so downstream sampling and evaluation paths are unaffected by the choice.
+
+This flag is distinct from `--training_strategy`, which selects `primary_only` vs `combine` data mixing.
 
 ## Per-Machine Instructions
 
@@ -219,7 +232,7 @@ Key constants: `num_devices=4` (A100s per node), `device=cuda`.
 
 Uses `scripts/stage3_train_multinode.sh` which launches via `mpiexec`.
 
-See [setup_polaris.md](setup_polaris.md) for environment setup.
+See [setup_polaris.md](setup/setup_polaris.md) for environment setup.
 
 ### Aurora (Intel GPUs)
 
@@ -236,7 +249,7 @@ Same editing pattern as Polaris. Key differences:
 qsub jobs/aurora/_template_stage3_pretrain_from_scratch.pbs
 ```
 
-See [setup_aurora.md](setup_aurora.md) for environment setup (including the custom `lightning` fork).
+See [setup_aurora.md](setup/setup_aurora.md) for environment setup (including the custom `lightning` fork).
 
 ### DGX Spark (single NVIDIA GPU)
 
@@ -253,7 +266,7 @@ bash jobs/spark/_template_stage3_pretrain_from_scratch.sh
 
 Key constants: `num_nodes=1`, `num_devices=1`, `device=cuda`.
 
-See [setup_spark.md](setup_spark.md) for environment setup.
+See [setup_spark.md](setup/setup_spark.md) for environment setup.
 
 ---
 

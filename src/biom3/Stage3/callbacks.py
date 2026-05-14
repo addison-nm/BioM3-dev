@@ -84,9 +84,11 @@ class MetricsHistoryCallback(pl.Callback):
       ``"global_step"`` and ``"epoch"`` index arrays.
     - ``"val"``: same structure for validation metrics (including ``"loss_gap"``).
 
-    Streaming ``metrics_history.{train,val}.jsonl`` files are also written
-    incrementally so metrics survive crashes and timeouts even if
-    ``on_train_end`` never fires.
+    Streaming ``metrics_history.{train,val}.jsonl`` files are written at
+    epoch boundaries: train step records are buffered in memory through the
+    epoch and flushed in a single batched write at ``on_train_epoch_end``
+    (which Lightning fires even on time-limit-triggered partial epochs).
+    Validation records are written at ``on_validation_epoch_end``.
 
     Parameters
     ----------
@@ -102,10 +104,6 @@ class MetricsHistoryCallback(pl.Callback):
         epochs. Captures the epoch-averaged ``train_*_epoch`` values rather
         than noisy step-level values. ``None`` disables epoch-level records
         (default: ``None``).
-    flush_every_n_steps : int | None
-        Flush pending JSONL records to disk (fsync) every *n* global steps.
-        ``None`` disables periodic flushing — records are only guaranteed on
-        disk once ``on_train_end`` runs (default: ``None``).
     all_ranks_val_loss : bool
         When True, record ``val_loss`` and ``val_loss_epoch`` on **every** rank
         at validation epoch end and dump one ``metrics_history.rank{N}.pt`` per
@@ -118,8 +116,7 @@ class MetricsHistoryCallback(pl.Callback):
     VAL_JSONL = "metrics_history.val.jsonl"
 
     def __init__(self, output_dir, save_ranks=None, every_n_steps=1,
-                 every_n_epochs=None, flush_every_n_steps=None,
-                 all_ranks_val_loss=False):
+                 every_n_epochs=None, all_ranks_val_loss=False):
         super().__init__()
         self.output_dir = output_dir
         self.save_ranks = save_ranks or [0]
@@ -127,16 +124,13 @@ class MetricsHistoryCallback(pl.Callback):
         self.every_n_epochs = (
             max(1, int(every_n_epochs)) if every_n_epochs else None
         )
-        self.flush_every_n_steps = (
-            max(1, int(flush_every_n_steps)) if flush_every_n_steps else None
-        )
         self.all_ranks_val_loss = all_ranks_val_loss
         self.train_step_metrics: list[dict] = []
         self.val_epoch_metrics: list[dict] = []
         self.per_rank_val_loss: list[dict] = []
+        self._pending_train_jsonl: list[dict] = []
         self._train_jsonl_fh = None
         self._val_jsonl_fh = None
-        self._unflushed_since_fsync = 0
 
     def _open_jsonl_streams(self):
         if self._train_jsonl_fh is not None:
@@ -161,11 +155,6 @@ class MetricsHistoryCallback(pl.Callback):
                 fh.close()
                 setattr(self, attr, None)
 
-    def _append_jsonl(self, fh, record):
-        if fh is None:
-            return
-        fh.write(json.dumps(record, default=_json_default) + "\n")
-
     def _fsync_streams(self):
         for fh in (self._train_jsonl_fh, self._val_jsonl_fh):
             if fh is None:
@@ -175,15 +164,20 @@ class MetricsHistoryCallback(pl.Callback):
                 os.fsync(fh.fileno())
             except OSError:
                 pass
-        self._unflushed_since_fsync = 0
 
-    def _maybe_fsync(self, trainer):
-        if self.flush_every_n_steps is None:
+    def _flush_pending_train_jsonl(self):
+        if self._train_jsonl_fh is None or not self._pending_train_jsonl:
             return
-        self._unflushed_since_fsync += 1
-        if trainer.global_step % self.flush_every_n_steps != 0:
-            return
-        self._fsync_streams()
+        for rec in self._pending_train_jsonl:
+            self._train_jsonl_fh.write(
+                json.dumps(rec, default=_json_default) + "\n"
+            )
+        try:
+            self._train_jsonl_fh.flush()
+            os.fsync(self._train_jsonl_fh.fileno())
+        except OSError:
+            pass
+        self._pending_train_jsonl.clear()
 
     def on_train_start(self, trainer, pl_module):
         if trainer.global_rank in self.save_ranks:
@@ -204,29 +198,28 @@ class MetricsHistoryCallback(pl.Callback):
             if k.startswith("train_"):
                 record[k] = v.item() if hasattr(v, "item") else v
         self.train_step_metrics.append(record)
-        self._append_jsonl(self._train_jsonl_fh, record)
-        self._maybe_fsync(trainer)
+        self._pending_train_jsonl.append(record)
 
     def on_train_epoch_end(self, trainer, pl_module):
-        if self.every_n_epochs is None:
-            return
         if trainer.global_rank not in self.save_ranks:
             return
         epoch = trainer.current_epoch
-        if (epoch + 1) % self.every_n_epochs != 0:
-            return
-        logged = trainer.callback_metrics
-        record = {
-            "global_step": trainer.global_step,
-            "epoch": epoch,
-            "source": "epoch",
-        }
-        for k, v in logged.items():
-            if k.startswith("train_"):
-                record[k] = v.item() if hasattr(v, "item") else v
-        self.train_step_metrics.append(record)
-        self._append_jsonl(self._train_jsonl_fh, record)
-        self._maybe_fsync(trainer)
+        if (
+            self.every_n_epochs is not None
+            and (epoch + 1) % self.every_n_epochs == 0
+        ):
+            logged = trainer.callback_metrics
+            record = {
+                "global_step": trainer.global_step,
+                "epoch": epoch,
+                "source": "epoch",
+            }
+            for k, v in logged.items():
+                if k.startswith("train_"):
+                    record[k] = v.item() if hasattr(v, "item") else v
+            self.train_step_metrics.append(record)
+            self._pending_train_jsonl.append(record)
+        self._flush_pending_train_jsonl()
 
     def on_validation_epoch_end(self, trainer, pl_module):
         if self.all_ranks_val_loss:
@@ -257,11 +250,15 @@ class MetricsHistoryCallback(pl.Callback):
         if val_loss is not None and train_loss is not None:
             record["loss_gap"] = val_loss - train_loss
         self.val_epoch_metrics.append(record)
-        self._append_jsonl(self._val_jsonl_fh, record)
-        # Validation epochs are coarse — always fsync the JSONL streams here so
-        # at most one val cycle's worth of metrics is at risk on a SIGKILL,
-        # regardless of flush_every_n_steps. Then snapshot the consolidated
-        # metrics_history.pt so it's recoverable without rebuild_metrics_history_pt.
+        if self._val_jsonl_fh is not None:
+            self._val_jsonl_fh.write(
+                json.dumps(record, default=_json_default) + "\n"
+            )
+        # Flush both streams (train buffer too, in case validation runs
+        # before on_train_epoch_end has flushed for this epoch — defensive
+        # against ordering differences across training strategies). Then
+        # snapshot metrics_history.pt for crash recovery.
+        self._flush_pending_train_jsonl()
         self._fsync_streams()
         self._save()
 
@@ -294,6 +291,7 @@ class MetricsHistoryCallback(pl.Callback):
         if trainer.global_rank not in self.save_ranks:
             self._close_jsonl_streams()
             return
+        self._flush_pending_train_jsonl()
         self._save()
         out_path = os.path.join(self.output_dir, "metrics_history.pt")
         logger.info(
@@ -306,6 +304,7 @@ class MetricsHistoryCallback(pl.Callback):
 
     def on_exception(self, trainer, pl_module, exception):
         """Best-effort flush if training crashes before ``on_train_end``."""
+        self._flush_pending_train_jsonl()
         self._close_jsonl_streams()
 
     @staticmethod
@@ -377,7 +376,7 @@ class TrainingBenchmarkCallback(pl.Callback):
         Per-device micro-batch size.
     acc_grad_batches : int
         Gradient accumulation steps.
-    gpu_devices : int
+    devices_per_node : int
         Number of GPU devices per node.
     num_nodes : int
         Number of nodes.
@@ -403,7 +402,7 @@ class TrainingBenchmarkCallback(pl.Callback):
     STEP_JSONL = "benchmark_steps.jsonl"
 
     def __init__(self, output_dir, *, batch_size, acc_grad_batches,
-                 gpu_devices, num_nodes, precision="32",
+                 devices_per_node, num_nodes, precision="32",
                  training_strategy="primary_only", num_workers=0,
                  skip_first_epoch=True, all_ranks_memory=False,
                  per_step=False):
@@ -411,10 +410,10 @@ class TrainingBenchmarkCallback(pl.Callback):
         self.output_dir = output_dir
         self.batch_size = batch_size
         self.acc_grad_batches = acc_grad_batches
-        self.gpu_devices = gpu_devices
+        self.devices_per_node = devices_per_node
         self.num_nodes = num_nodes
         self.effective_batch_size = (
-            batch_size * acc_grad_batches * gpu_devices * num_nodes
+            batch_size * acc_grad_batches * devices_per_node * num_nodes
         )
         self.precision = precision
         self.training_strategy = training_strategy
@@ -686,7 +685,7 @@ class TrainingBenchmarkCallback(pl.Callback):
             "config": {
                 "batch_size": self.batch_size,
                 "acc_grad_batches": self.acc_grad_batches,
-                "gpu_devices": self.gpu_devices,
+                "devices_per_node": self.devices_per_node,
                 "num_nodes": self.num_nodes,
                 "effective_batch_size": self.effective_batch_size,
                 "num_workers": self.num_workers,
@@ -718,14 +717,21 @@ class _CheckpointLogMixin:
         super()._save_checkpoint(trainer, filepath)
         if trainer.global_rank != 0:
             return
+        if self.monitor is None:
+            logger.info(
+                "Checkpoint saved [periodic]  epoch=%d  step=%d  path=%s",
+                trainer.current_epoch, trainer.global_step,
+                os.path.basename(filepath),
+            )
+            return
         score = self.current_score
         score_str = f"{float(score):.5f}" if score is not None else "n/a"
         best = self.best_model_score
         best_str = f"{float(best):.5f}" if best is not None else "n/a"
         logger.info(
-            "Checkpoint saved  epoch=%d  step=%d  %s=%s  best=%s  path=%s",
+            "Checkpoint saved [monitored]  epoch=%d  step=%d  %s=%s  best=%s  path=%s",
             trainer.current_epoch, trainer.global_step,
-            self.monitor or "none", score_str, best_str,
+            self.monitor, score_str, best_str,
             os.path.basename(filepath),
         )
 
@@ -924,6 +930,111 @@ class BestArtifactSyncCallback(pl.Callback):
                 "BestArtifactSyncCallback: sync failed (%s). Training "
                 "continues; checkpoint .ckpt is still on disk.", e,
             )
+
+
+class TimeLimitCallback(pl.Callback):
+    """Set trainer.should_stop when elapsed wall time exceeds deadline.
+
+    Rank 0 measures elapsed time and broadcasts the decision to all ranks via
+    torch.distributed.broadcast (a point-to-many data ship). Each rank then
+    sets its own trainer.should_stop locally — bypassing Lightning's built-in
+    reduce_boolean_decision, which does an integer SUM all-reduce that is
+    known-broken on XPU/CCL (same bug as SyncSafeModelCheckpoint).
+    """
+
+    def __init__(self, deadline_seconds, start_monotonic, check_every_n_steps=50):
+        super().__init__()
+        self.deadline_seconds = float(deadline_seconds)
+        self.start_monotonic = float(start_monotonic)
+        self.check_every_n_steps = max(1, int(check_every_n_steps))
+        self.fired = False
+
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+        if self.fired:
+            return
+        if (batch_idx + 1) % self.check_every_n_steps != 0:
+            return
+        if trainer.global_rank == 0:
+            elapsed = time.perf_counter() - self.start_monotonic
+            decision = 1 if elapsed >= self.deadline_seconds else 0
+        else:
+            elapsed = 0.0
+            decision = 0
+        if trainer.world_size > 1:
+            decision_t = torch.tensor([decision], dtype=torch.int32,
+                                      device=pl_module.device)
+            torch.distributed.broadcast(decision_t, src=0)
+            decision = int(decision_t.item())
+        if decision == 1:
+            self.fired = True
+            if trainer.global_rank == 0:
+                logger.info(
+                    "Time limit reached: elapsed %.1fs >= limit %.0fs. "
+                    "Triggering graceful stop.",
+                    elapsed, self.deadline_seconds,
+                )
+            trainer.should_stop = True
+
+
+class StepProgressCallback(pl.Callback):
+    """Log a within-epoch progress line at a fraction-of-epoch cadence.
+
+    fraction=0.5 (default) fires at 50% and 100% of each epoch. fraction=1.0
+    fires only at the final step. fraction=0.25 fires at 25/50/75/100. The
+    interval is clamped to >= 1 so very small dataloaders still get one
+    line per batch.
+    """
+
+    def __init__(self, fraction=0.5):
+        super().__init__()
+        self.fraction = float(fraction)
+        self._interval = None
+
+    def on_train_epoch_start(self, trainer, pl_module):
+        n = trainer.num_training_batches
+        self._interval = max(1, int(round(n * self.fraction)))
+
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+        if trainer.global_rank != 0 or self._interval is None:
+            return
+        b = batch_idx + 1
+        if b % self._interval != 0:
+            return
+        n = trainer.num_training_batches
+        pct = (b / n) * 100.0 if n > 0 else 0.0
+        logged = trainer.callback_metrics
+        loss = logged.get("train_loss_step") or logged.get("train_loss")
+        loss_str = (
+            f"{float(loss.item() if hasattr(loss, 'item') else loss):.4f}"
+            if loss is not None else "n/a"
+        )
+        logger.info(
+            "Step progress  epoch=%d  batch=%d/%d (%.1f%%)  train_loss=%s",
+            trainer.current_epoch, b, n, pct, loss_str,
+        )
+
+
+class EpochProgressCallback(pl.Callback):
+    """Log a 'Completed training epoch N. Time elapsed: T seconds' line at the
+    end of each training epoch, before validation / checkpoint save."""
+
+    def __init__(self):
+        super().__init__()
+        self._epoch_start_time = None
+
+    def on_train_epoch_start(self, trainer, pl_module):
+        self._epoch_start_time = time.perf_counter()
+
+    def on_train_epoch_end(self, trainer, pl_module):
+        if trainer.global_rank != 0 or self._epoch_start_time is None:
+            return
+        elapsed = time.perf_counter() - self._epoch_start_time
+        status = "ended early (partial)" if trainer.should_stop else "completed"
+        logger.info(
+            "Training epoch %d %s. Time elapsed: %.2f seconds",
+            trainer.current_epoch, status, elapsed,
+        )
+        self._epoch_start_time = None
 
 
 class SyncSafeModelCheckpoint(_CheckpointLogMixin, _ModelCheckpoint):

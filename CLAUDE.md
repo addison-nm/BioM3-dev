@@ -57,7 +57,7 @@ configs/            # JSON configs for each stage's inference, training, and dbi
   training/         #   Training configs with models/ and machines/ base configs
 scripts/            # Bash wrappers (embedding_pipeline, training, generation, sync)
 demos/              # End-to-end demos (dbio dataset building, SH3 embedding pipeline)
-data/databases/     # Symlinked reference databases (gitignored, see docs/setup_databases.md)
+data/databases/     # Symlinked reference databases (gitignored, see docs/setup/setup_databases.md)
 tests/              # pytest suite (conftest.py, per-stage tests, test data in tests/_data/)
 weights/            # Pre-trained model weights (gitignored, see weights/README.md)
 docs/               # Per-machine setup guides (Polaris, Aurora, DGX Spark)
@@ -73,7 +73,7 @@ Defined in `pyproject.toml`:
 - `biom3_ProteoScribe_sample` → `biom3.Stage3.__main__:run_ProteoScribe_sample`
 - `biom3_build_dataset` → `biom3.dbio.__main__:run_build_dataset`
 - `biom3_build_taxid_index` → `biom3.dbio.__main__:run_build_taxid_index`
-- `biom3_convert_to_parquet` → `biom3.dbio.__main__:run_convert_to_parquet`
+- `biom3_csv_to_parquet` → `biom3.dbio.__main__:run_csv_to_parquet`
 
 ## Building and running
 

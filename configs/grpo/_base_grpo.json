@@ -1,0 +1,26 @@
+{
+  "stage1_config": "./configs/inference/stage1_PenCL.json",
+  "stage2_config": "./configs/inference/stage2_Facilitator.json",
+  "stage3_config": "./configs/inference/stage3_ProteoScribe_sample.json",
+
+  "stage1_weights": null,
+  "stage2_weights": null,
+  "stage3_init_weights": null,
+
+  "prompts_path": "./configs/grpo/prompts/example_prompts.txt",
+
+  "steps": 200,
+  "num_generations": 4,
+  "batch_size": 1,
+  "learning_rate": 1e-5,
+  "weight_decay": 1e-6,
+  "beta": 0.01,
+  "eps": 0.20,
+  "max_grad_norm": 1.0,
+  "save_steps": 50,
+  "seed": 42,
+
+  "reward": "esmfold_plddt",
+
+  "output_root": "./outputs/grpo"
+}

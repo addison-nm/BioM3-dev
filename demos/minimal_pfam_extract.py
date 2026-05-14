@@ -11,7 +11,7 @@ Run:
 import csv
 import os
 
-from biom3.dbio.build_source_pfam import iter_pfam_fasta, _parse_fasta_header
+from biom3.dbio.builders.source_pfam import iter_pfam_fasta, _parse_fasta_header
 
 FASTA_PATH = "data/databases/pfam/Pfam-A.fasta.gz"
 TARGET_FAMILY = "PF00018"  # SH3 domain

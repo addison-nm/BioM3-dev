@@ -43,12 +43,12 @@
 
   "device": "cuda",
   "precision": "bf16",
-  "gpu_devices": 4,
+  "devices_per_node": 4,
   "num_nodes": 1,
   "acc_grad_batches": 1,
 
   "val_check_interval": 20,
-  "limit_val_batches": 0.05,
+  "limit_val_batches": 0.6,
 
   "log_every_n_steps": 100,
   "start_secondary": false,

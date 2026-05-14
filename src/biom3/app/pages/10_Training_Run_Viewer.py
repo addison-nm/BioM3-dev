@@ -107,7 +107,7 @@ _ARGS_SECTIONS = {
         "transformer_depth", "dropout", "diffusion_steps",
     ],
     "Run": [
-        "description", "tags", "notes", "gpu_devices", "num_nodes", "seed",
+        "description", "tags", "notes", "devices_per_node", "num_nodes", "seed",
         "data_root", "pretrained_weights",
     ],
 }

@@ -30,13 +30,28 @@ def test_stage3_imports():
 def test_dbio_imports():
     import biom3.dbio
     import biom3.dbio.config
-    import biom3.dbio.base
-    import biom3.dbio.swissprot
-    import biom3.dbio.pfam
-    import biom3.dbio.taxonomy
+    import biom3.dbio.caption
+    import biom3.dbio.stats
     import biom3.dbio.enrich
-    import biom3.dbio.uniprot_client
-    import biom3.dbio.build_dataset
+    import biom3.dbio.parsers.swissprot_dat
+    import biom3.dbio.parsers.pfam_stockholm
+    import biom3.dbio.parsers.expasy_dat
+    import biom3.dbio.parsers.smart_tsv
+    import biom3.dbio.parsers.brenda_flatfile
+    import biom3.dbio.readers.base
+    import biom3.dbio.readers.swissprot_csv
+    import biom3.dbio.readers.pfam_csv
+    import biom3.dbio.readers.taxonomy
+    import biom3.dbio.builders.source_swissprot
+    import biom3.dbio.builders.source_pfam
+    import biom3.dbio.builders.source_trembl
+    import biom3.dbio.builders.source_expasy
+    import biom3.dbio.builders.source_smart
+    import biom3.dbio.builders.source_brenda
+    import biom3.dbio.builders.pfam_subsets
+    import biom3.dbio.helpers.annotation_cache
+    import biom3.dbio.helpers.csv_to_parquet
+    import biom3.dbio.pipelines.build_dataset
 
 
 def test_viz_imports():

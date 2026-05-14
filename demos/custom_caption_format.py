@@ -11,8 +11,8 @@ Run:
 import os
 
 from biom3.dbio.caption import CaptionSpec
-from biom3.dbio.pfam_metadata import PfamMetadataParser
-from biom3.dbio.build_source_swissprot import build_swissprot_csv
+from biom3.dbio.parsers.pfam_stockholm import PfamMetadataParser
+from biom3.dbio.builders.source_swissprot import build_swissprot_csv
 
 OUTDIR = "demos/outputs/custom_captions"
 

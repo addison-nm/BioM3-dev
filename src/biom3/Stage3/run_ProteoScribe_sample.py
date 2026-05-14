@@ -53,6 +53,13 @@ from biom3.core.run_utils import (
     write_manifest,
 )
 from biom3.backend.device import setup_logger, get_backend_name
+from biom3.core.distributed import (
+    barrier,
+    broadcast_int,
+    gather_object_to_main,
+    init_distributed_if_launched,
+    is_main_process,
+)
 
 logger = setup_logger(__name__)
 
@@ -250,7 +257,23 @@ def _resolve_fill_token_id(fill_with: str, tokens: list) -> int:
     return tokens.index(canonical)
 
 
-def _build_initial_mask_state(args, batch_size: int, tokens: list):
+def _derive_sample_seed(base_seed: int, prompt_idx: int, replica_idx: int) -> int:
+    """Stable seed for the (prompt_idx, replica_idx) pair.
+
+    Uses ``numpy.random.SeedSequence`` so the same triple yields the same
+    output across processes / Python interpreters / world sizes. Plain
+    ``hash()`` is unsuitable here because it is salted by PYTHONHASHSEED.
+    """
+    ss = np.random.SeedSequence(entropy=[int(base_seed), int(prompt_idx), int(replica_idx)])
+    return int(ss.generate_state(1, dtype=np.uint32)[0]) & 0x7FFFFFFF
+
+
+def _make_sample_seeds(batch, base_seed: int) -> list:
+    """One stable seed per ``(global_idx, prompt_idx, replica_idx)`` triple."""
+    return [_derive_sample_seed(base_seed, p_idx, r_idx) for (_, p_idx, r_idx) in batch]
+
+
+def _build_initial_mask_state(args, batch_size: int, tokens: list, sample_seeds: list = None):
     """Construct the starting tensor and sampling path for a generation batch.
 
     Returns ``(extract_digit_samples, sampling_path)`` where:
@@ -272,11 +295,15 @@ def _build_initial_mask_state(args, batch_size: int, tokens: list):
     diffusion_steps = args.diffusion_steps
     sequence_length = getattr(args, 'sequence_length', diffusion_steps)
 
+    def _perm(i):
+        if sample_seeds is None:
+            return torch.randperm(diffusion_steps)
+        gen = torch.Generator().manual_seed(int(sample_seeds[i]))
+        return torch.randperm(diffusion_steps, generator=gen)
+
     if not getattr(args, 'pre_unmask', False):
         init = torch.zeros(batch_size, sequence_length, dtype=torch.long)
-        sampling_path = torch.stack([
-            torch.randperm(diffusion_steps) for _ in range(batch_size)
-        ])
+        sampling_path = torch.stack([_perm(i) for i in range(batch_size)])
         return init, sampling_path
 
     if diffusion_steps > sequence_length:
@@ -288,9 +315,7 @@ def _build_initial_mask_state(args, batch_size: int, tokens: list):
     fill_id = _resolve_fill_token_id(fill_with, tokens)
     init = torch.full((batch_size, sequence_length), fill_id, dtype=torch.long)
     init[:, :diffusion_steps] = 0
-    sampling_path = torch.stack([
-        torch.randperm(diffusion_steps) for _ in range(batch_size)
-    ])
+    sampling_path = torch.stack([_perm(i) for i in range(batch_size)])
     return init, sampling_path
 
 
@@ -329,25 +354,26 @@ def batch_stage3_generate_sequences(
             (prompt, replica) pair and returned in ``results``.
 
     Returns:
-        tuple: ``(design_sequence_dict, results)`` where
+        dict: rank-local results with keys
 
-        - ``design_sequence_dict``: dict mapping ``prompt_{p_idx}`` to a list
-          of generated sequences (one per replica), plus a ``_metadata`` key
-          with ``format_version``, ``num_prompts``, ``num_replicas``.
-        - ``results``: dict with auxiliary outputs:
-
+          * ``rank_local_sequences``: ``{(p_idx, r_idx): str}`` cleaned
+            sequence for every (prompt, replica) pair this rank
+            generated. Sparse — full assembly happens in ``main()`` via
+            ``_merge_shards`` after the all-ranks gather.
+          * ``num_prompts``: number of prompts in the input embedding tensor.
           * ``animation_frames``: ``{(p_idx, r_idx): [per-step token arrays]}``
             for the (prompt, replica) pairs selected via
             ``animate_prompts`` × ``animate_replicas``.  Empty when
-            animation is disabled.
+            animation is disabled. Stays rank-local — every rank writes
+            its own GIFs into the shared output dir (filenames embed
+            global ``(p_idx, r_idx)`` so collisions are impossible).
           * ``tokens``: token vocabulary list (index → string).
           * ``stored_probs``: ``{(p_idx, r_idx): np.ndarray [steps, seq_len, num_classes]}``
             of per-step conditional distributions, populated when
-            ``store_probabilities=True``.  Empty otherwise.
+            ``store_probabilities=True``.  Empty otherwise. Rank-local.
           * ``stored_final_frames``: ``{(p_idx, r_idx): np.ndarray [seq_len]}``
             of final-step token indices, populated alongside
-            ``stored_probs``.  Used downstream by the dynamics plot to
-            compute chosen-token probabilities.
+            ``stored_probs``.  Rank-local.
     """
 
     # Handle z_t if passed as a list of tensors
@@ -371,41 +397,57 @@ def batch_stage3_generate_sequences(
     args.pad_token_id = tokens.index('<PAD>')
 
     # Build flat work list of (prompt_idx, replica_idx) pairs to parallelize
-    # across both prompts and replicates
+    # across both prompts and replicates. Under torch.distributed each rank
+    # then processes only `i % world_size == rank` of the global list, so
+    # the global indexing is preserved for per-sample seed derivation.
+    rank = int(getattr(args, "_rank", 0))
+    world_size = int(getattr(args, "_world_size", 1))
+    base_seed = int(getattr(args, "_base_seed", 0))
+
     num_prompts = z_t.size(0)
     work_items = [
         (p_idx, r_idx)
         for p_idx in range(num_prompts)
         for r_idx in range(args.num_replicas)
     ]
+    rank_work_items = [
+        (i, p_idx, r_idx)
+        for i, (p_idx, r_idx) in enumerate(work_items)
+        if i % world_size == rank
+    ]
 
-    # Pre-allocate output: design_sequences[replica_idx][prompt_idx]
-    design_sequences = [[None] * num_prompts for _ in range(args.num_replicas)]
+    # Rank-local sparse output: only the (p_idx, r_idx) pairs this rank generates
+    rank_local_sequences = {}  # (p_idx, r_idx) -> str
 
     animate = animate_prompts is not None and animate_replicas is not None
     animation_frames = {}  # (p_idx, r_idx) -> list of numpy arrays, one per diffusion step
     stored_probs = {}      # (p_idx, r_idx) -> np.ndarray [steps, seq_len, num_classes]
     stored_final_frames = {}  # (p_idx, r_idx) -> np.ndarray [seq_len], final token indices
 
-    # Process all (prompt, replica) pairs in batches
-    num_batches = (len(work_items) + args.batch_size_sample - 1) // args.batch_size_sample
+    # Process this rank's slice in batches
+    num_batches = (len(rank_work_items) + args.batch_size_sample - 1) // args.batch_size_sample
     logger.info(
-        "Prompts: %d | Reps/prompt: %d | Total reps: %d | Batch size: %d | Batches: %d",
-        num_prompts, args.num_replicas, num_prompts * args.num_replicas, 
-        args.batch_size_sample, num_batches
+        "Prompts: %d | Reps/prompt: %d | Total reps: %d | Rank reps: %d | "
+        "Batch size: %d | Batches: %d (rank=%d/world=%d)",
+        num_prompts, args.num_replicas, num_prompts * args.num_replicas,
+        len(rank_work_items), args.batch_size_sample, num_batches, rank, world_size,
     )
-    for batch_start in tqdm.trange(0, len(work_items), args.batch_size_sample, desc="batch"):
-        batch = work_items[batch_start : batch_start + args.batch_size_sample]
+    for batch_start in tqdm.trange(0, len(rank_work_items), args.batch_size_sample, desc="batch"):
+        batch = rank_work_items[batch_start : batch_start + args.batch_size_sample]
         current_batch_size = len(batch)
 
         # Gather conditioning vectors for this batch (different prompts per item)
-        batch_prompt_indices = [p_idx for p_idx, r_idx in batch]
+        batch_prompt_indices = [p_idx for (_, p_idx, _) in batch]
         batched_z_text_sample = z_t[batch_prompt_indices]
+
+        # Per-sample seeds — world-size-invariant: same (base_seed, p_idx, r_idx)
+        # always produces the same seed regardless of how the work is split.
+        sample_seeds = _make_sample_seeds(batch, base_seed)
 
         # Build initial mask state (all-masked by default, or partially
         # pre-unmasked when args.pre_unmask is enabled).
         initial_samples, batch_perms = _build_initial_mask_state(
-            args, current_batch_size, tokens,
+            args, current_batch_size, tokens, sample_seeds=sample_seeds,
         )
 
         # Generate denoised samples using the model
@@ -419,6 +461,7 @@ def batch_stage3_generate_sequences(
                 extract_digit_label=batched_z_text_sample,
                 store_probabilities=store_probabilities,
                 skip_pad=(unmasking_order == 'confidence_no_pad'),
+                sample_seeds=sample_seeds,
             )
         else:
             mask_realization_list, _, batch_probs = Stage3_sample_tools.batch_generate_denoised_sampled(
@@ -429,14 +472,15 @@ def batch_stage3_generate_sequences(
                 extract_digit_label=batched_z_text_sample,
                 sampling_path=batch_perms,
                 store_probabilities=store_probabilities,
+                sample_seeds=sample_seeds,
             )
 
-        # Unpack results into the correct (replica, prompt) slots
-        for i, (p_idx, r_idx) in enumerate(batch):
+        # Unpack results into rank-local sparse dict
+        for i, (_, p_idx, r_idx) in enumerate(batch):
             mask_realization = mask_realization_list[-1][i]
             design_sequence = Stage3_ani_tools.convert_num_to_char(tokens, mask_realization[0])
             clean_sequence = design_sequence.replace('<START>', '').replace('<END>', '').replace('<PAD>', '')
-            design_sequences[r_idx][p_idx] = clean_sequence
+            rank_local_sequences[(p_idx, r_idx)] = clean_sequence
 
             if animate and p_idx in animate_prompts and r_idx in animate_replicas:
                 animation_frames[(p_idx, r_idx)] = [
@@ -451,30 +495,46 @@ def batch_stage3_generate_sequences(
                     mask_realization[0], dtype=np.int64,
                 )
 
-    assert all(seq is not None for row in design_sequences for seq in row), \
-        "Not all (prompt, replica) pairs were generated"
-
-    num_prompts = z_t.size(0)
-    design_sequence_dict = {
-        f'prompt_{p_idx}': [
-            design_sequences[r_idx][p_idx]
-            for r_idx in range(args.num_replicas)
-        ]
-        for p_idx in range(num_prompts)
-    }
-    design_sequence_dict['_metadata'] = {
-        'format_version': 2,
-        'num_prompts': num_prompts,
-        'num_replicas': args.num_replicas,
-    }
-
     results = {
         "animation_frames": animation_frames,
         "tokens": tokens,
         "stored_probs": stored_probs,
         "stored_final_frames": stored_final_frames,
+        "rank_local_sequences": rank_local_sequences,
+        "num_prompts": num_prompts,
     }
-    return design_sequence_dict, results
+    return results
+
+
+def _merge_shards(shards, num_prompts: int, num_replicas: int) -> dict:
+    """Merge rank-local ``{(p_idx, r_idx): str}`` shards into the public dict.
+
+    Verifies coverage so any silent loss surfaces immediately. Returns
+    the same prompt-keyed structure produced by single-rank runs (with
+    ``_metadata``) — preserving the existing public output schema.
+    """
+    merged = {(p, r): None for p in range(num_prompts) for r in range(num_replicas)}
+    for shard in shards:
+        if shard is None:
+            continue
+        for key, seq in shard.items():
+            if merged.get(key) is not None and merged[key] != seq:
+                raise RuntimeError(f"Conflicting shard outputs for {key}")
+            merged[key] = seq
+    missing = [k for k, v in merged.items() if v is None]
+    if missing:
+        raise RuntimeError(f"Missing (prompt, replica) pairs after gather: {missing}")
+
+    out = {
+        f"prompt_{p}": [merged[(p, r)] for r in range(num_replicas)]
+        for p in range(num_prompts)
+    }
+    out["_metadata"] = {
+        "format_version": 2,
+        "num_prompts": num_prompts,
+        "num_replicas": num_replicas,
+    }
+    return out
 
 
 def set_seed(seed):
@@ -505,23 +565,36 @@ def main(args, _setup_logging=True):
     warnings.filterwarnings("ignore", message=".*TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD.*")
     warnings.filterwarnings("ignore", message=".*LeafSpec.*is deprecated.*")
 
-    # Set up dual logging (console + file)
+    # Distributed init — no-op when not launched under mpiexec/torchrun.
+    rank, local_rank, world_size, resolved_device = init_distributed_if_launched(args.device)
+    if world_size > 1:
+        args.device = resolved_device
+
+    # Set up dual logging (console + file). Rank 0 only — non-zero ranks
+    # already silence themselves via setup_logger but we don't want them
+    # racing on the file handler.
     outdir = os.path.dirname(os.path.abspath(args.output_path))
-    os.makedirs(outdir, exist_ok=True)
+    if rank == 0:
+        os.makedirs(outdir, exist_ok=True)
     file_handler = None
-    if _setup_logging:
+    if _setup_logging and rank == 0:
         log_path, file_handler = setup_file_logging(outdir)
     start_time = datetime.now()
     logger.info("=" * 60)
     logger.info("ProteoScribe sampling (Stage 3)")
     logger.info("biom3 version: %s (git: %s)", get_biom3_version(), get_git_hash())
     logger.info("Command:     %s", " ".join(sys.argv))
+    if world_size > 1:
+        logger.info("Distributed: rank=%d local_rank=%d world_size=%d device=%s",
+                    rank, local_rank, world_size, resolved_device)
     logger.info("=" * 60)
 
     seed = config_args_parser.seed
 
     if seed <= 0:
-        seed = np.random.randint(2**32)
+        if rank == 0:
+            seed = int(np.random.randint(2**32))
+        seed = broadcast_int(seed, src=0)
 
     set_seed(seed)
     logger.info("Seed: %s", seed)
@@ -532,6 +605,9 @@ def main(args, _setup_logging=True):
     config_args = convert_to_namespace(config_dict)
 
     config_args.device = config_args_parser.device
+    config_args._rank = rank
+    config_args._world_size = world_size
+    config_args._base_seed = int(seed)
 
     # Merge CLI overrides for sampling parameters (fall back to JSON, then defaults)
     for attr, default in [('unmasking_order', 'random'), ('token_strategy', 'sample')]:
@@ -597,7 +673,7 @@ def main(args, _setup_logging=True):
 
     # sample sequences
     store_probs = getattr(config_args_parser, 'store_probabilities', False)
-    design_sequence_dict, results = batch_stage3_generate_sequences(
+    results = batch_stage3_generate_sequences(
             args=config_args,
             model=model,
             z_t=z_c,
@@ -609,13 +685,24 @@ def main(args, _setup_logging=True):
     tokens = results["tokens"]
     stored_probs = results["stored_probs"]
     stored_final_frames = results["stored_final_frames"]
+    rank_local_sequences = results["rank_local_sequences"]
 
-    logger.info("design_sequence_dict=%s", design_sequence_dict)
+    # Gather rank-local sequence shards to rank 0 and merge into the
+    # public prompt-keyed dict. No-op when world_size == 1.
+    if world_size > 1:
+        shards = gather_object_to_main(rank_local_sequences)
+    else:
+        shards = [rank_local_sequences]
 
-    torch.save(design_sequence_dict, f"{config_args_parser.output_path}")
+    design_sequence_dict = None
+    if rank == 0:
+        design_sequence_dict = _merge_shards(shards, num_prompts, config_args.num_replicas)
+        logger.info("design_sequence_dict=%s", design_sequence_dict)
 
-    # Write FASTA files
-    if getattr(config_args_parser, 'fasta', False):
+        torch.save(design_sequence_dict, f"{config_args_parser.output_path}")
+
+    # Write FASTA files (rank 0 only)
+    if rank == 0 and getattr(config_args_parser, 'fasta', False):
         fasta_dir = config_args_parser.fasta_dir or os.path.join(outdir, "fasta")
         os.makedirs(fasta_dir, exist_ok=True)
         for prompt_key, replicas in design_sequence_dict.items():
@@ -689,9 +776,9 @@ def main(args, _setup_logging=True):
             )
             logger.info("Probabilities saved: %s (shape=%s)", npz_path, probs_array.shape)
 
-    # Write manifest and clean up logging
+    # Write manifest and clean up logging (rank 0 only)
     elapsed = datetime.now() - start_time
-    if _setup_logging:
+    if _setup_logging and rank == 0:
         write_manifest(
             args, outdir, start_time, elapsed,
             outputs={
@@ -712,6 +799,11 @@ def main(args, _setup_logging=True):
         )
         logger.info("Done in %s", elapsed)
         teardown_file_logging("biom3", file_handler)
+
+    # Hold non-rank-0 processes until rank-0 finishes I/O so the launcher
+    # doesn't tear down the communicator out from under us.
+    if world_size > 1:
+        barrier()
 
 
 if __name__ == '__main__':

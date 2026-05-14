@@ -17,7 +17,7 @@ from biom3.dbio.enrich import (
     enrich_dataframe,
     load_expasy_lookup,
 )
-from biom3.dbio.swissprot_dat import (
+from biom3.dbio.parsers.swissprot_dat import (
     _extract_ec_numbers_from_lines,
     _parse_entry,
 )

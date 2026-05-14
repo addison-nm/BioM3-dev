@@ -3,9 +3,60 @@
 import json
 import logging
 import os
+import socket
 import subprocess
 import sys
 from datetime import datetime, timedelta
+
+
+_TRAINING_ENV_PREFIXES = (
+    "CUDA_", "NCCL_", "TORCH_", "DEEPSPEED_", "WANDB_",
+    "MASTER_", "WORLD_SIZE", "RANK", "LOCAL_RANK",
+    "SLURM_", "PBS_", "COBALT_", "PALS_", "PMI_", "OMPI_",
+    "OMP_NUM_THREADS", "MKL_NUM_THREADS",
+    "ZE_", "CCL_", "ONEAPI_",
+)
+
+_SENSITIVE_ENV_SUBSTRINGS = (
+    "KEY", "SECRET", "TOKEN", "PASSWORD", "CREDENTIAL", "AUTH",
+)
+
+
+def resolve_devices_per_node(args, *, default: int = 1):
+    """Resolve the canonical ``devices_per_node`` arg, honoring the
+    deprecated ``--gpu_devices`` alias.
+
+    Mutates ``args`` so that ``args.devices_per_node`` holds the resolved
+    integer. Emits a deprecation warning when the user supplied
+    ``--gpu_devices``.
+    """
+    new_val = getattr(args, "devices_per_node", None)
+    old_val = getattr(args, "gpu_devices", None)
+    if new_val is None and old_val is not None:
+        logging.getLogger(__name__).warning(
+            "--gpu_devices is deprecated; use --devices_per_node"
+        )
+        new_val = old_val
+    if new_val is None:
+        new_val = default
+    args.devices_per_node = int(new_val)
+    return args.devices_per_node
+
+
+def collect_training_env():
+    """Collect environment variables relevant to distributed training and HPC.
+
+    Variables whose names contain sensitive substrings (API keys, tokens, etc.)
+    are excluded.
+    """
+    env = {"hostname": socket.gethostname()}
+    for key, val in sorted(os.environ.items()):
+        if key.startswith(_TRAINING_ENV_PREFIXES):
+            upper = key.upper()
+            if any(s in upper for s in _SENSITIVE_ENV_SUBSTRINGS):
+                continue
+            env[key] = val
+    return env
 
 
 def get_biom3_version():
@@ -84,11 +135,11 @@ def setup_file_logging(outdir, logger_prefix="biom3", log_filename="run.log"):
     Returns (log_path, file_handler).  Pass the handler to
     ``teardown_file_logging`` when done.
     """
-    from biom3.backend.device import get_rank
+    from biom3.core.distributed import get_global_rank
 
     log_path = os.path.join(outdir, log_filename)
 
-    if get_rank() != 0:
+    if get_global_rank() != 0:
         return log_path, None
 
     file_handler = logging.FileHandler(log_path)
@@ -173,7 +224,7 @@ def write_manifest(args, outdir, start_time, elapsed,
         "timestamp": start_time.isoformat(),
         "elapsed_seconds": elapsed.total_seconds(),
         "command": " ".join(sys.argv),
-        "args": {k: v for k, v in vars(args).items()},
+        "args": {k: v for k, v in vars(args).items() if not k.startswith("_")},
         "python_version": sys.version,
     }
     if resolved_paths is not None:

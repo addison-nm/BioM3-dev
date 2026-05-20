@@ -1,0 +1,156 @@
+{
+    "entry_name": "11012_ASFK5",
+    "status": "Reviewed",
+    "accessions": [
+        "P0C9J8"
+    ],
+    "dates": [
+        "05-MAY-2009, integrated into UniProtKB/Swiss-Prot.",
+        "05-MAY-2009, sequence version 1.",
+        "28-JAN-2026, entry version 29."
+    ],
+    "gene_names": [
+        "OrderedLocusNames=Ken-021"
+    ],
+    "organelle": [],
+    "taxon_id": 561445,
+    "hosts": [
+        "NCBI_TaxID=6937; Ornithodoros (relapsing fever ticks).",
+        "NCBI_TaxID=85517; Phacochoerus aethiopicus (Warthog).",
+        "NCBI_TaxID=41426; Phacochoerus africanus (Warthog).",
+        "NCBI_TaxID=273792; Potamochoerus larvatus (Bushpig).",
+        "NCBI_TaxID=9823; Sus scrofa (Pig)."
+    ],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [LARGE SCALE GENOMIC DNA].",
+            "RA": "Kutish G.F., Rock D.L.",
+            "RT": "\"African swine fever virus genomes.\"",
+            "RL": "Submitted (MAR-2003) to the EMBL/GenBank/DDBJ databases."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "Plays a role in virus cell tropism, and may be required for efficient virus replication in macrophages. {ECO:0000250}."
+        },
+        {
+            "topic": "SUBCELLULAR LOCATION",
+            "text": "Host membrane {ECO:0000305}; Multi-pass membrane protein {ECO:0000305}."
+        },
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the asfivirus MGF 110 family. {ECO:0000305}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            [
+                "AY261360",
+                "-",
+                "NOT_ANNOTATED_CDS",
+                "Genomic_DNA"
+            ]
+        ],
+        "Proteomes": [
+            [
+                "UP000000861",
+                "Segment"
+            ]
+        ],
+        "GO": [
+            [
+                "GO:0033644",
+                "C:host cell membrane",
+                "IEA:UniProtKB-SubCell"
+            ]
+        ],
+        "InterPro": [
+            [
+                "IPR004848",
+                "ASFV_fam_110"
+            ]
+        ],
+        "Pfam": [
+            [
+                "PF01639",
+                "v110",
+                "1"
+            ]
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..169",
+            "qualifiers": {
+                "note": "Protein MGF 110-12L",
+                "id": "PRO_0000373220"
+            }
+        },
+        {
+            "type": "TRANSMEM",
+            "location": "2..20",
+            "qualifiers": {
+                "note": "Helical",
+                "evidence": "ECO:0000255"
+            }
+        },
+        {
+            "type": "TRANSMEM",
+            "location": "121..141",
+            "qualifiers": {
+                "note": "Helical",
+                "evidence": "ECO:0000255"
+            }
+        },
+        {
+            "type": "TRANSMEM",
+            "location": "148..168",
+            "qualifiers": {
+                "note": "Helical",
+                "evidence": "ECO:0000255"
+            }
+        }
+    ],
+    "keywords": [
+        "Host membrane",
+        "Membrane",
+        "Transmembrane",
+        "Transmembrane helix"
+    ],
+    "protein_existence": "3: Inferred from homology",
+    "sequence_length": 169,
+    "molecular_weight": 19806,
+    "crc64": "EEB5EF4CDD2DAE93",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "Protein MGF 110-12L",
+            "short": [],
+            "ec_numbers": [],
+            "evidence": []
+        },
+        "sub_name": null,
+        "alt_names": [],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "P0C9J8",
+    "organism": "African swine fever virus (isolate Pig/Kenya/KEN-50/1950) (ASFV).",
+    "lineage": [
+        "Viruses",
+        "Varidnaviria",
+        "Bamfordvirae",
+        "Nucleocytoviricota",
+        "Pokkesviricetes",
+        "Asfuvirales",
+        "Asfarviridae",
+        "Asfivirus",
+        "Asfivirus haemorrhagiae",
+        "African swine fever virus"
+    ],
+    "sequence": "MKVFLGLLLGFSIILILTYQSPTTQHPPKEELAYWCTYAKSCDFCWDCQNDTCINKVINESISITSIVNCRVTRDSQSCFYDISVKIPNHHSMECSYPRLYEHEMFMEKWRDEYWPIIIKQCCFYLVFSFAFAGCVAFAICKNLRLRTTIKLLILLSILVWLSQPILNN"
+}

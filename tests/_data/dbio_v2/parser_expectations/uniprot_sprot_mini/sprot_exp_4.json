@@ -1,0 +1,109 @@
+{
+    "entry_name": "1001R_ASFK5",
+    "status": "Reviewed",
+    "accessions": [
+        "P0C9F0"
+    ],
+    "dates": [
+        "05-MAY-2009, integrated into UniProtKB/Swiss-Prot.",
+        "05-MAY-2009, sequence version 1.",
+        "28-JAN-2026, entry version 13."
+    ],
+    "gene_names": [
+        "OrderedLocusNames=Ken-018"
+    ],
+    "organelle": [],
+    "taxon_id": 561445,
+    "hosts": [
+        "NCBI_TaxID=6937; Ornithodoros (relapsing fever ticks).",
+        "NCBI_TaxID=85517; Phacochoerus aethiopicus (Warthog).",
+        "NCBI_TaxID=41426; Phacochoerus africanus (Warthog).",
+        "NCBI_TaxID=273792; Potamochoerus larvatus (Bushpig).",
+        "NCBI_TaxID=9823; Sus scrofa (Pig)."
+    ],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [LARGE SCALE GENOMIC DNA].",
+            "RA": "Kutish G.F., Rock D.L.",
+            "RT": "\"African swine fever virus genomes.\"",
+            "RL": "Submitted (MAR-2003) to the EMBL/GenBank/DDBJ databases."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "Plays a role in virus cell tropism, and may be required for efficient virus replication in macrophages. {ECO:0000250}."
+        },
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the asfivirus MGF 100 family. {ECO:0000305}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            [
+                "AY261360",
+                "-",
+                "NOT_ANNOTATED_CDS",
+                "Genomic_DNA"
+            ]
+        ],
+        "SMR": [
+            [
+                "P0C9F0",
+                "-"
+            ]
+        ],
+        "Proteomes": [
+            [
+                "UP000000861",
+                "Segment"
+            ]
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..122",
+            "qualifiers": {
+                "note": "Protein MGF 100-1R",
+                "id": "PRO_0000373170"
+            }
+        }
+    ],
+    "keywords": [],
+    "protein_existence": "3: Inferred from homology",
+    "sequence_length": 122,
+    "molecular_weight": 14969,
+    "crc64": "C5E63C34B941711C",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "Protein MGF 100-1R",
+            "short": [],
+            "ec_numbers": [],
+            "evidence": []
+        },
+        "sub_name": null,
+        "alt_names": [],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "P0C9F0",
+    "organism": "African swine fever virus (isolate Pig/Kenya/KEN-50/1950) (ASFV).",
+    "lineage": [
+        "Viruses",
+        "Varidnaviria",
+        "Bamfordvirae",
+        "Nucleocytoviricota",
+        "Pokkesviricetes",
+        "Asfuvirales",
+        "Asfarviridae",
+        "Asfivirus",
+        "Asfivirus haemorrhagiae",
+        "African swine fever virus"
+    ],
+    "sequence": "MVRLFYNPIKYLFYRRSCKKRLRKALKKLNFYHPPKECCQIYRLLENAPGGTYFITENMTNELIMIAKDPVDKKIKSVKLYLTGNYIKINQHYYINIYMYLMRYNQIYKYPLICFSKYSKIL"
+}

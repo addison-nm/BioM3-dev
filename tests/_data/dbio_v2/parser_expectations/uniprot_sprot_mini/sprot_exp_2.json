@@ -1,0 +1,179 @@
+{
+    "entry_name": "049L_IIV6",
+    "status": "Reviewed",
+    "accessions": [
+        "Q91G50"
+    ],
+    "dates": [
+        "16-JUN-2009, integrated into UniProtKB/Swiss-Prot.",
+        "01-DEC-2001, sequence version 1.",
+        "28-JAN-2026, entry version 52."
+    ],
+    "gene_names": [
+        "ORFNames=IIV6-049L"
+    ],
+    "organelle": [],
+    "taxon_id": 176652,
+    "hosts": [
+        "NCBI_TaxID=6997; Acheta domesticus (House cricket).",
+        "NCBI_TaxID=168631; Chilo suppressalis (Asiatic rice borer moth).",
+        "NCBI_TaxID=6999; Gryllus bimaculatus (Two-spotted cricket).",
+        "NCBI_TaxID=58607; Gryllus campestris.",
+        "NCBI_TaxID=7108; Spodoptera frugiperda (Fall armyworm)."
+    ],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [LARGE SCALE GENOMIC DNA].",
+            "RX": "PubMed=11448171; DOI=10.1006/viro.2001.0963",
+            "RA": "Jakob N.J., Mueller K., Bahr U., Darai G.",
+            "RT": "\"Analysis of the first complete DNA sequence of an invertebrate iridovirus: coding strategy of the genome of Chilo iridescent virus.\"",
+            "RL": "Virology 286:182-196(2001)."
+        },
+        {
+            "RN": "[2]",
+            "RP": "GENOME REANNOTATION.",
+            "RX": "PubMed=17239238; DOI=10.1186/1743-422x-4-11",
+            "RA": "Eaton H.E., Metcalf J., Penny E., Tcherepanov V., Upton C., Brunetti C.R.",
+            "RT": "\"Comparative genomic analysis of the family Iridoviridae: re-annotating and defining the core set of iridovirus genes.\"",
+            "RL": "Virol. J. 4:11-11(2007)."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "SUBCELLULAR LOCATION",
+            "text": "Membrane {ECO:0000305}; Multi-pass membrane protein {ECO:0000305}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            [
+                "AF303741",
+                "AAK81982.1",
+                "-",
+                "Genomic_DNA"
+            ]
+        ],
+        "RefSeq": [
+            [
+                "NP_149512.1",
+                "NC_003038.1"
+            ]
+        ],
+        "SMR": [
+            [
+                "Q91G50",
+                "-"
+            ]
+        ],
+        "KEGG": [
+            [
+                "vg:1733420",
+                "-"
+            ]
+        ],
+        "OrthoDB": [
+            [
+                "27503at10239",
+                "-"
+            ]
+        ],
+        "Proteomes": [
+            [
+                "UP000001359",
+                "Segment"
+            ]
+        ],
+        "GO": [
+            [
+                "GO:0016020",
+                "C:membrane",
+                "IEA:UniProtKB-SubCell"
+            ],
+            [
+                "GO:0034257",
+                "F:nicotinamide riboside transmembrane transporter activity",
+                "IEA:InterPro"
+            ]
+        ],
+        "InterPro": [
+            [
+                "IPR006419",
+                "NMN_transpt_PnuC"
+            ]
+        ],
+        "Pfam": [
+            [
+                "PF04973",
+                "NMN_transporter",
+                "1"
+            ]
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..123",
+            "qualifiers": {
+                "note": "Transmembrane protein 049L",
+                "id": "PRO_0000377971"
+            }
+        },
+        {
+            "type": "TRANSMEM",
+            "location": "67..87",
+            "qualifiers": {
+                "note": "Helical",
+                "evidence": "ECO:0000255"
+            }
+        },
+        {
+            "type": "TRANSMEM",
+            "location": "104..121",
+            "qualifiers": {
+                "note": "Helical",
+                "evidence": "ECO:0000255"
+            }
+        }
+    ],
+    "keywords": [
+        "Membrane",
+        "Reference proteome",
+        "Transmembrane",
+        "Transmembrane helix"
+    ],
+    "protein_existence": "4: Predicted",
+    "sequence_length": 123,
+    "molecular_weight": 14309,
+    "crc64": "225DED35F902EAD6",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "Transmembrane protein 049L",
+            "short": [],
+            "ec_numbers": [],
+            "evidence": []
+        },
+        "sub_name": null,
+        "alt_names": [],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "Q91G50",
+    "organism": "Invertebrate iridescent virus 6 (IIV-6) (Chilo iridescent virus).",
+    "lineage": [
+        "Viruses",
+        "Varidnaviria",
+        "Bamfordvirae",
+        "Nucleocytoviricota",
+        "Megaviricetes",
+        "Pimascovirales",
+        "Pimascovirales incertae sedis",
+        "Iridoviridae",
+        "Betairidovirinae",
+        "Iridovirus",
+        "Iridovirus chilo1"
+    ],
+    "sequence": "MDKIEELKIEELKIEIPQRKTKFFHDSENSDKRDEEETLNPTITSKAKILIKSKNFWIETLIFVISVFGALCVAFGIMLIGFLLWLVSNTISILYFIKQKQYPLSLQQMVFLITTCIGVYNNV"
+}

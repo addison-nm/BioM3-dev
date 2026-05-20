@@ -1,0 +1,129 @@
+{
+    "entry_name": "028R_FRG3G",
+    "status": "Reviewed",
+    "accessions": [
+        "Q6GZU8"
+    ],
+    "dates": [
+        "28-JUN-2011, integrated into UniProtKB/Swiss-Prot.",
+        "19-JUL-2004, sequence version 1.",
+        "28-JAN-2026, entry version 58."
+    ],
+    "gene_names": [
+        "ORFNames=FV3-028R"
+    ],
+    "organelle": [],
+    "taxon_id": 654924,
+    "hosts": [
+        "NCBI_TaxID=30343; Dryophytes versicolor (chameleon treefrog).",
+        "NCBI_TaxID=8404; Lithobates pipiens (Northern leopard frog) (Rana pipiens).",
+        "NCBI_TaxID=45438; Lithobates sylvaticus (Wood frog) (Rana sylvatica).",
+        "NCBI_TaxID=8316; Notophthalmus viridescens (Eastern newt) (Triturus viridescens)."
+    ],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [LARGE SCALE GENOMIC DNA].",
+            "RX": "PubMed=15165820; DOI=10.1016/j.virol.2004.02.019",
+            "RA": "Tan W.G., Barkman T.J., Gregory Chinchar V., Essani K.",
+            "RT": "\"Comparative genomic analyses of frog virus 3, type species of the genus Ranavirus (family Iridoviridae).\"",
+            "RL": "Virology 323:70-84(2004)."
+        }
+    ],
+    "comments": [],
+    "cross_references": {
+        "EMBL": [
+            [
+                "AY548484",
+                "AAT09687.1",
+                "-",
+                "Genomic_DNA"
+            ]
+        ],
+        "RefSeq": [
+            [
+                "YP_031606.1",
+                "NC_005946.1"
+            ]
+        ],
+        "SMR": [
+            [
+                "Q6GZU8",
+                "-"
+            ]
+        ],
+        "KEGG": [
+            [
+                "vg:2947748",
+                "-"
+            ]
+        ],
+        "Proteomes": [
+            [
+                "UP000008770",
+                "Segment"
+            ]
+        ],
+        "InterPro": [
+            [
+                "IPR035913",
+                "RPB5-like_sf"
+            ]
+        ],
+        "SUPFAM": [
+            [
+                "SSF55287",
+                "RPB5-like RNA polymerase subunit",
+                "1"
+            ]
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..162",
+            "qualifiers": {
+                "note": "Uncharacterized protein 028R",
+                "id": "PRO_0000410501"
+            }
+        }
+    ],
+    "keywords": [
+        "Reference proteome"
+    ],
+    "protein_existence": "4: Predicted",
+    "sequence_length": 162,
+    "molecular_weight": 18210,
+    "crc64": "834AB3DB7C536917",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "Uncharacterized protein 028R",
+            "short": [],
+            "ec_numbers": [],
+            "evidence": []
+        },
+        "sub_name": null,
+        "alt_names": [],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "Q6GZU8",
+    "organism": "Frog virus 3 (isolate Goorha) (FV-3).",
+    "lineage": [
+        "Viruses",
+        "Varidnaviria",
+        "Bamfordvirae",
+        "Nucleocytoviricota",
+        "Megaviricetes",
+        "Pimascovirales",
+        "Pimascovirales incertae sedis",
+        "Iridoviridae",
+        "Alphairidovirinae",
+        "Ranavirus",
+        "Ranavirus rana1",
+        "Frog virus 3"
+    ],
+    "sequence": "MDPNVLKNLSLMLSRRAGVSGGEPPRMIEWPEYGQRSEPCGSQTVWYVDRPVGAPFIKAFASEVEERGGGILIHAGKVTFDSAKKLAAMKEVQVFDVKYFSFDLMAVVPEHSLWKRPGDKGYPEKTAQSFPKIMASDPVCRYHGFRPRDLVHVKPHDVYIVC"
+}

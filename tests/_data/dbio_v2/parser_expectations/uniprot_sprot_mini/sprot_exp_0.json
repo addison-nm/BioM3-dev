@@ -1,0 +1,144 @@
+{
+    "entry_name": "001R_FRG3G",
+    "status": "Reviewed",
+    "accessions": [
+        "Q6GZX4"
+    ],
+    "dates": [
+        "28-JUN-2011, integrated into UniProtKB/Swiss-Prot.",
+        "19-JUL-2004, sequence version 1.",
+        "28-JAN-2026, entry version 46."
+    ],
+    "gene_names": [
+        "ORFNames=FV3-001R"
+    ],
+    "organelle": [],
+    "taxon_id": 654924,
+    "hosts": [
+        "NCBI_TaxID=30343; Dryophytes versicolor (chameleon treefrog).",
+        "NCBI_TaxID=8404; Lithobates pipiens (Northern leopard frog) (Rana pipiens).",
+        "NCBI_TaxID=45438; Lithobates sylvaticus (Wood frog) (Rana sylvatica).",
+        "NCBI_TaxID=8316; Notophthalmus viridescens (Eastern newt) (Triturus viridescens)."
+    ],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [LARGE SCALE GENOMIC DNA].",
+            "RX": "PubMed=15165820; DOI=10.1016/j.virol.2004.02.019",
+            "RA": "Tan W.G., Barkman T.J., Gregory Chinchar V., Essani K.",
+            "RT": "\"Comparative genomic analyses of frog virus 3, type species of the genus Ranavirus (family Iridoviridae).\"",
+            "RL": "Virology 323:70-84(2004)."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "Transcription activation. {ECO:0000305}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            [
+                "AY548484",
+                "AAT09660.1",
+                "-",
+                "Genomic_DNA"
+            ]
+        ],
+        "RefSeq": [
+            [
+                "YP_031579.1",
+                "NC_005946.1"
+            ]
+        ],
+        "SwissPalm": [
+            [
+                "Q6GZX4",
+                "-"
+            ]
+        ],
+        "KEGG": [
+            [
+                "vg:2947773",
+                "-"
+            ]
+        ],
+        "Proteomes": [
+            [
+                "UP000008770",
+                "Segment"
+            ]
+        ],
+        "GO": [
+            [
+                "GO:0046782",
+                "P:regulation of viral transcription",
+                "IEA:InterPro"
+            ]
+        ],
+        "InterPro": [
+            [
+                "IPR007031",
+                "Poxvirus_VLTF3"
+            ]
+        ],
+        "Pfam": [
+            [
+                "PF04947",
+                "Pox_VLTF3",
+                "1"
+            ]
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..256",
+            "qualifiers": {
+                "note": "Putative transcription factor 001R",
+                "id": "PRO_0000410512"
+            }
+        }
+    ],
+    "keywords": [
+        "Activator",
+        "Reference proteome",
+        "Transcription",
+        "Transcription regulation"
+    ],
+    "protein_existence": "4: Predicted",
+    "sequence_length": 256,
+    "molecular_weight": 29735,
+    "crc64": "B4840739BF7D4121",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "Putative transcription factor 001R",
+            "short": [],
+            "ec_numbers": [],
+            "evidence": []
+        },
+        "sub_name": null,
+        "alt_names": [],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "Q6GZX4",
+    "organism": "Frog virus 3 (isolate Goorha) (FV-3).",
+    "lineage": [
+        "Viruses",
+        "Varidnaviria",
+        "Bamfordvirae",
+        "Nucleocytoviricota",
+        "Megaviricetes",
+        "Pimascovirales",
+        "Pimascovirales incertae sedis",
+        "Iridoviridae",
+        "Alphairidovirinae",
+        "Ranavirus",
+        "Ranavirus rana1",
+        "Frog virus 3"
+    ],
+    "sequence": "MAFSAEDVLKEYDRRRRMEALLLSLYYPNDRKLLDYKEWSPPRVQVECPKAPVEWNNPPSEKGLIVGHFSGIKYKGEKAQASEVDVNKMCCWVSKFKDAMRRYQGIQTCKIPGKVLSDLDAKIKAYNLTVEGVEGFVRYSRVTKQHVAAFLKELRHSKQYENVNLIHYILTDKRVDIQHLEKDLVKDFKALVESAHRMRQGHMINVKYILYQLLKKHGHGPDGPDILTVKTGSKGVLYDDSFRKIYTDLGWKFTPL"
+}

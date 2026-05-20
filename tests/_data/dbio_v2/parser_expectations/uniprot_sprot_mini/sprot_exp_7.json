@@ -1,0 +1,457 @@
+{
+    "entry_name": "11S1_CARIL",
+    "status": "Reviewed",
+    "accessions": [
+        "B5KVH4"
+    ],
+    "dates": [
+        "13-NOV-2019, integrated into UniProtKB/Swiss-Prot.",
+        "14-OCT-2008, sequence version 1.",
+        "05-FEB-2025, entry version 50."
+    ],
+    "gene_names": [],
+    "organelle": [],
+    "taxon_id": 32201,
+    "hosts": [],
+    "references": [
+        {
+            "RN": "[1] {ECO:0000312|EMBL:ABW86978.1}",
+            "RP": "NUCLEOTIDE SEQUENCE [MRNA], PROTEIN SEQUENCE OF 30-41; 79-101; 102-122; 104-122; 188-212; 257-269; 274-281; 368-392 AND 460-474, 3D-STRUCTURE MODELING, SUBUNIT, TISSUE SPECIFICITY, DEVELOPMENTAL STAGE, IDENTIFICATION BY MASS SPECTROMETRY, ALLERGEN, AND REGIONS.",
+            "RX": "PubMed=21718052; DOI=10.1021/jf2017447",
+            "RA": "Sharma G.M., Irsigler A., Dhanarajan P., Ayuso R., Bardina L., Sampson H.A., Roux K.H., Sathe S.K.",
+            "RT": "\"Cloning and characterization of an 11S legumin, Car i 4, a major allergen in pecan.\"",
+            "RL": "J. Agric. Food Chem. 59:9542-9552(2011)."
+        },
+        {
+            "RN": "[2]",
+            "RP": "TISSUE SPECIFICITY, DEVELOPMENTAL STAGE, AND INDUCTION.",
+            "RX": "PubMed=28121438; DOI=10.1021/acs.jafc.6b04199",
+            "RA": "Mattison C.P., Rai R., Settlage R.E., Hinchliffe D.J., Madison C., Bland J.M., Brashear S., Graham C.J., Tarver M.R., Florane C., Bechtel P.J.",
+            "RT": "\"RNA-Seq Analysis of Developing Pecan (Carya illinoinensis) Embryos Reveals Parallel Expression Patterns among Allergen and Lipid Metabolism Genes.\"",
+            "RL": "J. Agric. Food Chem. 65:1443-1455(2017)."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "Seed storage protein. {ECO:0000255|RuleBase:RU003681, ECO:0000305|PubMed:21718052, ECO:0000305|PubMed:28121438}."
+        },
+        {
+            "topic": "SUBUNIT",
+            "text": "Homohexamer (By similarity). Each subunit is composed of an acidic and a basic chain derived from a single precursor and linked by a disulfide bond (PubMed:21718052). {ECO:0000250|UniProtKB:A0A1L6K371, ECO:0000269|PubMed:21718052}."
+        },
+        {
+            "topic": "TISSUE SPECIFICITY",
+            "text": "Expressed in seeds (at protein level) (PubMed:21718052). Expressed in seeds (PubMed:28121438). {ECO:0000269|PubMed:21718052, ECO:0000269|PubMed:28121438}."
+        },
+        {
+            "topic": "DEVELOPMENTAL STAGE",
+            "text": "Expressed during seed maturation (PubMed:21718052). Expressed during embryonic development including the water, gel, dough and mature nut stages in the nut cavity tissues including the contents of the central vacuole, endosperm, embryo, placenta, seed coat, ovary packing tissue, developing fruit and cotyledon lobes. Expression increases during the transition from water to gel stage, levels off or decreases slightly from the gel to dough stage and increases again from the dough to mature stage (PubMed:28121438). {ECO:0000269|PubMed:21718052, ECO:0000269|PubMed:28121438}."
+        },
+        {
+            "topic": "INDUCTION",
+            "text": "Up-regulated during nut development. {ECO:0000269|PubMed:28121438}."
+        },
+        {
+            "topic": "ALLERGEN",
+            "text": "Causes an allergic reaction in human. Recombinant protein binds to IgE in 57% of the 28 patients tested allergic to pecan nuts. Acidic chain is more immunoreactive than the basic chain. {ECO:0000269|PubMed:21718052}."
+        },
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the 11S seed storage protein (globulins) family. {ECO:0000255|RuleBase:RU003681, ECO:0000305}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            [
+                "EU113051",
+                "ABW86978.1",
+                "-",
+                "mRNA"
+            ]
+        ],
+        "AlphaFoldDB": [
+            [
+                "B5KVH4",
+                "-"
+            ]
+        ],
+        "SMR": [
+            [
+                "B5KVH4",
+                "-"
+            ]
+        ],
+        "Allergome": [
+            [
+                "8299",
+                "Car i 4"
+            ],
+            [
+                "8300",
+                "Car i 4.0101"
+            ]
+        ],
+        "GO": [
+            [
+                "GO:0019863",
+                "F:IgE binding",
+                "IEA:UniProtKB-KW"
+            ],
+            [
+                "GO:0045735",
+                "F:nutrient reservoir activity",
+                "IC:UniProtKB"
+            ],
+            [
+                "GO:0048316",
+                "P:seed development",
+                "IEP:UniProtKB"
+            ],
+            [
+                "GO:0010431",
+                "P:seed maturation",
+                "IEP:UniProtKB"
+            ]
+        ],
+        "CDD": [
+            [
+                "cd02243",
+                "cupin_11S_legumin_C",
+                "1"
+            ],
+            [
+                "cd02242",
+                "cupin_11S_legumin_N",
+                "1"
+            ]
+        ],
+        "FunFam": [
+            [
+                "2.60.120.10:FF:000073",
+                "Glycinin G1",
+                "1"
+            ],
+            [
+                "2.60.120.10:FF:000124",
+                "Glycinin G5",
+                "1"
+            ]
+        ],
+        "Gene3D": [
+            [
+                "2.60.120.10",
+                "Jelly Rolls",
+                "2"
+            ]
+        ],
+        "InterPro": [
+            [
+                "IPR022379",
+                "11S_seedstore_CS"
+            ],
+            [
+                "IPR006044",
+                "11S_seedstore_pln"
+            ],
+            [
+                "IPR006045",
+                "Cupin_1"
+            ],
+            [
+                "IPR014710",
+                "RmlC-like_jellyroll"
+            ],
+            [
+                "IPR011051",
+                "RmlC_Cupin_sf"
+            ],
+            [
+                "IPR050253",
+                "Seed_Storage-Functional"
+            ]
+        ],
+        "PANTHER": [
+            [
+                "PTHR31189:SF35",
+                "12S SEED STORAGE PROTEIN CRB",
+                "1"
+            ],
+            [
+                "PTHR31189",
+                "OS03G0336100 PROTEIN-RELATED",
+                "1"
+            ]
+        ],
+        "Pfam": [
+            [
+                "PF00190",
+                "Cupin_1",
+                "2"
+            ]
+        ],
+        "PRINTS": [
+            [
+                "PR00439",
+                "11SGLOBULIN"
+            ]
+        ],
+        "SMART": [
+            [
+                "SM00835",
+                "Cupin_1",
+                "2"
+            ]
+        ],
+        "SUPFAM": [
+            [
+                "SSF51182",
+                "RmlC-like cupins",
+                "1"
+            ]
+        ],
+        "PROSITE": [
+            [
+                "PS00305",
+                "11S_SEED_STORAGE",
+                "1"
+            ]
+        ]
+    },
+    "features": [
+        {
+            "type": "SIGNAL",
+            "location": "1..24",
+            "qualifiers": {
+                "evidence": "ECO:0000255"
+            }
+        },
+        {
+            "type": "CHAIN",
+            "location": "25..316",
+            "qualifiers": {
+                "note": "11S globulin seed storage protein 1 acidic chain",
+                "evidence": "ECO:0000250|UniProtKB:Q2TPW5, ECO:0000255",
+                "id": "PRO_0000448540"
+            }
+        },
+        {
+            "type": "CHAIN",
+            "location": "317..505",
+            "qualifiers": {
+                "note": "11S globulin seed storage protein 1 basic chain",
+                "evidence": "ECO:0000250|UniProtKB:Q2TPW5",
+                "id": "PRO_0000448541"
+            }
+        },
+        {
+            "type": "DOMAIN",
+            "location": "42..255",
+            "qualifiers": {
+                "note": "Cupin type-1 1",
+                "evidence": "ECO:0000255"
+            }
+        },
+        {
+            "type": "DOMAIN",
+            "location": "329..478",
+            "qualifiers": {
+                "note": "Cupin type-1 2",
+                "evidence": "ECO:0000255"
+            }
+        },
+        {
+            "type": "REGION",
+            "location": "118..132",
+            "qualifiers": {
+                "note": "IgE-binding",
+                "evidence": "ECO:0000269|PubMed:21718052"
+            }
+        },
+        {
+            "type": "REGION",
+            "location": "193..232",
+            "qualifiers": {
+                "note": "Disordered",
+                "evidence": "ECO:0000256|SAM:MobiDB-lite"
+            }
+        },
+        {
+            "type": "REGION",
+            "location": "208..219",
+            "qualifiers": {
+                "note": "IgE-binding",
+                "evidence": "ECO:0000269|PubMed:21718052"
+            }
+        },
+        {
+            "type": "REGION",
+            "location": "238..249",
+            "qualifiers": {
+                "note": "IgE-binding",
+                "evidence": "ECO:0000269|PubMed:21718052"
+            }
+        },
+        {
+            "type": "REGION",
+            "location": "282..318",
+            "qualifiers": {
+                "note": "Disordered",
+                "evidence": "ECO:0000256|SAM:MobiDB-lite"
+            }
+        },
+        {
+            "type": "MOTIF",
+            "location": "316..321",
+            "qualifiers": {
+                "note": "NGXEET; peptidase recognition motif",
+                "evidence": "ECO:0000250|UniProtKB:Q2TPW5"
+            }
+        },
+        {
+            "type": "COMPBIAS",
+            "location": "219..228",
+            "qualifiers": {
+                "note": "Basic and acidic residues",
+                "evidence": "ECO:0000256|SAM:MobiDB-lite"
+            }
+        },
+        {
+            "type": "COMPBIAS",
+            "location": "282..316",
+            "qualifiers": {
+                "note": "Basic and acidic residues",
+                "evidence": "ECO:0000256|SAM:MobiDB-lite"
+            }
+        },
+        {
+            "type": "DISULFID",
+            "location": "37..70",
+            "qualifiers": {
+                "evidence": "ECO:0000250|UniProtKB:P04776"
+            }
+        },
+        {
+            "type": "DISULFID",
+            "location": "113..323",
+            "qualifiers": {
+                "note": "Interchain (between acidic and basic chains)",
+                "evidence": "ECO:0000250|UniProtKB:P04776"
+            }
+        }
+    ],
+    "keywords": [
+        "Allergen",
+        "Direct protein sequencing",
+        "Disulfide bond",
+        "IgE-binding protein",
+        "Seed storage protein",
+        "Signal",
+        "Storage protein"
+    ],
+    "protein_existence": "1: Evidence at protein level",
+    "sequence_length": 505,
+    "molecular_weight": 58016,
+    "crc64": "4B4A57816D3D6D7E",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "11S globulin seed storage protein 1",
+            "short": [],
+            "ec_numbers": [],
+            "evidence": [
+                "ECO:0000305"
+            ]
+        },
+        "sub_name": null,
+        "alt_names": [
+            {
+                "full": "11S legumin",
+                "short": [],
+                "ec_numbers": [],
+                "evidence": [
+                    "ECO:0000303|PubMed:21718052"
+                ]
+            },
+            {
+                "full": "Allergen Car i 4",
+                "short": [],
+                "ec_numbers": [],
+                "evidence": [
+                    "ECO:0000303|PubMed:21718052",
+                    "ECO:0000303|PubMed:28121438"
+                ]
+            },
+            {
+                "full": "Pec11S-1",
+                "short": [],
+                "ec_numbers": [],
+                "evidence": [
+                    "ECO:0000303|PubMed:21718052"
+                ]
+            },
+            {
+                "allergen": "Car i 4.0101",
+                "evidence": [
+                    "ECO:0000305"
+                ]
+            }
+        ],
+        "includes": [],
+        "contains": [
+            {
+                "rec_name": {
+                    "full": "11S globulin seed storage protein 1 acidic chain",
+                    "short": [],
+                    "ec_numbers": [],
+                    "evidence": [
+                        "ECO:0000305"
+                    ]
+                },
+                "sub_name": null,
+                "alt_names": [],
+                "includes": [],
+                "contains": [],
+                "flags": []
+            },
+            {
+                "rec_name": {
+                    "full": "11S globulin seed storage protein 1 basic chain",
+                    "short": [],
+                    "ec_numbers": [],
+                    "evidence": [
+                        "ECO:0000305"
+                    ]
+                },
+                "sub_name": null,
+                "alt_names": [],
+                "includes": [],
+                "contains": [],
+                "flags": []
+            }
+        ],
+        "flags": [
+            "Precursor"
+        ]
+    },
+    "primary_accession": "B5KVH4",
+    "organism": "Carya illinoinensis (Pecan).",
+    "lineage": [
+        "Eukaryota",
+        "Viridiplantae",
+        "Streptophyta",
+        "Embryophyta",
+        "Tracheophyta",
+        "Spermatophyta",
+        "Magnoliopsida",
+        "eudicotyledons",
+        "Gunneridae",
+        "Pentapetalae",
+        "rosids",
+        "fabids",
+        "Fagales",
+        "Juglandaceae",
+        "Carya"
+    ],
+    "sequence": "MAKPILLSIYLCLIIVALFNGCLAQSGGRQQHKFGQCQLNRLDALEPTNRIEAEAGVIESWDPNHQQLQCAGVAVVRRTIEPNGLLLPHYSNAPQLVYIARGRGITGVLFPGCPETFEESQRQSQQGQRREFQQDRHQKIRHFREGDIIAFPAGVAHWCYNDGSSPVVAIFLLDTHNNANQLDQNPRNFYLAGNPDDEFRPQGQQEYEQHRRQQQHQQRRGEHGEQQRDLGNNVFSGFDAEFLADAFNVDTETARRLQSENDHRGSIVRVEGRQLQVIRPRWSREEQEHEERKERERERESESERRQSRRGGRDDNGLEETICTLSLRENIGDPSRADIYTEEAGRISTVNSHNLPILRWLQLSAERGALYSDALYVPHWNLNAHSVVYALRGRAEVQVVDNFGQTVFDDELREGQLLTIPQNFAVVKRARDEGFEWVSFKTNENAMVSPLAGRTSAIRALPEEVLVNAFQIPREDARRLKFNRQESTLVRSRSRSSRSERRAEV"
+}

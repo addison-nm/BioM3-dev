@@ -1,0 +1,160 @@
+{
+    "entry_name": "3MGH_CERS4",
+    "status": "Reviewed",
+    "accessions": [
+        "Q3J3U4"
+    ],
+    "dates": [
+        "12-DEC-2006, integrated into UniProtKB/Swiss-Prot.",
+        "12-DEC-2006, sequence version 2.",
+        "28-JAN-2026, entry version 86."
+    ],
+    "gene_names": [
+        "OrderedLocusNames=RHOS4_09720",
+        "ORFNames=RSP_2381"
+    ],
+    "organelle": [],
+    "taxon_id": 272943,
+    "hosts": [],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [LARGE SCALE GENOMIC DNA].",
+            "RC": "STRAIN=ATCC 17023 / DSM 158 / JCM 6121 / CCUG 31486 / LMG 2827 / NBRC 12203 / NCIMB 8253 / ATH 2.4.1.",
+            "RA": "Copeland A., Lucas S., Lapidus A., Barry K., Detter J.C., Glavina T., Hammon N., Israni S., Pitluck S., Richardson P., Mackenzie C., Choudhary M., Larimer F., Hauser L.J., Land M., Donohue T.J., Kaplan S.",
+            "RT": "\"Complete sequence of chromosome 1 of Rhodobacter sphaeroides 2.4.1.\"",
+            "RL": "Submitted (SEP-2005) to the EMBL/GenBank/DDBJ databases."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the DNA glycosylase MPG family. {ECO:0000255|HAMAP-Rule:MF_00527}."
+        },
+        {
+            "topic": "SEQUENCE CAUTION",
+            "text": "Sequence=ABA78540.1; Type=Erroneous initiation; Evidence={ECO:0000305};"
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            "EMBL; CP000143; ABA78540.1; ALT_INIT; Genomic_DNA."
+        ],
+        "RefSeq": [
+            "RefSeq; WP_011337446.1; NZ_CP030271.1."
+        ],
+        "AlphaFoldDB": [
+            "AlphaFoldDB; Q3J3U4; -."
+        ],
+        "SMR": [
+            "SMR; Q3J3U4; -."
+        ],
+        "STRING": [
+            "STRING; 272943.RSP_2381; -."
+        ],
+        "EnsemblBacteria": [
+            "EnsemblBacteria; ABA78540; ABA78540; RSP_2381."
+        ],
+        "GeneID": [
+            "GeneID; 3719976; -."
+        ],
+        "KEGG": [
+            "KEGG; rsp:RSP_2381; -."
+        ],
+        "PATRIC": [
+            "PATRIC; fig|272943.9.peg.1298; -."
+        ],
+        "eggNOG": [
+            "eggNOG; COG2094; Bacteria."
+        ],
+        "OrthoDB": [
+            "OrthoDB; 9794313at2; -."
+        ],
+        "Proteomes": [
+            "Proteomes; UP000002703; Chromosome 1."
+        ],
+        "GO": [
+            "GO; GO:0003905; F:alkylbase DNA N-glycosylase activity; IEA:InterPro.",
+            "GO; GO:0003677; F:DNA binding; IEA:InterPro.",
+            "GO; GO:0006284; P:base-excision repair; IEA:InterPro."
+        ],
+        "CDD": [
+            "CDD; cd00540; AAG; 1."
+        ],
+        "Gene3D": [
+            "Gene3D; 3.10.300.10; Methylpurine-DNA glycosylase (MPG); 1."
+        ],
+        "HAMAP": [
+            "HAMAP; MF_00527; 3MGH; 1."
+        ],
+        "InterPro": [
+            "InterPro; IPR011034; Formyl_transferase-like_C_sf.",
+            "InterPro; IPR003180; MPG.",
+            "InterPro; IPR036995; MPG_sf."
+        ],
+        "NCBIfam": [
+            "NCBIfam; TIGR00567; 3mg; 1.",
+            "NCBIfam; NF002003; PRK00802.1-3; 1."
+        ],
+        "PANTHER": [
+            "PANTHER; PTHR10429; DNA-3-METHYLADENINE GLYCOSYLASE; 1.",
+            "PANTHER; PTHR10429:SF0; DNA-3-METHYLADENINE GLYCOSYLASE; 1."
+        ],
+        "Pfam": [
+            "Pfam; PF02245; Pur_DNA_glyco; 1."
+        ],
+        "SUPFAM": [
+            "SUPFAM; SSF50486; FMT C-terminal domain-like; 1."
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..197",
+            "qualifiers": {
+                "note": "Putative 3-methyladenine DNA glycosylase",
+                "id": "PRO_0000265048"
+            }
+        }
+    ],
+    "keywords": [
+        "DNA damage",
+        "DNA repair",
+        "Hydrolase",
+        "Reference proteome"
+    ],
+    "protein_existence": "3: Inferred from homology",
+    "sequence_length": 197,
+    "molecular_weight": 20698,
+    "crc64": "9E03DA298F543CEC",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "Putative 3-methyladenine DNA glycosylase",
+            "short": [],
+            "ec_numbers": [
+                "3.2.2.-"
+            ],
+            "evidence": [
+                "ECO:0000255|HAMAP-Rule:MF_00527"
+            ]
+        },
+        "sub_name": null,
+        "alt_names": [],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "Q3J3U4",
+    "organism": "Cereibacter sphaeroides (strain ATCC 17023 / DSM 158 / JCM 6121 / CCUG 31486 / LMG 2827 / NBRC 12203 / NCIMB 8253 / ATH 2.4.1.) (Rhodobacter sphaeroides).",
+    "lineage": [
+        "Bacteria",
+        "Pseudomonadati",
+        "Pseudomonadota",
+        "Alphaproteobacteria",
+        "Rhodobacterales",
+        "Paracoccaceae",
+        "Cereibacter"
+    ],
+    "sequence": "MSHRRQTAQEGGQMEGQAACFAREAPAVAVDLLGAHLQVRGVGGRIVETEAYTPDDPASHSFRGPTPRNAAMFGPPGCAYVYLSYGIHLCLNVVCAPGHAVLIRALEPTEGLAQMAARRGTDVARLLCSGPGRIGQALGLTLADDGTAFGTRGFAVRWGAPVAAGEILCGPRIGISRAADMPWRFGLRGSPCLSRRF"
+}

@@ -1,16 +1,16 @@
 {
-    "entry_name": "049L_IIV6",
+    "entry_name": "200R_IIV6",
     "status": "Reviewed",
     "accessions": [
-        "Q91G50"
+        "Q91FX0"
     ],
     "dates": [
         "16-JUN-2009, integrated into UniProtKB/Swiss-Prot.",
         "01-DEC-2001, sequence version 1.",
-        "28-JAN-2026, entry version 52."
+        "28-JAN-2026, entry version 40."
     ],
     "gene_names": [
-        "ORFNames=IIV6-049L"
+        "ORFNames=IIV6-200R"
     ],
     "organelle": [],
     "taxon_id": 176652,
@@ -39,82 +39,45 @@
             "RL": "Virol. J. 4:11-11(2007)."
         }
     ],
-    "comments": [
-        {
-            "topic": "SUBCELLULAR LOCATION",
-            "text": "Membrane {ECO:0000305}; Multi-pass membrane protein {ECO:0000305}."
-        }
-    ],
+    "comments": [],
     "cross_references": {
         "EMBL": [
-            "EMBL; AF303741; AAK81982.1; -; Genomic_DNA."
+            "EMBL; AF303741; AAK82062.1; -; Genomic_DNA."
         ],
         "RefSeq": [
-            "RefSeq; NP_149512.1; NC_003038.1."
-        ],
-        "SMR": [
-            "SMR; Q91G50; -."
+            "RefSeq; NP_149663.1; NC_003038.1."
         ],
         "KEGG": [
-            "KEGG; vg:1733420; -."
+            "KEGG; vg:1733071; -."
         ],
         "OrthoDB": [
-            "OrthoDB; 27503at10239; -."
+            "OrthoDB; 89at10486; -."
         ],
         "Proteomes": [
             "Proteomes; UP000001359; Segment."
-        ],
-        "GO": [
-            "GO; GO:0016020; C:membrane; IEA:UniProtKB-SubCell.",
-            "GO; GO:0034257; F:nicotinamide riboside transmembrane transporter activity; IEA:InterPro."
-        ],
-        "InterPro": [
-            "InterPro; IPR006419; NMN_transpt_PnuC."
-        ],
-        "Pfam": [
-            "Pfam; PF04973; NMN_transporter; 1."
         ]
     },
     "features": [
         {
             "type": "CHAIN",
-            "location": "1..123",
+            "location": "1..61",
             "qualifiers": {
-                "note": "Transmembrane protein 049L",
-                "id": "PRO_0000377971"
-            }
-        },
-        {
-            "type": "TRANSMEM",
-            "location": "67..87",
-            "qualifiers": {
-                "note": "Helical",
-                "evidence": "ECO:0000255"
-            }
-        },
-        {
-            "type": "TRANSMEM",
-            "location": "104..121",
-            "qualifiers": {
-                "note": "Helical",
-                "evidence": "ECO:0000255"
+                "note": "Putative MSV199 domain-containing protein 200R",
+                "id": "PRO_0000377915"
             }
         }
     ],
     "keywords": [
-        "Membrane",
-        "Reference proteome",
-        "Transmembrane",
-        "Transmembrane helix"
+        "Reference proteome"
     ],
     "protein_existence": "4: Predicted",
-    "sequence_length": 123,
-    "molecular_weight": 14309,
-    "crc64": "225DED35F902EAD6",
+    "sequence_length": 61,
+    "molecular_weight": 7374,
+    "crc64": "11345B9E322A5D0D",
     "unparsed": {},
     "description": {
         "rec_name": {
-            "full": "Transmembrane protein 049L",
+            "full": "Putative MSV199 domain-containing protein 200R",
             "short": [],
             "ec_numbers": [],
             "evidence": []
@@ -125,7 +88,7 @@
         "contains": [],
         "flags": []
     },
-    "primary_accession": "Q91G50",
+    "primary_accession": "Q91FX0",
     "organism": "Invertebrate iridescent virus 6 (IIV-6) (Chilo iridescent virus).",
     "lineage": [
         "Viruses",
@@ -140,5 +103,5 @@
         "Iridovirus",
         "Iridovirus chilo1"
     ],
-    "sequence": "MDKIEELKIEELKIEIPQRKTKFFHDSENSDKRDEEETLNPTITSKAKILIKSKNFWIETLIFVISVFGALCVAFGIMLIGFLLWLVSNTISILYFIKQKQYPLSLQQMVFLITTCIGVYNNV"
+    "sequence": "MMKDLFTFVMDKNISIDINSDWFKELWYPLSKKCRSNTLFDFKDEVKAPPPPERAVKVWLY"
 }

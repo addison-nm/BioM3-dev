@@ -1,0 +1,284 @@
+{
+    "entry_name": "2A5G_RABIT",
+    "status": "Reviewed",
+    "accessions": [
+        "Q28651",
+        "Q28648",
+        "Q28650",
+        "Q28652"
+    ],
+    "dates": [
+        "30-MAY-2000, integrated into UniProtKB/Swiss-Prot.",
+        "01-NOV-1996, sequence version 1.",
+        "18-JUN-2025, entry version 123."
+    ],
+    "gene_names": [
+        "Name=PPP2R5C"
+    ],
+    "organelle": [],
+    "taxon_id": 9986,
+    "hosts": [],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [MRNA] (ISOFORMS GAMMA-1; GAMMA-3; GAMMA-4 AND GAMMA-5).",
+            "RC": "STRAIN=New Zealand; TISSUE=Skeletal muscle",
+            "RX": "PubMed=8576224; DOI=10.1074/jbc.271.5.2578",
+            "RA": "Csortos C., Zolnierowicz S., Bako E., Durbin S.D., Depaoli-Roach A.A.",
+            "RT": "\"High complexity in the expression of the B' subunit of protein phosphatase 2A0. Evidence for the existence of at least seven novel isoforms.\"",
+            "RL": "J. Biol. Chem. 271:2578-2588(1996)."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "The B regulatory subunit might modulate substrate selectivity and catalytic activity, and might also direct the localization of the catalytic enzyme to a particular subcellular compartment. The PP2A-PPP2R5C holoenzyme may activate TP53 and play a role in DNA damage-induced inhibition of cell proliferation. PP2A-PPP2R5C may also regulate the ERK signaling pathway through ERK dephosphorylation (By similarity). {ECO:0000250}."
+        },
+        {
+            "topic": "SUBUNIT",
+            "text": "PP2A consists of a common heterodimeric core enzyme, composed of PPP2CA a 36 kDa catalytic subunit (subunit C) and PPP2R1A a 65 kDa constant regulatory subunit (PR65 or subunit A), that associates with a variety of regulatory subunits. Proteins that associate with the core dimer include three families of regulatory subunits B (the R2/B/PR55/B55, R3/B''/PR72/PR130/PR59 and R5/B'/B56 families), the 48 kDa variable regulatory subunit, viral proteins, and cell signaling molecules. Interacts with SGO1 (By similarity). Interacts with SGO1; the interaction is direct. May interact with TP53 (By similarity). Interacts with IER3 and/or ERK kinases; regulates ERK dephosphorylation (By similarity) Interacts with CIP2A; this interaction stabilizes CIP2A (By similarity). {ECO:0000250|UniProtKB:Q13362}."
+        },
+        {
+            "topic": "SUBCELLULAR LOCATION",
+            "text": "Nucleus {ECO:0000250}. Chromosome, centromere {ECO:0000250}."
+        },
+        {
+            "topic": "ALTERNATIVE PRODUCTS",
+            "text": "Event=Alternative splicing; Named isoforms=4; Name=Gamma-3; Synonyms=Beta-3; IsoId=Q28651-1; Sequence=Displayed; Name=Gamma-1; Synonyms=Beta-4; IsoId=Q28651-2; Sequence=VSP_005116; Name=Gamma-4; Synonyms=Beta-1; IsoId=Q28651-3; Sequence=VSP_005114; Name=Gamma-5; Synonyms=Beta-2; IsoId=Q28651-4; Sequence=VSP_005115;"
+        },
+        {
+            "topic": "TISSUE SPECIFICITY",
+            "text": "Highly expressed in testis, heart and spleen. Also found in brain and skeletal muscle."
+        },
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the phosphatase 2A regulatory subunit B56 family. {ECO:0000305}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            "EMBL; U38191; AAC48530.1; -; mRNA.",
+            "EMBL; U37770; AAC48528.1; -; mRNA.",
+            "EMBL; U38190; AAC48529.1; -; mRNA.",
+            "EMBL; U38192; AAC48531.1; -; mRNA."
+        ],
+        "RefSeq": [
+            "RefSeq; NP_001075833.1; NM_001082364.1. [Q28651-1]",
+            "RefSeq; XP_051690764.1; XM_051834804.2. [Q28651-3]",
+            "RefSeq; XP_069921127.1; XM_070065026.1. [Q28651-3]"
+        ],
+        "AlphaFoldDB": [
+            "AlphaFoldDB; Q28651; -."
+        ],
+        "SMR": [
+            "SMR; Q28651; -."
+        ],
+        "FunCoup": [
+            "FunCoup; Q28651; 3429."
+        ],
+        "STRING": [
+            "STRING; 9986.ENSOCUP00000028766; -."
+        ],
+        "PaxDb": [
+            "PaxDb; 9986-ENSOCUP00000023817; -."
+        ],
+        "Ensembl": [
+            "Ensembl; ENSOCUT00000053898.1; ENSOCUP00000036260.1; ENSOCUG00000011221.4. [Q28651-3]"
+        ],
+        "GeneID": [
+            "GeneID; 100009216; -."
+        ],
+        "KEGG": [
+            "KEGG; ocu:100009216; -."
+        ],
+        "CTD": [
+            "CTD; 5527; -."
+        ],
+        "eggNOG": [
+            "eggNOG; KOG2085; Eukaryota."
+        ],
+        "GeneTree": [
+            "GeneTree; ENSGT01030000234620; -."
+        ],
+        "InParanoid": [
+            "InParanoid; Q28651; -."
+        ],
+        "OrthoDB": [
+            "OrthoDB; 10264446at2759; -."
+        ],
+        "Proteomes": [
+            "Proteomes; UP000001811; Unplaced."
+        ],
+        "Bgee": [
+            "Bgee; ENSOCUG00000011221; Expressed in autopod skin and 17 other cell types or tissues."
+        ],
+        "GO": [
+            "GO; GO:0000775; C:chromosome, centromeric region; ISS:UniProtKB.",
+            "GO; GO:0005829; C:cytosol; IEA:TreeGrafter.",
+            "GO; GO:0005634; C:nucleus; IEA:UniProtKB-SubCell.",
+            "GO; GO:0000159; C:protein phosphatase type 2A complex; ISS:UniProtKB.",
+            "GO; GO:0072542; F:protein phosphatase activator activity; IEA:TreeGrafter.",
+            "GO; GO:0007165; P:signal transduction; IEA:InterPro."
+        ],
+        "FunFam": [
+            "FunFam; 1.25.10.10:FF:000003; Serine/threonine-protein phosphatase 2A 56 kDa regulatory subunit; 1."
+        ],
+        "Gene3D": [
+            "Gene3D; 1.25.10.10; Leucine-rich Repeat Variant; 1."
+        ],
+        "InterPro": [
+            "InterPro; IPR011989; ARM-like.",
+            "InterPro; IPR016024; ARM-type_fold.",
+            "InterPro; IPR002554; PP2A_B56."
+        ],
+        "PANTHER": [
+            "PANTHER; PTHR10257; SERINE/THREONINE PROTEIN PHOSPHATASE 2A PP2A REGULATORY SUBUNIT B; 1.",
+            "PANTHER; PTHR10257:SF3; SERINE_THREONINE-PROTEIN PHOSPHATASE 2A 56 KDA REGULATORY SUBUNIT GAMMA ISOFORM; 1."
+        ],
+        "Pfam": [
+            "Pfam; PF01603; B56; 1."
+        ],
+        "PIRSF": [
+            "PIRSF; PIRSF028043; PP2A_B56; 1."
+        ],
+        "SUPFAM": [
+            "SUPFAM; SSF48371; ARM repeat; 1."
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..524",
+            "qualifiers": {
+                "note": "Serine/threonine-protein phosphatase 2A 56 kDa regulatory subunit gamma isoform",
+                "id": "PRO_0000071459"
+            }
+        },
+        {
+            "type": "REGION",
+            "location": "476..524",
+            "qualifiers": {
+                "note": "Disordered",
+                "evidence": "ECO:0000256|SAM:MobiDB-lite"
+            }
+        },
+        {
+            "type": "MOTIF",
+            "location": "472..489",
+            "qualifiers": {
+                "note": "Nuclear localization signal",
+                "evidence": "ECO:0000255"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "1",
+            "qualifiers": {
+                "note": "N-acetylmethionine",
+                "evidence": "ECO:0000250|UniProtKB:Q13362"
+            }
+        },
+        {
+            "type": "VAR_SEQ",
+            "location": "443..524",
+            "qualifiers": {
+                "note": "YSLCSHASTVSMPLAMETDGPLFEDVQMLRKTVSDEARQAQKDPKKERPLAR RKSELPQDPHTKKALEAHCRADELVPQDGR -> VLKKRAI (in isoform Gamma-1)",
+                "evidence": "ECO:0000303|PubMed:8576224",
+                "id": "VSP_005116"
+            }
+        },
+        {
+            "type": "VAR_SEQ",
+            "location": "482..524",
+            "qualifiers": {
+                "note": "AQKDPKKERPLARRKSELPQDPHTKKALEAHCRADELVPQDGR -> QLVGR KAVSSTQVRKV (in isoform Gamma-4)",
+                "evidence": "ECO:0000303|PubMed:8576224",
+                "id": "VSP_005114"
+            }
+        },
+        {
+            "type": "VAR_SEQ",
+            "location": "482..524",
+            "qualifiers": {
+                "note": "AQKDPKKERPLARRKSELPQDPHTKKALEAHCRADELVPQDGR -> VKVPG (in isoform Gamma-5)",
+                "evidence": "ECO:0000303|PubMed:8576224",
+                "id": "VSP_005115"
+            }
+        }
+    ],
+    "keywords": [
+        "Acetylation",
+        "Alternative splicing",
+        "Centromere",
+        "Chromosome",
+        "Nucleus",
+        "Reference proteome"
+    ],
+    "protein_existence": "2: Evidence at transcript level",
+    "sequence_length": 524,
+    "molecular_weight": 60985,
+    "crc64": "DC4520D122DAF386",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "Serine/threonine-protein phosphatase 2A 56 kDa regulatory subunit gamma isoform",
+            "short": [],
+            "ec_numbers": [],
+            "evidence": []
+        },
+        "sub_name": null,
+        "alt_names": [
+            {
+                "full": "PP2A B subunit isoform B'-beta",
+                "short": [],
+                "ec_numbers": [],
+                "evidence": []
+            },
+            {
+                "full": "PP2A B subunit isoform B'-gamma",
+                "short": [],
+                "ec_numbers": [],
+                "evidence": []
+            },
+            {
+                "full": "PP2A B subunit isoform B56-gamma",
+                "short": [],
+                "ec_numbers": [],
+                "evidence": []
+            },
+            {
+                "full": "PP2A B subunit isoform PR61-gamma",
+                "short": [],
+                "ec_numbers": [],
+                "evidence": []
+            },
+            {
+                "full": "PP2A B subunit isoform R5-gamma",
+                "short": [],
+                "ec_numbers": [],
+                "evidence": []
+            }
+        ],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "Q28651",
+    "organism": "Oryctolagus cuniculus (Rabbit).",
+    "lineage": [
+        "Eukaryota",
+        "Metazoa",
+        "Chordata",
+        "Craniata",
+        "Vertebrata",
+        "Euteleostomi",
+        "Mammalia",
+        "Eutheria",
+        "Euarchontoglires",
+        "Glires",
+        "Lagomorpha",
+        "Leporidae",
+        "Oryctolagus"
+    ],
+    "sequence": "MLTCNKAGSRMVVDAASSNGPFQPVALLHIRDVPPADQEKLFIQKLRQCCVLFDFVSDPLSDLKWKEVKRAALSEMVEYITHNRNVITEPIYPEVVHMFAVNMFRTLPPSSNPTGAEFDPEEDEPTLEAAWPHLQLVYEFFLRFLESPDFQPNIAKKYIDQKFVLQLLELFDSEDPRERDFLKTTLHRIYGKFLGLRAYIRKQINNIFYRFIYETEHHNGIAELLEILGSIINGFALPLKEEHKIFLLKVLLPLHKVKSLSVYHPQLAYCVVQFLEKDSTLTEPVVMALLKYWPKTHSPKEVMFLNELEEILDVIEPSEFVKIMEPLFRQLAKCVSSPHFQVAERALYYWNNEYIMSLISDNAAKILPIMFPSLYRNSKTHWNKTIHGLIYNALKLFMEMNQKLFDDCTQQFKAEKLKEKLKMKEREEAWVKIENLAKANPQYSLCSHASTVSMPLAMETDGPLFEDVQMLRKTVSDEARQAQKDPKKERPLARRKSELPQDPHTKKALEAHCRADELVPQDGR"
+}

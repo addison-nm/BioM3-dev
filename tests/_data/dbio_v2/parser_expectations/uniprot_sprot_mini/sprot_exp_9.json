@@ -1,0 +1,396 @@
+{
+    "entry_name": "14334_ARATH",
+    "status": "Reviewed",
+    "accessions": [
+        "P46077"
+    ],
+    "dates": [
+        "01-NOV-1995, integrated into UniProtKB/Swiss-Prot.",
+        "01-OCT-1996, sequence version 2.",
+        "28-JAN-2026, entry version 168."
+    ],
+    "gene_names": [
+        "Name=GRF4",
+        "OrderedLocusNames=At1g35160",
+        "ORFNames=T32G9.30"
+    ],
+    "organelle": [],
+    "taxon_id": 3702,
+    "hosts": [],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [MRNA].",
+            "RC": "STRAIN=cv. Columbia",
+            "RX": "PubMed=7972511; DOI=10.1104/pp.105.4.1459",
+            "RA": "Lu G., Rooney M.F., Wu K., Ferl R.J.",
+            "RT": "\"Five cDNAs encoding Arabidopsis GF14 proteins.\"",
+            "RL": "Plant Physiol. 105:1459-1460(1994)."
+        },
+        {
+            "RN": "[2]",
+            "RP": "SEQUENCE REVISION TO 23 AND 245.",
+            "RA": "Ferl R.J.",
+            "RL": "Submitted (AUG-1996) to the EMBL/GenBank/DDBJ databases."
+        },
+        {
+            "RN": "[3]",
+            "RP": "NUCLEOTIDE SEQUENCE [GENOMIC DNA].",
+            "RX": "PubMed=9276953; DOI=10.1104/pp.114.4.1421",
+            "RA": "Wu K., Rooney M.F., Ferl R.J.",
+            "RT": "\"The Arabidopsis 14-3-3 multigene family.\"",
+            "RL": "Plant Physiol. 114:1421-1431(1997)."
+        },
+        {
+            "RN": "[4]",
+            "RP": "NUCLEOTIDE SEQUENCE [LARGE SCALE GENOMIC DNA].",
+            "RC": "STRAIN=cv. Columbia",
+            "RX": "PubMed=11130712; DOI=10.1038/35048500",
+            "RA": "Theologis A., Ecker J.R., Palm C.J., Federspiel N.A., Kaul S., White O., Alonso J., Altafi H., Araujo R., Bowman C.L., Brooks S.Y., Buehler E., Chan A., Chao Q., Chen H., Cheuk R.F., Chin C.W., Chung M.K., Conn L., Conway A.B., Conway A.R., Creasy T.H., Dewar K., Dunn P., Etgu P., Feldblyum T.V., Feng J.-D., Fong B., Fujii C.Y., Gill J.E., Goldsmith A.D., Haas B., Hansen N.F., Hughes B., Huizar L., Hunter J.L., Jenkins J., Johnson-Hopson C., Khan S., Khaykin E., Kim C.J., Koo H.L., Kremenetskaia I., Kurtz D.B., Kwan A., Lam B., Langin-Hooper S., Lee A., Lee J.M., Lenz C.A., Li J.H., Li Y.-P., Lin X., Liu S.X., Liu Z.A., Luros J.S., Maiti R., Marziali A., Militscher J., Miranda M., Nguyen M., Nierman W.C., Osborne B.I., Pai G., Peterson J., Pham P.K., Rizzo M., Rooney T., Rowley D., Sakano H., Salzberg S.L., Schwartz J.R., Shinn P., Southwick A.M., Sun H., Tallon L.J., Tambunga G., Toriumi M.J., Town C.D., Utterback T., Van Aken S., Vaysberg M., Vysotskaia V.S., Walker M., Wu D., Yu G., Fraser C.M., Venter J.C., Davis R.W.",
+            "RT": "\"Sequence and analysis of chromosome 1 of the plant Arabidopsis thaliana.\"",
+            "RL": "Nature 408:816-820(2000)."
+        },
+        {
+            "RN": "[5]",
+            "RP": "GENOME REANNOTATION.",
+            "RC": "STRAIN=cv. Columbia",
+            "RX": "PubMed=27862469; DOI=10.1111/tpj.13415",
+            "RA": "Cheng C.Y., Krishnakumar V., Chan A.P., Thibaud-Nissen F., Schobel S., Town C.D.",
+            "RT": "\"Araport11: a complete reannotation of the Arabidopsis thaliana reference genome.\"",
+            "RL": "Plant J. 89:789-804(2017)."
+        },
+        {
+            "RN": "[6]",
+            "RP": "NUCLEOTIDE SEQUENCE [LARGE SCALE MRNA].",
+            "RA": "Brover V.V., Troukhan M.E., Alexandrov N.A., Lu Y.-P., Flavell R.B., Feldmann K.A.",
+            "RT": "\"Full-length cDNA from Arabidopsis thaliana.\"",
+            "RL": "Submitted (MAR-2002) to the EMBL/GenBank/DDBJ databases."
+        },
+        {
+            "RN": "[7]",
+            "RP": "PHOSPHORYLATION [LARGE SCALE ANALYSIS] AT SER-248, AND IDENTIFICATION BY MASS SPECTROMETRY [LARGE SCALE ANALYSIS].",
+            "RC": "STRAIN=cv. Columbia",
+            "RX": "PubMed=19245862; DOI=10.1016/j.jprot.2009.02.004",
+            "RA": "Jones A.M.E., MacLean D., Studholme D.J., Serna-Sanz A., Andreasson E., Rathjen J.P., Peck S.C.",
+            "RT": "\"Phosphoproteomic analysis of nuclei-enriched fractions from Arabidopsis thaliana.\"",
+            "RL": "J. Proteomics 72:439-451(2009)."
+        },
+        {
+            "RN": "[8]",
+            "RP": "PHOSPHORYLATION [LARGE SCALE ANALYSIS] AT SER-248, AND IDENTIFICATION BY MASS SPECTROMETRY [LARGE SCALE ANALYSIS].",
+            "RX": "PubMed=19376835; DOI=10.1104/pp.109.138677",
+            "RA": "Reiland S., Messerli G., Baerenfaller K., Gerrits B., Endler A., Grossmann J., Gruissem W., Baginsky S.",
+            "RT": "\"Large-scale Arabidopsis phosphoproteome profiling reveals novel chloroplast kinase substrates and phosphorylation networks.\"",
+            "RL": "Plant Physiol. 150:889-903(2009)."
+        },
+        {
+            "RN": "[9]",
+            "RP": "ACETYLATION [LARGE SCALE ANALYSIS] AT ALA-2, CLEAVAGE OF INITIATOR METHIONINE [LARGE SCALE ANALYSIS], AND IDENTIFICATION BY MASS SPECTROMETRY [LARGE SCALE ANALYSIS].",
+            "RX": "PubMed=22223895; DOI=10.1074/mcp.m111.015131",
+            "RA": "Bienvenut W.V., Sumpton D., Martinez A., Lilla S., Espagne C., Meinnel T., Giglione C.",
+            "RT": "\"Comparative large-scale characterisation of plant vs. mammal proteins reveals similar and idiosyncratic N-alpha acetylation features.\"",
+            "RL": "Mol. Cell. Proteomics 11:M111.015131-M111.015131(2012)."
+        },
+        {
+            "RN": "[10]",
+            "RP": "INTERACTION WITH CINV1.",
+            "RX": "PubMed=25256212; DOI=10.1111/tpj.12677",
+            "RA": "Gao J., van Kleeff P.J., Oecking C., Li K.W., Erban A., Kopka J., Hincha D.K., de Boer A.H.",
+            "RT": "\"Light modulated activity of root alkaline/neutral invertase involves the interaction with 14-3-3 proteins.\"",
+            "RL": "Plant J. 80:785-796(2014)."
+        },
+        {
+            "RN": "[11]",
+            "RP": "INTERACTION WITH FD.",
+            "RX": "PubMed=25661797; DOI=10.1038/srep08341",
+            "RA": "Kawamoto N., Sasabe M., Endo M., Machida Y., Araki T.",
+            "RT": "\"Calcium-dependent protein kinases responsible for the phosphorylation of a bZIP transcription factor FD crucial for the florigen complex formation.\"",
+            "RL": "Sci. Rep. 5:8341-8341(2015)."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "Is associated with a DNA binding complex that binds to the G box, a well-characterized cis-acting DNA regulatory element found in plant genes."
+        },
+        {
+            "topic": "SUBUNIT",
+            "text": "Interacts with FD (PubMed:25661797). Interacts with CINV1 (PubMed:25256212). {ECO:0000269|PubMed:25256212, ECO:0000269|PubMed:25661797}."
+        },
+        {
+            "topic": "INTERACTION",
+            "text": "P46077; Q00403: GTF2B; Xeno; NbExp=2; IntAct=EBI-637479, EBI-389564;"
+        },
+        {
+            "topic": "SUBCELLULAR LOCATION",
+            "text": "Nucleus {ECO:0000250|UniProtKB:P48349}. Cytoplasm {ECO:0000250|UniProtKB:P48349}. Note=Translocates from the cytosol to the nucleus when phosphorylated. {ECO:0000250|UniProtKB:P48349}."
+        },
+        {
+            "topic": "ALTERNATIVE PRODUCTS",
+            "text": "Event=Alternative splicing; Named isoforms=1; Comment=A number of isoforms are produced. According to EST sequences.; Name=1; IsoId=P46077-1; Sequence=Displayed;"
+        },
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the 14-3-3 family. {ECO:0000305}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            "EMBL; L09111; AAB06231.1; -; mRNA.",
+            "EMBL; AF001414; AAB62224.1; -; Genomic_DNA.",
+            "EMBL; AC079605; AAG50610.1; -; Genomic_DNA.",
+            "EMBL; CP002684; AEE31760.1; -; Genomic_DNA.",
+            "EMBL; AY084342; AAM60925.1; -; mRNA."
+        ],
+        "PIR": [
+            "PIR; C86472; C86472."
+        ],
+        "RefSeq": [
+            "RefSeq; NP_564453.1; NM_103213.3. [P46077-1]"
+        ],
+        "AlphaFoldDB": [
+            "AlphaFoldDB; P46077; -."
+        ],
+        "SMR": [
+            "SMR; P46077; -."
+        ],
+        "BioGRID": [
+            "BioGRID; 25635; 26."
+        ],
+        "FunCoup": [
+            "FunCoup; P46077; 3603."
+        ],
+        "IntAct": [
+            "IntAct; P46077; 8."
+        ],
+        "MINT": [
+            "MINT; P46077; -."
+        ],
+        "STRING": [
+            "STRING; 3702.P46077; -."
+        ],
+        "iPTMnet": [
+            "iPTMnet; P46077; -."
+        ],
+        "PaxDb": [
+            "PaxDb; 3702-AT1G35160.2; -."
+        ],
+        "ProteomicsDB": [
+            "ProteomicsDB; 244516; -. [P46077-1]"
+        ],
+        "GeneID": [
+            "GeneID; 840403; -."
+        ],
+        "Gramene": [
+            "Gramene; AT1G35160.1; AT1G35160.1; AT1G35160."
+        ],
+        "KEGG": [
+            "KEGG; ath:AT1G35160; -."
+        ],
+        "Araport": [
+            "Araport; AT1G35160; -."
+        ],
+        "TAIR": [
+            "TAIR; AT1G35160; GF14 PHI."
+        ],
+        "eggNOG": [
+            "eggNOG; KOG0841; Eukaryota."
+        ],
+        "HOGENOM": [
+            "HOGENOM; CLU_058290_0_0_1; -."
+        ],
+        "InParanoid": [
+            "InParanoid; P46077; -."
+        ],
+        "OMA": [
+            "OMA; AVCMKEV; -."
+        ],
+        "OrthoDB": [
+            "OrthoDB; 10260625at2759; -."
+        ],
+        "PhylomeDB": [
+            "PhylomeDB; P46077; -."
+        ],
+        "PRO": [
+            "PRO; PR:P46077; -."
+        ],
+        "Proteomes": [
+            "Proteomes; UP000006548; Chromosome 1."
+        ],
+        "ExpressionAtlas": [
+            "ExpressionAtlas; P46077; baseline and differential."
+        ],
+        "GO": [
+            "GO; GO:0005737; C:cytoplasm; IBA:GO_Central.",
+            "GO; GO:0005829; C:cytosol; HDA:TAIR.",
+            "GO; GO:0005794; C:Golgi apparatus; HDA:TAIR.",
+            "GO; GO:0005634; C:nucleus; HDA:TAIR.",
+            "GO; GO:0045309; F:protein phosphorylated amino acid binding; TAS:TIGR.",
+            "GO; GO:0009742; P:brassinosteroid mediated signaling pathway; IPI:TAIR.",
+            "GO; GO:0008104; P:intracellular protein localization; IBA:GO_Central.",
+            "GO; GO:0007165; P:signal transduction; IBA:GO_Central."
+        ],
+        "FunFam": [
+            "FunFam; 1.20.190.20:FF:000002; 14-3-3 protein epsilon; 1."
+        ],
+        "Gene3D": [
+            "Gene3D; 1.20.190.20; 14-3-3 domain; 1."
+        ],
+        "InterPro": [
+            "InterPro; IPR000308; 14-3-3.",
+            "InterPro; IPR023409; 14-3-3_CS.",
+            "InterPro; IPR036815; 14-3-3_dom_sf.",
+            "InterPro; IPR023410; 14-3-3_domain."
+        ],
+        "PANTHER": [
+            "PANTHER; PTHR18860; 14-3-3 PROTEIN; 1."
+        ],
+        "Pfam": [
+            "Pfam; PF00244; 14-3-3; 1."
+        ],
+        "PIRSF": [
+            "PIRSF; PIRSF000868; 14-3-3; 1."
+        ],
+        "PRINTS": [
+            "PRINTS; PR00305; 1433ZETA."
+        ],
+        "SMART": [
+            "SMART; SM00101; 14_3_3; 1."
+        ],
+        "SUPFAM": [
+            "SUPFAM; SSF48445; 14-3-3 protein; 1."
+        ],
+        "PROSITE": [
+            "PROSITE; PS00796; 1433_1; 1.",
+            "PROSITE; PS00797; 1433_2; 1."
+        ]
+    },
+    "features": [
+        {
+            "type": "INIT_MET",
+            "location": "1",
+            "qualifiers": {
+                "note": "Removed",
+                "evidence": "ECO:0007744|PubMed:22223895"
+            }
+        },
+        {
+            "type": "CHAIN",
+            "location": "2..267",
+            "qualifiers": {
+                "note": "14-3-3-like protein GF14 phi",
+                "id": "PRO_0000058666"
+            }
+        },
+        {
+            "type": "REGION",
+            "location": "244..267",
+            "qualifiers": {
+                "note": "Disordered",
+                "evidence": "ECO:0000256|SAM:MobiDB-lite"
+            }
+        },
+        {
+            "type": "COMPBIAS",
+            "location": "250..267",
+            "qualifiers": {
+                "note": "Basic and acidic residues",
+                "evidence": "ECO:0000256|SAM:MobiDB-lite"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "2",
+            "qualifiers": {
+                "note": "N-acetylalanine",
+                "evidence": "ECO:0007744|PubMed:22223895"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "73",
+            "qualifiers": {
+                "note": "Phosphoserine",
+                "evidence": "ECO:0000250|UniProtKB:P48349"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "196",
+            "qualifiers": {
+                "note": "Phosphoserine",
+                "evidence": "ECO:0000250|UniProtKB:P48349"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "217",
+            "qualifiers": {
+                "note": "Phosphothreonine",
+                "evidence": "ECO:0000250|UniProtKB:P48349"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "248",
+            "qualifiers": {
+                "note": "Phosphoserine",
+                "evidence": "ECO:0007744|PubMed:19245862, ECO:0007744|PubMed:19376835"
+            }
+        }
+    ],
+    "keywords": [
+        "Acetylation",
+        "Alternative splicing",
+        "Cytoplasm",
+        "Nucleus",
+        "Phosphoprotein",
+        "Reference proteome"
+    ],
+    "protein_existence": "1: Evidence at protein level",
+    "sequence_length": 267,
+    "molecular_weight": 30194,
+    "crc64": "18FA010F752CC134",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "14-3-3-like protein GF14 phi",
+            "short": [],
+            "ec_numbers": [],
+            "evidence": []
+        },
+        "sub_name": null,
+        "alt_names": [
+            {
+                "full": "General regulatory factor 4",
+                "short": [],
+                "ec_numbers": [],
+                "evidence": []
+            }
+        ],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "P46077",
+    "organism": "Arabidopsis thaliana (Mouse-ear cress).",
+    "lineage": [
+        "Eukaryota",
+        "Viridiplantae",
+        "Streptophyta",
+        "Embryophyta",
+        "Tracheophyta",
+        "Spermatophyta",
+        "Magnoliopsida",
+        "eudicotyledons",
+        "Gunneridae",
+        "Pentapetalae",
+        "rosids",
+        "malvids",
+        "Brassicales",
+        "Brassicaceae",
+        "Camelineae",
+        "Arabidopsis"
+    ],
+    "sequence": "MAAPPASSSAREEFVYLAKLAEQAERYEEMVEFMEKVAEAVDKDELTVEERNLLSVAYKNVIGARRASWRIISSIEQKEESRGNDDHVTTIRDYRSKIESELSKICDGILKLLDTRLVPASANGDSKVFYLKMKGDYHRYLAEFKTGQERKDAAEHTLTAYKAAQDIANAELAPTHPIRLGLALNFSVFYYEILNSPDRACNLAKQAFDEAIAELDTLGEESYKDSTLIMQLLRDNLTLWTSDMQDESPEEIKEAAAPKPAEEQKEI"
+}

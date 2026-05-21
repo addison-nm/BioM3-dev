@@ -1,4 +1,6 @@
 import gzip
+import io
+import json
 from typing import ClassVar
 
 import pytest
@@ -7,6 +9,7 @@ from biom3.dbio_v2.parsers import (
     ParseError,
     Record,
     SchemaError,
+    dump_jsonl,
     iter_lines,
     open_text,
 )
@@ -88,3 +91,38 @@ class TestFailLoudReader:
         with pytest.raises(ParseError):
             with open_text(str(p)) as fh:
                 fh.read()
+
+
+class TestJsonEmission:
+
+    def test_to_json_round_trips_as_dict(self):
+        r = Record("misc", a=1, b="two", c=[1, 2, {"x": None}])
+        assert json.loads(r.to_json()) == r.as_dict()
+
+    def test_to_json_excludes_record_type(self):
+        # record_type is a ClassVar / construct-time tag, not a field;
+        # to_json mirrors as_dict and must not leak it into the payload.
+        assert json.loads(_Promised(alpha="x", beta=1).to_json()) == {
+            "alpha": "x", "beta": 1,
+        }
+
+    def test_to_json_compact_default_is_single_line(self):
+        s = Record(a=1, b=2).to_json()
+        assert "\n" not in s
+
+    def test_to_json_indent_pretty(self):
+        s = Record(a=1).to_json(indent=2)
+        assert s == '{\n  "a": 1\n}'
+
+    def test_dump_jsonl_writes_one_line_per_record_and_returns_count(self):
+        recs = [Record(a=i, b="v") for i in range(3)]
+        buf = io.StringIO()
+        n = dump_jsonl(recs, buf)
+        lines = buf.getvalue().splitlines()
+        assert n == 3 and len(lines) == 3
+        assert [json.loads(ln) for ln in lines] == [r.as_dict() for r in recs]
+
+    def test_dump_jsonl_empty_stream(self):
+        buf = io.StringIO()
+        assert dump_jsonl(iter([]), buf) == 0
+        assert buf.getvalue() == ""

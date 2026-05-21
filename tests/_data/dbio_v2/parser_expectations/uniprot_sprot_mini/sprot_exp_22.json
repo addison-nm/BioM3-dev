@@ -1,0 +1,131 @@
+{
+    "entry_name": "2AMD_ECTOL",
+    "status": "Reviewed",
+    "accessions": [
+        "P81593"
+    ],
+    "dates": [
+        "15-JUL-1999, integrated into UniProtKB/Swiss-Prot.",
+        "15-JUL-1999, sequence version 1.",
+        "09-APR-2025, entry version 67."
+    ],
+    "gene_names": [],
+    "organelle": [],
+    "taxon_id": 301,
+    "hosts": [],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "PROTEIN SEQUENCE.",
+            "RC": "STRAIN=JS45",
+            "RX": "PubMed=9573204; DOI=10.1128/jb.180.9.2502-2506.1998",
+            "RA": "He Z., Spain J.C.",
+            "RT": "\"A novel 2-aminomuconate deaminase in the nitrobenzene degradation pathway of Pseudomonas pseudoalcaligenes JS45.\"",
+            "RL": "J. Bacteriol. 180:2502-2506(1998)."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "Converts 2-aminomuconate to 4-oxalocrotonate, an intermediate step in the biodegradation of nitrobenzene."
+        },
+        {
+            "topic": "CATALYTIC ACTIVITY",
+            "text": "Reaction=(2Z,4E)-2-aminomuconate + H2O = (3E)-2-oxohex-3-enedioate + NH4(+); Xref=Rhea:RHEA:20996, ChEBI:CHEBI:15377, ChEBI:CHEBI:28938, ChEBI:CHEBI:64908, ChEBI:CHEBI:77859; EC=3.5.99.5;"
+        },
+        {
+            "topic": "BIOPHYSICOCHEMICAL PROPERTIES",
+            "text": "Kinetic parameters: KM=67 uM for 2-aminomuconate; Vmax=125 umol/min/mg enzyme with glucose as substrate; pH dependence: Optimum pH is 6.6.;"
+        },
+        {
+            "topic": "PATHWAY",
+            "text": "Xenobiotic degradation; nitrobenzene degradation."
+        },
+        {
+            "topic": "SUBUNIT",
+            "text": "Homohexamer."
+        }
+    ],
+    "cross_references": {
+        "AlphaFoldDB": [
+            "AlphaFoldDB; P81593; -."
+        ],
+        "SMR": [
+            "SMR; P81593; -."
+        ],
+        "BioCyc": [
+            "BioCyc; MetaCyc:MONOMER-13320; -."
+        ],
+        "BRENDA": [
+            "BRENDA; 3.5.99.11; 5150."
+        ],
+        "UniPathway": [
+            "UniPathway; UPA00923; -."
+        ],
+        "GO": [
+            "GO; GO:0050540; F:2-aminomuconate deaminase activity; IEA:UniProtKB-EC."
+        ],
+        "Gene3D": [
+            "Gene3D; 3.30.1330.40; RutC-like; 1."
+        ],
+        "InterPro": [
+            "InterPro; IPR035959; RutC-like_sf."
+        ],
+        "SUPFAM": [
+            "SUPFAM; SSF55298; YjgF-like; 1."
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..>54",
+            "qualifiers": {
+                "note": "2-aminomuconate deaminase",
+                "id": "PRO_0000064358"
+            }
+        },
+        {
+            "type": "NON_TER",
+            "location": "54",
+            "qualifiers": {}
+        }
+    ],
+    "keywords": [
+        "Direct protein sequencing",
+        "Hydrolase"
+    ],
+    "protein_existence": "1: Evidence at protein level",
+    "sequence_length": 54,
+    "molecular_weight": 5582,
+    "crc64": "E4DA7200DA1FCEA3",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "2-aminomuconate deaminase",
+            "short": [],
+            "ec_numbers": [
+                "3.5.99.5"
+            ],
+            "evidence": []
+        },
+        "sub_name": null,
+        "alt_names": [],
+        "includes": [],
+        "contains": [],
+        "flags": [
+            "Fragment"
+        ]
+    },
+    "primary_accession": "P81593",
+    "organism": "Ectopseudomonas oleovorans (Pseudomonas oleovorans).",
+    "lineage": [
+        "Bacteria",
+        "Pseudomonadati",
+        "Pseudomonadota",
+        "Gammaproteobacteria",
+        "Pseudomonadales",
+        "Pseudomonadaceae",
+        "Ectopseudomonas"
+    ],
+    "sequence": "STLSSNDAKVVDGKATPLGSFPHVKRAGDFLYVSGTSSRRPDNTIAGAELDSTS"
+}

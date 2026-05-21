@@ -1,16 +1,16 @@
 {
-    "entry_name": "049L_IIV6",
+    "entry_name": "308L_IIV6",
     "status": "Reviewed",
     "accessions": [
-        "Q91G50"
+        "Q91FL6"
     ],
     "dates": [
         "16-JUN-2009, integrated into UniProtKB/Swiss-Prot.",
         "01-DEC-2001, sequence version 1.",
-        "28-JAN-2026, entry version 52."
+        "28-JAN-2026, entry version 35."
     ],
     "gene_names": [
-        "ORFNames=IIV6-049L"
+        "ORFNames=IIV6-308L"
     ],
     "organelle": [],
     "taxon_id": 176652,
@@ -39,82 +39,50 @@
             "RL": "Virol. J. 4:11-11(2007)."
         }
     ],
-    "comments": [
-        {
-            "topic": "SUBCELLULAR LOCATION",
-            "text": "Membrane {ECO:0000305}; Multi-pass membrane protein {ECO:0000305}."
-        }
-    ],
+    "comments": [],
     "cross_references": {
         "EMBL": [
-            "EMBL; AF303741; AAK81982.1; -; Genomic_DNA."
+            "EMBL; AF303741; AAK82169.1; -; Genomic_DNA."
         ],
         "RefSeq": [
-            "RefSeq; NP_149512.1; NC_003038.1."
-        ],
-        "SMR": [
-            "SMR; Q91G50; -."
+            "RefSeq; NP_149771.1; NC_003038.1."
         ],
         "KEGG": [
-            "KEGG; vg:1733420; -."
-        ],
-        "OrthoDB": [
-            "OrthoDB; 27503at10239; -."
+            "KEGG; vg:1733119; -."
         ],
         "Proteomes": [
             "Proteomes; UP000001359; Segment."
-        ],
-        "GO": [
-            "GO; GO:0016020; C:membrane; IEA:UniProtKB-SubCell.",
-            "GO; GO:0034257; F:nicotinamide riboside transmembrane transporter activity; IEA:InterPro."
-        ],
-        "InterPro": [
-            "InterPro; IPR006419; NMN_transpt_PnuC."
-        ],
-        "Pfam": [
-            "Pfam; PF04973; NMN_transporter; 1."
         ]
     },
     "features": [
         {
+            "type": "SIGNAL",
+            "location": "1..23",
+            "qualifiers": {
+                "evidence": "ECO:0000255"
+            }
+        },
+        {
             "type": "CHAIN",
-            "location": "1..123",
+            "location": "24..73",
             "qualifiers": {
-                "note": "Transmembrane protein 049L",
-                "id": "PRO_0000377971"
-            }
-        },
-        {
-            "type": "TRANSMEM",
-            "location": "67..87",
-            "qualifiers": {
-                "note": "Helical",
-                "evidence": "ECO:0000255"
-            }
-        },
-        {
-            "type": "TRANSMEM",
-            "location": "104..121",
-            "qualifiers": {
-                "note": "Helical",
-                "evidence": "ECO:0000255"
+                "note": "Uncharacterized protein 308L",
+                "id": "PRO_0000377852"
             }
         }
     ],
     "keywords": [
-        "Membrane",
         "Reference proteome",
-        "Transmembrane",
-        "Transmembrane helix"
+        "Signal"
     ],
-    "protein_existence": "4: Predicted",
-    "sequence_length": 123,
-    "molecular_weight": 14309,
-    "crc64": "225DED35F902EAD6",
+    "protein_existence": "3: Inferred from homology",
+    "sequence_length": 73,
+    "molecular_weight": 7958,
+    "crc64": "40785977D253B248",
     "unparsed": {},
     "description": {
         "rec_name": {
-            "full": "Transmembrane protein 049L",
+            "full": "Uncharacterized protein 308L",
             "short": [],
             "ec_numbers": [],
             "evidence": []
@@ -123,9 +91,11 @@
         "alt_names": [],
         "includes": [],
         "contains": [],
-        "flags": []
+        "flags": [
+            "Precursor"
+        ]
     },
-    "primary_accession": "Q91G50",
+    "primary_accession": "Q91FL6",
     "organism": "Invertebrate iridescent virus 6 (IIV-6) (Chilo iridescent virus).",
     "lineage": [
         "Viruses",
@@ -140,5 +110,5 @@
         "Iridovirus",
         "Iridovirus chilo1"
     ],
-    "sequence": "MDKIEELKIEELKIEIPQRKTKFFHDSENSDKRDEEETLNPTITSKAKILIKSKNFWIETLIFVISVFGALCVAFGIMLIGFLLWLVSNTISILYFIKQKQYPLSLQQMVFLITTCIGVYNNV"
+    "sequence": "MLHLIKMVSKIVLLITLVFIVSAVTGSDTWVGECDYACENGKNAIDACCSQKGYAPRGYCPNGMHARCQYSVI"
 }

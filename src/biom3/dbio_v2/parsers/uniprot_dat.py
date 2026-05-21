@@ -43,7 +43,9 @@ The bracketed two-letter code is the source flat-file line tag.
                                   from every value (terminal ``.`` is kept);
                                   evidence lists are deduplicated in
                                   insertion order.
-- ``gene_names``        [GN]    : list[str], raw GN lines
+- ``gene_names``        [GN]    : list[str], one element per ``Key=value``
+                                  sub-token (GN lines are ``;``-separated, e.g.
+                                  ``Name=GRF4; OrderedLocusNames=At1g35160;``)
 - ``organism``          [OS]    : str, OS text (continuation lines joined)
 - ``organelle``         [OG]    : list[str], raw OG lines
 - ``lineage``           [OC]    : list[str], OC taxa, top-down, period stripped
@@ -55,8 +57,13 @@ The bracketed two-letter code is the source flat-file line tag.
 - ``comments``          [CC]    : list[dict], ``{"topic": str, "text": str}``
                                   per CC ``-!-`` block; ECO evidence tags kept
                                   intact; the copyright footer is not a block
-- ``cross_references``  [DR]    : dict[str, list[list[str]]], DR by database
-                                  name
+- ``cross_references``  [DR]    : dict[str, list[str]], grouped by database
+                                  name. Each value is a list of the raw DR
+                                  line bodies (cols 6+) verbatim — the
+                                  database token, ``;``-separated fields,
+                                  terminal ``.``, and any optional isoform
+                                  tag ``[P12345-N]`` are all preserved as
+                                  written.
 - ``features``          [FT]    : list[dict], ``{"type", "location",
                                   "qualifiers": {name: str}}`` from FT
 - ``keywords``          [KW]    : list[str], KW terms, period stripped
@@ -116,7 +123,7 @@ class UniProtRecord(Record):
     hosts: list[str]
     references: list[dict]
     comments: list[dict]
-    cross_references: dict[str, list[list[str]]]
+    cross_references: dict[str, list[str]]
     features: list[dict]
     keywords: list[str]
     protein_existence: str | None
@@ -198,11 +205,11 @@ def parse_entry(lines: list[str]) -> UniProtRecord:
     _flush_cc(acc)
     acc["description"] = parse_description(acc.pop("_de_lines"))
     for ref in acc["references"]:
-        for k in ("RX", "RA", "RT"):
+        for k in ("RC", "RG", "RX", "RA", "RT"):
             if k in ref:
                 ref[k] = ref[k].rstrip(";")
     acc["primary_accession"] = acc["accessions"][0] if acc["accessions"] else None
-    acc["organism"] = " ".join(acc.pop("_os")).strip()
+    acc["organism"] = _join_wrap(acc.pop("_os")).strip()
     lineage_text = " ".join(acc.pop("_oc")).strip().rstrip(".")
     acc["lineage"] = [t.strip() for t in lineage_text.split(";") if t.strip()]
     sequence = re.sub(r"\s", "", "".join(acc.pop("_seq_chunks")))
@@ -244,6 +251,22 @@ _REF_CONT_CODES = {"RP", "RC", "RX", "RG", "RA", "RT", "RL"}
 def _text(line: str) -> str:
     """Return the data portion of a flat-file line (columns 6+)."""
     return line[5:].rstrip("\n")
+
+
+def _join_wrap(parts) -> str:
+    """Join wrapped UniProt continuation lines with one space, except
+    when the previous chunk ends with ``-``. UniProt wraps mid-word on a
+    hyphen with no separator (e.g. ``'Ser-`` on one CC line continued by
+    ``241'`` on the next is a single token ``'Ser-241'``), so naive
+    space-join silently introduces wrong spaces.
+    """
+    if not parts:
+        return ""
+    out = parts[0]
+    for p in parts[1:]:
+        sep = "" if out.endswith("-") else " "
+        out = out + sep + p
+    return out
 
 
 def _new_accumulator() -> dict:
@@ -465,7 +488,12 @@ def _h_de(data, acc):
 
 
 def _h_gn(data, acc):
-    acc["gene_names"].append(data.strip().rstrip(";"))
+    # GN lines are `Key=value; Key=value; ...;` — one element per sub-token
+    # (per the spec at https://web.expasy.org/docs/userman.html, "The GN line").
+    for token in data.split(";"):
+        token = token.strip()
+        if token:
+            acc["gene_names"].append(token)
 
 
 def _h_os(data, acc):
@@ -498,7 +526,11 @@ def _h_ref(code, data, acc):
     if not acc["references"]:
         acc["references"].append({})
     ref = acc["references"][-1]
-    ref[code] = (ref[code] + " " + data.strip()).strip() if code in ref else data.strip()
+    chunk = data.strip()
+    if code in ref:
+        ref[code] = _join_wrap([ref[code], chunk]).strip()
+    else:
+        ref[code] = chunk
 
 
 def _h_cc(data, acc):
@@ -523,18 +555,23 @@ def _h_cc(data, acc):
 
 def _flush_cc(acc):
     if acc["_cc_topic"] is not None and acc["_cc_text"]:
-        text = " ".join(acc["_cc_text"]).strip()
+        text = _join_wrap(acc["_cc_text"]).strip()
         acc["comments"].append({"topic": acc["_cc_topic"], "text": text})
     acc["_cc_text"] = []
 
 
 def _h_dr(data, acc):
-    parts = [p.strip() for p in data.rstrip().rstrip(".").split(";")]
-    if not parts or not parts[0]:
+    # Preserve each DR line verbatim (cols 6+, trailing `.` and any optional
+    # isoform tag intact). Group by database name (first ``;``-delimited
+    # token) so callers can still look up by DB without losing source detail.
+    line = data.strip()
+    semi = line.find(";")
+    if semi <= 0:
         return
-    database = parts[0]
-    identifiers = [p for p in parts[1:] if p]
-    acc["cross_references"].setdefault(database, []).append(identifiers)
+    database = line[:semi].strip()
+    if not database:
+        return
+    acc["cross_references"].setdefault(database, []).append(line)
 
 
 def _h_ft(data, acc):
@@ -578,7 +615,7 @@ def _h_ft(data, acc):
         closed = chunk.endswith('"')
         if closed:
             chunk = chunk[:-1]
-        feature["qualifiers"][name] = (feature["qualifiers"][name] + " " + chunk).strip()
+        feature["qualifiers"][name] = _join_wrap([feature["qualifiers"][name], chunk]).strip()
         if closed:
             acc["_ft_qual"] = None
 

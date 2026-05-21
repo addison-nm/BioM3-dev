@@ -1,0 +1,175 @@
+{
+    "entry_name": "1A1D_PSES0",
+    "status": "Reviewed",
+    "accessions": [
+        "P30297"
+    ],
+    "dates": [
+        "01-APR-1993, integrated into UniProtKB/Swiss-Prot.",
+        "01-APR-1993, sequence version 1.",
+        "09-APR-2025, entry version 86."
+    ],
+    "gene_names": [
+        "Name=acdS {ECO:0000255|HAMAP-Rule:MF_00807}"
+    ],
+    "organelle": [],
+    "taxon_id": 29439,
+    "hosts": [],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [GENOMIC DNA].",
+            "RX": "PubMed=1821764; DOI=10.1105/tpc.3.11.1187",
+            "RA": "Klee H.J., Hayford M.B., Kretzmer K.A., Barry G.F., Kishore G.M.",
+            "RT": "\"Control of ethylene synthesis by expression of a bacterial enzyme in transgenic tomato plants.\"",
+            "RL": "Plant Cell 3:1187-1193(1991)."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "Catalyzes a cyclopropane ring-opening reaction, the irreversible conversion of 1-aminocyclopropane-1-carboxylate (ACC) to ammonia and alpha-ketobutyrate. Allows growth on ACC as a nitrogen source."
+        },
+        {
+            "topic": "CATALYTIC ACTIVITY",
+            "text": "Reaction=1-aminocyclopropane-1-carboxylate + H2O = 2-oxobutanoate + NH4(+); Xref=Rhea:RHEA:16933, ChEBI:CHEBI:15377, ChEBI:CHEBI:16763, ChEBI:CHEBI:28938, ChEBI:CHEBI:58360; EC=3.5.99.7; Evidence={ECO:0000255|HAMAP-Rule:MF_00807};"
+        },
+        {
+            "topic": "COFACTOR",
+            "text": "Name=pyridoxal 5'-phosphate; Xref=ChEBI:CHEBI:597326;"
+        },
+        {
+            "topic": "SUBUNIT",
+            "text": "Homotrimer."
+        },
+        {
+            "topic": "BIOTECHNOLOGY",
+            "text": "Introduced by genetic manipulation and expressed in improved ripening tomato by Monsanto. ACC is the immediate precursor of the phytohormone ethylene which is involved in the control of ripening. ACC deaminase reduces ethylene biosynthesis and thus extends the shelf life of fruits and vegetables."
+        },
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the ACC deaminase/D-cysteine desulfhydrase family. {ECO:0000255|HAMAP-Rule:MF_00807}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            "EMBL; M80882; AAA73153.1; -; Genomic_DNA."
+        ],
+        "PIR": [
+            "PIR; JQ1330; JQ1330."
+        ],
+        "AlphaFoldDB": [
+            "AlphaFoldDB; P30297; -."
+        ],
+        "SMR": [
+            "SMR; P30297; -."
+        ],
+        "GO": [
+            "GO; GO:0008660; F:1-aminocyclopropane-1-carboxylate deaminase activity; IEA:UniProtKB-UniRule.",
+            "GO; GO:0019148; F:D-cysteine desulfhydrase activity; IEA:TreeGrafter.",
+            "GO; GO:0030170; F:pyridoxal phosphate binding; IEA:InterPro.",
+            "GO; GO:0018871; P:1-aminocyclopropane-1-carboxylate metabolic process; IEA:UniProtKB-UniRule.",
+            "GO; GO:0009310; P:amine catabolic process; IEA:InterPro."
+        ],
+        "CDD": [
+            "CDD; cd06449; ACCD; 1."
+        ],
+        "FunFam": [
+            "FunFam; 3.40.50.1100:FF:000048; 1-aminocyclopropane-1-carboxylate deaminase; 1.",
+            "FunFam; 3.40.50.1100:FF:000053; 1-aminocyclopropane-1-carboxylate deaminase; 1."
+        ],
+        "Gene3D": [
+            "Gene3D; 3.40.50.1100; -; 2."
+        ],
+        "HAMAP": [
+            "HAMAP; MF_00807; ACC_deaminase; 1."
+        ],
+        "InterPro": [
+            "InterPro; IPR027278; ACCD_DCysDesulf.",
+            "InterPro; IPR005965; ACP_carboxylate_deaminase.",
+            "InterPro; IPR020601; ACP_carboxylate_deaminase_bac.",
+            "InterPro; IPR001926; TrpB-like_PALP.",
+            "InterPro; IPR036052; TrpB-like_PALP_sf."
+        ],
+        "NCBIfam": [
+            "NCBIfam; TIGR01274; ACC_deam; 1."
+        ],
+        "PANTHER": [
+            "PANTHER; PTHR43780; 1-AMINOCYCLOPROPANE-1-CARBOXYLATE DEAMINASE-RELATED; 1.",
+            "PANTHER; PTHR43780:SF2; 1-AMINOCYCLOPROPANE-1-CARBOXYLATE DEAMINASE-RELATED; 1."
+        ],
+        "Pfam": [
+            "Pfam; PF00291; PALP; 1."
+        ],
+        "PIRSF": [
+            "PIRSF; PIRSF006278; ACCD_DCysDesulf; 1."
+        ],
+        "SUPFAM": [
+            "SUPFAM; SSF53686; Tryptophan synthase beta subunit-like PLP-dependent enzymes; 1."
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..338",
+            "qualifiers": {
+                "note": "1-aminocyclopropane-1-carboxylate deaminase",
+                "id": "PRO_0000184503"
+            }
+        },
+        {
+            "type": "ACT_SITE",
+            "location": "78",
+            "qualifiers": {
+                "note": "Nucleophile",
+                "evidence": "ECO:0000255|HAMAP-Rule:MF_00807"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "51",
+            "qualifiers": {
+                "note": "N6-(pyridoxal phosphate)lysine",
+                "evidence": "ECO:0000255|HAMAP-Rule:MF_00807"
+            }
+        }
+    ],
+    "keywords": [
+        "Genetically modified food",
+        "Hydrolase",
+        "Pyridoxal phosphate"
+    ],
+    "protein_existence": "1: Evidence at protein level",
+    "sequence_length": 338,
+    "molecular_weight": 36873,
+    "crc64": "F496374E7C12B6AD",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "1-aminocyclopropane-1-carboxylate deaminase",
+            "short": [
+                "ACC deaminase",
+                "ACCD"
+            ],
+            "ec_numbers": [
+                "3.5.99.7"
+            ],
+            "evidence": [
+                "ECO:0000255|HAMAP-Rule:MF_00807"
+            ]
+        },
+        "sub_name": null,
+        "alt_names": [],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "P30297",
+    "organism": "Pseudomonas sp. (strain 6G5).",
+    "lineage": [
+        "Bacteria",
+        "Pseudomonadati",
+        "Pseudomonadota"
+    ],
+    "sequence": "MNLNRFERYPLTFGPSPITPLKRLSQHLGGKVELYAKREDCNSGLAFGGNKTRKLEYLIPEAIEQGCDTLVSIGGIQSNQTRQVAAVAAHLGMKCVLVQENWVNYSDAVYDRVGNIEMSRIMGADVRLDAAGFDIGIRPSWEKAMSDVVEQGGKPFPIPAGCSEHPYGGLGFVGFAEEVRQQEKELGFKFDYIVVCSVTGSTQAGMVVGFAADGRSKNVIGIDASAKPEQTKAQILRIARHTAELVELGREITEEDVVLDTRFAYPEYGLPNEGTLEAIRLCGSLEGVLTDPVYEGKSMHGMIEMVRRGEFPEGSKVLYAHLGGAPALNAYSFLFRNG"
+}

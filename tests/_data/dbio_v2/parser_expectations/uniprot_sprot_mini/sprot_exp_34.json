@@ -1,0 +1,228 @@
+{
+    "entry_name": "3L22_BUNCA",
+    "status": "Reviewed",
+    "accessions": [
+        "A1IVR9"
+    ],
+    "dates": [
+        "03-MAY-2011, integrated into UniProtKB/Swiss-Prot.",
+        "06-FEB-2007, sequence version 1.",
+        "09-APR-2025, entry version 63."
+    ],
+    "gene_names": [],
+    "organelle": [],
+    "taxon_id": 92438,
+    "hosts": [],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [GENOMIC DNA], PROTEIN SEQUENCE OF 3-37 AND 40-71, FUNCTION, AND MASS SPECTROMETRY.",
+            "RC": "TISSUE=Venom",
+            "RX": "PubMed=30944155; DOI=10.1042/bcj20180909",
+            "RA": "Utkin Y.N., Kuch U., Kasheverov I.E., Lebedev D.S., Cederlund E., Molles B.E., Polyak I., Ivanov I.A., Prokopev N.A., Ziganshin R.H., Jornvall H., Alvelius G., Chanhome L., Warrell D.A., Mebs D., Bergman T., Tsetlin V.I.",
+            "RT": "\"Novel long-chain neurotoxins from Bungarus candidus distinguish the two binding sites in muscle-type nicotinic acetylcholine receptors.\"",
+            "RL": "Biochem. J. 476:1285-1302(2019)."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "Binds to muscular and neuronal nicotinic acetylcholine receptor (nAChR) and inhibits acetylcholine from binding to the receptor, thereby impairing neuromuscular and neuronal transmission (PubMed:30944155). Blocks muscle type nAChR (PubMed:30944155). Also binds with high affinity to alpha-7/CHRNA7 nAChRs (By similarity). In addition, shows a weak inhibition of neuronal alpha-3-beta-2/CHRNA3-CHRNB2 nAChR (By similarity). Selectively binds to alpha-1-delta subunit interface of the mouse muscle nicotinic acetylcholine receptor, with a 10-fold higher affinity for the adult than for the fetal receptors (By similarity). In vivo, when intraperitoneally injected into mice, causes flaccid paralysis and respiratory distress, followed by death within 2-4 hours (By similarity). {ECO:0000250|UniProtKB:A1IVR8, ECO:0000269|PubMed:30944155}."
+        },
+        {
+            "topic": "SUBUNIT",
+            "text": "Monomer in solution, homodimer in crystal state. {ECO:0000250|UniProtKB:P60615}."
+        },
+        {
+            "topic": "SUBCELLULAR LOCATION",
+            "text": "Secreted {ECO:0000250|UniProtKB:A1IVR8}."
+        },
+        {
+            "topic": "TISSUE SPECIFICITY",
+            "text": "Expressed by the venom gland. {ECO:0000305}."
+        },
+        {
+            "topic": "MASS SPECTROMETRY",
+            "text": "Mass=8143.5; Method=MALDI; Evidence={ECO:0000269|PubMed:30944155};"
+        },
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the three-finger toxin family. Long-chain subfamily. Type II alpha-neurotoxin sub-subfamily. {ECO:0000305}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            "EMBL; AM231682; CAJ77820.1; -; Genomic_DNA."
+        ],
+        "AlphaFoldDB": [
+            "AlphaFoldDB; A1IVR9; -."
+        ],
+        "SMR": [
+            "SMR; A1IVR9; -."
+        ],
+        "GO": [
+            "GO; GO:0005576; C:extracellular region; IEA:UniProtKB-SubCell.",
+            "GO; GO:0030550; F:acetylcholine receptor inhibitor activity; IEA:UniProtKB-KW.",
+            "GO; GO:0099106; F:ion channel regulator activity; IEA:UniProtKB-KW.",
+            "GO; GO:0090729; F:toxin activity; IEA:UniProtKB-KW."
+        ],
+        "CDD": [
+            "CDD; cd00206; TFP_snake_toxin; 1."
+        ],
+        "Gene3D": [
+            "Gene3D; 2.10.60.10; CD59; 1."
+        ],
+        "InterPro": [
+            "InterPro; IPR003571; Snake_3FTx.",
+            "InterPro; IPR045860; Snake_toxin-like_sf.",
+            "InterPro; IPR018354; Snake_toxin_con_site.",
+            "InterPro; IPR054131; Toxin_cobra-type."
+        ],
+        "Pfam": [
+            "Pfam; PF21947; Toxin_cobra-type; 1."
+        ],
+        "SUPFAM": [
+            "SUPFAM; SSF57302; Snake toxin-like; 1."
+        ],
+        "PROSITE": [
+            "PROSITE; PS00272; SNAKE_TOXIN; 1."
+        ]
+    },
+    "features": [
+        {
+            "type": "SIGNAL",
+            "location": "<1..2",
+            "qualifiers": {
+                "evidence": "ECO:0000269|PubMed:30944155"
+            }
+        },
+        {
+            "type": "CHAIN",
+            "location": "3..75",
+            "qualifiers": {
+                "note": "Alpha-elapitoxin-Bc2b",
+                "evidence": "ECO:0000305|PubMed:30944155",
+                "id": "PRO_5000189421"
+            }
+        },
+        {
+            "type": "DISULFID",
+            "location": "5..24",
+            "qualifiers": {
+                "evidence": "ECO:0000250|UniProtKB:P60615"
+            }
+        },
+        {
+            "type": "DISULFID",
+            "location": "17..45",
+            "qualifiers": {
+                "evidence": "ECO:0000250|UniProtKB:P60615"
+            }
+        },
+        {
+            "type": "DISULFID",
+            "location": "30..34",
+            "qualifiers": {
+                "evidence": "ECO:0000250|UniProtKB:P60615"
+            }
+        },
+        {
+            "type": "DISULFID",
+            "location": "49..60",
+            "qualifiers": {
+                "evidence": "ECO:0000250|UniProtKB:P60615"
+            }
+        },
+        {
+            "type": "DISULFID",
+            "location": "61..66",
+            "qualifiers": {
+                "evidence": "ECO:0000250|UniProtKB:P60615"
+            }
+        },
+        {
+            "type": "NON_TER",
+            "location": "1",
+            "qualifiers": {
+                "evidence": "ECO:0000312|EMBL:CAJ77820.1"
+            }
+        }
+    ],
+    "keywords": [
+        "Acetylcholine receptor inhibiting toxin",
+        "Direct protein sequencing",
+        "Disulfide bond",
+        "Ion channel impairing toxin",
+        "Neurotoxin",
+        "Postsynaptic neurotoxin",
+        "Secreted",
+        "Signal",
+        "Toxin"
+    ],
+    "protein_existence": "1: Evidence at protein level",
+    "sequence_length": 75,
+    "molecular_weight": 8418,
+    "crc64": "917333D1B4F96C0B",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "Alpha-elapitoxin-Bc2b",
+            "short": [
+                "Alpha-EPTX-Bc2b"
+            ],
+            "ec_numbers": [],
+            "evidence": [
+                "ECO:0000305"
+            ]
+        },
+        "sub_name": null,
+        "alt_names": [
+            {
+                "full": "Alpha-delta-Bgt-2",
+                "short": [],
+                "ec_numbers": [],
+                "evidence": [
+                    "ECO:0000312|EMBL:CAJ77820.1"
+                ]
+            },
+            {
+                "full": "Alpha/delta-bungarotoxin-2",
+                "short": [
+                    "Alpha/delta-BgTx-2"
+                ],
+                "ec_numbers": [],
+                "evidence": [
+                    "ECO:0000303|PubMed:30944155"
+                ]
+            }
+        ],
+        "includes": [],
+        "contains": [],
+        "flags": [
+            "Precursor",
+            "Fragment"
+        ]
+    },
+    "primary_accession": "A1IVR9",
+    "organism": "Bungarus candidus (Malayan krait).",
+    "lineage": [
+        "Eukaryota",
+        "Metazoa",
+        "Chordata",
+        "Craniata",
+        "Vertebrata",
+        "Euteleostomi",
+        "Lepidosauria",
+        "Squamata",
+        "Bifurcata",
+        "Unidentata",
+        "Episquamata",
+        "Toxicofera",
+        "Serpentes",
+        "Colubroidea",
+        "Elapidae",
+        "Bungarinae",
+        "Bungarus"
+    ],
+    "sequence": "YTLLCYKTPIPINAETCPPGENLCYTKMWCDIWCSSRGKVVELGCAATCPSKKPYEEVTCCSTDKCNPHPKQRPD"
+}

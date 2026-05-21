@@ -1,0 +1,213 @@
+{
+    "entry_name": "25DK2_PSEPU",
+    "status": "Reviewed",
+    "accessions": [
+        "M5AWY0"
+    ],
+    "dates": [
+        "20-JUN-2018, integrated into UniProtKB/Swiss-Prot.",
+        "29-MAY-2013, sequence version 1.",
+        "28-JAN-2026, entry version 36."
+    ],
+    "gene_names": [
+        "Name=camE25-2 {ECO:0000303|PubMed:23524667, ECO:0000312|EMBL:BAN13304.1}"
+    ],
+    "organelle": [
+        "Plasmid CAM."
+    ],
+    "taxon_id": 303,
+    "hosts": [],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [GENOMIC DNA].",
+            "RC": "STRAIN=ATCC 17453 / DSM 50198 / JCM 6157 / NCIMB 10007 / NRRL B-4067 / Stanier 77 / Biotype A; PLASMID=CAM",
+            "RX": "PubMed=22267661; DOI=10.1128/aem.07694-11",
+            "RA": "Leisch H., Shi R., Grosse S., Morley K., Bergeron H., Cygler M., Iwaki H., Hasegawa Y., Lau P.C.K.",
+            "RT": "\"Cloning, Baeyer-Villiger biooxidations, and structures of the camphor pathway 2-oxo-Delta(3)-4,5,5-trimethylcyclopentenylacetyl-coenzyme A monooxygenase of Pseudomonas putida ATCC 17453.\"",
+            "RL": "Appl. Environ. Microbiol. 78:2200-2212(2012)."
+        },
+        {
+            "RN": "[2]",
+            "RP": "NUCLEOTIDE SEQUENCE [GENOMIC DNA], FUNCTION, BVMO ACTIVITY, SUBSTRATE SPECIFICITY, BIOPHYSICOCHEMICAL PROPERTIES, AND SUBUNIT.",
+            "RC": "STRAIN=ATCC 17453 / DSM 50198 / JCM 6157 / NCIMB 10007 / NRRL B-4067 / Stanier 77 / Biotype A; PLASMID=CAM",
+            "RX": "PubMed=23524667; DOI=10.1128/aem.03958-12",
+            "RA": "Iwaki H., Grosse S., Bergeron H., Leisch H., Morley K., Hasegawa Y., Lau P.C.K.",
+            "RT": "\"Camphor pathway redux: functional recombinant expression of 2,5- and 3,6-diketocamphane monooxygenases of Pseudomonas putida ATCC 17453 with their cognate flavin reductase catalyzing Baeyer-Villiger reactions.\"",
+            "RL": "Appl. Environ. Microbiol. 79:3282-3293(2013)."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "Involved in the degradation and assimilation of (+)-camphor, which allows P.putida strain NCIMB 10007 to grow on this enantiomer of camphor as the sole carbon source. Catalyzes the FMNH(2)-dependent lactonization of 2,5-diketocamphane via a Baeyer-Villiger oxidation to produce the unstable lactone 5-oxo-1,2-campholide with (R,R) configuration, that presumably undergoes spontaneous hydrolysis to form 2-oxo-Delta(3)-4,5,5-trimethylcyclopentenylacetate (By similarity). Is also able to convert (+)-camphor and norcamphor to the corresponding lactone in vitro. Shows no conversion of (-)-camphor, (+)-fenchone, (-)-fenchone, and (+)-nopinone. Acts on other bicyclic ketones and, to a lesser extent, on some 2- and 4-substituted monocyclic ketones (PubMed:23524667). {ECO:0000250|UniProtKB:Q6STM1, ECO:0000269|PubMed:23524667}."
+        },
+        {
+            "topic": "CATALYTIC ACTIVITY",
+            "text": "Reaction=(1R,4R)-bornane-2,5-dione + FMNH2 + O2 = (1R,4R)-5-oxo-1,2-campholide + FMN + H2O + H(+); Xref=Rhea:RHEA:34415, ChEBI:CHEBI:15377, ChEBI:CHEBI:15378, ChEBI:CHEBI:15379, ChEBI:CHEBI:15392, ChEBI:CHEBI:18130, ChEBI:CHEBI:57618, ChEBI:CHEBI:58210; EC=1.14.14.108; Evidence={ECO:0000250|UniProtKB:Q6STM1};"
+        },
+        {
+            "topic": "BIOPHYSICOCHEMICAL PROPERTIES",
+            "text": "pH dependence: Optimum pH is 8.0. {ECO:0000269|PubMed:23524667};"
+        },
+        {
+            "topic": "PATHWAY",
+            "text": "Terpene metabolism; (R)-camphor degradation. {ECO:0000250|UniProtKB:Q6STM1}."
+        },
+        {
+            "topic": "SUBUNIT",
+            "text": "Homodimer. Likely forms a loose transient complex with a P.putida flavin reductase that provides the required FMNH(2) to the enzyme. {ECO:0000269|PubMed:23524667}."
+        },
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the bacterial luciferase oxidoreductase family. {ECO:0000305}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            "EMBL; AB771747; BAN13304.1; -; Genomic_DNA."
+        ],
+        "AlphaFoldDB": [
+            "AlphaFoldDB; M5AWY0; -."
+        ],
+        "SMR": [
+            "SMR; M5AWY0; -."
+        ],
+        "BRENDA": [
+            "BRENDA; 1.14.14.108; 5092."
+        ],
+        "UniPathway": [
+            "UniPathway; UPA00719; -."
+        ],
+        "GO": [
+            "GO; GO:0005829; C:cytosol; IEA:TreeGrafter.",
+            "GO; GO:0018684; F:2,5-diketocamphane 1,2-monooxygenase; IEA:UniProtKB-EC.",
+            "GO; GO:0019383; P:(+)-camphor catabolic process; IEA:UniProtKB-UniPathway."
+        ],
+        "Gene3D": [
+            "Gene3D; 3.20.20.30; Luciferase-like domain; 1."
+        ],
+        "InterPro": [
+            "InterPro; IPR050766; Bact_Lucif_Oxidored.",
+            "InterPro; IPR011251; Luciferase-like_dom.",
+            "InterPro; IPR036661; Luciferase-like_sf."
+        ],
+        "PANTHER": [
+            "PANTHER; PTHR30137:SF16; BLL0895 PROTEIN; 1.",
+            "PANTHER; PTHR30137; LUCIFERASE-LIKE MONOOXYGENASE; 1."
+        ],
+        "Pfam": [
+            "Pfam; PF00296; Bac_luciferase; 1."
+        ],
+        "SUPFAM": [
+            "SUPFAM; SSF51679; Bacterial luciferase-like; 1."
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..363",
+            "qualifiers": {
+                "note": "2,5-diketocamphane 1,2-monooxygenase 2",
+                "id": "PRO_0000444572"
+            }
+        },
+        {
+            "type": "BINDING",
+            "location": "74",
+            "qualifiers": {
+                "ligand": "FMN",
+                "ligand_id": "ChEBI:CHEBI:58210",
+                "evidence": "ECO:0000250|UniProtKB:D7UER1"
+            }
+        },
+        {
+            "type": "BINDING",
+            "location": "186..194",
+            "qualifiers": {
+                "ligand": "FMN",
+                "ligand_id": "ChEBI:CHEBI:58210",
+                "evidence": "ECO:0000250|UniProtKB:D7UER1"
+            }
+        }
+    ],
+    "keywords": [
+        "Flavoprotein",
+        "FMN",
+        "Monooxygenase",
+        "Oxidoreductase",
+        "Plasmid"
+    ],
+    "protein_existence": "1: Evidence at protein level",
+    "sequence_length": 363,
+    "molecular_weight": 40576,
+    "crc64": "DB782C17E1A42BC1",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "2,5-diketocamphane 1,2-monooxygenase 2",
+            "short": [
+                "2,5-DKCMO 2",
+                "2,5-diketocamphane monooxygenase 2"
+            ],
+            "ec_numbers": [
+                "1.14.14.108"
+            ],
+            "evidence": [
+                "ECO:0000305|PubMed:23524667",
+                "ECO:0000303|PubMed:23524667",
+                "ECO:0000250|UniProtKB:Q6STM1"
+            ]
+        },
+        "sub_name": null,
+        "alt_names": [
+            {
+                "full": "2,5-diketocamphane 1,2-monooxygenase oxygenating component",
+                "short": [],
+                "ec_numbers": [],
+                "evidence": [
+                    "ECO:0000303|PubMed:23524667"
+                ]
+            },
+            {
+                "full": "2,5-diketocamphane 1,2-monooxygenase oxygenating subunit",
+                "short": [],
+                "ec_numbers": [],
+                "evidence": [
+                    "ECO:0000303|PubMed:23524667"
+                ]
+            },
+            {
+                "full": "Camphor 1,2-monooxygenase",
+                "short": [],
+                "ec_numbers": [],
+                "evidence": []
+            },
+            {
+                "full": "Type II Baeyer-Villiger monooxygenase",
+                "short": [
+                    "Type II BVMO"
+                ],
+                "ec_numbers": [],
+                "evidence": [
+                    "ECO:0000303|PubMed:23524667"
+                ]
+            }
+        ],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "M5AWY0",
+    "organism": "Pseudomonas putida (Arthrobacter siderocapsulatus).",
+    "lineage": [
+        "Bacteria",
+        "Pseudomonadati",
+        "Pseudomonadota",
+        "Gammaproteobacteria",
+        "Pseudomonadales",
+        "Pseudomonadaceae",
+        "Pseudomonas"
+    ],
+    "sequence": "MQAGFFHTPYNLPTRTARQMFDWSLKLAQVCDEAGFADFMIGEHSTLAWENIPCPEIIIGAAAPLTKNIRFAPMAHLLPYHNPASLAIQVGWLSQILEGRYFLGVAPGGHHTDAILHGFEGIGPLQEQMFEALELMEKVWARKPFMEKGKFFQAGFPGPDTMPEYDVEIADNSPWGGREALEIAVTGLTKNSSSLKWAGERNYSPISFFGGHEVMRSHYDTWAAAMQSKGFTPDTSRFRVTREIFIADTDAEARKRAKASGMAKTWEHYLFPIYKKFNLFPGIIADAGLDIDPSQIDMDFLADHVWLCGSPETVKGKIENMIERSGGCGQIIVNSHDNIDNPEPYFESLQRLAQEVLPNVKTS"
+}

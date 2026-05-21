@@ -1,19 +1,19 @@
 {
-    "entry_name": "1105L_ASFP4",
+    "entry_name": "3601L_ASFWA",
     "status": "Reviewed",
     "accessions": [
-        "P0C9H6"
+        "P0C9L8"
     ],
     "dates": [
         "05-MAY-2009, integrated into UniProtKB/Swiss-Prot.",
         "05-MAY-2009, sequence version 1.",
-        "28-JAN-2026, entry version 24."
+        "28-JAN-2026, entry version 26."
     ],
     "gene_names": [
-        "OrderedLocusNames=Pret-013"
+        "OrderedLocusNames=War-002"
     ],
     "organelle": [],
-    "taxon_id": 561443,
+    "taxon_id": 561444,
     "hosts": [
         "NCBI_TaxID=6937; Ornithodoros (relapsing fever ticks).",
         "NCBI_TaxID=85517; Phacochoerus aethiopicus (Warthog).",
@@ -36,77 +36,49 @@
             "text": "Plays a role in virus cell tropism, and may be required for efficient virus replication in macrophages. {ECO:0000250}."
         },
         {
-            "topic": "INDUCTION",
-            "text": "Expressed in the early phase of the viral replicative cycle. {ECO:0000305}."
-        },
-        {
             "topic": "SIMILARITY",
-            "text": "Belongs to the asfivirus MGF 110 family. {ECO:0000305}."
+            "text": "Belongs to the asfivirus MGF 360 family. {ECO:0000305}."
         }
     ],
     "cross_references": {
         "EMBL": [
-            "EMBL; AY261363; -; NOT_ANNOTATED_CDS; Genomic_DNA."
+            "EMBL; AY261366; -; NOT_ANNOTATED_CDS; Genomic_DNA."
         ],
         "SMR": [
-            "SMR; P0C9H6; -."
+            "SMR; P0C9L8; -."
         ],
         "Proteomes": [
-            "Proteomes; UP000000859; Segment."
+            "Proteomes; UP000000858; Segment."
+        ],
+        "GO": [
+            "GO; GO:0042330; P:taxis; IEA:InterPro."
         ],
         "InterPro": [
-            "InterPro; IPR004848; ASFV_fam_110."
+            "InterPro; IPR002595; ASFV_MGF360."
         ],
         "Pfam": [
-            "Pfam; PF01639; v110; 1."
+            "Pfam; PF01671; ASFV_360; 1."
         ]
     },
     "features": [
         {
-            "type": "SIGNAL",
-            "location": "1..18",
-            "qualifiers": {
-                "evidence": "ECO:0000255"
-            }
-        },
-        {
             "type": "CHAIN",
-            "location": "19..121",
+            "location": "1..360",
             "qualifiers": {
-                "note": "Protein MGF 110-5L",
-                "id": "PRO_0000373198"
-            }
-        },
-        {
-            "type": "CARBOHYD",
-            "location": "62",
-            "qualifiers": {
-                "note": "N-linked (GlcNAc...) asparagine; by host",
-                "evidence": "ECO:0000255"
-            }
-        },
-        {
-            "type": "CARBOHYD",
-            "location": "116",
-            "qualifiers": {
-                "note": "N-linked (GlcNAc...) asparagine; by host",
-                "evidence": "ECO:0000255"
+                "note": "Protein MGF 360-1L",
+                "id": "PRO_0000373244"
             }
         }
     ],
-    "keywords": [
-        "Early protein",
-        "Glycoprotein",
-        "Signal"
-    ],
+    "keywords": [],
     "protein_existence": "3: Inferred from homology",
-    "sequence_length": 121,
-    "molecular_weight": 14109,
-    "crc64": "FF3B05F6F2F3010D",
+    "sequence_length": 360,
+    "molecular_weight": 41667,
+    "crc64": "4E1EBADE64AA8BAC",
     "unparsed": {},
     "description": {
         "rec_name": {
-            "full": "Protein MGF 110-5L",
+            "full": "Protein MGF 360-1L",
             "short": [],
             "ec_numbers": [],
             "evidence": []
@@ -115,12 +87,10 @@
         "alt_names": [],
         "includes": [],
         "contains": [],
-        "flags": [
-            "Precursor"
-        ]
+        "flags": []
     },
-    "primary_accession": "P0C9H6",
-    "organism": "African swine fever virus (isolate Tick/South Africa/Pretoriuskop Pr4/1996) (ASFV).",
+    "primary_accession": "P0C9L8",
+    "organism": "African swine fever virus (isolate Warthog/Namibia/Wart80/1980) (ASFV).",
     "lineage": [
         "Viruses",
         "Varidnaviria",
@@ -133,5 +103,5 @@
         "Asfivirus haemorrhagiae",
         "African swine fever virus"
     ],
-    "sequence": "MLVIFLGILGLLANQVSSQLVGQLHPTENPSENELEYWCTYMECCQFCWDCQNGLCVNKLGNTTILENEYVHPCIVSRWLNKCMYDLGQGIDHVMVCSQPKYWNPYKILKKEWKENNSQNK"
+    "sequence": "MPSTLQALTKKVLATQPIFKDDYCILERCGLWWHEAPITIHHTCIDKQILVKTASFKHGLTLNVALMKAVQENNHDLIELFTEWGADISFGLVTVNMECTQDLCQKLGARKALSENKILEIFYNVKYVKTSSNIILCHELLSNNPLFLNNAQLKLRIFGELDALSINITLDNISFNEMLTRYWYSMAILYKLTEAIQYFYQRYSHFKDWRLICGVAYNNVFDLHEIYNKEKTNIDIDEMMQLACMYDGNYTTIYYCCMLGADINRAMITSVMNFCEGNLFLCIDLGADAFKESIEIASQANNWILINILLFKNYSPDSSLLSLKTTDPEKINVLLDEEKYKSKNMLMYEESLFHIYGTNT"
 }

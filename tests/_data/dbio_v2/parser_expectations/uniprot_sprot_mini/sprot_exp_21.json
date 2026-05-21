@@ -1,0 +1,429 @@
+{
+    "entry_name": "2ABA_MOUSE",
+    "status": "Reviewed",
+    "accessions": [
+        "Q6P1F6"
+    ],
+    "dates": [
+        "27-SEP-2004, integrated into UniProtKB/Swiss-Prot.",
+        "05-JUL-2004, sequence version 1.",
+        "28-JAN-2026, entry version 163."
+    ],
+    "gene_names": [
+        "Name=Ppp2r2a {ECO:0000303|PubMed:39003739, ECO:0000312|MGI:MGI:1919228}"
+    ],
+    "organelle": [],
+    "taxon_id": 10090,
+    "hosts": [],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [LARGE SCALE MRNA].",
+            "RC": "STRAIN=C57BL/6J; TISSUE=Brain, and Embryo",
+            "RX": "PubMed=15489334; DOI=10.1101/gr.2596504",
+            "RG": "The MGC Project Team",
+            "RT": "\"The status, quality, and expansion of the NIH full-length cDNA project: the Mammalian Gene Collection (MGC).\"",
+            "RL": "Genome Res. 14:2121-2127(2004)."
+        },
+        {
+            "RN": "[2]",
+            "RP": "PROTEIN SEQUENCE OF 200-210, AND IDENTIFICATION BY MASS SPECTROMETRY.",
+            "RC": "TISSUE=Hippocampus",
+            "RA": "Lubec G., Klug S.",
+            "RL": "Submitted (MAR-2007) to UniProtKB."
+        },
+        {
+            "RN": "[3]",
+            "RP": "IDENTIFICATION BY MASS SPECTROMETRY [LARGE SCALE ANALYSIS].",
+            "RC": "TISSUE=Brain, Brown adipose tissue, Heart, Kidney, Liver, Lung, Pancreas, Spleen, and Testis",
+            "RX": "PubMed=21183079; DOI=10.1016/j.cell.2010.12.001",
+            "RA": "Huttlin E.L., Jedrychowski M.P., Elias J.E., Goswami T., Rad R., Beausoleil S.A., Villen J., Haas W., Sowa M.E., Gygi S.P.",
+            "RT": "\"A tissue-specific atlas of mouse protein phosphorylation and expression.\"",
+            "RL": "Cell 143:1174-1189(2010)."
+        },
+        {
+            "RN": "[4]",
+            "RP": "INTERACTION WITH CRTC3.",
+            "RX": "PubMed=30611118; DOI=10.1016/j.isci.2018.12.012",
+            "RA": "Sonntag T., Ostojic J., Vaughan J.M., Moresco J.J., Yoon Y.S., Yates J.R. III, Montminy M.",
+            "RT": "\"Mitogenic Signals Stimulate the CREB Coactivator CRTC3 through PP2A Recruitment.\"",
+            "RL": "IScience 11:134-145(2018)."
+        },
+        {
+            "RN": "[5]",
+            "RP": "DISRUPTION PHENOTYPE.",
+            "RX": "PubMed=32582689; DOI=10.3389/fcell.2020.00358",
+            "RA": "Panicker N., Coutman M., Lawlor-O'Neill C., Kahl R.G.S., Roselli S., Verrills N.M.",
+            "RT": "\"Ppp2r2a knockout mice reveal that protein phosphatase 2A regulatory subunit, PP2A-B55alpha, is an essential regulator of neuronal and epidermal embryonic development.\"",
+            "RL": "Front. Cell Dev. Biol. 8:358-358(2020)."
+        },
+        {
+            "RN": "[6]",
+            "RP": "FUNCTION, AND DISRUPTION PHENOTYPE.",
+            "RX": "PubMed=39003739; DOI=10.1016/j.celrep.2024.114494",
+            "RA": "Sanz-Flores M., Ruiz-Torres M., Aguirre-Portoles C., El Bakkali A., Salvador-Barbero B., Villarroya-Beltri C., Ortega S., Megias D., Gerlich D.W., Alvarez-Fernandez M., Malumbres M.",
+            "RT": "\"PP2A-B55 phosphatase counteracts Ki-67-dependent chromosome individualization during mitosis.\"",
+            "RL": "Cell Rep. 43:114494-114494(2024)."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "Substrate-recognition subunit of protein phosphatase 2A (PP2A) that plays a key role in cell cycle by controlling mitosis entry and exit (PubMed:39003739). Involved in chromosome clustering during late mitosis by mediating dephosphorylation of MKI67 (PubMed:39003739). Essential for serine/threonine-protein phosphatase 2A-mediated dephosphorylation of WEE1, preventing its ubiquitin-mediated proteolysis, increasing WEE1 protein levels, and promoting the G2/M checkpoint (By similarity). {ECO:0000250|UniProtKB:P63151, ECO:0000269|PubMed:39003739}."
+        },
+        {
+            "topic": "SUBUNIT",
+            "text": "PP2A consists of a common heterodimeric core enzyme, composed of a 36 kDa catalytic subunit (subunit C) and a 65 kDa constant regulatory subunit (PR65 or subunit A), that associates with a variety of regulatory subunits (By similarity). Proteins that associate with the core dimer include three families of regulatory subunits B (the R2/B/PR55/B55, R3/B''/PR72/PR130/PR59 and R5/B'/B56 families), the 48 kDa variable regulatory subunit, viral proteins, and cell signaling molecules (By similarity). Interacts with the PP2A C catalytic subunit PPP2CA (By similarity). Interacts with the PP2A A subunit PPP2R1A (By similarity). Interacts with TP53 (By similarity). Interacts with IER5 (By similarity). Interacts with MFHAS1; the interaction is direct (By similarity). Interacts with PABIR1/FAM122A (via its N-terminus); the interaction is direct and inhibits PP2A activity (By similarity). Interacts with ARPP19; the interaction is direct and inhibits PP2A activity (By similarity). Interacts with CRTC3 (PubMed:30611118). {ECO:0000250|UniProtKB:P63151, ECO:0000269|PubMed:30611118}."
+        },
+        {
+            "topic": "DOMAIN",
+            "text": "Has an extended WD 2 repeat that is important for the interaction with PPP2R1A. {ECO:0000250|UniProtKB:P63151}."
+        },
+        {
+            "topic": "DISRUPTION PHENOTYPE",
+            "text": "Lethality during late embryonic development (PubMed:32582689, PubMed:39003739). Embryos are significantly smaller and display a variety of neural defects such as exencephaly, spina bifida and cranial vault collapse, as well as syndactyly and severe epidermal defects; all processes driven by growth and differentiation of the ectoderm (PubMed:32582689). Embryos have incomplete epidermal barrier acquisition, associated with thin, poorly differentiated stratified epithelium with weak attachment to the underlying dermis (PubMed:32582689). Mitotic cells display increased chromosome scattering, associated with in the presence of enhanced phosphorylation and perichromosomal loading of Mki67 (PubMed:39003739). {ECO:0000269|PubMed:32582689, ECO:0000269|PubMed:39003739}."
+        },
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the phosphatase 2A regulatory subunit B family. {ECO:0000305}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            "EMBL; BC065100; AAH65100.1; -; mRNA.",
+            "EMBL; BC080692; AAH80692.1; -; mRNA."
+        ],
+        "CCDS": [
+            "CCDS; CCDS56967.1; -."
+        ],
+        "RefSeq": [
+            "RefSeq; NP_001192117.1; NM_001205188.1.",
+            "RefSeq; NP_082308.1; NM_028032.3."
+        ],
+        "AlphaFoldDB": [
+            "AlphaFoldDB; Q6P1F6; -."
+        ],
+        "SMR": [
+            "SMR; Q6P1F6; -."
+        ],
+        "BioGRID": [
+            "BioGRID; 215068; 41."
+        ],
+        "CORUM": [
+            "CORUM; Q6P1F6; -."
+        ],
+        "FunCoup": [
+            "FunCoup; Q6P1F6; 3499."
+        ],
+        "IntAct": [
+            "IntAct; Q6P1F6; 7."
+        ],
+        "MINT": [
+            "MINT; Q6P1F6; -."
+        ],
+        "STRING": [
+            "STRING; 10090.ENSMUSP00000086640; -."
+        ],
+        "GlyGen": [
+            "GlyGen; Q6P1F6; 1 site, 1 O-linked glycan (1 site)."
+        ],
+        "iPTMnet": [
+            "iPTMnet; Q6P1F6; -."
+        ],
+        "PhosphoSitePlus": [
+            "PhosphoSitePlus; Q6P1F6; -."
+        ],
+        "SwissPalm": [
+            "SwissPalm; Q6P1F6; -."
+        ],
+        "jPOST": [
+            "jPOST; Q6P1F6; -."
+        ],
+        "PaxDb": [
+            "PaxDb; 10090-ENSMUSP00000086640; -."
+        ],
+        "ProteomicsDB": [
+            "ProteomicsDB; 285988; -."
+        ],
+        "Pumba": [
+            "Pumba; Q6P1F6; -."
+        ],
+        "Antibodypedia": [
+            "Antibodypedia; 22918; 219 antibodies from 30 providers."
+        ],
+        "Ensembl": [
+            "Ensembl; ENSMUST00000089230.7; ENSMUSP00000086640.6; ENSMUSG00000022052.10."
+        ],
+        "GeneID": [
+            "GeneID; 71978; -."
+        ],
+        "KEGG": [
+            "KEGG; mmu:71978; -."
+        ],
+        "UCSC": [
+            "UCSC; uc007uku.3; mouse."
+        ],
+        "AGR": [
+            "AGR; MGI:1919228; -."
+        ],
+        "CTD": [
+            "CTD; 5520; -."
+        ],
+        "MGI": [
+            "MGI; MGI:1919228; Ppp2r2a."
+        ],
+        "VEuPathDB": [
+            "VEuPathDB; HostDB:ENSMUSG00000022052; -."
+        ],
+        "eggNOG": [
+            "eggNOG; KOG1354; Eukaryota."
+        ],
+        "GeneTree": [
+            "GeneTree; ENSGT00950000182864; -."
+        ],
+        "HOGENOM": [
+            "HOGENOM; CLU_021713_3_3_1; -."
+        ],
+        "InParanoid": [
+            "InParanoid; Q6P1F6; -."
+        ],
+        "OMA": [
+            "OMA; NQIKWCR; -."
+        ],
+        "OrthoDB": [
+            "OrthoDB; 6274823at2759; -."
+        ],
+        "PhylomeDB": [
+            "PhylomeDB; Q6P1F6; -."
+        ],
+        "Reactome": [
+            "Reactome; R-MMU-2995383; Initiation of Nuclear Envelope (NE) Reformation.",
+            "Reactome; R-MMU-69231; Cyclin D associated events in G1.",
+            "Reactome; R-MMU-69273; Cyclin A/B1/B2 associated events during G2/M transition.",
+            "Reactome; R-MMU-975957; Nonsense Mediated Decay (NMD) enhanced by the Exon Junction Complex (EJC).",
+            "Reactome; R-MMU-9860927; Turbulent (oscillatory, disturbed) flow shear stress activates signaling by PIEZO1 and integrins in endothelial cells."
+        ],
+        "BioGRID-ORCS": [
+            "BioGRID-ORCS; 71978; 15 hits in 77 CRISPR screens."
+        ],
+        "PRO": [
+            "PRO; PR:Q6P1F6; -."
+        ],
+        "Proteomes": [
+            "Proteomes; UP000000589; Chromosome 14."
+        ],
+        "RNAct": [
+            "RNAct; Q6P1F6; protein."
+        ],
+        "Bgee": [
+            "Bgee; ENSMUSG00000022052; Expressed in embryonic post-anal tail and 252 other cell types or tissues."
+        ],
+        "ExpressionAtlas": [
+            "ExpressionAtlas; Q6P1F6; baseline and differential."
+        ],
+        "GO": [
+            "GO; GO:0005829; C:cytosol; IBA:GO_Central.",
+            "GO; GO:0098978; C:glutamatergic synapse; IDA:SynGO.",
+            "GO; GO:0000159; C:protein phosphatase type 2A complex; IDA:UniProtKB.",
+            "GO; GO:0045202; C:synapse; IDA:SynGO.",
+            "GO; GO:0140767; F:enzyme-substrate adaptor activity; IDA:UniProtKB.",
+            "GO; GO:0051721; F:protein phosphatase 2A binding; ISO:GO_Central.",
+            "GO; GO:0019888; F:protein phosphatase regulator activity; IDA:UniProtKB.",
+            "GO; GO:0044877; F:protein-containing complex binding; ISO:GO_Central.",
+            "GO; GO:0048156; F:tau protein binding; ISO:GO_Central.",
+            "GO; GO:0006470; P:protein dephosphorylation; ISS:UniProtKB.",
+            "GO; GO:0051983; P:regulation of chromosome segregation; IDA:UniProtKB.",
+            "GO; GO:0043278; P:response to morphine; IMP:MGI."
+        ],
+        "FunFam": [
+            "FunFam; 2.130.10.10:FF:000002; Serine/threonine-protein phosphatase 2A 55 kDa regulatory subunit B; 1."
+        ],
+        "Gene3D": [
+            "Gene3D; 2.130.10.10; YVTN repeat-like/Quinoprotein amine dehydrogenase; 1."
+        ],
+        "InterPro": [
+            "InterPro; IPR000009; PP2A_PR55.",
+            "InterPro; IPR018067; PP2A_PR55_CS.",
+            "InterPro; IPR015943; WD40/YVTN_repeat-like_dom_sf.",
+            "InterPro; IPR036322; WD40_repeat_dom_sf.",
+            "InterPro; IPR001680; WD40_rpt."
+        ],
+        "PANTHER": [
+            "PANTHER; PTHR11871; PROTEIN PHOSPHATASE PP2A REGULATORY SUBUNIT B; 1."
+        ],
+        "PIRSF": [
+            "PIRSF; PIRSF037309; PP2A_PR55; 1."
+        ],
+        "PRINTS": [
+            "PRINTS; PR00600; PP2APR55."
+        ],
+        "SMART": [
+            "SMART; SM00320; WD40; 7."
+        ],
+        "SUPFAM": [
+            "SUPFAM; SSF50978; WD40 repeat-like; 1."
+        ],
+        "PROSITE": [
+            "PROSITE; PS01024; PR55_1; 1.",
+            "PROSITE; PS01025; PR55_2; 1."
+        ]
+    },
+    "features": [
+        {
+            "type": "INIT_MET",
+            "location": "1",
+            "qualifiers": {
+                "note": "Removed",
+                "evidence": "ECO:0000250|UniProtKB:P63151"
+            }
+        },
+        {
+            "type": "CHAIN",
+            "location": "2..447",
+            "qualifiers": {
+                "note": "Serine/threonine-protein phosphatase 2A 55 kDa regulatory subunit B alpha isoform",
+                "id": "PRO_0000071417"
+            }
+        },
+        {
+            "type": "REPEAT",
+            "location": "11..80",
+            "qualifiers": {
+                "note": "WD 1",
+                "evidence": "ECO:0000250|UniProtKB:P63151"
+            }
+        },
+        {
+            "type": "REPEAT",
+            "location": "94..174",
+            "qualifiers": {
+                "note": "WD 2",
+                "evidence": "ECO:0000250|UniProtKB:P63151"
+            }
+        },
+        {
+            "type": "REPEAT",
+            "location": "175..218",
+            "qualifiers": {
+                "note": "WD 3",
+                "evidence": "ECO:0000250|UniProtKB:P63151"
+            }
+        },
+        {
+            "type": "REPEAT",
+            "location": "227..270",
+            "qualifiers": {
+                "note": "WD 4",
+                "evidence": "ECO:0000250|UniProtKB:P63151"
+            }
+        },
+        {
+            "type": "REPEAT",
+            "location": "288..325",
+            "qualifiers": {
+                "note": "WD 5",
+                "evidence": "ECO:0000250|UniProtKB:P63151"
+            }
+        },
+        {
+            "type": "REPEAT",
+            "location": "347..381",
+            "qualifiers": {
+                "note": "WD 6",
+                "evidence": "ECO:0000250|UniProtKB:P63151"
+            }
+        },
+        {
+            "type": "REPEAT",
+            "location": "414..446",
+            "qualifiers": {
+                "note": "WD 7",
+                "evidence": "ECO:0000250|UniProtKB:P63151"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "2",
+            "qualifiers": {
+                "note": "N-acetylalanine",
+                "evidence": "ECO:0000250|UniProtKB:P63151"
+            }
+        }
+    ],
+    "keywords": [
+        "Acetylation",
+        "Direct protein sequencing",
+        "Reference proteome",
+        "Repeat",
+        "WD repeat"
+    ],
+    "protein_existence": "1: Evidence at protein level",
+    "sequence_length": 447,
+    "molecular_weight": 51692,
+    "crc64": "F4D407FF7ADA4ED6",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "Serine/threonine-protein phosphatase 2A 55 kDa regulatory subunit B alpha isoform",
+            "short": [],
+            "ec_numbers": [],
+            "evidence": []
+        },
+        "sub_name": null,
+        "alt_names": [
+            {
+                "full": "PP2A subunit B isoform B55-alpha",
+                "short": [
+                    "B55"
+                ],
+                "ec_numbers": [],
+                "evidence": [
+                    "ECO:0000303|PubMed:39003739"
+                ]
+            },
+            {
+                "full": "PP2A subunit B isoform PR55-alpha",
+                "short": [],
+                "ec_numbers": [],
+                "evidence": []
+            },
+            {
+                "full": "PP2A subunit B isoform R2-alpha",
+                "short": [],
+                "ec_numbers": [],
+                "evidence": []
+            },
+            {
+                "full": "PP2A subunit B isoform alpha",
+                "short": [],
+                "ec_numbers": [],
+                "evidence": []
+            }
+        ],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "Q6P1F6",
+    "organism": "Mus musculus (Mouse).",
+    "lineage": [
+        "Eukaryota",
+        "Metazoa",
+        "Chordata",
+        "Craniata",
+        "Vertebrata",
+        "Euteleostomi",
+        "Mammalia",
+        "Eutheria",
+        "Euarchontoglires",
+        "Glires",
+        "Rodentia",
+        "Myomorpha",
+        "Muroidea",
+        "Muridae",
+        "Murinae",
+        "Mus",
+        "Mus"
+    ],
+    "sequence": "MAGAGGGNDIQWCFSQVKGAVDDDVAEADIISTVEFNHSGELLATGDKGGRVVIFQQEQENKIQSHSRGEYNVYSTFQSHEPEFDYLKSLEIEEKINKIRWLPQKNAAQFLLSTNDKTIKLWKISERDKRPEGYNLKEEDGRYRDPTTVTTLRVPVFRPMDLMVEASPRRIFANAHTYHINSISINSDYETYLSADDLRINLWHLEITDRSFNIVDIKPANMEELTEVITAAEFHPNSCNTFVYSSSKGTIRLCDMRASALCDRHSKLFEEPEDPSNRSFFSEIISSISDVKFSHSGRYMMTRDYLSVKIWDLNMENRPVETYQVHEYLRSKLCSLYENDCIFDKFECCWNGSDSVVMTGSYNNFFRMFDRNTKRDITLEASRENNKPRTVLKPRKVCASGKRKKDEISVDSLDFNKKILHTAWHPKENIIAVATTNNLYIFQDKVN"
+}

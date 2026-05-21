@@ -1,0 +1,259 @@
+{
+    "entry_name": "3DHQ_CLAL4",
+    "status": "Reviewed",
+    "accessions": [
+        "C4YCH0"
+    ],
+    "dates": [
+        "30-NOV-2010, integrated into UniProtKB/Swiss-Prot.",
+        "28-JUL-2009, sequence version 1.",
+        "28-JAN-2026, entry version 65."
+    ],
+    "gene_names": [
+        "Name=DQD1 {ECO:0000255|HAMAP-Rule:MF_03136}",
+        "ORFNames=CLUG_05809"
+    ],
+    "organelle": [],
+    "taxon_id": 306902,
+    "hosts": [],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [LARGE SCALE GENOMIC DNA].",
+            "RC": "STRAIN=ATCC 42720",
+            "RX": "PubMed=19465905; DOI=10.1038/nature08064",
+            "RA": "Butler G., Rasmussen M.D., Lin M.F., Santos M.A.S., Sakthikumar S., Munro C.A., Rheinbay E., Grabherr M., Forche A., Reedy J.L., Agrafioti I., Arnaud M.B., Bates S., Brown A.J.P., Brunke S., Costanzo M.C., Fitzpatrick D.A., de Groot P.W.J., Harris D., Hoyer L.L., Hube B., Klis F.M., Kodira C., Lennard N., Logue M.E., Martin R., Neiman A.M., Nikolaou E., Quail M.A., Quinn J., Santos M.C., Schmitzberger F.F., Sherlock G., Shah P., Silverstein K.A.T., Skrzypek M.S., Soll D., Staggs R., Stansfield I., Stumpf M.P.H., Sudbery P.E., Srikantha T., Zeng Q., Berman J., Berriman M., Heitman J., Gow N.A.R., Lorenz M.C., Birren B.W., Kellis M., Cuomo C.A.",
+            "RT": "\"Evolution of pathogenicity and sexual reproduction in eight Candida genomes.\"",
+            "RL": "Nature 459:657-662(2009)."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "Is involved in the catabolism of quinate. Allows the utilization of quinate as carbon source via the beta-ketoadipate pathway. {ECO:0000255|HAMAP-Rule:MF_03136}."
+        },
+        {
+            "topic": "CATALYTIC ACTIVITY",
+            "text": "Reaction=3-dehydroquinate = 3-dehydroshikimate + H2O; Xref=Rhea:RHEA:21096, ChEBI:CHEBI:15377, ChEBI:CHEBI:16630, ChEBI:CHEBI:32364; EC=4.2.1.10; Evidence={ECO:0000255|HAMAP-Rule:MF_03136};"
+        },
+        {
+            "topic": "PATHWAY",
+            "text": "Aromatic compound metabolism; 3,4-dihydroxybenzoate biosynthesis; 3,4-dihydroxybenzoate from 3-dehydroquinate: step 1/2. {ECO:0000255|HAMAP-Rule:MF_03136}."
+        },
+        {
+            "topic": "SUBUNIT",
+            "text": "Homododecamer. Adopts a ring-like structure, composed of an arrangement of two hexameric rings stacked on top of one another. {ECO:0000255|HAMAP-Rule:MF_03136}."
+        },
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the type-II 3-dehydroquinase family. {ECO:0000255|HAMAP-Rule:MF_03136}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            "EMBL; CH408083; EEQ41681.1; -; Genomic_DNA."
+        ],
+        "RefSeq": [
+            "RefSeq; XP_002614323.1; XM_002614277.1."
+        ],
+        "AlphaFoldDB": [
+            "AlphaFoldDB; C4YCH0; -."
+        ],
+        "SMR": [
+            "SMR; C4YCH0; -."
+        ],
+        "GeneID": [
+            "GeneID; 8494624; -."
+        ],
+        "KEGG": [
+            "KEGG; clu:CLUG_05809; -."
+        ],
+        "VEuPathDB": [
+            "VEuPathDB; FungiDB:CLUG_05809; -."
+        ],
+        "HOGENOM": [
+            "HOGENOM; CLU_090968_1_0_1; -."
+        ],
+        "InParanoid": [
+            "InParanoid; C4YCH0; -."
+        ],
+        "OMA": [
+            "OMA; AYTHYSY; -."
+        ],
+        "OrthoDB": [
+            "OrthoDB; 8191625at2759; -."
+        ],
+        "UniPathway": [
+            "UniPathway; UPA00088; UER00178."
+        ],
+        "Proteomes": [
+            "Proteomes; UP000007703; Unassembled WGS sequence."
+        ],
+        "GO": [
+            "GO; GO:0003855; F:3-dehydroquinate dehydratase activity; IEA:UniProtKB-UniRule.",
+            "GO; GO:0046279; P:3,4-dihydroxybenzoate biosynthetic process; IEA:UniProtKB-UniRule.",
+            "GO; GO:0019631; P:quinate catabolic process; IEA:TreeGrafter."
+        ],
+        "CDD": [
+            "CDD; cd00466; DHQase_II; 1."
+        ],
+        "Gene3D": [
+            "Gene3D; 3.40.50.9100; Dehydroquinase, class II; 1."
+        ],
+        "HAMAP": [
+            "HAMAP; MF_00169; AroQ; 1."
+        ],
+        "InterPro": [
+            "InterPro; IPR001874; DHquinase_II.",
+            "InterPro; IPR018509; DHquinase_II_CS.",
+            "InterPro; IPR036441; DHquinase_II_sf."
+        ],
+        "NCBIfam": [
+            "NCBIfam; TIGR01088; aroQ; 1.",
+            "NCBIfam; NF003804; PRK05395.1-1; 1.",
+            "NCBIfam; NF003805; PRK05395.1-2; 1.",
+            "NCBIfam; NF003806; PRK05395.1-3; 1.",
+            "NCBIfam; NF003807; PRK05395.1-4; 1."
+        ],
+        "PANTHER": [
+            "PANTHER; PTHR21272; CATABOLIC 3-DEHYDROQUINASE; 1.",
+            "PANTHER; PTHR21272:SF3; CATABOLIC 3-DEHYDROQUINASE; 1."
+        ],
+        "Pfam": [
+            "Pfam; PF01220; DHquinase_II; 1."
+        ],
+        "PIRSF": [
+            "PIRSF; PIRSF001399; DHquinase_II; 1."
+        ],
+        "SUPFAM": [
+            "SUPFAM; SSF52304; Type II 3-dehydroquinate dehydratase; 1."
+        ],
+        "PROSITE": [
+            "PROSITE; PS01029; DEHYDROQUINASE_II; 1."
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..145",
+            "qualifiers": {
+                "note": "Catabolic 3-dehydroquinase",
+                "id": "PRO_0000402364"
+            }
+        },
+        {
+            "type": "ACT_SITE",
+            "location": "24",
+            "qualifiers": {
+                "note": "Proton acceptor",
+                "evidence": "ECO:0000255|HAMAP-Rule:MF_03136"
+            }
+        },
+        {
+            "type": "ACT_SITE",
+            "location": "103",
+            "qualifiers": {
+                "note": "Proton donor",
+                "evidence": "ECO:0000255|HAMAP-Rule:MF_03136"
+            }
+        },
+        {
+            "type": "BINDING",
+            "location": "77",
+            "qualifiers": {
+                "ligand": "substrate",
+                "evidence": "ECO:0000255|HAMAP-Rule:MF_03136"
+            }
+        },
+        {
+            "type": "BINDING",
+            "location": "83",
+            "qualifiers": {
+                "ligand": "substrate",
+                "evidence": "ECO:0000255|HAMAP-Rule:MF_03136"
+            }
+        },
+        {
+            "type": "BINDING",
+            "location": "90",
+            "qualifiers": {
+                "ligand": "substrate",
+                "evidence": "ECO:0000255|HAMAP-Rule:MF_03136"
+            }
+        },
+        {
+            "type": "BINDING",
+            "location": "104..105",
+            "qualifiers": {
+                "ligand": "substrate",
+                "evidence": "ECO:0000255|HAMAP-Rule:MF_03136"
+            }
+        },
+        {
+            "type": "BINDING",
+            "location": "114",
+            "qualifiers": {
+                "ligand": "substrate",
+                "evidence": "ECO:0000255|HAMAP-Rule:MF_03136"
+            }
+        },
+        {
+            "type": "SITE",
+            "location": "19",
+            "qualifiers": {
+                "note": "Transition state stabilizer",
+                "evidence": "ECO:0000255|HAMAP-Rule:MF_03136"
+            }
+        }
+    ],
+    "keywords": [
+        "Lyase",
+        "Quinate metabolism"
+    ],
+    "protein_existence": "3: Inferred from homology",
+    "sequence_length": 145,
+    "molecular_weight": 16153,
+    "crc64": "032AED87D4A121FE",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "Catabolic 3-dehydroquinase",
+            "short": [
+                "cDHQase"
+            ],
+            "ec_numbers": [
+                "4.2.1.10"
+            ],
+            "evidence": [
+                "ECO:0000255|HAMAP-Rule:MF_03136"
+            ]
+        },
+        "sub_name": null,
+        "alt_names": [
+            {
+                "full": "3-dehydroquinate dehydratase",
+                "short": [],
+                "ec_numbers": [],
+                "evidence": [
+                    "ECO:0000255|HAMAP-Rule:MF_03136"
+                ]
+            }
+        ],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "C4YCH0",
+    "organism": "Clavispora lusitaniae (strain ATCC 42720) (Yeast) (Candida lusitaniae).",
+    "lineage": [
+        "Eukaryota",
+        "Fungi",
+        "Dikarya",
+        "Ascomycota",
+        "Saccharomycotina",
+        "Pichiomycetes",
+        "Metschnikowiaceae",
+        "Clavispora"
+    ],
+    "sequence": "MVKKVLLINGPNLNLLGTREPEKYGTTTLKDIEMEAHQQVAKHQDAELFTYQNNTEGFIIDRIQEAKQQGVGFIIINAGAYTHTSVGIRDALLGTAIPFIEVHITNVHQREPFRHHSYLSDKAIAVIAGLGVYGYTAAIEYALNY"
+}

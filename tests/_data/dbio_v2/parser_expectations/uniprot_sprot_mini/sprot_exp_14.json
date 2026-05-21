@@ -1,0 +1,358 @@
+{
+    "entry_name": "1A04_GORGO",
+    "status": "Reviewed",
+    "accessions": [
+        "P30378"
+    ],
+    "dates": [
+        "01-APR-1993, integrated into UniProtKB/Swiss-Prot.",
+        "01-APR-1993, sequence version 1.",
+        "28-JAN-2026, entry version 123."
+    ],
+    "gene_names": [],
+    "organelle": [],
+    "taxon_id": 9595,
+    "hosts": [],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [MRNA].",
+            "RX": "PubMed=1744581; DOI=10.1084/jem.174.6.1491",
+            "RA": "Lawlor D.A., Warren E., Taylor P., Parham P.",
+            "RT": "\"Gorilla class I major histocompatibility complex alleles: comparison to human and chimpanzee class I.\"",
+            "RL": "J. Exp. Med. 174:1491-1509(1991)."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "Involved in the presentation of foreign antigens to the immune system."
+        },
+        {
+            "topic": "SUBUNIT",
+            "text": "Heterodimer of an alpha chain and a beta chain (beta-2-microglobulin)."
+        },
+        {
+            "topic": "SUBCELLULAR LOCATION",
+            "text": "Membrane; Single-pass type I membrane protein."
+        },
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the MHC class I family. {ECO:0000305}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            "EMBL; X60256; CAA42808.1; -; mRNA."
+        ],
+        "PIR": [
+            "PIR; JH0537; JH0537."
+        ],
+        "RefSeq": [
+            "RefSeq; NP_001266480.1; NM_001279551.1."
+        ],
+        "AlphaFoldDB": [
+            "AlphaFoldDB; P30378; -."
+        ],
+        "SMR": [
+            "SMR; P30378; -."
+        ],
+        "GeneID": [
+            "GeneID; 101141279; -."
+        ],
+        "eggNOG": [
+            "eggNOG; ENOG502RQEK; Eukaryota."
+        ],
+        "InParanoid": [
+            "InParanoid; P30378; -."
+        ],
+        "Proteomes": [
+            "Proteomes; UP000001519; Unplaced."
+        ],
+        "GO": [
+            "GO; GO:0031901; C:early endosome membrane; IEA:UniProtKB-ARBA.",
+            "GO; GO:0012507; C:ER to Golgi transport vesicle membrane; IEA:UniProtKB-ARBA.",
+            "GO; GO:0009897; C:external side of plasma membrane; IBA:GO_Central.",
+            "GO; GO:0005615; C:extracellular space; IBA:GO_Central.",
+            "GO; GO:0000139; C:Golgi membrane; IEA:UniProtKB-ARBA.",
+            "GO; GO:0098553; C:lumenal side of endoplasmic reticulum membrane; IEA:UniProtKB-ARBA.",
+            "GO; GO:0042612; C:MHC class I protein complex; IEA:UniProtKB-KW.",
+            "GO; GO:0030670; C:phagocytic vesicle membrane; IEA:UniProtKB-ARBA.",
+            "GO; GO:0055038; C:recycling endosome membrane; IEA:UniProtKB-ARBA.",
+            "GO; GO:0042605; F:peptide antigen binding; IBA:GO_Central.",
+            "GO; GO:0005102; F:signaling receptor binding; IBA:GO_Central.",
+            "GO; GO:0002486; P:antigen processing and presentation of endogenous peptide antigen via MHC class I via ER pathway, TAP-independent; IBA:GO_Central.",
+            "GO; GO:0002476; P:antigen processing and presentation of endogenous peptide antigen via MHC class Ib; IBA:GO_Central.",
+            "GO; GO:0006955; P:immune response; IBA:GO_Central.",
+            "GO; GO:0001916; P:positive regulation of T cell mediated cytotoxicity; IBA:GO_Central."
+        ],
+        "CDD": [
+            "CDD; cd21027; IgC1_MHC_Ia_HLA-A; 1."
+        ],
+        "FunFam": [
+            "FunFam; 2.60.40.10:FF:000014; H-2 class I histocompatibility antigen, alpha chain; 1.",
+            "FunFam; 3.30.500.10:FF:000001; H-2 class I histocompatibility antigen, alpha chain; 1."
+        ],
+        "Gene3D": [
+            "Gene3D; 2.60.40.10; Immunoglobulins; 1.",
+            "Gene3D; 3.30.500.10; MHC class I-like antigen recognition-like; 1."
+        ],
+        "InterPro": [
+            "InterPro; IPR007110; Ig-like_dom.",
+            "InterPro; IPR036179; Ig-like_dom_sf.",
+            "InterPro; IPR013783; Ig-like_fold.",
+            "InterPro; IPR003006; Ig/MHC_CS.",
+            "InterPro; IPR003597; Ig_C1-set.",
+            "InterPro; IPR050208; MHC_class-I_related.",
+            "InterPro; IPR011161; MHC_I-like_Ag-recog.",
+            "InterPro; IPR037055; MHC_I-like_Ag-recog_sf.",
+            "InterPro; IPR011162; MHC_I/II-like_Ag-recog.",
+            "InterPro; IPR001039; MHC_I_a_a1/a2.",
+            "InterPro; IPR010579; MHC_I_a_C."
+        ],
+        "PANTHER": [
+            "PANTHER; PTHR16675:SF229; HLA CLASS I HISTOCOMPATIBILITY ANTIGEN, A ALPHA CHAIN; 1.",
+            "PANTHER; PTHR16675; MHC CLASS I-RELATED; 1."
+        ],
+        "Pfam": [
+            "Pfam; PF07654; C1-set; 1.",
+            "Pfam; PF00129; MHC_I; 1.",
+            "Pfam; PF06623; MHC_I_C; 1."
+        ],
+        "PRINTS": [
+            "PRINTS; PR01638; MHCCLASSI."
+        ],
+        "SMART": [
+            "SMART; SM00407; IGc1; 1."
+        ],
+        "SUPFAM": [
+            "SUPFAM; SSF48726; Immunoglobulin; 1.",
+            "SUPFAM; SSF54452; MHC antigen-recognition domain; 1."
+        ],
+        "PROSITE": [
+            "PROSITE; PS50835; IG_LIKE; 1.",
+            "PROSITE; PS00290; IG_MHC; 1."
+        ]
+    },
+    "features": [
+        {
+            "type": "SIGNAL",
+            "location": "1..24",
+            "qualifiers": {
+                "evidence": "ECO:0000250"
+            }
+        },
+        {
+            "type": "CHAIN",
+            "location": "25..365",
+            "qualifiers": {
+                "note": "Class I histocompatibility antigen, Gogo-A*0501 alpha chain",
+                "id": "PRO_0000018900"
+            }
+        },
+        {
+            "type": "TOPO_DOM",
+            "location": "25..308",
+            "qualifiers": {
+                "note": "Extracellular",
+                "evidence": "ECO:0000255"
+            }
+        },
+        {
+            "type": "TRANSMEM",
+            "location": "309..332",
+            "qualifiers": {
+                "note": "Helical",
+                "evidence": "ECO:0000255"
+            }
+        },
+        {
+            "type": "TOPO_DOM",
+            "location": "333..365",
+            "qualifiers": {
+                "note": "Cytoplasmic",
+                "evidence": "ECO:0000255"
+            }
+        },
+        {
+            "type": "DOMAIN",
+            "location": "209..295",
+            "qualifiers": {
+                "note": "Ig-like C1-type"
+            }
+        },
+        {
+            "type": "REGION",
+            "location": "25..114",
+            "qualifiers": {
+                "note": "Alpha-1"
+            }
+        },
+        {
+            "type": "REGION",
+            "location": "115..206",
+            "qualifiers": {
+                "note": "Alpha-2"
+            }
+        },
+        {
+            "type": "REGION",
+            "location": "207..298",
+            "qualifiers": {
+                "note": "Alpha-3"
+            }
+        },
+        {
+            "type": "REGION",
+            "location": "299..308",
+            "qualifiers": {
+                "note": "Connecting peptide"
+            }
+        },
+        {
+            "type": "REGION",
+            "location": "338..365",
+            "qualifiers": {
+                "note": "Disordered",
+                "evidence": "ECO:0000256|SAM:MobiDB-lite"
+            }
+        },
+        {
+            "type": "COMPBIAS",
+            "location": "342..359",
+            "qualifiers": {
+                "note": "Low complexity",
+                "evidence": "ECO:0000256|SAM:MobiDB-lite"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "343",
+            "qualifiers": {
+                "note": "Phosphoserine",
+                "evidence": "ECO:0000250|UniProtKB:P10314"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "344",
+            "qualifiers": {
+                "note": "Phosphotyrosine",
+                "evidence": "ECO:0000250|UniProtKB:P10314"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "345",
+            "qualifiers": {
+                "note": "Phosphoserine",
+                "evidence": "ECO:0000250|UniProtKB:P10314"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "349",
+            "qualifiers": {
+                "note": "Phosphoserine",
+                "evidence": "ECO:0000250|UniProtKB:P10314"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "352",
+            "qualifiers": {
+                "note": "Phosphoserine",
+                "evidence": "ECO:0000250|UniProtKB:P10314"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "356",
+            "qualifiers": {
+                "note": "Phosphoserine",
+                "evidence": "ECO:0000250|UniProtKB:P10314"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "359",
+            "qualifiers": {
+                "note": "Phosphoserine",
+                "evidence": "ECO:0000250|UniProtKB:P10314"
+            }
+        },
+        {
+            "type": "CARBOHYD",
+            "location": "110",
+            "qualifiers": {
+                "note": "N-linked (GlcNAc...) asparagine",
+                "evidence": "ECO:0000250"
+            }
+        },
+        {
+            "type": "DISULFID",
+            "location": "125..188",
+            "qualifiers": {
+                "evidence": "ECO:0000255|PROSITE-ProRule:PRU00114"
+            }
+        },
+        {
+            "type": "DISULFID",
+            "location": "227..283",
+            "qualifiers": {
+                "evidence": "ECO:0000255|PROSITE-ProRule:PRU00114"
+            }
+        }
+    ],
+    "keywords": [
+        "Disulfide bond",
+        "Glycoprotein",
+        "Immunity",
+        "Membrane",
+        "MHC I",
+        "Phosphoprotein",
+        "Reference proteome",
+        "Signal",
+        "Transmembrane",
+        "Transmembrane helix"
+    ],
+    "protein_existence": "2: Evidence at transcript level",
+    "sequence_length": 365,
+    "molecular_weight": 40896,
+    "crc64": "340DAD21F9B3B8AB",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "Class I histocompatibility antigen, Gogo-A*0501 alpha chain",
+            "short": [],
+            "ec_numbers": [],
+            "evidence": []
+        },
+        "sub_name": null,
+        "alt_names": [],
+        "includes": [],
+        "contains": [],
+        "flags": [
+            "Precursor"
+        ]
+    },
+    "primary_accession": "P30378",
+    "organism": "Gorilla gorilla gorilla (Western lowland gorilla).",
+    "lineage": [
+        "Eukaryota",
+        "Metazoa",
+        "Chordata",
+        "Craniata",
+        "Vertebrata",
+        "Euteleostomi",
+        "Mammalia",
+        "Eutheria",
+        "Euarchontoglires",
+        "Primates",
+        "Haplorrhini",
+        "Catarrhini",
+        "Hominidae",
+        "Gorilla"
+    ],
+    "sequence": "MAVVAPRTLLLLLSGALALTQTWAGSHSMRYFSTSVSRPGRGEPRFIAVGYVDDTQFVRFDSDAASQRMEPRAPWMEQEEPEYWDRQTQISKTNAQIELESLRIALRYYNQSEDGSHTIQRMYGCDVGSDGRFLRGYQQDAYDGKDYIASNEDLRSWTAADMAAEITKRKWEAAHFAEQLRAYLEGTCVEWLRRYLENGKETLQRTDAPKTHTTHQAVSDHEATLKCWALSFYPAEITLTWQRDGEDQTQDTELVETRPAGDGTFQKWAAVVVPSGQEQRYTCHVQHEGLPKPLTLRWEPSSQPTIPIVGIIAGLVLFGAVIAGAVVAAVRWRRKSSDRKGGSYSQAASSDSAQGSDVSLTACKV"
+}

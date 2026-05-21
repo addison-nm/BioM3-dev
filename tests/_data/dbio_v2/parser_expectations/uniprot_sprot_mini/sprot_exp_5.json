@@ -46,38 +46,19 @@
     ],
     "cross_references": {
         "EMBL": [
-            [
-                "AY261360",
-                "-",
-                "NOT_ANNOTATED_CDS",
-                "Genomic_DNA"
-            ]
+            "EMBL; AY261360; -; NOT_ANNOTATED_CDS; Genomic_DNA."
         ],
         "Proteomes": [
-            [
-                "UP000000861",
-                "Segment"
-            ]
+            "Proteomes; UP000000861; Segment."
         ],
         "GO": [
-            [
-                "GO:0033644",
-                "C:host cell membrane",
-                "IEA:UniProtKB-SubCell"
-            ]
+            "GO; GO:0033644; C:host cell membrane; IEA:UniProtKB-SubCell."
         ],
         "InterPro": [
-            [
-                "IPR004848",
-                "ASFV_fam_110"
-            ]
+            "InterPro; IPR004848; ASFV_fam_110."
         ],
         "Pfam": [
-            [
-                "PF01639",
-                "v110",
-                "1"
-            ]
+            "Pfam; PF01639; v110; 1."
         ]
     },
     "features": [

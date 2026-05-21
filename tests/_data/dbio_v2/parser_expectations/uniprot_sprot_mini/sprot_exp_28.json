@@ -1,0 +1,257 @@
+{
+    "entry_name": "3BHS3_MESAU",
+    "status": "Reviewed",
+    "accessions": [
+        "O35296"
+    ],
+    "dates": [
+        "15-JUL-1998, integrated into UniProtKB/Swiss-Prot.",
+        "23-JAN-2007, sequence version 3.",
+        "28-JAN-2026, entry version 117."
+    ],
+    "gene_names": [
+        "Name=HSD3B3"
+    ],
+    "organelle": [],
+    "taxon_id": 10036,
+    "hosts": [],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [MRNA], FUNCTION, CATALYTIC ACTIVITY, TISSUE SPECIFICITY, AND PATHWAY.",
+            "RC": "TISSUE=Liver",
+            "RX": "PubMed=8547173; DOI=10.1016/0960-0760(95)00197-2",
+            "RA": "Rogerson F.M., Lehoux J.-G., Mason J.I.",
+            "RT": "\"Expression and characterization of isoforms of 3 beta-hydroxysteroid dehydrogenase/delta 5-->4-isomerase in the hamster.\"",
+            "RL": "J. Steroid Biochem. Mol. Biol. 55:481-487(1995)."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "Responsible for the reduction of the oxo group on the C-3 of 5alpha-androstane steroids. Catalyzes the conversion of dihydrotestosterone to its inactive form 5alpha-androstanediol, that does not bind androgen receptor/AR. Does not function as an isomerase. {ECO:0000269|PubMed:8547173}."
+        },
+        {
+            "topic": "CATALYTIC ACTIVITY",
+            "text": "Reaction=a 3beta-hydroxysteroid + NADP(+) = a 3-oxosteroid + NADPH + H(+); Xref=Rhea:RHEA:34787, ChEBI:CHEBI:15378, ChEBI:CHEBI:36836, ChEBI:CHEBI:47788, ChEBI:CHEBI:57783, ChEBI:CHEBI:58349; EC=1.1.1.270; Evidence={ECO:0000269|PubMed:8547173};"
+        },
+        {
+            "topic": "CATALYTIC ACTIVITY",
+            "text": "Reaction=5alpha-androstane-3beta,17beta-diol + NADP(+) = 17beta-hydroxy-5alpha-androstan-3-one + NADPH + H(+); Xref=Rhea:RHEA:16297, ChEBI:CHEBI:15378, ChEBI:CHEBI:16330, ChEBI:CHEBI:18329, ChEBI:CHEBI:57783, ChEBI:CHEBI:58349; EC=1.1.1.210; Evidence={ECO:0000269|PubMed:8547173};"
+        },
+        {
+            "topic": "PATHWAY",
+            "text": "Steroid metabolism. {ECO:0000269|PubMed:8547173}."
+        },
+        {
+            "topic": "SUBCELLULAR LOCATION",
+            "text": "Endoplasmic reticulum membrane; Single-pass membrane protein. Mitochondrion membrane; Single-pass membrane protein."
+        },
+        {
+            "topic": "TISSUE SPECIFICITY",
+            "text": "High levels in adrenal gland, kidney and male liver (at protein level). Low levels in female liver (at protein level). Expressed in ovaries (at protein level). {ECO:0000269|PubMed:8547173}."
+        },
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the 3-beta-HSD family. {ECO:0000305}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            "EMBL; AF017636; AAB70302.1; -; mRNA."
+        ],
+        "RefSeq": [
+            "RefSeq; NP_001268326.1; NM_001281397.1."
+        ],
+        "AlphaFoldDB": [
+            "AlphaFoldDB; O35296; -."
+        ],
+        "SMR": [
+            "SMR; O35296; -."
+        ],
+        "STRING": [
+            "STRING; 10036.ENSMAUP00000013541; -."
+        ],
+        "GeneID": [
+            "GeneID; 101837099; -."
+        ],
+        "KEGG": [
+            "KEGG; maua:101837099; -."
+        ],
+        "eggNOG": [
+            "eggNOG; KOG1430; Eukaryota."
+        ],
+        "OrthoDB": [
+            "OrthoDB; 1925334at2759; -."
+        ],
+        "Proteomes": [
+            "Proteomes; UP000886700; Unplaced."
+        ],
+        "GO": [
+            "GO; GO:0005789; C:endoplasmic reticulum membrane; IEA:UniProtKB-SubCell.",
+            "GO; GO:0031966; C:mitochondrial membrane; IEA:UniProtKB-SubCell.",
+            "GO; GO:0000253; F:3-beta-hydroxysteroid 3-dehydrogenase (NADP+) activity; IEA:UniProtKB-EC.",
+            "GO; GO:0047024; F:5-alpha-androstane-3-beta,17-beta-diol dehydrogenase (NADP+) activity; IEA:UniProtKB-EC.",
+            "GO; GO:0006694; P:steroid biosynthetic process; IEA:InterPro."
+        ],
+        "FunFam": [
+            "FunFam; 3.40.50.720:FF:000220; 3 beta-hydroxysteroid dehydrogenase/Delta 5-->4-isomerase type 1; 1."
+        ],
+        "Gene3D": [
+            "Gene3D; 3.40.50.720; NAD(P)-binding Rossmann-like Domain; 1."
+        ],
+        "InterPro": [
+            "InterPro; IPR002225; 3Beta_OHSteriod_DH/Estase.",
+            "InterPro; IPR050177; Lipid_A_modif_metabolic_enz.",
+            "InterPro; IPR036291; NAD(P)-bd_dom_sf."
+        ],
+        "PANTHER": [
+            "PANTHER; PTHR43245; BIFUNCTIONAL POLYMYXIN RESISTANCE PROTEIN ARNA; 1.",
+            "PANTHER; PTHR43245:SF51; SHORT CHAIN DEHYDROGENASE_REDUCTASE FAMILY 42E, MEMBER 2; 1."
+        ],
+        "Pfam": [
+            "Pfam; PF01073; 3Beta_HSD; 1."
+        ],
+        "SUPFAM": [
+            "SUPFAM; SSF51735; NAD(P)-binding Rossmann-fold domains; 1."
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..373",
+            "qualifiers": {
+                "note": "NADPH-dependent 3-keto-steroid reductase HSD3B3",
+                "id": "PRO_0000087779"
+            }
+        },
+        {
+            "type": "TRANSMEM",
+            "location": "288..308",
+            "qualifiers": {
+                "note": "Helical",
+                "evidence": "ECO:0000255"
+            }
+        },
+        {
+            "type": "ACT_SITE",
+            "location": "159",
+            "qualifiers": {
+                "note": "Proton donor",
+                "evidence": "ECO:0000250|UniProtKB:Q12068"
+            }
+        },
+        {
+            "type": "BINDING",
+            "location": "10..15",
+            "qualifiers": {
+                "ligand": "NADP(+)",
+                "ligand_id": "ChEBI:CHEBI:58349",
+                "evidence": "ECO:0000250|UniProtKB:Q12068"
+            }
+        },
+        {
+            "type": "BINDING",
+            "location": "155",
+            "qualifiers": {
+                "ligand": "NADP(+)",
+                "ligand_id": "ChEBI:CHEBI:58349",
+                "evidence": "ECO:0000250|UniProtKB:Q12068"
+            }
+        },
+        {
+            "type": "BINDING",
+            "location": "159",
+            "qualifiers": {
+                "ligand": "NADP(+)",
+                "ligand_id": "ChEBI:CHEBI:58349",
+                "evidence": "ECO:0000250|UniProtKB:Q12068"
+            }
+        }
+    ],
+    "keywords": [
+        "Endoplasmic reticulum",
+        "Lipid metabolism",
+        "Membrane",
+        "Mitochondrion",
+        "NADP",
+        "Oxidoreductase",
+        "Reference proteome",
+        "Steroid metabolism",
+        "Transmembrane",
+        "Transmembrane helix"
+    ],
+    "protein_existence": "1: Evidence at protein level",
+    "sequence_length": 373,
+    "molecular_weight": 41806,
+    "crc64": "B588DDC2D3F15DF1",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "NADPH-dependent 3-keto-steroid reductase HSD3B3",
+            "short": [],
+            "ec_numbers": [],
+            "evidence": [
+                "ECO:0000305|PubMed:8547173"
+            ]
+        },
+        "sub_name": null,
+        "alt_names": [
+            {
+                "full": "3 beta-hydroxysteroid dehydrogenase type 3",
+                "short": [],
+                "ec_numbers": [],
+                "evidence": [
+                    "ECO:0000303|PubMed:8547173"
+                ]
+            },
+            {
+                "full": "3 beta-hydroxysteroid dehydrogenase type III",
+                "short": [
+                    "3 beta-HSD III"
+                ],
+                "ec_numbers": [
+                    "1.1.1.270"
+                ],
+                "evidence": [
+                    "ECO:0000269|PubMed:8547173"
+                ]
+            },
+            {
+                "full": "Dihydrotestosterone 3-ketoreductase",
+                "short": [],
+                "ec_numbers": [
+                    "1.1.1.210"
+                ],
+                "evidence": [
+                    "ECO:0000305|PubMed:8547173",
+                    "ECO:0000269|PubMed:8547173"
+                ]
+            }
+        ],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "O35296",
+    "organism": "Mesocricetus auratus (Golden hamster).",
+    "lineage": [
+        "Eukaryota",
+        "Metazoa",
+        "Chordata",
+        "Craniata",
+        "Vertebrata",
+        "Euteleostomi",
+        "Mammalia",
+        "Eutheria",
+        "Euarchontoglires",
+        "Glires",
+        "Rodentia",
+        "Myomorpha",
+        "Muroidea",
+        "Cricetidae",
+        "Cricetinae",
+        "Mesocricetus"
+    ],
+    "sequence": "MPAWSCLVTGAGGFLGQRIIRMLAQEKELQEVRTLFRSFTPKHREELSKLQTKTKVTVLEGDILDAQCLRRACQGISVVIHTAAAIDVFGAIPRQTVIDINLKGTQHLLDACIGARVPVFIYSSSVAVAGPNSYKVIIQNGSEEENHESTWSDPYAYSKKMAEKAVLAANGSTLKDGGTLHTCALRLPFIYGEKSKFISDTMDRALKNNGLINGFSRFSVISSVYVNNAAWAHVLAARGLQDPKKSPNIQGQFYYISDDTPHQSYDDLCYTLSKDWGLRPDSSWKPPVALLYWFGFLLETVSFLLRPVYNYQPPFNRHLVTLLNSVFTFSYKKAQRDLGYEPLVSWEEAREKTSEWIGSLVEQHKGTLNIKAQ"
+}

@@ -38,56 +38,28 @@
     ],
     "cross_references": {
         "EMBL": [
-            [
-                "AY548484",
-                "AAT09660.1",
-                "-",
-                "Genomic_DNA"
-            ]
+            "EMBL; AY548484; AAT09660.1; -; Genomic_DNA."
         ],
         "RefSeq": [
-            [
-                "YP_031579.1",
-                "NC_005946.1"
-            ]
+            "RefSeq; YP_031579.1; NC_005946.1."
         ],
         "SwissPalm": [
-            [
-                "Q6GZX4",
-                "-"
-            ]
+            "SwissPalm; Q6GZX4; -."
         ],
         "KEGG": [
-            [
-                "vg:2947773",
-                "-"
-            ]
+            "KEGG; vg:2947773; -."
         ],
         "Proteomes": [
-            [
-                "UP000008770",
-                "Segment"
-            ]
+            "Proteomes; UP000008770; Segment."
         ],
         "GO": [
-            [
-                "GO:0046782",
-                "P:regulation of viral transcription",
-                "IEA:InterPro"
-            ]
+            "GO; GO:0046782; P:regulation of viral transcription; IEA:InterPro."
         ],
         "InterPro": [
-            [
-                "IPR007031",
-                "Poxvirus_VLTF3"
-            ]
+            "InterPro; IPR007031; Poxvirus_VLTF3."
         ],
         "Pfam": [
-            [
-                "PF04947",
-                "Pox_VLTF3",
-                "1"
-            ]
+            "Pfam; PF04947; Pox_VLTF3; 1."
         ]
     },
     "features": [

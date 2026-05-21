@@ -1,0 +1,287 @@
+{
+    "entry_name": "1433T_RABIT",
+    "status": "Reviewed",
+    "accessions": [
+        "Q6Q6X0"
+    ],
+    "dates": [
+        "13-SEP-2004, integrated into UniProtKB/Swiss-Prot.",
+        "05-JUL-2004, sequence version 1.",
+        "28-JAN-2026, entry version 110."
+    ],
+    "gene_names": [
+        "Name=YWHAQ"
+    ],
+    "organelle": [],
+    "taxon_id": 9986,
+    "hosts": [],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [MRNA].",
+            "RA": "Qian Z., Barmack N.H.",
+            "RL": "Submitted (FEB-2004) to the EMBL/GenBank/DDBJ databases."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "Adapter protein implicated in the regulation of a large spectrum of both general and specialized signaling pathways. Binds to a large number of partners, usually by recognition of a phosphoserine or phosphothreonine motif. Binding generally results in the modulation of the activity of the binding partner. Negatively regulates the kinase activity of PDPK1 (By similarity). {ECO:0000250}."
+        },
+        {
+            "topic": "SUBUNIT",
+            "text": "Homodimer. Interacts with CDK16 (By similarity). Interacts with RGS7 (phosphorylated form). Interacts with SSH1. Interacts with CDKN1B ('Thr-198' phosphorylated form); the interaction translocates CDKN1B to the cytoplasm. Interacts with GAB2. Interacts with the 'Ser-241' phosphorylated form of PDPK1. Interacts with the 'Thr-369' phosphorylated form of DAPK2 (By similarity). Interacts with PI4KB, TBC1D22A and TBC1D22B (By similarity). Interacts with SLITRK1 (By similarity). Interacts with RIPOR2 (By similarity). Interacts with INAVA; the interaction increases upon PRR (pattern recognition receptor) stimulation and is required for cellular signaling pathway activation and cytokine secretion (By similarity). Interacts with MARK2, MARK3 and MARK4 (By similarity). Interacts with MEFV (By similarity). {ECO:0000250|UniProtKB:P27348, ECO:0000250|UniProtKB:P68254}."
+        },
+        {
+            "topic": "SUBCELLULAR LOCATION",
+            "text": "Cytoplasm {ECO:0000250}."
+        },
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the 14-3-3 family. {ECO:0000305}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            "EMBL; AY555574; AAS72303.1; -; mRNA."
+        ],
+        "RefSeq": [
+            "RefSeq; NP_001075637.2; NM_001082168.2."
+        ],
+        "AlphaFoldDB": [
+            "AlphaFoldDB; Q6Q6X0; -."
+        ],
+        "SMR": [
+            "SMR; Q6Q6X0; -."
+        ],
+        "FunCoup": [
+            "FunCoup; Q6Q6X0; 1315."
+        ],
+        "STRING": [
+            "STRING; 9986.ENSOCUP00000009032; -."
+        ],
+        "PaxDb": [
+            "PaxDb; 9986-ENSOCUP00000009032; -."
+        ],
+        "GeneID": [
+            "GeneID; 100008930; -."
+        ],
+        "KEGG": [
+            "KEGG; ocu:100008930; -."
+        ],
+        "CTD": [
+            "CTD; 10971; -."
+        ],
+        "eggNOG": [
+            "eggNOG; KOG0841; Eukaryota."
+        ],
+        "InParanoid": [
+            "InParanoid; Q6Q6X0; -."
+        ],
+        "OrthoDB": [
+            "OrthoDB; 10260625at2759; -."
+        ],
+        "Proteomes": [
+            "Proteomes; UP000001811; Unplaced."
+        ],
+        "GO": [
+            "GO; GO:0005737; C:cytoplasm; IEA:UniProtKB-SubCell."
+        ],
+        "CDD": [
+            "CDD; cd10023; 14-3-3_theta; 1."
+        ],
+        "FunFam": [
+            "FunFam; 1.20.190.20:FF:000001; 14-3-3 gamma 1; 1."
+        ],
+        "Gene3D": [
+            "Gene3D; 1.20.190.20; 14-3-3 domain; 1."
+        ],
+        "InterPro": [
+            "InterPro; IPR000308; 14-3-3.",
+            "InterPro; IPR023409; 14-3-3_CS.",
+            "InterPro; IPR036815; 14-3-3_dom_sf.",
+            "InterPro; IPR023410; 14-3-3_domain.",
+            "InterPro; IPR042584; 14-3-3_theta."
+        ],
+        "PANTHER": [
+            "PANTHER; PTHR18860; 14-3-3 PROTEIN; 1."
+        ],
+        "Pfam": [
+            "Pfam; PF00244; 14-3-3; 1."
+        ],
+        "PIRSF": [
+            "PIRSF; PIRSF000868; 14-3-3; 1."
+        ],
+        "PRINTS": [
+            "PRINTS; PR00305; 1433ZETA."
+        ],
+        "SMART": [
+            "SMART; SM00101; 14_3_3; 1."
+        ],
+        "SUPFAM": [
+            "SUPFAM; SSF48445; 14-3-3 protein; 1."
+        ],
+        "PROSITE": [
+            "PROSITE; PS00796; 1433_1; 1.",
+            "PROSITE; PS00797; 1433_2; 1."
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..245",
+            "qualifiers": {
+                "note": "14-3-3 protein theta",
+                "id": "PRO_0000058639"
+            }
+        },
+        {
+            "type": "SITE",
+            "location": "56",
+            "qualifiers": {
+                "note": "Interaction with phosphoserine on interacting protein",
+                "evidence": "ECO:0000250"
+            }
+        },
+        {
+            "type": "SITE",
+            "location": "127",
+            "qualifiers": {
+                "note": "Interaction with phosphoserine on interacting protein",
+                "evidence": "ECO:0000250"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "1",
+            "qualifiers": {
+                "note": "N-acetylmethionine",
+                "evidence": "ECO:0000250|UniProtKB:P27348"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "3",
+            "qualifiers": {
+                "note": "N6-acetyllysine",
+                "evidence": "ECO:0000250|UniProtKB:P27348"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "49",
+            "qualifiers": {
+                "note": "N6-acetyllysine; alternate",
+                "evidence": "ECO:0000250|UniProtKB:P27348"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "68",
+            "qualifiers": {
+                "note": "N6-acetyllysine",
+                "evidence": "ECO:0000250|UniProtKB:P27348"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "82",
+            "qualifiers": {
+                "note": "3'-nitrotyrosine",
+                "evidence": "ECO:0000250|UniProtKB:Q9CQV8"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "92",
+            "qualifiers": {
+                "note": "Phosphoserine",
+                "evidence": "ECO:0000250|UniProtKB:P68254"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "104",
+            "qualifiers": {
+                "note": "3'-nitrotyrosine",
+                "evidence": "ECO:0000250|UniProtKB:Q9CQV8"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "115",
+            "qualifiers": {
+                "note": "N6-acetyllysine",
+                "evidence": "ECO:0000250|UniProtKB:P27348"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "232",
+            "qualifiers": {
+                "note": "Phosphoserine; by CK1",
+                "evidence": "ECO:0000250|UniProtKB:P27348, ECO:0000305"
+            }
+        },
+        {
+            "type": "CROSSLNK",
+            "location": "49",
+            "qualifiers": {
+                "note": "Glycyl lysine isopeptide (Lys-Gly) (interchain with G-Cter in SUMO2); alternate",
+                "evidence": "ECO:0000250|UniProtKB:P27348"
+            }
+        }
+    ],
+    "keywords": [
+        "Acetylation",
+        "Cytoplasm",
+        "Isopeptide bond",
+        "Nitration",
+        "Phosphoprotein",
+        "Reference proteome",
+        "Ubl conjugation"
+    ],
+    "protein_existence": "2: Evidence at transcript level",
+    "sequence_length": 245,
+    "molecular_weight": 27778,
+    "crc64": "E30471260E8B366E",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "14-3-3 protein theta",
+            "short": [],
+            "ec_numbers": [],
+            "evidence": []
+        },
+        "sub_name": null,
+        "alt_names": [
+            {
+                "full": "14-3-3 protein tau",
+                "short": [],
+                "ec_numbers": [],
+                "evidence": []
+            }
+        ],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "Q6Q6X0",
+    "organism": "Oryctolagus cuniculus (Rabbit).",
+    "lineage": [
+        "Eukaryota",
+        "Metazoa",
+        "Chordata",
+        "Craniata",
+        "Vertebrata",
+        "Euteleostomi",
+        "Mammalia",
+        "Eutheria",
+        "Euarchontoglires",
+        "Glires",
+        "Lagomorpha",
+        "Leporidae",
+        "Oryctolagus"
+    ],
+    "sequence": "MEKTELIQKAKLAEQAERYDDMATCMKAVTEQGAELSNEERNLLSVAYKNVVGGRRSAWRVISSIEQKTDTSDKKLQLIKDYREKVESELRSICTTVLELLDKYLIANATNPESKVFYLKMKGDYFRYLAEVACGDDRKQTIENSQGAYQEAFDISKKEMQPTHPIRLGLALNFSVFYYEILNNPELACTLAKTAFDEAIAELDTLNEDSYKDSTLIMQLLRDNLTLWTSDSAGEECDAAEGAEN"
+}

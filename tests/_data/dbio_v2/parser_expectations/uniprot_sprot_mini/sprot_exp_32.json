@@ -1,0 +1,305 @@
+{
+    "entry_name": "3HAO_XANE5",
+    "status": "Reviewed",
+    "accessions": [
+        "Q3BV37"
+    ],
+    "dates": [
+        "11-JUL-2006, integrated into UniProtKB/Swiss-Prot.",
+        "22-NOV-2005, sequence version 1.",
+        "28-JAN-2026, entry version 107."
+    ],
+    "gene_names": [
+        "Name=nbaC {ECO:0000255|HAMAP-Rule:MF_00825}",
+        "OrderedLocusNames=XCV1645"
+    ],
+    "organelle": [],
+    "taxon_id": 316273,
+    "hosts": [],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [LARGE SCALE GENOMIC DNA].",
+            "RC": "STRAIN=85-10",
+            "RX": "PubMed=16237009; DOI=10.1128/jb.187.21.7254-7266.2005",
+            "RA": "Thieme F., Koebnik R., Bekel T., Berger C., Boch J., Buettner D., Caldana C., Gaigalat L., Goesmann A., Kay S., Kirchner O., Lanz C., Linke B., McHardy A.C., Meyer F., Mittenhuber G., Nies D.H., Niesbach-Kloesgen U., Patschkowski T., Rueckert C., Rupp O., Schneiker S., Schuster S.C., Vorhoelter F.J., Weber E., Puehler A., Bonas U., Bartels D., Kaiser O.",
+            "RT": "\"Insights into genome plasticity and pathogenicity of the plant pathogenic Bacterium Xanthomonas campestris pv. vesicatoria revealed by the complete genome sequence.\"",
+            "RL": "J. Bacteriol. 187:7254-7266(2005)."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "Catalyzes the oxidative ring opening of 3-hydroxyanthranilate to 2-amino-3-carboxymuconate semialdehyde, which spontaneously cyclizes to quinolinate. {ECO:0000255|HAMAP-Rule:MF_00825}."
+        },
+        {
+            "topic": "CATALYTIC ACTIVITY",
+            "text": "Reaction=3-hydroxyanthranilate + O2 = (2Z,4Z)-2-amino-3-carboxymuconate 6-semialdehyde; Xref=Rhea:RHEA:17953, ChEBI:CHEBI:15379, ChEBI:CHEBI:36559, ChEBI:CHEBI:77612; EC=1.13.11.6; Evidence={ECO:0000255|HAMAP-Rule:MF_00825};"
+        },
+        {
+            "topic": "COFACTOR",
+            "text": "Name=Fe(2+); Xref=ChEBI:CHEBI:29033; Evidence={ECO:0000255|HAMAP-Rule:MF_00825}; Note=Binds 2 Fe(2+) ions per subunit. {ECO:0000255|HAMAP-Rule:MF_00825};"
+        },
+        {
+            "topic": "PATHWAY",
+            "text": "Cofactor biosynthesis; NAD(+) biosynthesis; quinolinate from L-kynurenine: step 3/3. {ECO:0000255|HAMAP-Rule:MF_00825}."
+        },
+        {
+            "topic": "SUBUNIT",
+            "text": "Homodimer. {ECO:0000255|HAMAP-Rule:MF_00825}."
+        },
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the 3-HAO family. {ECO:0000255|HAMAP-Rule:MF_00825}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            "EMBL; AM039952; CAJ23322.1; -; Genomic_DNA."
+        ],
+        "RefSeq": [
+            "RefSeq; WP_008576309.1; NC_007508.1."
+        ],
+        "AlphaFoldDB": [
+            "AlphaFoldDB; Q3BV37; -."
+        ],
+        "SMR": [
+            "SMR; Q3BV37; -."
+        ],
+        "STRING": [
+            "STRING; 456327.BJD11_14365; -."
+        ],
+        "GeneID": [
+            "GeneID; 61778506; -."
+        ],
+        "KEGG": [
+            "KEGG; xcv:XCV1645; -."
+        ],
+        "eggNOG": [
+            "eggNOG; COG0662; Bacteria."
+        ],
+        "HOGENOM": [
+            "HOGENOM; CLU_095765_0_0_6; -."
+        ],
+        "UniPathway": [
+            "UniPathway; UPA00253; UER00330."
+        ],
+        "Proteomes": [
+            "Proteomes; UP000007069; Chromosome."
+        ],
+        "GO": [
+            "GO; GO:0000334; F:3-hydroxyanthranilate 3,4-dioxygenase activity; IEA:UniProtKB-UniRule.",
+            "GO; GO:0008198; F:ferrous iron binding; IEA:UniProtKB-UniRule.",
+            "GO; GO:0043420; P:anthranilate metabolic process; IEA:UniProtKB-UniRule.",
+            "GO; GO:0006569; P:L-tryptophan catabolic process; IEA:UniProtKB-UniRule.",
+            "GO; GO:0009435; P:NAD+ biosynthetic process; IEA:UniProtKB-UniPathway.",
+            "GO; GO:0019805; P:quinolinate biosynthetic process; IEA:UniProtKB-UniRule."
+        ],
+        "CDD": [
+            "CDD; cd06123; cupin_HAO; 1."
+        ],
+        "Gene3D": [
+            "Gene3D; 2.60.120.10; Jelly Rolls; 1."
+        ],
+        "HAMAP": [
+            "HAMAP; MF_00825; 3_HAO; 1."
+        ],
+        "InterPro": [
+            "InterPro; IPR010329; 3hydroanth_dOase.",
+            "InterPro; IPR014710; RmlC-like_jellyroll.",
+            "InterPro; IPR011051; RmlC_Cupin_sf."
+        ],
+        "NCBIfam": [
+            "NCBIfam; TIGR03037; anthran_nbaC; 1.",
+            "NCBIfam; NF009763; PRK13264.1; 1."
+        ],
+        "PANTHER": [
+            "PANTHER; PTHR15497; 3-HYDROXYANTHRANILATE 3,4-DIOXYGENASE; 1.",
+            "PANTHER; PTHR15497:SF1; 3-HYDROXYANTHRANILATE 3,4-DIOXYGENASE; 1."
+        ],
+        "Pfam": [
+            "Pfam; PF06052; 3-HAO; 1."
+        ],
+        "SUPFAM": [
+            "SUPFAM; SSF51182; RmlC-like cupins; 1."
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..176",
+            "qualifiers": {
+                "note": "3-hydroxyanthranilate 3,4-dioxygenase",
+                "id": "PRO_0000245480"
+            }
+        },
+        {
+            "type": "BINDING",
+            "location": "44",
+            "qualifiers": {
+                "ligand": "O2",
+                "ligand_id": "ChEBI:CHEBI:15379",
+                "evidence": "ECO:0000255|HAMAP-Rule:MF_00825"
+            }
+        },
+        {
+            "type": "BINDING",
+            "location": "48",
+            "qualifiers": {
+                "ligand": "Fe cation",
+                "ligand_id": "ChEBI:CHEBI:24875",
+                "ligand_label": "1",
+                "ligand_note": "catalytic",
+                "evidence": "ECO:0000255|HAMAP-Rule:MF_00825"
+            }
+        },
+        {
+            "type": "BINDING",
+            "location": "54",
+            "qualifiers": {
+                "ligand": "Fe cation",
+                "ligand_id": "ChEBI:CHEBI:24875",
+                "ligand_label": "1",
+                "ligand_note": "catalytic",
+                "evidence": "ECO:0000255|HAMAP-Rule:MF_00825"
+            }
+        },
+        {
+            "type": "BINDING",
+            "location": "54",
+            "qualifiers": {
+                "ligand": "substrate",
+                "evidence": "ECO:0000255|HAMAP-Rule:MF_00825"
+            }
+        },
+        {
+            "type": "BINDING",
+            "location": "92",
+            "qualifiers": {
+                "ligand": "Fe cation",
+                "ligand_id": "ChEBI:CHEBI:24875",
+                "ligand_label": "1",
+                "ligand_note": "catalytic",
+                "evidence": "ECO:0000255|HAMAP-Rule:MF_00825"
+            }
+        },
+        {
+            "type": "BINDING",
+            "location": "96",
+            "qualifiers": {
+                "ligand": "substrate",
+                "evidence": "ECO:0000255|HAMAP-Rule:MF_00825"
+            }
+        },
+        {
+            "type": "BINDING",
+            "location": "106",
+            "qualifiers": {
+                "ligand": "substrate",
+                "evidence": "ECO:0000255|HAMAP-Rule:MF_00825"
+            }
+        },
+        {
+            "type": "BINDING",
+            "location": "121",
+            "qualifiers": {
+                "ligand": "Fe cation",
+                "ligand_id": "ChEBI:CHEBI:24875",
+                "ligand_label": "2",
+                "evidence": "ECO:0000255|HAMAP-Rule:MF_00825"
+            }
+        },
+        {
+            "type": "BINDING",
+            "location": "124",
+            "qualifiers": {
+                "ligand": "Fe cation",
+                "ligand_id": "ChEBI:CHEBI:24875",
+                "ligand_label": "2",
+                "evidence": "ECO:0000255|HAMAP-Rule:MF_00825"
+            }
+        },
+        {
+            "type": "BINDING",
+            "location": "158",
+            "qualifiers": {
+                "ligand": "Fe cation",
+                "ligand_id": "ChEBI:CHEBI:24875",
+                "ligand_label": "2",
+                "evidence": "ECO:0000255|HAMAP-Rule:MF_00825"
+            }
+        },
+        {
+            "type": "BINDING",
+            "location": "161",
+            "qualifiers": {
+                "ligand": "Fe cation",
+                "ligand_id": "ChEBI:CHEBI:24875",
+                "ligand_label": "2",
+                "evidence": "ECO:0000255|HAMAP-Rule:MF_00825"
+            }
+        }
+    ],
+    "keywords": [
+        "Dioxygenase",
+        "Iron",
+        "Metal-binding",
+        "Oxidoreductase",
+        "Pyridine nucleotide biosynthesis"
+    ],
+    "protein_existence": "3: Inferred from homology",
+    "sequence_length": 176,
+    "molecular_weight": 20210,
+    "crc64": "F9638C9EA4618289",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "3-hydroxyanthranilate 3,4-dioxygenase",
+            "short": [],
+            "ec_numbers": [
+                "1.13.11.6"
+            ],
+            "evidence": [
+                "ECO:0000255|HAMAP-Rule:MF_00825"
+            ]
+        },
+        "sub_name": null,
+        "alt_names": [
+            {
+                "full": "3-hydroxyanthranilate oxygenase",
+                "short": [
+                    "3-HAO"
+                ],
+                "ec_numbers": [],
+                "evidence": [
+                    "ECO:0000255|HAMAP-Rule:MF_00825"
+                ]
+            },
+            {
+                "full": "3-hydroxyanthranilic acid dioxygenase",
+                "short": [
+                    "HAD"
+                ],
+                "ec_numbers": [],
+                "evidence": [
+                    "ECO:0000255|HAMAP-Rule:MF_00825"
+                ]
+            }
+        ],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "Q3BV37",
+    "organism": "Xanthomonas euvesicatoria pv. vesicatoria (strain 85-10) (Xanthomonas campestris pv. vesicatoria).",
+    "lineage": [
+        "Bacteria",
+        "Pseudomonadati",
+        "Pseudomonadota",
+        "Gammaproteobacteria",
+        "Lysobacterales",
+        "Lysobacteraceae",
+        "Xanthomonas"
+    ],
+    "sequence": "MLIPPINLHAWIEEHRHLLKPPVGNKCIQQDGFIIMVVGGPNARTDYHYDEGPEWFFQLEGEMVLKVQDEGVARDIPIRAGEVFLLPPKVPHSPQRAAGSIGLVIERERLPNEQDGLQWYCPQCNHKLYEAMFPLKNIETDFPPVFDRFYRSLALRTCSQCGHLHPAPERYATVED"
+}

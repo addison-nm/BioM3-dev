@@ -1,0 +1,249 @@
+{
+    "entry_name": "1A_CMVY",
+    "status": "Reviewed",
+    "accessions": [
+        "Q83264"
+    ],
+    "dates": [
+        "15-DEC-1998, integrated into UniProtKB/Swiss-Prot.",
+        "01-NOV-1996, sequence version 1.",
+        "28-JAN-2026, entry version 73."
+    ],
+    "gene_names": [
+        "ORFNames=ORF1a"
+    ],
+    "organelle": [],
+    "taxon_id": 12312,
+    "hosts": [
+        "NCBI_TaxID=3659; Cucumis sativus (Cucumber).",
+        "NCBI_TaxID=4097; Nicotiana tabacum (Common tobacco).",
+        "NCBI_TaxID=4081; Solanum lycopersicum (Tomato) (Lycopersicon esculentum)."
+    ],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [GENOMIC RNA].",
+            "RA": "Kataoka J., Masuta C., Takanami Y.",
+            "RT": "\"Complete nucleotide sequence of RNA1 of cucumber mosaic virus Y strain and evolutionary relationships among genome RNAs of the virus strains.\"",
+            "RL": "Nihon Shokubutsu Byori Gakkaiho 56:501-507(1990)."
+        },
+        {
+            "RN": "[2]",
+            "RP": "INTERACTION WITH ARABIDOPSIS TIP1-1; TIP1-2; TIP1-3; TIP2-1; TIP2-2 AND TIP2-3.",
+            "RC": "STRAIN=Isolate Kor",
+            "RX": "PubMed=17030879; DOI=10.1099/vir.0.82252-0",
+            "RA": "Kim M.J., Kim H.R., Paek K.-H.",
+            "RT": "\"Arabidopsis tonoplast proteins TIP1 and TIP2 interact with the cucumber mosaic virus 1a replication protein.\"",
+            "RL": "J. Gen. Virol. 87:3425-3431(2006)."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "Involved in the virus replication. Contains a helicase domain and a methyltransferase domain. The methyltransferase domain is probably involved in viral RNA capping. Involved in the formation of ER membrane spherular invaginations in which RNA replication complexes form (By similarity). {ECO:0000250}."
+        },
+        {
+            "topic": "SUBUNIT",
+            "text": "Interacts with RNA-directed RNA polymerase 2a (By similarity). Interacts with Arabidopsis TIP1-1, TIP1-2, TIP1-3, TIP2-1, TIP2-2 and TIP2-3. {ECO:0000250, ECO:0000269|PubMed:17030879}."
+        },
+        {
+            "topic": "SUBCELLULAR LOCATION",
+            "text": "Host endoplasmic reticulum membrane {ECO:0000250}; Peripheral membrane protein {ECO:0000250}."
+        },
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the bromoviridae replication protein 1a family. {ECO:0000305}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            "EMBL; D12537; BAA02105.1; -; Genomic_RNA."
+        ],
+        "PIR": [
+            "PIR; JQ2169; JQ2169."
+        ],
+        "SMR": [
+            "SMR; Q83264; -."
+        ],
+        "GO": [
+            "GO; GO:0044167; C:host cell endoplasmic reticulum membrane; IEA:UniProtKB-SubCell.",
+            "GO; GO:0005524; F:ATP binding; IEA:UniProtKB-KW.",
+            "GO; GO:0004386; F:helicase activity; IEA:UniProtKB-KW.",
+            "GO; GO:0016817; F:hydrolase activity, acting on acid anhydrides; IEA:InterPro.",
+            "GO; GO:0008174; F:mRNA methyltransferase activity; IEA:InterPro.",
+            "GO; GO:0003723; F:RNA binding; IEA:InterPro.",
+            "GO; GO:0032259; P:methylation; IEA:UniProtKB-KW.",
+            "GO; GO:0016556; P:mRNA modification; IEA:InterPro.",
+            "GO; GO:0006396; P:RNA processing; IEA:InterPro."
+        ],
+        "Gene3D": [
+            "Gene3D; 3.40.50.300; P-loop containing nucleotide triphosphate hydrolases; 2."
+        ],
+        "InterPro": [
+            "InterPro; IPR027351; (+)RNA_virus_helicase_core_dom.",
+            "InterPro; IPR021002; 1a_necrotic_phenotyp-det_dom.",
+            "InterPro; IPR002588; Alphavirus-like_MT_dom.",
+            "InterPro; IPR022184; CMV_1a_C.",
+            "InterPro; IPR027417; P-loop_NTPase."
+        ],
+        "Pfam": [
+            "Pfam; PF12467; CMV_1a; 1.",
+            "Pfam; PF12503; CMV_1a_C; 1.",
+            "Pfam; PF01443; Viral_helicase1; 1.",
+            "Pfam; PF01660; Vmethyltransf; 1."
+        ],
+        "SUPFAM": [
+            "SUPFAM; SSF52540; P-loop containing nucleoside triphosphate hydrolases; 1."
+        ],
+        "PROSITE": [
+            "PROSITE; PS51743; ALPHAVIRUS_MT; 1.",
+            "PROSITE; PS51657; PSRV_HELICASE; 1."
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..993",
+            "qualifiers": {
+                "note": "Replication protein 1a",
+                "id": "PRO_0000083264"
+            }
+        },
+        {
+            "type": "DOMAIN",
+            "location": "72..290",
+            "qualifiers": {
+                "note": "Alphavirus-like MT",
+                "evidence": "ECO:0000255|PROSITE-ProRule:PRU01079"
+            }
+        },
+        {
+            "type": "DOMAIN",
+            "location": "683..839",
+            "qualifiers": {
+                "note": "(+)RNA virus helicase ATP-binding"
+            }
+        },
+        {
+            "type": "DOMAIN",
+            "location": "840..993",
+            "qualifiers": {
+                "note": "(+)RNA virus helicase C-terminal"
+            }
+        },
+        {
+            "type": "REGION",
+            "location": "51..409",
+            "qualifiers": {
+                "note": "Methyltransferase"
+            }
+        },
+        {
+            "type": "REGION",
+            "location": "538..561",
+            "qualifiers": {
+                "note": "Disordered",
+                "evidence": "ECO:0000256|SAM:MobiDB-lite"
+            }
+        },
+        {
+            "type": "REGION",
+            "location": "713..976",
+            "qualifiers": {
+                "note": "ATP-dependent helicase"
+            }
+        },
+        {
+            "type": "COMPBIAS",
+            "location": "542..556",
+            "qualifiers": {
+                "note": "Polar residues",
+                "evidence": "ECO:0000256|SAM:MobiDB-lite"
+            }
+        },
+        {
+            "type": "BINDING",
+            "location": "715..722",
+            "qualifiers": {
+                "ligand": "ATP",
+                "ligand_id": "ChEBI:CHEBI:30616",
+                "evidence": "ECO:0000255"
+            }
+        }
+    ],
+    "keywords": [
+        "ATP-binding",
+        "Helicase",
+        "Host endoplasmic reticulum",
+        "Host membrane",
+        "Hydrolase",
+        "Membrane",
+        "Methyltransferase",
+        "Nucleotide-binding",
+        "Transferase"
+    ],
+    "protein_existence": "1: Evidence at protein level",
+    "sequence_length": 993,
+    "molecular_weight": 111468,
+    "crc64": "20F9EA0F3A63D0FF",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "Replication protein 1a",
+            "short": [],
+            "ec_numbers": [],
+            "evidence": []
+        },
+        "sub_name": null,
+        "alt_names": [],
+        "includes": [
+            {
+                "rec_name": {
+                    "full": "ATP-dependent helicase",
+                    "short": [],
+                    "ec_numbers": [
+                        "3.6.4.-"
+                    ],
+                    "evidence": []
+                },
+                "sub_name": null,
+                "alt_names": [],
+                "includes": [],
+                "contains": [],
+                "flags": []
+            },
+            {
+                "rec_name": {
+                    "full": "Methyltransferase",
+                    "short": [],
+                    "ec_numbers": [
+                        "2.1.1.-"
+                    ],
+                    "evidence": []
+                },
+                "sub_name": null,
+                "alt_names": [],
+                "includes": [],
+                "contains": [],
+                "flags": []
+            }
+        ],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "Q83264",
+    "organism": "Cucumber mosaic virus (strain Y) (CMV).",
+    "lineage": [
+        "Viruses",
+        "Riboviria",
+        "Orthornavirae",
+        "Kitrinoviricota",
+        "Alsuviricetes",
+        "Martellivirales",
+        "Bromoviridae",
+        "Cucumovirus",
+        "Cucumovirus CMV",
+        "Cucumber mosaic virus"
+    ],
+    "sequence": "MATSSFNINELVASHGDKGLLATALVDKTTHEQLEEQLQHQRRGRKVYIRNVLGVKDSEVIRNRYGGKYDLHLTQQEFASQGLAGALRLCGTLDCLDSFPSSGLRQDLVLDFGGSWVTHYLRGHNVHCCSPCLGIRDKMRHSERLMNMRKIILNDPQQFDGRQPDFCTQPAADCKVQAHFAISIHGGYDMGFRGLCEAMNAHGTTILKGTMMFDGAMMFDDQGVIPELNCQWRKIRSAFSETEDVTPLVGKLNSTVFSRVRKFKTMVAFDFINESTMSYVHDWENIKSFLTDQTYSYRGMTYGIERCVIHAGIMTYKIIGVPGMCPPELIRHCIWFPSIKDYVGLKIPASQDLVEWKTVRILTSTLRETEEIAMRCYNDKKAWMEQFKVILGVLSAKSSTIVINGMSMQSGERIDINDYHYIGFAILLHTKMKYEQLGKMYDMWNASSISKWFAALTRPLRVFFSSVVHALFPTLRPREEKEFLIKLSTFVTFNEECSFDGGEEWDVISSAAYVATQAVTDGKILAAQKAEKLAEKLAQPVSEVSDSPETSSQTPDDTADVCGKEREVSELDSLSAQTRSPITRVAERATAMLEYAAYEKHLHDTTVSNLKRIWNMAGGDDKRSFLEGNLKFVFDSYFTVDPMVNIHFSTGRWVRPVPEGIVYPVGYNERGLGPKSDGELYIVNSECVICNSESLSTVYGRSLQTPTGTISQVDGVAGCGKTMPIKSIFEPSTDMIVTANKKSAQDVRMALFKSSDSKEACTFVRTADSVLLNECPTVSRVLEDEVVLLHFGQLCAVMSKLKAVRAICFGDAEQIAFSSRDASFDMRFSKIIPDETSDADTTFRSPQDVVPLVRLMATKALPKGTHSKYTKWVSQSKVRRSVTSRAIASVTLVDLDSSRFYITMTQADKASLISRAKEMNLPKTFWNERIKTVHESQGISEDHVTLVRLKSTKCDLFKQFSYCLVALTRHKVTFRYEYCGVLNGDLIASVARA"
+}

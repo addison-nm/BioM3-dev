@@ -63,159 +63,61 @@
     ],
     "cross_references": {
         "EMBL": [
-            [
-                "EU113051",
-                "ABW86978.1",
-                "-",
-                "mRNA"
-            ]
+            "EMBL; EU113051; ABW86978.1; -; mRNA."
         ],
         "AlphaFoldDB": [
-            [
-                "B5KVH4",
-                "-"
-            ]
+            "AlphaFoldDB; B5KVH4; -."
         ],
         "SMR": [
-            [
-                "B5KVH4",
-                "-"
-            ]
+            "SMR; B5KVH4; -."
         ],
         "Allergome": [
-            [
-                "8299",
-                "Car i 4"
-            ],
-            [
-                "8300",
-                "Car i 4.0101"
-            ]
+            "Allergome; 8299; Car i 4.",
+            "Allergome; 8300; Car i 4.0101."
         ],
         "GO": [
-            [
-                "GO:0019863",
-                "F:IgE binding",
-                "IEA:UniProtKB-KW"
-            ],
-            [
-                "GO:0045735",
-                "F:nutrient reservoir activity",
-                "IC:UniProtKB"
-            ],
-            [
-                "GO:0048316",
-                "P:seed development",
-                "IEP:UniProtKB"
-            ],
-            [
-                "GO:0010431",
-                "P:seed maturation",
-                "IEP:UniProtKB"
-            ]
+            "GO; GO:0019863; F:IgE binding; IEA:UniProtKB-KW.",
+            "GO; GO:0045735; F:nutrient reservoir activity; IC:UniProtKB.",
+            "GO; GO:0048316; P:seed development; IEP:UniProtKB.",
+            "GO; GO:0010431; P:seed maturation; IEP:UniProtKB."
         ],
         "CDD": [
-            [
-                "cd02243",
-                "cupin_11S_legumin_C",
-                "1"
-            ],
-            [
-                "cd02242",
-                "cupin_11S_legumin_N",
-                "1"
-            ]
+            "CDD; cd02243; cupin_11S_legumin_C; 1.",
+            "CDD; cd02242; cupin_11S_legumin_N; 1."
         ],
         "FunFam": [
-            [
-                "2.60.120.10:FF:000073",
-                "Glycinin G1",
-                "1"
-            ],
-            [
-                "2.60.120.10:FF:000124",
-                "Glycinin G5",
-                "1"
-            ]
+            "FunFam; 2.60.120.10:FF:000073; Glycinin G1; 1.",
+            "FunFam; 2.60.120.10:FF:000124; Glycinin G5; 1."
         ],
         "Gene3D": [
-            [
-                "2.60.120.10",
-                "Jelly Rolls",
-                "2"
-            ]
+            "Gene3D; 2.60.120.10; Jelly Rolls; 2."
         ],
         "InterPro": [
-            [
-                "IPR022379",
-                "11S_seedstore_CS"
-            ],
-            [
-                "IPR006044",
-                "11S_seedstore_pln"
-            ],
-            [
-                "IPR006045",
-                "Cupin_1"
-            ],
-            [
-                "IPR014710",
-                "RmlC-like_jellyroll"
-            ],
-            [
-                "IPR011051",
-                "RmlC_Cupin_sf"
-            ],
-            [
-                "IPR050253",
-                "Seed_Storage-Functional"
-            ]
+            "InterPro; IPR022379; 11S_seedstore_CS.",
+            "InterPro; IPR006044; 11S_seedstore_pln.",
+            "InterPro; IPR006045; Cupin_1.",
+            "InterPro; IPR014710; RmlC-like_jellyroll.",
+            "InterPro; IPR011051; RmlC_Cupin_sf.",
+            "InterPro; IPR050253; Seed_Storage-Functional."
         ],
         "PANTHER": [
-            [
-                "PTHR31189:SF35",
-                "12S SEED STORAGE PROTEIN CRB",
-                "1"
-            ],
-            [
-                "PTHR31189",
-                "OS03G0336100 PROTEIN-RELATED",
-                "1"
-            ]
+            "PANTHER; PTHR31189:SF35; 12S SEED STORAGE PROTEIN CRB; 1.",
+            "PANTHER; PTHR31189; OS03G0336100 PROTEIN-RELATED; 1."
         ],
         "Pfam": [
-            [
-                "PF00190",
-                "Cupin_1",
-                "2"
-            ]
+            "Pfam; PF00190; Cupin_1; 2."
         ],
         "PRINTS": [
-            [
-                "PR00439",
-                "11SGLOBULIN"
-            ]
+            "PRINTS; PR00439; 11SGLOBULIN."
         ],
         "SMART": [
-            [
-                "SM00835",
-                "Cupin_1",
-                "2"
-            ]
+            "SMART; SM00835; Cupin_1; 2."
         ],
         "SUPFAM": [
-            [
-                "SSF51182",
-                "RmlC-like cupins",
-                "1"
-            ]
+            "SUPFAM; SSF51182; RmlC-like cupins; 1."
         ],
         "PROSITE": [
-            [
-                "PS00305",
-                "11S_SEED_STORAGE",
-                "1"
-            ]
+            "PROSITE; PS00305; 11S_SEED_STORAGE; 1."
         ]
     },
     "features": [

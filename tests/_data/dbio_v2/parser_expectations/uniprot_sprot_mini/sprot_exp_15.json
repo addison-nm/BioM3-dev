@@ -1,0 +1,193 @@
+{
+    "entry_name": "1A1D_ALLAM",
+    "status": "Reviewed",
+    "accessions": [
+        "B9K206"
+    ],
+    "dates": [
+        "28-JUL-2009, integrated into UniProtKB/Swiss-Prot.",
+        "24-MAR-2009, sequence version 1.",
+        "09-APR-2025, entry version 74."
+    ],
+    "gene_names": [
+        "Name=acdS {ECO:0000255|HAMAP-Rule:MF_00807}",
+        "OrderedLocusNames=Avi_5856"
+    ],
+    "organelle": [],
+    "taxon_id": 311402,
+    "hosts": [],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [LARGE SCALE GENOMIC DNA].",
+            "RC": "STRAIN=ATCC BAA-846 / DSM 112012 / S4",
+            "RX": "PubMed=19251847; DOI=10.1128/jb.01779-08",
+            "RA": "Slater S.C., Goldman B.S., Goodner B., Setubal J.C., Farrand S.K., Nester E.W., Burr T.J., Banta L., Dickerman A.W., Paulsen I., Otten L., Suen G., Welch R., Almeida N.F., Arnold F., Burton O.T., Du Z., Ewing A., Godsy E., Heisel S., Houmiel K.L., Jhaveri J., Lu J., Miller N.M., Norton S., Chen Q., Phoolcharoen W., Ohlin V., Ondrusek D., Pride N., Stricklin S.L., Sun J., Wheeler C., Wilson L., Zhu H., Wood D.W.",
+            "RT": "\"Genome sequences of three Agrobacterium biovars help elucidate the evolution of multichromosome genomes in bacteria.\"",
+            "RL": "J. Bacteriol. 191:2501-2511(2009)."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "Catalyzes a cyclopropane ring-opening reaction, the irreversible conversion of 1-aminocyclopropane-1-carboxylate (ACC) to ammonia and alpha-ketobutyrate. Allows growth on ACC as a nitrogen source. {ECO:0000255|HAMAP-Rule:MF_00807}."
+        },
+        {
+            "topic": "CATALYTIC ACTIVITY",
+            "text": "Reaction=1-aminocyclopropane-1-carboxylate + H2O = 2-oxobutanoate + NH4(+); Xref=Rhea:RHEA:16933, ChEBI:CHEBI:15377, ChEBI:CHEBI:16763, ChEBI:CHEBI:28938, ChEBI:CHEBI:58360; EC=3.5.99.7; Evidence={ECO:0000255|HAMAP-Rule:MF_00807};"
+        },
+        {
+            "topic": "COFACTOR",
+            "text": "Name=pyridoxal 5'-phosphate; Xref=ChEBI:CHEBI:597326; Evidence={ECO:0000255|HAMAP-Rule:MF_00807};"
+        },
+        {
+            "topic": "SUBUNIT",
+            "text": "Homotrimer. {ECO:0000255|HAMAP-Rule:MF_00807}."
+        },
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the ACC deaminase/D-cysteine desulfhydrase family. {ECO:0000255|HAMAP-Rule:MF_00807}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            "EMBL; CP000634; ACM38904.1; -; Genomic_DNA."
+        ],
+        "RefSeq": [
+            "RefSeq; WP_012654146.1; NC_011988.1."
+        ],
+        "AlphaFoldDB": [
+            "AlphaFoldDB; B9K206; -."
+        ],
+        "SMR": [
+            "SMR; B9K206; -."
+        ],
+        "STRING": [
+            "STRING; 311402.Avi_5856; -."
+        ],
+        "KEGG": [
+            "KEGG; avi:Avi_5856; -."
+        ],
+        "eggNOG": [
+            "eggNOG; COG2515; Bacteria."
+        ],
+        "HOGENOM": [
+            "HOGENOM; CLU_048897_2_1_5; -."
+        ],
+        "Proteomes": [
+            "Proteomes; UP000001596; Chromosome 2."
+        ],
+        "GO": [
+            "GO; GO:0008660; F:1-aminocyclopropane-1-carboxylate deaminase activity; IEA:UniProtKB-UniRule.",
+            "GO; GO:0019148; F:D-cysteine desulfhydrase activity; IEA:TreeGrafter.",
+            "GO; GO:0030170; F:pyridoxal phosphate binding; IEA:InterPro.",
+            "GO; GO:0018871; P:1-aminocyclopropane-1-carboxylate metabolic process; IEA:UniProtKB-UniRule.",
+            "GO; GO:0009310; P:amine catabolic process; IEA:InterPro."
+        ],
+        "CDD": [
+            "CDD; cd06449; ACCD; 1."
+        ],
+        "FunFam": [
+            "FunFam; 3.40.50.1100:FF:000048; 1-aminocyclopropane-1-carboxylate deaminase; 1."
+        ],
+        "Gene3D": [
+            "Gene3D; 3.40.50.1100; -; 2."
+        ],
+        "HAMAP": [
+            "HAMAP; MF_00807; ACC_deaminase; 1."
+        ],
+        "InterPro": [
+            "InterPro; IPR027278; ACCD_DCysDesulf.",
+            "InterPro; IPR005965; ACP_carboxylate_deaminase.",
+            "InterPro; IPR020601; ACP_carboxylate_deaminase_bac.",
+            "InterPro; IPR001926; TrpB-like_PALP.",
+            "InterPro; IPR036052; TrpB-like_PALP_sf."
+        ],
+        "NCBIfam": [
+            "NCBIfam; TIGR01274; ACC_deam; 1."
+        ],
+        "PANTHER": [
+            "PANTHER; PTHR43780; 1-AMINOCYCLOPROPANE-1-CARBOXYLATE DEAMINASE-RELATED; 1.",
+            "PANTHER; PTHR43780:SF2; 1-AMINOCYCLOPROPANE-1-CARBOXYLATE DEAMINASE-RELATED; 1."
+        ],
+        "Pfam": [
+            "Pfam; PF00291; PALP; 1."
+        ],
+        "PIRSF": [
+            "PIRSF; PIRSF006278; ACCD_DCysDesulf; 1."
+        ],
+        "SUPFAM": [
+            "SUPFAM; SSF53686; Tryptophan synthase beta subunit-like PLP-dependent enzymes; 1."
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..337",
+            "qualifiers": {
+                "note": "1-aminocyclopropane-1-carboxylate deaminase",
+                "id": "PRO_1000148575"
+            }
+        },
+        {
+            "type": "ACT_SITE",
+            "location": "77",
+            "qualifiers": {
+                "note": "Nucleophile",
+                "evidence": "ECO:0000255|HAMAP-Rule:MF_00807"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "50",
+            "qualifiers": {
+                "note": "N6-(pyridoxal phosphate)lysine",
+                "evidence": "ECO:0000255|HAMAP-Rule:MF_00807"
+            }
+        }
+    ],
+    "keywords": [
+        "Hydrolase",
+        "Pyridoxal phosphate",
+        "Reference proteome"
+    ],
+    "protein_existence": "3: Inferred from homology",
+    "sequence_length": 337,
+    "molecular_weight": 36472,
+    "crc64": "9828FC50CC0143AC",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "1-aminocyclopropane-1-carboxylate deaminase",
+            "short": [
+                "ACC deaminase",
+                "ACCD"
+            ],
+            "ec_numbers": [
+                "3.5.99.7"
+            ],
+            "evidence": [
+                "ECO:0000255|HAMAP-Rule:MF_00807"
+            ]
+        },
+        "sub_name": null,
+        "alt_names": [],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "B9K206",
+    "organism": "Allorhizobium ampelinum (strain ATCC BAA-846 / DSM 112012 / S4) (Agrobacterium vitis (strain S4)).",
+    "lineage": [
+        "Bacteria",
+        "Pseudomonadati",
+        "Pseudomonadota",
+        "Alphaproteobacteria",
+        "Hyphomicrobiales",
+        "Rhizobiaceae",
+        "Rhizobium/Agrobacterium group",
+        "Allorhizobium",
+        "Allorhizobium ampelinum"
+    ],
+    "sequence": "MLDAFDRYPLTFGPTPIEKLERLTDHLGGKVQLYAKREDCNSGLAFGGNKLRKLEYIIPDAIASGADTLVSIGGVQSNHTRMVAAVAAKIGFKCRLVQEAWVPHEDAVYDRVGNIMLSRIMGADVRLVDDGFDIGIRRSWEEAIEEVKAAGGKPYAIPAGASVHKYGGLGYVGFAEEVRAQEAALGFAFDYIVVCTVTGSSHAGMAVGFAKDGRADHVIGIDASFTPDQTRAQVLEIAQRTADLVKLGREMRPEDIVLVEDYAYPVYGVPSEETKDAIRLVGRLEGMITDPVYEGKSMQGMIDLVKKGYFPEGSKVLYAHLGGAPALNGYGYAFRNG"
+}

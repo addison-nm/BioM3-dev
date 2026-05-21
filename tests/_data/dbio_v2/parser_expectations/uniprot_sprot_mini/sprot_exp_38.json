@@ -1,0 +1,152 @@
+{
+    "entry_name": "3MGH_CYTH3",
+    "status": "Reviewed",
+    "accessions": [
+        "Q11UN5"
+    ],
+    "dates": [
+        "12-DEC-2006, integrated into UniProtKB/Swiss-Prot.",
+        "22-AUG-2006, sequence version 1.",
+        "09-APR-2025, entry version 82."
+    ],
+    "gene_names": [
+        "OrderedLocusNames=CHU_1611"
+    ],
+    "organelle": [],
+    "taxon_id": 269798,
+    "hosts": [],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [LARGE SCALE GENOMIC DNA].",
+            "RC": "STRAIN=ATCC 33406 / DSM 1761 / JCM 20678 / CIP 103989 / IAM 12607 / NBRC 15051 / NCIMB 9469 / D465",
+            "RX": "PubMed=17400776; DOI=10.1128/aem.00225-07",
+            "RA": "Xie G., Bruce D.C., Challacombe J.F., Chertkov O., Detter J.C., Gilna P., Han C.S., Lucas S., Misra M., Myers G.L., Richardson P., Tapia R., Thayer N., Thompson L.S., Brettin T.S., Henrissat B., Wilson D.B., McBride M.J.",
+            "RT": "\"Genome sequence of the cellulolytic gliding bacterium Cytophaga hutchinsonii.\"",
+            "RL": "Appl. Environ. Microbiol. 73:3536-3546(2007)."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the DNA glycosylase MPG family. {ECO:0000255|HAMAP-Rule:MF_00527}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            "EMBL; CP000383; ABG58881.1; -; Genomic_DNA."
+        ],
+        "RefSeq": [
+            "RefSeq; WP_011584996.1; NC_008255.1."
+        ],
+        "AlphaFoldDB": [
+            "AlphaFoldDB; Q11UN5; -."
+        ],
+        "SMR": [
+            "SMR; Q11UN5; -."
+        ],
+        "STRING": [
+            "STRING; 269798.CHU_1611; -."
+        ],
+        "KEGG": [
+            "KEGG; chu:CHU_1611; -."
+        ],
+        "eggNOG": [
+            "eggNOG; COG2094; Bacteria."
+        ],
+        "HOGENOM": [
+            "HOGENOM; CLU_060471_2_1_10; -."
+        ],
+        "OrthoDB": [
+            "OrthoDB; 9794313at2; -."
+        ],
+        "Proteomes": [
+            "Proteomes; UP000001822; Chromosome."
+        ],
+        "GO": [
+            "GO; GO:0003905; F:alkylbase DNA N-glycosylase activity; IEA:InterPro.",
+            "GO; GO:0003677; F:DNA binding; IEA:InterPro.",
+            "GO; GO:0006284; P:base-excision repair; IEA:InterPro."
+        ],
+        "CDD": [
+            "CDD; cd00540; AAG; 1."
+        ],
+        "FunFam": [
+            "FunFam; 3.10.300.10:FF:000001; Putative 3-methyladenine DNA glycosylase; 1."
+        ],
+        "Gene3D": [
+            "Gene3D; 3.10.300.10; Methylpurine-DNA glycosylase (MPG); 1."
+        ],
+        "HAMAP": [
+            "HAMAP; MF_00527; 3MGH; 1."
+        ],
+        "InterPro": [
+            "InterPro; IPR011034; Formyl_transferase-like_C_sf.",
+            "InterPro; IPR003180; MPG.",
+            "InterPro; IPR036995; MPG_sf."
+        ],
+        "NCBIfam": [
+            "NCBIfam; TIGR00567; 3mg; 1."
+        ],
+        "PANTHER": [
+            "PANTHER; PTHR10429; DNA-3-METHYLADENINE GLYCOSYLASE; 1.",
+            "PANTHER; PTHR10429:SF0; DNA-3-METHYLADENINE GLYCOSYLASE; 1."
+        ],
+        "Pfam": [
+            "Pfam; PF02245; Pur_DNA_glyco; 1."
+        ],
+        "SUPFAM": [
+            "SUPFAM; SSF50486; FMT C-terminal domain-like; 1."
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..198",
+            "qualifiers": {
+                "note": "Putative 3-methyladenine DNA glycosylase",
+                "id": "PRO_0000265013"
+            }
+        }
+    ],
+    "keywords": [
+        "DNA damage",
+        "DNA repair",
+        "Hydrolase",
+        "Reference proteome"
+    ],
+    "protein_existence": "3: Inferred from homology",
+    "sequence_length": 198,
+    "molecular_weight": 22581,
+    "crc64": "7FF9375C752B8BC3",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "Putative 3-methyladenine DNA glycosylase",
+            "short": [],
+            "ec_numbers": [
+                "3.2.2.-"
+            ],
+            "evidence": [
+                "ECO:0000255|HAMAP-Rule:MF_00527"
+            ]
+        },
+        "sub_name": null,
+        "alt_names": [],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "Q11UN5",
+    "organism": "Cytophaga hutchinsonii (strain ATCC 33406 / DSM 1761 / CIP 103989 / NBRC 15051 / NCIMB 9469 / D465).",
+    "lineage": [
+        "Bacteria",
+        "Pseudomonadati",
+        "Bacteroidota",
+        "Cytophagia",
+        "Cytophagales",
+        "Cytophagaceae",
+        "Cytophaga"
+    ],
+    "sequence": "MFPKLSESFYLRENVQLISKELLGKVLVTYIDGKYTAGIITETEAYQAPEDKASHAFNNRRTTRTEVFYNKGGIGYVYLCYGIHHLFNVVTNNENIPHAILIRSVEPLEGVDIMMQRRNKKKLDKTLTAGPGALSQALGITRLHNKIPLSANTVWIEDRNIPVESIVSTTRVGIDYAQEYKDKPWRYYIAGNKWISRG"
+}

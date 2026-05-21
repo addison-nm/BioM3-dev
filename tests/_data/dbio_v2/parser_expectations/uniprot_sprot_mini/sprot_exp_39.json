@@ -1,0 +1,140 @@
+{
+    "entry_name": "3MGH_LISMC",
+    "status": "Reviewed",
+    "accessions": [
+        "C1L1K0"
+    ],
+    "dates": [
+        "22-SEP-2009, integrated into UniProtKB/Swiss-Prot.",
+        "26-MAY-2009, sequence version 1.",
+        "18-JUN-2025, entry version 63."
+    ],
+    "gene_names": [
+        "OrderedLocusNames=Lm4b_00947"
+    ],
+    "organelle": [],
+    "taxon_id": 568819,
+    "hosts": [],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [LARGE SCALE GENOMIC DNA].",
+            "RC": "STRAIN=CLIP80459",
+            "RX": "PubMed=22530965; DOI=10.1186/1471-2164-13-144",
+            "RA": "Hain T., Ghai R., Billion A., Kuenne C.T., Steinweg C., Izar B., Mohamed W., Mraheil M., Domann E., Schaffrath S., Karst U., Goesmann A., Oehm S., Puhler A., Merkl R., Vorwerk S., Glaser P., Garrido P., Rusniok C., Buchrieser C., Goebel W., Chakraborty T.",
+            "RT": "\"Comparative genomics and transcriptomics of lineages I, II, and III strains of Listeria monocytogenes.\"",
+            "RL": "BMC Genomics 13:144-144(2012)."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the DNA glycosylase MPG family. {ECO:0000255|HAMAP-Rule:MF_00527}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            "EMBL; FM242711; CAS04715.1; -; Genomic_DNA."
+        ],
+        "RefSeq": [
+            "RefSeq; WP_003724850.1; NC_012488.1."
+        ],
+        "AlphaFoldDB": [
+            "AlphaFoldDB; C1L1K0; -."
+        ],
+        "SMR": [
+            "SMR; C1L1K0; -."
+        ],
+        "KEGG": [
+            "KEGG; lmc:Lm4b_00947; -."
+        ],
+        "HOGENOM": [
+            "HOGENOM; CLU_060471_2_0_9; -."
+        ],
+        "GO": [
+            "GO; GO:0003905; F:alkylbase DNA N-glycosylase activity; IEA:InterPro.",
+            "GO; GO:0003677; F:DNA binding; IEA:InterPro.",
+            "GO; GO:0006284; P:base-excision repair; IEA:InterPro."
+        ],
+        "CDD": [
+            "CDD; cd00540; AAG; 1."
+        ],
+        "FunFam": [
+            "FunFam; 3.10.300.10:FF:000001; Putative 3-methyladenine DNA glycosylase; 1."
+        ],
+        "Gene3D": [
+            "Gene3D; 3.10.300.10; Methylpurine-DNA glycosylase (MPG); 1."
+        ],
+        "HAMAP": [
+            "HAMAP; MF_00527; 3MGH; 1."
+        ],
+        "InterPro": [
+            "InterPro; IPR011034; Formyl_transferase-like_C_sf.",
+            "InterPro; IPR003180; MPG.",
+            "InterPro; IPR036995; MPG_sf."
+        ],
+        "NCBIfam": [
+            "NCBIfam; TIGR00567; 3mg; 1.",
+            "NCBIfam; NF002002; PRK00802.1-2; 1."
+        ],
+        "PANTHER": [
+            "PANTHER; PTHR10429; DNA-3-METHYLADENINE GLYCOSYLASE; 1.",
+            "PANTHER; PTHR10429:SF0; DNA-3-METHYLADENINE GLYCOSYLASE; 1."
+        ],
+        "Pfam": [
+            "Pfam; PF02245; Pur_DNA_glyco; 1."
+        ],
+        "SUPFAM": [
+            "SUPFAM; SSF50486; FMT C-terminal domain-like; 1."
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..207",
+            "qualifiers": {
+                "note": "Putative 3-methyladenine DNA glycosylase",
+                "id": "PRO_1000211762"
+            }
+        }
+    ],
+    "keywords": [
+        "DNA damage",
+        "DNA repair",
+        "Hydrolase"
+    ],
+    "protein_existence": "3: Inferred from homology",
+    "sequence_length": 207,
+    "molecular_weight": 23491,
+    "crc64": "21A9EE5336FE8390",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "Putative 3-methyladenine DNA glycosylase",
+            "short": [],
+            "ec_numbers": [
+                "3.2.2.-"
+            ],
+            "evidence": [
+                "ECO:0000255|HAMAP-Rule:MF_00527"
+            ]
+        },
+        "sub_name": null,
+        "alt_names": [],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "C1L1K0",
+    "organism": "Listeria monocytogenes serotype 4b (strain CLIP80459).",
+    "lineage": [
+        "Bacteria",
+        "Bacillati",
+        "Bacillota",
+        "Bacilli",
+        "Bacillales",
+        "Listeriaceae",
+        "Listeria"
+    ],
+    "sequence": "MEAIITKEFFEDKTTIELARDILGMRLVHQTDEGILSGLIVETEAYLGATDMAAHSFQNLRTKRTEVMFSSPGRIYMYQMHRQVLLNFITMPKGIPEAILIRAIEPDEQAKQQMVQNRHGKTGYELTNGPGKLTQALGLSMQDYGKTLFDSNIWLEEAKLPHLIEATNRIGVPNKGIATHFPLRFTVKGSPYISAQRKSRILTDIWK"
+}

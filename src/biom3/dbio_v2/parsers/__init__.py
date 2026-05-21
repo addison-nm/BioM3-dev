@@ -14,8 +14,13 @@ from biom3.dbio_v2.parsers.base import (
     ParseError,
     Record,
     SchemaError,
+    dump_jsonl,
     iter_lines,
     open_text,
 )
 
-__all__ = ["Record", "ParseError", "SchemaError", "iter_lines", "open_text"]
+__all__ = [
+    "Record", "ParseError", "SchemaError",
+    "iter_lines", "open_text",
+    "dump_jsonl",
+]

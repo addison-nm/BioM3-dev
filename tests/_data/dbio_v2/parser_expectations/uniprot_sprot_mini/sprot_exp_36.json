@@ -1,0 +1,153 @@
+{
+    "entry_name": "3MGH_ALKOO",
+    "status": "Reviewed",
+    "accessions": [
+        "A8MF35"
+    ],
+    "dates": [
+        "05-FEB-2008, integrated into UniProtKB/Swiss-Prot.",
+        "04-DEC-2007, sequence version 1.",
+        "18-JUN-2025, entry version 75."
+    ],
+    "gene_names": [
+        "OrderedLocusNames=Clos_1158"
+    ],
+    "organelle": [],
+    "taxon_id": 350688,
+    "hosts": [],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [LARGE SCALE GENOMIC DNA].",
+            "RC": "STRAIN=OhILAs",
+            "RA": "Copeland A., Lucas S., Lapidus A., Barry K., Detter J.C., Glavina del Rio T., Hammon N., Israni S., Dalin E., Tice H., Pitluck S., Chain P., Malfatti S., Shin M., Vergez L., Schmutz J., Larimer F., Land M., Hauser L., Kyrpides N., Mikhailova N., Stolz J.F., Dawson A., Fisher E., Crable B., Perera E., Lisak J., Ranganathan M., Basu P., Richardson P.",
+            "RT": "\"Complete genome of Alkaliphilus oremlandii OhILAs.\"",
+            "RL": "Submitted (OCT-2007) to the EMBL/GenBank/DDBJ databases."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the DNA glycosylase MPG family. {ECO:0000255|HAMAP-Rule:MF_00527}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            "EMBL; CP000853; ABW18704.1; -; Genomic_DNA."
+        ],
+        "RefSeq": [
+            "RefSeq; WP_012159016.1; NC_009922.1."
+        ],
+        "AlphaFoldDB": [
+            "AlphaFoldDB; A8MF35; -."
+        ],
+        "SMR": [
+            "SMR; A8MF35; -."
+        ],
+        "STRING": [
+            "STRING; 350688.Clos_1158; -."
+        ],
+        "KEGG": [
+            "KEGG; aoe:Clos_1158; -."
+        ],
+        "eggNOG": [
+            "eggNOG; COG2094; Bacteria."
+        ],
+        "HOGENOM": [
+            "HOGENOM; CLU_060471_0_2_9; -."
+        ],
+        "OrthoDB": [
+            "OrthoDB; 9794313at2; -."
+        ],
+        "Proteomes": [
+            "Proteomes; UP000000269; Chromosome."
+        ],
+        "GO": [
+            "GO; GO:0003905; F:alkylbase DNA N-glycosylase activity; IEA:InterPro.",
+            "GO; GO:0003677; F:DNA binding; IEA:InterPro.",
+            "GO; GO:0006284; P:base-excision repair; IEA:InterPro."
+        ],
+        "CDD": [
+            "CDD; cd00540; AAG; 1."
+        ],
+        "FunFam": [
+            "FunFam; 3.10.300.10:FF:000001; Putative 3-methyladenine DNA glycosylase; 1."
+        ],
+        "Gene3D": [
+            "Gene3D; 3.10.300.10; Methylpurine-DNA glycosylase (MPG); 1."
+        ],
+        "HAMAP": [
+            "HAMAP; MF_00527; 3MGH; 1."
+        ],
+        "InterPro": [
+            "InterPro; IPR011034; Formyl_transferase-like_C_sf.",
+            "InterPro; IPR003180; MPG.",
+            "InterPro; IPR036995; MPG_sf."
+        ],
+        "NCBIfam": [
+            "NCBIfam; TIGR00567; 3mg; 1.",
+            "NCBIfam; NF002001; PRK00802.1-1; 1.",
+            "NCBIfam; NF002003; PRK00802.1-3; 1."
+        ],
+        "PANTHER": [
+            "PANTHER; PTHR10429; DNA-3-METHYLADENINE GLYCOSYLASE; 1.",
+            "PANTHER; PTHR10429:SF0; DNA-3-METHYLADENINE GLYCOSYLASE; 1."
+        ],
+        "Pfam": [
+            "Pfam; PF02245; Pur_DNA_glyco; 1."
+        ],
+        "SUPFAM": [
+            "SUPFAM; SSF50486; FMT C-terminal domain-like; 1."
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..202",
+            "qualifiers": {
+                "note": "Putative 3-methyladenine DNA glycosylase",
+                "id": "PRO_1000060929"
+            }
+        }
+    ],
+    "keywords": [
+        "DNA damage",
+        "DNA repair",
+        "Hydrolase",
+        "Reference proteome"
+    ],
+    "protein_existence": "3: Inferred from homology",
+    "sequence_length": 202,
+    "molecular_weight": 23112,
+    "crc64": "9D95DCD12EDB989E",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "Putative 3-methyladenine DNA glycosylase",
+            "short": [],
+            "ec_numbers": [
+                "3.2.2.-"
+            ],
+            "evidence": [
+                "ECO:0000255|HAMAP-Rule:MF_00527"
+            ]
+        },
+        "sub_name": null,
+        "alt_names": [],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "A8MF35",
+    "organism": "Alkaliphilus oremlandii (strain OhILAs) (Clostridium oremlandii (strain OhILAs)).",
+    "lineage": [
+        "Bacteria",
+        "Bacillati",
+        "Bacillota",
+        "Clostridia",
+        "Peptostreptococcales",
+        "Natronincolaceae",
+        "Alkaliphilus"
+    ],
+    "sequence": "MKLERKFYDRPTLEVSKDLLGKKLVHYVKGEKLSARIVEVEAYIGAIDKAAHSYNNKITERTKIMFGPPGYAYVYLIYGMYHCMNIVTEKDGVAAAVLIRAVEPVNGIETMANYRYSKPIEDLTKKQIHNLTSGPGKLCVAMNISKINNGADLCGEEMWIEADGYHNFEIVTTKRINIDYAEEAIDFPWRFYIKDNPFISRK"
+}

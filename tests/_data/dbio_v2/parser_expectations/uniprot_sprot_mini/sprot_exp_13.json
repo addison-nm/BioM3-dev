@@ -1,0 +1,140 @@
+{
+    "entry_name": "16D10_MELJA",
+    "status": "Reviewed",
+    "accessions": [
+        "Q06JG6"
+    ],
+    "dates": [
+        "30-NOV-2010, integrated into UniProtKB/Swiss-Prot.",
+        "31-OCT-2006, sequence version 1.",
+        "28-JUN-2023, entry version 16."
+    ],
+    "gene_names": [
+        "Name=16D10"
+    ],
+    "organelle": [],
+    "taxon_id": 6303,
+    "hosts": [],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [GENOMIC DNA], AND FUNCTION.",
+            "RX": "PubMed=16985000; DOI=10.1073/pnas.0604698103",
+            "RA": "Huang G., Allen R., Davis E.L., Baum T.J., Hussey R.S.",
+            "RT": "\"Engineering broad root-knot resistance in transgenic plants by RNAi silencing of a conserved and essential root-knot nematode parasitism gene.\"",
+            "RL": "Proc. Natl. Acad. Sci. U.S.A. 103:14302-14306(2006)."
+        },
+        {
+            "RN": "[2]",
+            "RP": "REVIEW.",
+            "RX": "PubMed=18078779; DOI=10.1016/j.pbi.2007.10.010",
+            "RA": "Mitchum M.G., Wang X., Davis E.L.",
+            "RT": "\"Diverse and conserved roles of CLE peptides.\"",
+            "RL": "Curr. Opin. Plant Biol. 11:75-81(2008)."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "Plays a role in the differentiation or division of feeding cells (syncytia) induced in plant roots during infection. Promotes host root growth. {ECO:0000269|PubMed:16985000}."
+        },
+        {
+            "topic": "SUBCELLULAR LOCATION",
+            "text": "Secreted {ECO:0000250}. Host cytoplasm {ECO:0000250}. Host extracellular space {ECO:0000250}. Note=Secreted into host root cells via the nematode stylet to transform the recipient cells into enlarged multinucleate feeding cells called giant-cells or syncytia. {ECO:0000250}."
+        },
+        {
+            "topic": "TISSUE SPECIFICITY",
+            "text": "Highly expressed exclusively within the subventral esophageal gland cell during syncytium formation in host plants."
+        },
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the CLV3/ESR signal peptide family. {ECO:0000305}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            "EMBL; DQ841121; ABI33931.1; -; Genomic_DNA."
+        ],
+        "AlphaFoldDB": [
+            "AlphaFoldDB; Q06JG6; -."
+        ],
+        "Proteomes": [
+            "Proteomes; UP000887561; Unplaced."
+        ],
+        "GO": [
+            "GO; GO:0005576; C:extracellular region; IEA:UniProtKB-SubCell.",
+            "GO; GO:0030430; C:host cell cytoplasm; IEA:UniProtKB-SubCell.",
+            "GO; GO:0043655; C:host extracellular space; IEA:UniProtKB-SubCell.",
+            "GO; GO:0030154; P:cell differentiation; IEA:UniProtKB-KW."
+        ]
+    },
+    "features": [
+        {
+            "type": "SIGNAL",
+            "location": "1..30",
+            "qualifiers": {
+                "evidence": "ECO:0000255"
+            }
+        },
+        {
+            "type": "CHAIN",
+            "location": "31..43",
+            "qualifiers": {
+                "note": "CLAVATA3/ESR (CLE)-related protein 16D10",
+                "id": "PRO_0000401217"
+            }
+        },
+        {
+            "type": "MOTIF",
+            "location": "31..43",
+            "qualifiers": {
+                "note": "CLE"
+            }
+        }
+    ],
+    "keywords": [
+        "Differentiation",
+        "Host cytoplasm",
+        "Reference proteome",
+        "Secreted",
+        "Signal"
+    ],
+    "protein_existence": "2: Evidence at transcript level",
+    "sequence_length": 43,
+    "molecular_weight": 4625,
+    "crc64": "CC5E0C37E220AF2E",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "CLAVATA3/ESR (CLE)-related protein 16D10",
+            "short": [],
+            "ec_numbers": [],
+            "evidence": []
+        },
+        "sub_name": null,
+        "alt_names": [],
+        "includes": [],
+        "contains": [],
+        "flags": [
+            "Precursor"
+        ]
+    },
+    "primary_accession": "Q06JG6",
+    "organism": "Meloidogyne javanica (Root-knot nematode worm).",
+    "lineage": [
+        "Eukaryota",
+        "Metazoa",
+        "Ecdysozoa",
+        "Nematoda",
+        "Chromadorea",
+        "Rhabditida",
+        "Tylenchina",
+        "Tylenchomorpha",
+        "Tylenchoidea",
+        "Meloidogynidae",
+        "Meloidogyninae",
+        "Meloidogyne",
+        "Meloidogyne incognita group"
+    ],
+    "sequence": "MFTNSIKNLIIYLMPLMVTLMLLSVSFVDAGKKPSGPNPGGNN"
+}

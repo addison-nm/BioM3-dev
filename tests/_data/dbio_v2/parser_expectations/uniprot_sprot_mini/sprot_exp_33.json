@@ -1,0 +1,191 @@
+{
+    "entry_name": "3L21_ACAAN",
+    "status": "Reviewed",
+    "accessions": [
+        "P01385"
+    ],
+    "dates": [
+        "21-JUL-1986, integrated into UniProtKB/Swiss-Prot.",
+        "21-JUL-1986, sequence version 1.",
+        "18-JUN-2025, entry version 95."
+    ],
+    "gene_names": [],
+    "organelle": [],
+    "taxon_id": 8605,
+    "hosts": [],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "PROTEIN SEQUENCE, TOXIC DOSE, AND SUBCELLULAR LOCATION.",
+            "RC": "TISSUE=Venom",
+            "RX": "PubMed=7305964; DOI=10.1042/bj1930899",
+            "RA": "Kim H.S., Tamiya N.",
+            "RT": "\"Isolation, properties and amino acid sequence of a long-chain neurotoxin, Acanthophis antarcticus b, from the venom of an Australian snake (the common death adder, Acanthophis antarcticus).\"",
+            "RL": "Biochem. J. 193:899-906(1981)."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "Binds with high affinity to muscular (alpha-1/CHRNA1) and neuronal (alpha-7/CHRNA7) nicotinic acetylcholine receptor (nAChR) and inhibits acetylcholine from binding to the receptor, thereby impairing neuromuscular and neuronal transmission. {ECO:0000250|UniProtKB:P60615}."
+        },
+        {
+            "topic": "SUBCELLULAR LOCATION",
+            "text": "Secreted {ECO:0000269|PubMed:7305964}."
+        },
+        {
+            "topic": "TISSUE SPECIFICITY",
+            "text": "Expressed by the venom gland. {ECO:0000305}."
+        },
+        {
+            "topic": "TOXIC DOSE",
+            "text": "LD(50) is 0.13 mg/kg by intramuscular injection into mice. {ECO:0000269|PubMed:7305964}."
+        },
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the three-finger toxin family. Long-chain subfamily. Type II alpha-neurotoxin sub-subfamily. {ECO:0000305}."
+        }
+    ],
+    "cross_references": {
+        "PIR": [
+            "PIR; A01656; N2AW1."
+        ],
+        "AlphaFoldDB": [
+            "AlphaFoldDB; P01385; -."
+        ],
+        "SMR": [
+            "SMR; P01385; -."
+        ],
+        "GO": [
+            "GO; GO:0005576; C:extracellular region; IEA:UniProtKB-SubCell.",
+            "GO; GO:0030550; F:acetylcholine receptor inhibitor activity; IEA:UniProtKB-KW.",
+            "GO; GO:0099106; F:ion channel regulator activity; IEA:UniProtKB-KW.",
+            "GO; GO:0090729; F:toxin activity; IEA:UniProtKB-KW."
+        ],
+        "CDD": [
+            "CDD; cd00206; TFP_snake_toxin; 1."
+        ],
+        "Gene3D": [
+            "Gene3D; 2.10.60.10; CD59; 1."
+        ],
+        "InterPro": [
+            "InterPro; IPR003571; Snake_3FTx.",
+            "InterPro; IPR045860; Snake_toxin-like_sf.",
+            "InterPro; IPR018354; Snake_toxin_con_site.",
+            "InterPro; IPR054131; Toxin_cobra-type."
+        ],
+        "Pfam": [
+            "Pfam; PF21947; Toxin_cobra-type; 1."
+        ],
+        "SUPFAM": [
+            "SUPFAM; SSF57302; Snake toxin-like; 1."
+        ],
+        "PROSITE": [
+            "PROSITE; PS00272; SNAKE_TOXIN; 1."
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..73",
+            "qualifiers": {
+                "note": "Alpha-elapitoxin-Aa2b",
+                "id": "PRO_0000093527"
+            }
+        },
+        {
+            "type": "DISULFID",
+            "location": "3..20",
+            "qualifiers": {
+                "evidence": "ECO:0000250"
+            }
+        },
+        {
+            "type": "DISULFID",
+            "location": "13..41",
+            "qualifiers": {
+                "evidence": "ECO:0000250"
+            }
+        },
+        {
+            "type": "DISULFID",
+            "location": "26..30",
+            "qualifiers": {
+                "evidence": "ECO:0000250"
+            }
+        },
+        {
+            "type": "DISULFID",
+            "location": "45..56",
+            "qualifiers": {
+                "evidence": "ECO:0000250"
+            }
+        },
+        {
+            "type": "DISULFID",
+            "location": "57..62",
+            "qualifiers": {
+                "evidence": "ECO:0000250"
+            }
+        }
+    ],
+    "keywords": [
+        "Acetylcholine receptor inhibiting toxin",
+        "Direct protein sequencing",
+        "Disulfide bond",
+        "Ion channel impairing toxin",
+        "Neurotoxin",
+        "Postsynaptic neurotoxin",
+        "Secreted",
+        "Toxin"
+    ],
+    "protein_existence": "1: Evidence at protein level",
+    "sequence_length": 73,
+    "molecular_weight": 8135,
+    "crc64": "18328AD781D8150F",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "Alpha-elapitoxin-Aa2b",
+            "short": [
+                "Alpha-EPTX-Aa2b"
+            ],
+            "ec_numbers": [],
+            "evidence": []
+        },
+        "sub_name": null,
+        "alt_names": [
+            {
+                "full": "Long neurotoxin 1",
+                "short": [],
+                "ec_numbers": [],
+                "evidence": []
+            }
+        ],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "P01385",
+    "organism": "Acanthophis antarcticus (Common death adder).",
+    "lineage": [
+        "Eukaryota",
+        "Metazoa",
+        "Chordata",
+        "Craniata",
+        "Vertebrata",
+        "Euteleostomi",
+        "Lepidosauria",
+        "Squamata",
+        "Bifurcata",
+        "Unidentata",
+        "Episquamata",
+        "Toxicofera",
+        "Serpentes",
+        "Colubroidea",
+        "Elapidae",
+        "Hydrophiinae",
+        "Acanthophis"
+    ],
+    "sequence": "VICYRGYNNPQTCPPGENVCFTRTWCDAFCSSRGKVVELGCAATCPIVKSYNEVKCCSTDKCNPFPVRPRRPP"
+}

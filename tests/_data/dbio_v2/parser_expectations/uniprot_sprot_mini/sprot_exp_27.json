@@ -1,0 +1,134 @@
+{
+    "entry_name": "3609L_ASFWA",
+    "status": "Reviewed",
+    "accessions": [
+        "P0C9P0"
+    ],
+    "dates": [
+        "05-MAY-2009, integrated into UniProtKB/Swiss-Prot.",
+        "05-MAY-2009, sequence version 1.",
+        "28-JAN-2026, entry version 31."
+    ],
+    "gene_names": [
+        "OrderedLocusNames=War-029"
+    ],
+    "organelle": [],
+    "taxon_id": 561444,
+    "hosts": [
+        "NCBI_TaxID=6937; Ornithodoros (relapsing fever ticks).",
+        "NCBI_TaxID=85517; Phacochoerus aethiopicus (Warthog).",
+        "NCBI_TaxID=41426; Phacochoerus africanus (Warthog).",
+        "NCBI_TaxID=273792; Potamochoerus larvatus (Bushpig).",
+        "NCBI_TaxID=9823; Sus scrofa (Pig)."
+    ],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [LARGE SCALE GENOMIC DNA].",
+            "RA": "Kutish G.F., Rock D.L.",
+            "RT": "\"African swine fever virus genomes.\"",
+            "RL": "Submitted (MAR-2003) to the EMBL/GenBank/DDBJ databases."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "Plays a role in virus cell tropism, and may be required for efficient virus replication in macrophages. {ECO:0000250|UniProtKB:Q65137}."
+        },
+        {
+            "topic": "SUBUNIT",
+            "text": "Interacts with host STAT1; this interaction mediates STAT1 degradation through apoptosis. Interacts with host STAT2; this interaction mediates STAT2 degradation through the proteasome. {ECO:0000250|UniProtKB:Q65137}."
+        },
+        {
+            "topic": "SUBCELLULAR LOCATION",
+            "text": "Host cytoplasm {ECO:0000250|UniProtKB:Q65137}."
+        },
+        {
+            "topic": "INDUCTION",
+            "text": "Expressed in the early phase of the viral replicative cycle. {ECO:0000305}."
+        },
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the asfivirus MGF 360 family. {ECO:0000305}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            "EMBL; AY261366; -; NOT_ANNOTATED_CDS; Genomic_DNA."
+        ],
+        "SMR": [
+            "SMR; P0C9P0; -."
+        ],
+        "Proteomes": [
+            "Proteomes; UP000000858; Segment."
+        ],
+        "GO": [
+            "GO; GO:0030430; C:host cell cytoplasm; IEA:UniProtKB-SubCell.",
+            "GO; GO:0052170; P:symbiont-mediated suppression of host innate immune response; IEA:UniProtKB-KW.",
+            "GO; GO:0039563; P:symbiont-mediated suppression of host JAK-STAT cascade via inhibition of STAT1 activity; IEA:UniProtKB-KW.",
+            "GO; GO:0039564; P:symbiont-mediated suppression of host JAK-STAT cascade via inhibition of STAT2 activity; IEA:UniProtKB-KW.",
+            "GO; GO:0039502; P:symbiont-mediated suppression of host type I interferon-mediated signaling pathway; IEA:UniProtKB-KW.",
+            "GO; GO:0042330; P:taxis; IEA:InterPro."
+        ],
+        "InterPro": [
+            "InterPro; IPR002595; ASFV_MGF360."
+        ],
+        "Pfam": [
+            "Pfam; PF01671; ASFV_360; 1."
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..352",
+            "qualifiers": {
+                "note": "Protein MGF 360-9L",
+                "id": "PRO_0000373268"
+            }
+        }
+    ],
+    "keywords": [
+        "Early protein",
+        "Host cytoplasm",
+        "Host-virus interaction",
+        "Inhibition of host innate immune response by virus",
+        "Inhibition of host interferon signaling pathway by virus",
+        "Inhibition of host STAT1 by virus",
+        "Inhibition of host STAT2 by virus",
+        "Interferon antiviral system evasion",
+        "Viral immunoevasion"
+    ],
+    "protein_existence": "3: Inferred from homology",
+    "sequence_length": 352,
+    "molecular_weight": 41464,
+    "crc64": "AB7AFB1070710C4E",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "Protein MGF 360-9L",
+            "short": [],
+            "ec_numbers": [],
+            "evidence": []
+        },
+        "sub_name": null,
+        "alt_names": [],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "P0C9P0",
+    "organism": "African swine fever virus (isolate Warthog/Namibia/Wart80/1980) (ASFV).",
+    "lineage": [
+        "Viruses",
+        "Varidnaviria",
+        "Bamfordvirae",
+        "Nucleocytoviricota",
+        "Pokkesviricetes",
+        "Asfuvirales",
+        "Asfarviridae",
+        "Asfivirus",
+        "Asfivirus haemorrhagiae",
+        "African swine fever virus"
+    ],
+    "sequence": "MVLSLQTLAKKVLAGQRPTKCHPHFLKCYGLWWHNGPMIFDQNQKKIWSPIFTDGVHINAALVKAVAENNYDLIKLFTEWGANIDYSLLSVNTERTRDLCRELGAKEQLKQEEVLYYFNIIKRNLTSSNIILCHEVFSHNPILETINRTKLRGIIYEQLEALMENTDILSELLTKYWYGIAIEFNLTKAIHYFYQRYVHLHQWRLMYALFYNNVCDLHELYAKEKIRMDMDEMLKWACRKNYNYLTIYYCCIVLGADINQAMFHSIQFYNIGNMFFCIDLGANAIEEGKTLALQKDKSFIASLLSINCYSMNDSLSLKETDPEVIKRMLKDYHSKNMSIAHKYYIKHGFNDI"
+}

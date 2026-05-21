@@ -1,0 +1,132 @@
+{
+    "entry_name": "36011_ASFM2",
+    "status": "Reviewed",
+    "accessions": [
+        "Q65123"
+    ],
+    "dates": [
+        "05-MAY-2009, integrated into UniProtKB/Swiss-Prot.",
+        "01-NOV-1996, sequence version 1.",
+        "28-JAN-2026, entry version 70."
+    ],
+    "gene_names": [
+        "OrderedLocusNames=Mal-030",
+        "ORFNames=LMW3EL"
+    ],
+    "organelle": [],
+    "taxon_id": 10500,
+    "hosts": [
+        "NCBI_TaxID=6937; Ornithodoros (relapsing fever ticks).",
+        "NCBI_TaxID=85517; Phacochoerus aethiopicus (Warthog).",
+        "NCBI_TaxID=41426; Phacochoerus africanus (Warthog).",
+        "NCBI_TaxID=273792; Potamochoerus larvatus (Bushpig).",
+        "NCBI_TaxID=9823; Sus scrofa (Pig)."
+    ],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [GENOMIC DNA].",
+            "RX": "PubMed=8030263; DOI=10.1006/viro.1994.1426",
+            "RA": "Yozawa T., Kutish G.F., Afonso C.L., Lu Z., Rock D.L.",
+            "RT": "\"Two novel multigene families, 530 and 300, in the terminal variable regions of African swine fever virus genome.\"",
+            "RL": "Virology 202:997-1002(1994)."
+        },
+        {
+            "RN": "[2]",
+            "RP": "NUCLEOTIDE SEQUENCE [LARGE SCALE GENOMIC DNA].",
+            "RA": "Kutish G.F., Rock D.L.",
+            "RT": "\"African swine fever virus genomes.\"",
+            "RL": "Submitted (MAR-2003) to the EMBL/GenBank/DDBJ databases."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "Plays a role in virus cell tropism, and may be required for efficient virus replication in macrophages. In addition, inhibits the phosphorylation of host TBK1 and IRF7 and thereby negatively regulates the host cGAS signaling pathway and antagonizes IFN-mediated antiviral activity. {ECO:0000250|UniProtKB:P0C9P6}."
+        },
+        {
+            "topic": "SUBUNIT",
+            "text": "Interacts with host TBK1 ad IRF7. {ECO:0000250|UniProtKB:P0C9P6}."
+        },
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the asfivirus MGF 360 family. {ECO:0000305}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            "EMBL; U03762; AAA50536.1; -; Genomic_DNA.",
+            "EMBL; AY261361; -; NOT_ANNOTATED_CDS; Genomic_DNA."
+        ],
+        "SMR": [
+            "SMR; Q65123; -."
+        ],
+        "Proteomes": [
+            "Proteomes; UP000000860; Segment."
+        ],
+        "GO": [
+            "GO; GO:0039557; P:symbiont-mediated suppression of host cytoplasmic pattern recognition receptor signaling pathway via inhibition of IRF7 activity; IEA:UniProtKB-KW.",
+            "GO; GO:0039723; P:symbiont-mediated suppression of host cytoplasmic pattern recognition receptor signaling pathway via inhibition of TBK1 activity; IEA:UniProtKB-KW.",
+            "GO; GO:0039722; P:symbiont-mediated suppression of host toll-like receptor signaling pathway; IEA:UniProtKB-KW.",
+            "GO; GO:0042330; P:taxis; IEA:InterPro."
+        ],
+        "InterPro": [
+            "InterPro; IPR002595; ASFV_MGF360."
+        ],
+        "Pfam": [
+            "Pfam; PF01671; ASFV_360; 1."
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..353",
+            "qualifiers": {
+                "note": "Protein MGF 360-11L",
+                "id": "PRO_0000373279"
+            }
+        }
+    ],
+    "keywords": [
+        "Host-virus interaction",
+        "Inhibition of host innate immune response by virus",
+        "Inhibition of host IRF7 by virus",
+        "Inhibition of host RLR pathway by virus",
+        "Inhibition of host TBK1 by virus",
+        "Inhibition of host TLR pathway by virus",
+        "Viral immunoevasion"
+    ],
+    "protein_existence": "3: Inferred from homology",
+    "sequence_length": 353,
+    "molecular_weight": 41804,
+    "crc64": "54AA3A62F4F738C3",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "Protein MGF 360-11L",
+            "short": [],
+            "ec_numbers": [],
+            "evidence": []
+        },
+        "sub_name": null,
+        "alt_names": [],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "Q65123",
+    "organism": "African swine fever virus (isolate Tick/Malawi/Lil 20-1/1983) (ASFV).",
+    "lineage": [
+        "Viruses",
+        "Varidnaviria",
+        "Bamfordvirae",
+        "Nucleocytoviricota",
+        "Pokkesviricetes",
+        "Asfuvirales",
+        "Asfarviridae",
+        "Asfivirus",
+        "Asfivirus haemorrhagiae",
+        "African swine fever virus"
+    ],
+    "sequence": "MLPSLQSLTKKVLAKQCVPVDQYHVLKCCGLWWYDGPITFYVYRHKMFIRSTCFSEGIELNTVLMKAAKENNHDLIRLFAEWGADINYGLICAHTEHTRNLCRELGAKDRLDRDYILKIFFDTTRNKTDSNIILCHEMFSNNPNLKNVDNLDLREEIMWELRGLMEITYMLDHDNSFSNMLTKYWYAIAVDYGLKKAIHYFYQRYTHLHHWRLMCALFYNNVFDLHELYVIERVRMDIDEMMHIACVQDYSYAAIYYCFIMGANINQAMLVSIQNYNLGNMFFCIDLGANAFEEGKALAEQKENYLIADALSLKHYNPVISLLSVIMDPEKINCMLKNYHSINMRVFLDYERR"
+}

@@ -27,11 +27,16 @@ as a pure bag (no check).
 from __future__ import annotations
 
 import gzip
+import json
 from contextlib import contextmanager
-from typing import ClassVar, Iterator, get_origin
+from typing import ClassVar, IO, Iterable, Iterator, get_origin
 
 
-__all__ = ["Record", "ParseError", "SchemaError", "iter_lines", "open_text"]
+__all__ = [
+    "Record", "ParseError", "SchemaError",
+    "iter_lines", "open_text",
+    "dump_jsonl",
+]
 
 
 class ParseError(Exception):
@@ -160,6 +165,29 @@ class Record:
         """Return a shallow copy of the stored fields as a plain dict."""
         return dict(self._fields)
 
+    def to_json(
+        self,
+        *,
+        indent: int | None = None,
+        ensure_ascii: bool = False,
+        sort_keys: bool = False,
+    ) -> str:
+        """Serialize the record's fields to a JSON string.
+
+        Mirrors :meth:`as_dict` (``record_type`` is a class-level tag and
+        is not emitted). Default ``indent=None`` yields compact one-line
+        output suitable for JSONL streaming; pass ``indent=2`` or ``4``
+        for pretty-printing. The defaults match what the expectation
+        JSONs under ``tests/_data/dbio_v2/parser_expectations/`` use, so
+        ``json.loads(rec.to_json())`` round-trips back to ``as_dict``.
+        """
+        return json.dumps(
+            self.as_dict(),
+            indent=indent,
+            ensure_ascii=ensure_ascii,
+            sort_keys=sort_keys,
+        )
+
     # --- attribute-style read access -----------------------------------
 
     def __getattr__(self, name: str):
@@ -233,3 +261,33 @@ def open_text(path: str, encoding: str = "utf-8"):
             yield handle
     except (EOFError, gzip.BadGzipFile, OSError) as exc:
         raise ParseError(f"failed reading {path}: {exc}") from exc
+
+
+# ---------------------------------------------------------------------------
+# JSON / JSONL emission
+# ---------------------------------------------------------------------------
+
+def dump_jsonl(
+    records: Iterable[Record],
+    stream: IO[str],
+    *,
+    ensure_ascii: bool = False,
+) -> int:
+    """Write a stream of :class:`Record` instances to *stream* as JSONL —
+    one compact JSON object per line. Returns the number of records
+    written so callers can verify the count without re-iterating.
+
+    Pairs with any ``iter_records`` parser::
+
+        from biom3.dbio_v2.parsers import dump_jsonl
+        from biom3.dbio_v2.parsers.uniprot_dat import iter_records
+
+        with open("out.jsonl", "w") as f:
+            n = dump_jsonl(iter_records("uniprot_sprot.dat.gz"), f)
+    """
+    count = 0
+    for rec in records:
+        stream.write(rec.to_json(ensure_ascii=ensure_ascii))
+        stream.write("\n")
+        count += 1
+    return count

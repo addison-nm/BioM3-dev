@@ -42,24 +42,13 @@
     ],
     "cross_references": {
         "EMBL": [
-            [
-                "AY261360",
-                "-",
-                "NOT_ANNOTATED_CDS",
-                "Genomic_DNA"
-            ]
+            "EMBL; AY261360; -; NOT_ANNOTATED_CDS; Genomic_DNA."
         ],
         "SMR": [
-            [
-                "P0C9F0",
-                "-"
-            ]
+            "SMR; P0C9F0; -."
         ],
         "Proteomes": [
-            [
-                "UP000000861",
-                "Segment"
-            ]
+            "Proteomes; UP000000861; Segment."
         ]
     },
     "features": [

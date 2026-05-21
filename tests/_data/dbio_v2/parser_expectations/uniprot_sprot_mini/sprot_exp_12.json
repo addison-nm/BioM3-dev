@@ -1,0 +1,196 @@
+{
+    "entry_name": "143B2_ONCMY",
+    "status": "Reviewed",
+    "accessions": [
+        "Q6UFZ8"
+    ],
+    "dates": [
+        "22-NOV-2005, integrated into UniProtKB/Swiss-Prot.",
+        "05-JUL-2004, sequence version 1.",
+        "28-JAN-2026, entry version 66."
+    ],
+    "gene_names": [],
+    "organelle": [],
+    "taxon_id": 8022,
+    "hosts": [],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "NUCLEOTIDE SEQUENCE [MRNA], TISSUE SPECIFICITY, DEVELOPMENTAL STAGE, AND INDUCTION.",
+            "RX": "PubMed=15326212; DOI=10.1242/jeb.01165",
+            "RA": "Koskinen H., Krasnov A., Rexroad C., Gorodilov Y., Afanasyev S., Moelsae H.",
+            "RT": "\"The 14-3-3 proteins in the teleost fish rainbow trout (Oncorhynchus mykiss).\"",
+            "RL": "J. Exp. Biol. 207:3361-3368(2004)."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "Adapter protein implicated in the regulation of a large spectrum of both general and specialized signaling pathways. Binds to a large number of partners, usually by recognition of a phosphoserine or phosphothreonine motif. Binding generally results in the modulation of the activity of the binding partner (By similarity). {ECO:0000250}."
+        },
+        {
+            "topic": "SUBUNIT",
+            "text": "Homodimer, and heterodimer with other family members. {ECO:0000250}."
+        },
+        {
+            "topic": "SUBCELLULAR LOCATION",
+            "text": "Cytoplasm {ECO:0000250}."
+        },
+        {
+            "topic": "TISSUE SPECIFICITY",
+            "text": "Expressed in brain, gill, heart, intestine, kidney, liver, ovary, skeletal muscle, spleen and testis. {ECO:0000269|PubMed:15326212}."
+        },
+        {
+            "topic": "DEVELOPMENTAL STAGE",
+            "text": "Expressed throughout development. {ECO:0000269|PubMed:15326212}."
+        },
+        {
+            "topic": "INDUCTION",
+            "text": "Repressed under stress conditions such as netting. {ECO:0000269|PubMed:15326212}."
+        },
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the 14-3-3 family. {ECO:0000305}."
+        }
+    ],
+    "cross_references": {
+        "EMBL": [
+            "EMBL; AY370880; AAQ72488.1; -; mRNA."
+        ],
+        "RefSeq": [
+            "RefSeq; NP_001117941.1; NM_001124469.1."
+        ],
+        "AlphaFoldDB": [
+            "AlphaFoldDB; Q6UFZ8; -."
+        ],
+        "SMR": [
+            "SMR; Q6UFZ8; -."
+        ],
+        "GeneID": [
+            "GeneID; 100136193; -."
+        ],
+        "KEGG": [
+            "KEGG; omy:100136193; -."
+        ],
+        "OrthoDB": [
+            "OrthoDB; 10260625at2759; -."
+        ],
+        "Proteomes": [
+            "Proteomes; UP000694395; Unplaced."
+        ],
+        "GO": [
+            "GO; GO:0005737; C:cytoplasm; IEA:UniProtKB-SubCell."
+        ],
+        "FunFam": [
+            "FunFam; 1.20.190.20:FF:000001; 14-3-3 gamma 1; 1."
+        ],
+        "Gene3D": [
+            "Gene3D; 1.20.190.20; 14-3-3 domain; 1."
+        ],
+        "InterPro": [
+            "InterPro; IPR000308; 14-3-3.",
+            "InterPro; IPR023409; 14-3-3_CS.",
+            "InterPro; IPR036815; 14-3-3_dom_sf.",
+            "InterPro; IPR023410; 14-3-3_domain."
+        ],
+        "PANTHER": [
+            "PANTHER; PTHR18860; 14-3-3 PROTEIN; 1."
+        ],
+        "Pfam": [
+            "Pfam; PF00244; 14-3-3; 1."
+        ],
+        "PIRSF": [
+            "PIRSF; PIRSF000868; 14-3-3; 1."
+        ],
+        "PRINTS": [
+            "PRINTS; PR00305; 1433ZETA."
+        ],
+        "SMART": [
+            "SMART; SM00101; 14_3_3; 1."
+        ],
+        "SUPFAM": [
+            "SUPFAM; SSF48445; 14-3-3 protein; 1."
+        ],
+        "PROSITE": [
+            "PROSITE; PS00796; 1433_1; 1."
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..244",
+            "qualifiers": {
+                "note": "14-3-3 protein beta/alpha-2",
+                "id": "PRO_0000058604"
+            }
+        },
+        {
+            "type": "SITE",
+            "location": "56",
+            "qualifiers": {
+                "note": "Interaction with phosphoserine on interacting protein",
+                "evidence": "ECO:0000250"
+            }
+        },
+        {
+            "type": "SITE",
+            "location": "127",
+            "qualifiers": {
+                "note": "Interaction with phosphoserine on interacting protein",
+                "evidence": "ECO:0000250"
+            }
+        },
+        {
+            "type": "MOD_RES",
+            "location": "1",
+            "qualifiers": {
+                "note": "N-acetylmethionine",
+                "evidence": "ECO:0000250"
+            }
+        }
+    ],
+    "keywords": [
+        "Acetylation",
+        "Cytoplasm",
+        "Reference proteome"
+    ],
+    "protein_existence": "2: Evidence at transcript level",
+    "sequence_length": 244,
+    "molecular_weight": 27441,
+    "crc64": "69D32DFFA9DA1F09",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "14-3-3 protein beta/alpha-2",
+            "short": [
+                "Protein 14-3-3B2"
+            ],
+            "ec_numbers": [],
+            "evidence": []
+        },
+        "sub_name": null,
+        "alt_names": [],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "Q6UFZ8",
+    "organism": "Oncorhynchus mykiss (Rainbow trout) (Salmo gairdneri).",
+    "lineage": [
+        "Eukaryota",
+        "Metazoa",
+        "Chordata",
+        "Craniata",
+        "Vertebrata",
+        "Euteleostomi",
+        "Actinopterygii",
+        "Neopterygii",
+        "Teleostei",
+        "Protacanthopterygii",
+        "Salmoniformes",
+        "Salmonidae",
+        "Salmoninae",
+        "Oncorhynchus"
+    ],
+    "sequence": "MDKNDLVQKAKLAEQAERYDDMAGAMKSVTEQGGELSNEERNLLSVAYKNVVGARRSSWRVISSIEQKTEGNEKKQAMAKEYREKIETELQDICNDVLGLLDKYLIANATAAESKVFYLKMKGDYYRYLSEVAAGDAKKTTVDNSQQAYQDAFDISKKEMQPTHPIRLGLALNFSVFFYEILNNPEKACTLAKTAFDEAIAELDTLNEDSYKDSTLIMQLLKGHLTLWTSENQGDEGETGEGEN"
+}

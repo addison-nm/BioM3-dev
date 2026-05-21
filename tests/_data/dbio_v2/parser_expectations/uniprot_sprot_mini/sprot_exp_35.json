@@ -1,0 +1,202 @@
+{
+    "entry_name": "3L27_NAJNA",
+    "status": "Reviewed",
+    "accessions": [
+        "C0HM09"
+    ],
+    "dates": [
+        "03-AUG-2022, integrated into UniProtKB/Swiss-Prot.",
+        "03-AUG-2022, sequence version 1.",
+        "09-APR-2025, entry version 8."
+    ],
+    "gene_names": [],
+    "organelle": [],
+    "taxon_id": 35670,
+    "hosts": [],
+    "references": [
+        {
+            "RN": "[1]",
+            "RP": "PROTEIN SEQUENCE, FUNCTION, SUBCELLULAR LOCATION, AND MASS SPECTROMETRY.",
+            "RX": "PubMed=35418867; DOI=10.3389/fphar.2022.815079",
+            "RA": "Huynh T.M., Silva A., Isbister G.K., Hodgson W.C.",
+            "RT": "\"Isolation and Characterization of Two Postsynaptic Neurotoxins From Indian Cobra (Naja Naja) Venom.\"",
+            "RL": "Front. Pharmacol. 13:815079-815079(2022)."
+        }
+    ],
+    "comments": [
+        {
+            "topic": "FUNCTION",
+            "text": "Nicotinic acetylcholine receptor antagonist (PubMed:35418867). Binds to muscle nicotinic acetylcholine receptor (nAChR) and inhibits acetylcholine from binding to the receptor, thereby impairing neuromuscular transmission (PubMed:35418867). Produces peripheral paralysis by blocking neuromuscular transmission at the postsynaptic site (PubMed:35418867). Induces concentration-dependent inhibition of indirect twitches and abolishes contractile responses of tissues to exogenous acetylcholine and carbachol, in the chick biventer cervicis nerve-muscle preparation at 100-300 nM (in vitro) (PubMed:35418867). Prior incubation of tissues with Indian polyvalent antivenom (1 ml/0.6 mg) prevents the neurotoxic effects at 100 nM (in vitro) (PubMed:35418867). Addition of Indian polyvalent antivenom (1 ml/0.6 mg) at the t90 time point partially restores the neurotoxic effects (in vitro) (PubMed:35418867). Displays a reversible antagonism of concentration-response curves to carbachol, with a pA2 of 8.17 (in vitro) (PubMed:35418867). {ECO:0000269|PubMed:35418867}."
+        },
+        {
+            "topic": "SUBCELLULAR LOCATION",
+            "text": "Secreted {ECO:0000269|PubMed:35418867}."
+        },
+        {
+            "topic": "TISSUE SPECIFICITY",
+            "text": "Expressed by the venom gland. {ECO:0000305}."
+        },
+        {
+            "topic": "MASS SPECTROMETRY",
+            "text": "Mass=7807.5; Method=MALDI; Evidence={ECO:0000269|PubMed:35418867};"
+        },
+        {
+            "topic": "MISCELLANEOUS",
+            "text": "Constitutes approximately 3% of the whole venom protein content. {ECO:0000269|PubMed:35418867}."
+        },
+        {
+            "topic": "SIMILARITY",
+            "text": "Belongs to the three-finger toxin family. Long-chain subfamily. Type II alpha-neurotoxin sub-subfamily. {ECO:0000305}."
+        }
+    ],
+    "cross_references": {
+        "SMR": [
+            "SMR; C0HM09; -."
+        ],
+        "Proteomes": [
+            "Proteomes; UP000694559; Unplaced."
+        ],
+        "GO": [
+            "GO; GO:0005576; C:extracellular region; IEA:UniProtKB-SubCell.",
+            "GO; GO:0030550; F:acetylcholine receptor inhibitor activity; IEA:UniProtKB-KW.",
+            "GO; GO:0099106; F:ion channel regulator activity; IEA:UniProtKB-KW.",
+            "GO; GO:0090729; F:toxin activity; IEA:UniProtKB-KW."
+        ],
+        "CDD": [
+            "CDD; cd00206; TFP_snake_toxin; 1."
+        ],
+        "Gene3D": [
+            "Gene3D; 2.10.60.10; CD59; 1."
+        ],
+        "InterPro": [
+            "InterPro; IPR003571; Snake_3FTx.",
+            "InterPro; IPR045860; Snake_toxin-like_sf.",
+            "InterPro; IPR018354; Snake_toxin_con_site.",
+            "InterPro; IPR054131; Toxin_cobra-type."
+        ],
+        "Pfam": [
+            "Pfam; PF21947; Toxin_cobra-type; 1."
+        ],
+        "SUPFAM": [
+            "SUPFAM; SSF57302; Snake toxin-like; 1."
+        ],
+        "PROSITE": [
+            "PROSITE; PS00272; SNAKE_TOXIN; 1."
+        ]
+    },
+    "features": [
+        {
+            "type": "CHAIN",
+            "location": "1..71",
+            "qualifiers": {
+                "note": "Alpha-elapitoxin-Nn3a",
+                "id": "PRO_0000456214"
+            }
+        },
+        {
+            "type": "DISULFID",
+            "location": "3..20",
+            "qualifiers": {
+                "evidence": "ECO:0000250|UniProtKB:P25671"
+            }
+        },
+        {
+            "type": "DISULFID",
+            "location": "14..42",
+            "qualifiers": {
+                "evidence": "ECO:0000250|UniProtKB:P25671"
+            }
+        },
+        {
+            "type": "DISULFID",
+            "location": "26..30",
+            "qualifiers": {
+                "evidence": "ECO:0000250|UniProtKB:P25671"
+            }
+        },
+        {
+            "type": "DISULFID",
+            "location": "46..56",
+            "qualifiers": {
+                "evidence": "ECO:0000250|UniProtKB:P25671"
+            }
+        },
+        {
+            "type": "DISULFID",
+            "location": "57..62",
+            "qualifiers": {
+                "evidence": "ECO:0000250|UniProtKB:P25671"
+            }
+        }
+    ],
+    "keywords": [
+        "Acetylcholine receptor inhibiting toxin",
+        "Direct protein sequencing",
+        "Disulfide bond",
+        "Ion channel impairing toxin",
+        "Neurotoxin",
+        "Postsynaptic neurotoxin",
+        "Reference proteome",
+        "Secreted",
+        "Toxin"
+    ],
+    "protein_existence": "1: Evidence at protein level",
+    "sequence_length": 71,
+    "molecular_weight": 7805,
+    "crc64": "F1981E995C9269AB",
+    "unparsed": {},
+    "description": {
+        "rec_name": {
+            "full": "Alpha-elapitoxin-Nn3a",
+            "short": [],
+            "ec_numbers": [],
+            "evidence": [
+                "ECO:0000303|PubMed:35418867"
+            ]
+        },
+        "sub_name": null,
+        "alt_names": [
+            {
+                "full": "Long neurotoxin 7",
+                "short": [],
+                "ec_numbers": [],
+                "evidence": [
+                    "ECO:0000305"
+                ]
+            },
+            {
+                "full": "Long-chain alpha-neurotoxin Nn3a",
+                "short": [],
+                "ec_numbers": [],
+                "evidence": [
+                    "ECO:0000303|PubMed:35418867"
+                ]
+            }
+        ],
+        "includes": [],
+        "contains": [],
+        "flags": []
+    },
+    "primary_accession": "C0HM09",
+    "organism": "Naja naja (Indian cobra).",
+    "lineage": [
+        "Eukaryota",
+        "Metazoa",
+        "Chordata",
+        "Craniata",
+        "Vertebrata",
+        "Euteleostomi",
+        "Lepidosauria",
+        "Squamata",
+        "Bifurcata",
+        "Unidentata",
+        "Episquamata",
+        "Toxicofera",
+        "Serpentes",
+        "Colubroidea",
+        "Elapidae",
+        "Elapinae",
+        "Naja"
+    ],
+    "sequence": "IRCFITPDITSKDCPNGHVCYTKTWCDGFCSIRGERVDLDGCAATCPTVTGVDIQCCSTDNCNPFPTRKRP"
+}

@@ -94,7 +94,7 @@ class TestSwissProtEntry:
         assert d["flags"] == []
 
     def test_cross_references_pfam(self, sprot):
-        assert sprot[0].cross_references["Pfam"] == [["PF04947", "Pox_VLTF3", "1"]]
+        assert sprot[0].cross_references["Pfam"] == ["Pfam; PF04947; Pox_VLTF3; 1."]
 
     def test_comment_block_keeps_evidence_tag_and_period(self, sprot):
         c = sprot[0].comments[0]
@@ -162,7 +162,7 @@ class TestTremblEntry:
         r = trembl[0]
         assert r.comments[0]["topic"] == "COFACTOR"
         assert "ECO:0000256" in r.comments[0]["text"]
-        assert r.cross_references["Pfam"] == [["PF00199", "Catalase", "1"]]
+        assert r.cross_references["Pfam"] == ["Pfam; PF00199; Catalase; 1."]
 
     def test_keywords_keep_evidence(self, trembl):
         assert all("ECO:0000256" in k for k in trembl[0].keywords[:1])
@@ -227,11 +227,13 @@ class TestFailLoud:
             list(iter_records(str(p)))
 
 
+NUM_SPROT_EXP_FILES = 40
+
 class TestJsonExpectations:
     """Per-entry comparison against hand-written JSON expectations under
     tests/_data/dbio_v2/parser_expectations/uniprot_sprot_mini/."""
-
-    @pytest.mark.parametrize("idx", range(8))
+    
+    @pytest.mark.parametrize("idx", range(NUM_SPROT_EXP_FILES))
     def test_record_matches_expectation(self, sprot, idx):
         with open(os.path.join(SPROT_EXPECTATIONS, f"sprot_exp_{idx}.json")) as f:
             expected = json.load(f)
@@ -241,6 +243,14 @@ class TestJsonExpectations:
             f"differing keys: "
             f"{[k for k in expected if expected[k] != actual.get(k)]}"
         )
+
+    @pytest.mark.parametrize("idx", range(NUM_SPROT_EXP_FILES))
+    def test_to_json_round_trips_to_expectation(self, sprot, idx):
+        """Record.to_json() must produce the same payload as the
+        expectation JSON after round-tripping through json.loads."""
+        with open(os.path.join(SPROT_EXPECTATIONS, f"sprot_exp_{idx}.json")) as f:
+            expected = json.load(f)
+        assert json.loads(sprot[idx].to_json()) == expected
 
 
 class TestParseDescriptionUnit:

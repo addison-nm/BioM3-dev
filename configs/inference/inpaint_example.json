@@ -1,0 +1,9 @@
+{
+  "template": "MKLV----------GGSAA-----HHHH",
+  "auto_add_start": true,
+  "auto_add_stop": true,
+  "per_prompt": {
+    "0": "MKLV----------GGSAA-----HHHH",
+    "1": "----------------------------------"
+  }
+}

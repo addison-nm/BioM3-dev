@@ -30,6 +30,7 @@ import copy
 import json
 import os
 import sys
+from collections import defaultdict
 from datetime import datetime
 import random
 import warnings
@@ -59,6 +60,13 @@ from biom3.core.distributed import (
     gather_object_to_main,
     init_distributed_if_launched,
     is_main_process,
+)
+from biom3.Stage3.inpaint import (
+    RUNTIME_TOKENS,
+    build_template_state,
+    build_sampling_path_row,
+    load_inpaint_config,
+    resolve_template,
 )
 
 logger = setup_logger(__name__)
@@ -132,6 +140,16 @@ def parse_arguments(args):
                         help="Path to JSON config describing the pre-unmask "
                              "strategy (strategy, fill_with, diffusion_budget). "
                              "Required when --pre_unmask is set.")
+    parser.add_argument('--inpaint', action='store_true', default=False,
+                        help="Start diffusion from a partially-filled template "
+                             "(in-painting); fixed residues are frozen and only "
+                             "mask ('-') positions are generated. Requires "
+                             "--inpaint_config. Mutually exclusive with --pre_unmask.")
+    parser.add_argument('--inpaint_config', type=str, default=None,
+                        help="Path to JSON config describing the in-painting "
+                             "template(s): keys 'template', 'per_prompt', "
+                             "'auto_add_start', 'auto_add_stop'. Required when "
+                             "--inpaint is set.")
     return parser.parse_args(args)
 
 
@@ -319,6 +337,99 @@ def _build_initial_mask_state(args, batch_size: int, tokens: list, sample_seeds:
     return init, sampling_path
 
 
+def _resolve_inpaint_args(config_args, config_args_parser):
+    """Resolve in-painting CLI/config onto ``config_args``.
+
+    Sets ``config_args.inpaint`` and (when enabled) ``config_args.inpaint_config``.
+    Enforces that ``--inpaint`` and ``--pre_unmask`` are mutually exclusive.
+    Returns ``config_args`` for convenience.
+    """
+    config_args.inpaint = bool(getattr(config_args_parser, 'inpaint', False))
+    if config_args.inpaint:
+        if getattr(config_args, 'pre_unmask', False):
+            raise ValueError("--inpaint and --pre_unmask are mutually exclusive")
+        config_args.inpaint_config = load_inpaint_config(
+            getattr(config_args_parser, 'inpaint_config', None)
+        )
+        logger.info(
+            "In-painting enabled: shared_template=%s per_prompt=%d "
+            "auto_add_start=%s auto_add_stop=%s seq_len=%d",
+            config_args.inpaint_config.get('template') is not None,
+            len(config_args.inpaint_config.get('per_prompt') or {}),
+            config_args.inpaint_config['auto_add_start'],
+            config_args.inpaint_config['auto_add_stop'],
+            getattr(config_args, 'sequence_length', None),
+        )
+    elif getattr(config_args_parser, 'inpaint_config', None):
+        logger.warning("--inpaint_config ignored because --inpaint is not set")
+    return config_args
+
+
+def _generate_inpaint(args, tokens, rank_work_items, base_seed,
+                      rank_local_sequences, process_batch):
+    """Drive in-painting generation for this rank's ``(global_idx, p, r)`` slice.
+
+    Each prompt's template is parsed into a frozen initial state plus the set of
+    mask positions to generate. Work items are bucketed by mask count ``D`` so
+    every batch shares a uniform diffusion budget (the samplers run a single
+    scalar ``args.diffusion_steps`` budget). Per-item permutations and token
+    sampling are driven by the same world-size-invariant
+    ``_derive_sample_seed(base_seed, p, r)`` used by the default path, so
+    in-painting outputs depend only on (seed, indices) — not world size or
+    batch packing. Templates with no masks are emitted verbatim.
+    """
+    seq_len = getattr(args, 'sequence_length', args.diffusion_steps)
+    cfg = args.inpaint_config
+
+    # Templates are per-prompt (identical across replicas); cache by prompt.
+    state_cache = {}
+    buckets = defaultdict(list)  # D -> list of (global_idx, p, r, state_row, path_row, seed)
+    for (i, p_idx, r_idx) in rank_work_items:
+        if p_idx not in state_cache:
+            template = resolve_template(p_idx, cfg)
+            state_cache[p_idx] = build_template_state(
+                template, seq_len,
+                auto_add_start=cfg.get('auto_add_start', True),
+                auto_add_stop=cfg.get('auto_add_stop', True),
+                tokens=tokens,
+            )
+        state_row, mask_positions = state_cache[p_idx]
+        D = int(mask_positions.numel())
+        seed = _derive_sample_seed(base_seed, p_idx, r_idx)
+        gen = torch.Generator().manual_seed(int(seed))
+        path_row = build_sampling_path_row(mask_positions, seq_len, generator=gen)
+        buckets[D].append((i, p_idx, r_idx, state_row, path_row, seed))
+
+    # Fully-specified templates (no masks): emit as-is, no diffusion.
+    if 0 in buckets:
+        zero_items = buckets.pop(0)
+        logger.warning(
+            "In-painting: %d (prompt, replica) item(s) have no mask positions; "
+            "emitting the template unchanged.", len(zero_items),
+        )
+        for (_i, p_idx, r_idx, state_row, _path, _seed) in zero_items:
+            design_sequence = Stage3_ani_tools.convert_num_to_char(tokens, state_row)
+            clean_sequence = design_sequence.replace('<START>', '').replace('<END>', '').replace('<PAD>', '')
+            rank_local_sequences[(p_idx, r_idx)] = clean_sequence
+
+    total = sum(len(v) for v in buckets.values())
+    logger.info(
+        "In-painting: %d rank-local item(s) across %d mask-count bucket(s) %s | seq_len=%d",
+        total, len(buckets), {d: len(v) for d, v in sorted(buckets.items())}, seq_len,
+    )
+
+    bs = args.batch_size_sample
+    for D in sorted(buckets):
+        items = buckets[D]
+        for start in tqdm.trange(0, len(items), bs, desc=f"inpaint D={D}"):
+            chunk = items[start:start + bs]
+            batch = [(i, p_idx, r_idx) for (i, p_idx, r_idx, _s, _p, _sd) in chunk]
+            initial_samples = torch.stack([s for (_i, _p, _r, s, _pp, _sd) in chunk])
+            batch_perms = torch.stack([pp for (_i, _p, _r, _s, pp, _sd) in chunk])
+            sample_seeds = [sd for (_i, _p, _r, _s, _pp, sd) in chunk]
+            process_batch(batch, initial_samples, batch_perms, sample_seeds, D)
+
+
 # Step 4: Sample sequences from the model
 @torch.no_grad()
 def batch_stage3_generate_sequences(
@@ -385,12 +496,9 @@ def batch_stage3_generate_sequences(
     model.to(args.device)
     z_t = z_t.to(args.device)
 
-    # Amino acid tokenization including special characters
-    tokens = [
-        '-', '<START>', 'A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M',
-        'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y', '<END>', '<PAD>',
-        'X', 'U', 'Z', 'B', 'O'  # Special characters
-    ]
+    # Amino acid tokenization including special characters (canonical runtime
+    # vocab, shared with the in-painting template parser so token ids agree).
+    tokens = list(RUNTIME_TOKENS)
 
     if '<PAD>' not in tokens:
         raise ValueError("Token vocabulary is missing '<PAD>' — cannot resolve pad_token_id")
@@ -424,76 +532,91 @@ def batch_stage3_generate_sequences(
     stored_probs = {}      # (p_idx, r_idx) -> np.ndarray [steps, seq_len, num_classes]
     stored_final_frames = {}  # (p_idx, r_idx) -> np.ndarray [seq_len], final token indices
 
-    # Process this rank's slice in batches
-    num_batches = (len(rank_work_items) + args.batch_size_sample - 1) // args.batch_size_sample
-    logger.info(
-        "Prompts: %d | Reps/prompt: %d | Total reps: %d | Rank reps: %d | "
-        "Batch size: %d | Batches: %d (rank=%d/world=%d)",
-        num_prompts, args.num_replicas, num_prompts * args.num_replicas,
-        len(rank_work_items), args.batch_size_sample, num_batches, rank, world_size,
-    )
-    for batch_start in tqdm.trange(0, len(rank_work_items), args.batch_size_sample, desc="batch"):
-        batch = rank_work_items[batch_start : batch_start + args.batch_size_sample]
-        current_batch_size = len(batch)
+    unmasking_order = getattr(args, 'unmasking_order', 'random')
 
-        # Gather conditioning vectors for this batch (different prompts per item)
-        batch_prompt_indices = [p_idx for (_, p_idx, _) in batch]
-        batched_z_text_sample = z_t[batch_prompt_indices]
+    def _process_batch(batch, initial_samples, batch_perms, sample_seeds, diffusion_steps):
+        """Run one uniform-budget batch and scatter results into rank-local outputs.
 
-        # Per-sample seeds — world-size-invariant: same (base_seed, p_idx, r_idx)
-        # always produces the same seed regardless of how the work is split.
-        sample_seeds = _make_sample_seeds(batch, base_seed)
+        ``batch`` is a list of ``(global_idx, p_idx, r_idx)`` triples.
+        ``diffusion_steps`` is the number of unmasking steps for this batch
+        (full sequence length for default/pre_unmask, or the per-bucket mask
+        count for in-painting); it is applied to ``args.diffusion_steps`` for
+        the sampler call and restored afterwards.
+        """
+        prev_steps = args.diffusion_steps
+        args.diffusion_steps = diffusion_steps
+        try:
+            batch_prompt_indices = [p_idx for (_, p_idx, _) in batch]
+            batched_z_text_sample = z_t[batch_prompt_indices]
 
-        # Build initial mask state (all-masked by default, or partially
-        # pre-unmasked when args.pre_unmask is enabled).
-        initial_samples, batch_perms = _build_initial_mask_state(
-            args, current_batch_size, tokens, sample_seeds=sample_seeds,
-        )
-
-        # Generate denoised samples using the model
-        unmasking_order = getattr(args, 'unmasking_order', 'random')
-        if unmasking_order in ('confidence', 'confidence_no_pad'):
-            mask_realization_list, _, batch_probs = Stage3_sample_tools.batch_generate_denoised_sampled_confidence(
-                args=args,
-                model=model,
-                extract_digit_samples=initial_samples,
-                extract_time=torch.zeros(current_batch_size).long(),
-                extract_digit_label=batched_z_text_sample,
-                store_probabilities=store_probabilities,
-                skip_pad=(unmasking_order == 'confidence_no_pad'),
-                sample_seeds=sample_seeds,
-            )
-        else:
-            mask_realization_list, _, batch_probs = Stage3_sample_tools.batch_generate_denoised_sampled(
-                args=args,
-                model=model,
-                extract_digit_samples=initial_samples,
-                extract_time=torch.zeros(current_batch_size).long(),
-                extract_digit_label=batched_z_text_sample,
-                sampling_path=batch_perms,
-                store_probabilities=store_probabilities,
-                sample_seeds=sample_seeds,
-            )
-
-        # Unpack results into rank-local sparse dict
-        for i, (_, p_idx, r_idx) in enumerate(batch):
-            mask_realization = mask_realization_list[-1][i]
-            design_sequence = Stage3_ani_tools.convert_num_to_char(tokens, mask_realization[0])
-            clean_sequence = design_sequence.replace('<START>', '').replace('<END>', '').replace('<PAD>', '')
-            rank_local_sequences[(p_idx, r_idx)] = clean_sequence
-
-            if animate and p_idx in animate_prompts and r_idx in animate_replicas:
-                animation_frames[(p_idx, r_idx)] = [
-                    mask_realization_list[step][i][0].copy()
-                    for step in range(args.diffusion_steps)
-                ]
-
-            if batch_probs is not None:
-                # batch_probs shape: [steps, batch, seq_len, num_classes]
-                stored_probs[(p_idx, r_idx)] = batch_probs[:, i]
-                stored_final_frames[(p_idx, r_idx)] = np.asarray(
-                    mask_realization[0], dtype=np.int64,
+            if unmasking_order in ('confidence', 'confidence_no_pad'):
+                mask_realization_list, _, batch_probs = Stage3_sample_tools.batch_generate_denoised_sampled_confidence(
+                    args=args,
+                    model=model,
+                    extract_digit_samples=initial_samples,
+                    extract_time=torch.zeros(len(batch)).long(),
+                    extract_digit_label=batched_z_text_sample,
+                    store_probabilities=store_probabilities,
+                    skip_pad=(unmasking_order == 'confidence_no_pad'),
+                    sample_seeds=sample_seeds,
                 )
+            else:
+                mask_realization_list, _, batch_probs = Stage3_sample_tools.batch_generate_denoised_sampled(
+                    args=args,
+                    model=model,
+                    extract_digit_samples=initial_samples,
+                    extract_time=torch.zeros(len(batch)).long(),
+                    extract_digit_label=batched_z_text_sample,
+                    sampling_path=batch_perms,
+                    store_probabilities=store_probabilities,
+                    sample_seeds=sample_seeds,
+                )
+
+            # Unpack results into rank-local sparse dict
+            for i, (_, p_idx, r_idx) in enumerate(batch):
+                mask_realization = mask_realization_list[-1][i]
+                design_sequence = Stage3_ani_tools.convert_num_to_char(tokens, mask_realization[0])
+                clean_sequence = design_sequence.replace('<START>', '').replace('<END>', '').replace('<PAD>', '')
+                rank_local_sequences[(p_idx, r_idx)] = clean_sequence
+
+                if animate and p_idx in animate_prompts and r_idx in animate_replicas:
+                    animation_frames[(p_idx, r_idx)] = [
+                        mask_realization_list[step][i][0].copy()
+                        for step in range(diffusion_steps)
+                    ]
+
+                if batch_probs is not None:
+                    # batch_probs shape: [steps, batch, seq_len, num_classes]
+                    stored_probs[(p_idx, r_idx)] = batch_probs[:, i]
+                    stored_final_frames[(p_idx, r_idx)] = np.asarray(
+                        mask_realization[0], dtype=np.int64,
+                    )
+        finally:
+            args.diffusion_steps = prev_steps
+
+    if getattr(args, 'inpaint', False):
+        _generate_inpaint(
+            args, tokens, rank_work_items, base_seed,
+            rank_local_sequences, _process_batch,
+        )
+    else:
+        # Process this rank's slice in batches of uniform budget.
+        num_batches = (len(rank_work_items) + args.batch_size_sample - 1) // args.batch_size_sample
+        logger.info(
+            "Prompts: %d | Reps/prompt: %d | Total reps: %d | Rank reps: %d | "
+            "Batch size: %d | Batches: %d (rank=%d/world=%d)",
+            num_prompts, args.num_replicas, num_prompts * args.num_replicas,
+            len(rank_work_items), args.batch_size_sample, num_batches, rank, world_size,
+        )
+        for batch_start in tqdm.trange(0, len(rank_work_items), args.batch_size_sample, desc="batch"):
+            batch = rank_work_items[batch_start : batch_start + args.batch_size_sample]
+            # Per-sample seeds — world-size-invariant: same (base_seed, p_idx, r_idx)
+            # always produces the same seed regardless of how the work is split.
+            sample_seeds = _make_sample_seeds(batch, base_seed)
+            initial_samples, batch_perms = _build_initial_mask_state(
+                args, len(batch), tokens, sample_seeds=sample_seeds,
+            )
+            _process_batch(batch, initial_samples, batch_perms, sample_seeds, args.diffusion_steps)
 
     results = {
         "animation_frames": animation_frames,
@@ -646,6 +769,12 @@ def main(args, _setup_logging=True):
         logger.warning(
             "--pre_unmask_config ignored because --pre_unmask is not set"
         )
+
+    # In-painting feature: start diffusion from a partially-filled template.
+    # The diffusion budget is derived per-prompt from the template's mask count
+    # (handled in batch_stage3_generate_sequences), so diffusion_steps is left
+    # at the architectural sequence length here.
+    _resolve_inpaint_args(config_args, config_args_parser)
 
     # load test dataset
     embedding_dataset = torch.load(config_args_parser.input_path)

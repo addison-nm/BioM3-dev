@@ -1,0 +1,85 @@
+#!/bin/bash -l
+#PBS -A NLDesignProtein
+#PBS -N gdpo_scaling_n<NUM_NODES>
+#PBS -l walltime=<WALLTIME>
+#PBS -l select=<NUM_NODES>
+#PBS -l place=scatter
+#PBS -l filesystems=home:flare
+#PBS -q <QUEUE>
+#PBS -j oe
+# PBS -M <emailaddress>
+# PBS -m be
+
+# Multi-node weak-scaling study for the GDPO trainer.
+# Concrete per-N jobs are sibling files in this directory:
+#   job_gdpo_scaling_n8.pbs ... job_gdpo_scaling_n128.pbs
+#
+# Design (see scaling/README.md for full notes):
+#   - Per-rank workload K = 12 sequences (one per local Aurora tile).
+#   - Group size G fixed at 24 (matches production_v02_multixpu) so the
+#     within-group advantage variance stays comparable across N.
+#   - Prompts per step B = K * N / G = N / 2. Grows with N.
+#   - BG = K * N = 12 * N. Rank 0's ELBO + opt step operates on BG;
+#     this is the bottleneck we expect the study to surface.
+#   - 10 steps total; analysis discards step 1 (ESMFold warm-up) and
+#     averages step_time_s over steps 2-10 → 9 steady-state samples.
+
+projdir=${PBS_O_WORKDIR}
+cd ${projdir}
+
+module load frameworks
+source ./venvs/biom3-env/bin/activate
+
+# Configurations to edit
+config_path=./configs/grpo/example_gdpo.json
+prompts_path=./configs/grpo/prompts/sh3_v03_mixed_512.txt
+stage1_weights=./weights/PenCL/PenCL_V09152023_last.ckpt
+stage2_weights=./weights/Facilitator/Facilitator_MMD15.ckpt/last.ckpt
+stage3_init_weights=./weights/ProteoScribe/ProteoScribe_SH3_epoch52.ckpt/single_model.pth
+
+num_nodes=<NUM_NODES>
+num_generations=24              # G — paper default; preserves advantage variance.
+batch_size=<BATCH_SIZE>         # B = N / 2 (so BG = 12 * N → K=12 per rank).
+steps=10
+save_steps=10                   # Final checkpoint only — analysis only reads train_log.json.
+beta=0.01
+eps=0.20
+n_quadrature=2
+inner_mc=1
+kl_estimator=tokenwise_k3
+reward=esmfold_plddt
+
+# Constant configurations
+device=xpu
+
+# Common run-id prefix so scripts/analyze_gdpo_scaling.py picks up the set.
+study_id=v01
+datetime=$(date +%Y%m%d_%H%M%S)
+config_name=$(basename "${config_path}" .json)
+run_id=${config_name}_scaling_${study_id}_n${num_nodes}_BG$((12*num_nodes))_s${steps}_V${datetime}
+
+# Direct output to log file
+mkdir -p logs
+log_fpath=logs/${run_id}.${PBS_JOBID}.o
+
+source environment.sh
+./scripts/gdpo_train_multinode.sh \
+    ${config_path} \
+    ${num_nodes} \
+    ${device} \
+    ${run_id} \
+    --steps ${steps} \
+    --num_generations ${num_generations} \
+    --batch_size ${batch_size} \
+    --beta ${beta} \
+    --eps ${eps} \
+    --n_quadrature ${n_quadrature} \
+    --inner_mc ${inner_mc} \
+    --kl_estimator ${kl_estimator} \
+    --save_steps ${save_steps} \
+    --reward ${reward} \
+    --prompts_path ${prompts_path} \
+    --stage1_weights ${stage1_weights} \
+    --stage2_weights ${stage2_weights} \
+    --stage3_init_weights ${stage3_init_weights} \
+> ${log_fpath} 2>&1

@@ -353,6 +353,7 @@ def _tokenwise_k3_kl(
     z_c_rep: torch.Tensor,         # (BG, emb_dim)
     diffusion_budget: Optional[int] = None,
     fill_id: int = PAD_ID,
+    gradient_checkpoint: bool = False,
 ) -> torch.Tensor:
     """Cheap k3 KL estimator on a single fully-masked forward pass.
 
@@ -363,13 +364,33 @@ def _tokenwise_k3_kl(
     positions [0, D) are MASK and positions [D, L_total) hold ``fill_id``
     (PAD). The KL average then naturally restricts to non-PAD positions
     via ``valid = (ids_all != PAD_ID)``.
+
+    With ``gradient_checkpoint=True`` and grad enabled on the trainable
+    policy, the new-policy forward is wrapped in
+    ``torch.utils.checkpoint.checkpoint(use_reentrant=False)`` so its
+    activations are recomputed during backward. Without checkpointing
+    the local-attention transformer's activations on (BG, L=1024) push
+    a 64 GB Aurora tile over ~BG≈48; the ELBO compute already uses the
+    same trick, this just extends it to the KL term.
     """
     BG, L_total = ids_all.shape
     D = diffusion_budget if diffusion_budget is not None else L_total
     x_masked = torch.full_like(ids_all, fill_id)
     x_masked[:, :D] = MASK_ID
     t_steps = torch.zeros(BG, dtype=torch.long, device=ids_all.device)
-    logits_new = s3(x_masked, t_steps, z_c_rep).float().permute(0, 2, 1)
+    do_ckpt = (
+        gradient_checkpoint
+        and torch.is_grad_enabled()
+        and any(p.requires_grad for p in s3.parameters())
+    )
+    if do_ckpt:
+        def _ckpt_new_fwd(x_, t_, z_):
+            return s3(x_, t_, z_).float().permute(0, 2, 1)
+        logits_new = torch.utils.checkpoint.checkpoint(
+            _ckpt_new_fwd, x_masked, t_steps, z_c_rep, use_reentrant=False
+        )
+    else:
+        logits_new = s3(x_masked, t_steps, z_c_rep).float().permute(0, 2, 1)
     with torch.no_grad():
         logits_ref = ref_s3(x_masked, t_steps, z_c_rep).float().permute(0, 2, 1)
     lp_new = F.log_softmax(logits_new, dim=-1).gather(-1, ids_all.unsqueeze(-1)).squeeze(-1)
@@ -429,11 +450,21 @@ def _resolve_rollout_devices(
 def _gdpo_rollout(
     s3: torch.nn.Module,
     cfg3: Namespace,
-    z_c: torch.Tensor,             # (1, emb_dim)
+    z_c: torch.Tensor,             # (1, emb_dim) OR (K, emb_dim) per-row
     K: int,
     device: torch.device,
 ) -> torch.Tensor:
     """Rollout ``K`` sequences honoring ``cfg3.pre_unmask``.
+
+    Accepts ``z_c`` in two shapes:
+      - ``(1, emb_dim)``: a single prompt's conditioning, broadcast to all
+        K replicas. The legacy single-prompt path.
+      - ``(K, emb_dim)``: per-row conditioning, one row per replica.
+        Used by the distributed trainer to batch multiple prompts'
+        replicas into a single rollout call so all local tiles can be
+        kept busy in parallel (previously the per-prompt loop in
+        ``_rollout_local_shard`` dispatched 3-replica-per-prompt chunks,
+        which left 9 of 12 tiles idle on every call).
 
     Returns ``(K, L_total)`` int64 token IDs. Equivalent to
     ``biom3.rl.grpo.diffusion_rollout`` when pre_unmask is False;
@@ -441,7 +472,14 @@ def _gdpo_rollout(
     [D, L_total) are pre-filled with the configured fill token.
     """
     L_total = getattr(cfg3, 'sequence_length', cfg3.diffusion_steps)
-    z_rep = z_c.repeat(K, 1)
+    if z_c.shape[0] == K:
+        z_rep = z_c
+    elif z_c.shape[0] == 1:
+        z_rep = z_c.repeat(K, 1)
+    else:
+        raise ValueError(
+            f"z_c.shape[0] must be 1 (broadcast) or K={K} (per-row), got {z_c.shape[0]}"
+        )
     init, sampling_path = _build_initial_mask_state(cfg3, batch_size=K, tokens=TOKENS)
     init = init.to(device)
     sampling_path = sampling_path.to(device)
@@ -618,6 +656,8 @@ def gdpo_train(
     stage3_init_weights: Optional[str] = None,
 ):
     cfg3.device = str(device)
+    # Silence Stage 3's per-rollout tqdm bar — keeps the .o log readable.
+    cfg3._silent_tqdm = True
 
     torch.manual_seed(gdpo_cfg.seed)
     np.random.seed(gdpo_cfg.seed)
@@ -794,13 +834,8 @@ def gdpo_train(
             _stamp("rollout")
 
             seqs = [decode_tokens(ids_all[i]) for i in range(BG)]
-            logger.info("step=%d generated sequences (B*G=%d):", step, BG)
-            for i, seq in enumerate(seqs):
-                p_idx = i // G
-                logger.info(
-                    "  [prompt %d / replica %d] len=%d %s",
-                    p_idx, i % G, len(seq), seq,
-                )
+            # Per-replica sequences go to debug.out when debug_log=True; don't
+            # repeat them on stdout (BG=1536 → 1536 lines per step otherwise).
             _stamp("decode")
 
             # Within-batch sequence-diversity diagnostics. Cheap (LRU
@@ -892,6 +927,7 @@ def gdpo_train(
             kl_loss = _tokenwise_k3_kl(
                 s3, ref_s3, ids_all, z_cs_rep,
                 diffusion_budget=D, fill_id=fill_id,
+                gradient_checkpoint=gdpo_cfg.gradient_checkpoint,
             )
         elif gdpo_cfg.kl_estimator == "sdmc":
             # Forward-KL surrogate via SDMC; elbo_ref is a no-grad estimate.

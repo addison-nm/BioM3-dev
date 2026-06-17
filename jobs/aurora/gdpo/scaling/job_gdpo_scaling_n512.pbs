@@ -1,0 +1,90 @@
+#!/bin/bash -l
+#PBS -A NLDesignProtein
+#PBS -N gdpo_scaling_n512
+#PBS -l walltime=04:00:00
+#PBS -l select=512
+#PBS -l place=scatter
+#PBS -l filesystems=home:flare
+#PBS -q prod
+#PBS -j oe
+
+# Weak-scaling study, N=512 nodes. B=1024, G=24, BG=24576 (K=48 per rank).
+# Single-mpiexec run on the full 512-node allocation — kept separate from
+# the parallel-sub-runs combined job (job_gdpo_scaling_all.pbs) because at
+# N=512 a single sub-run consumes the entire allocation and can't share
+# it with the smaller N's.
+#
+# Walltime: 4 h. At K=96 / D=128 / 20 steps the per-step time at N=512
+# is estimated at ~470-520 s (the rollout + ESMFold portion roughly
+# doubles vs K=48, plus the gradient all-reduce overhead grows with N).
+# 20 steps × ~500 s ≈ 2.8 h compute + ~5 min cold start, leaving ~1 h
+# margin for ESMFold cold load + Python init at 512 nodes.
+#
+# This run uses the same v03 study_id as the combined job so its output
+# directory + train_log.json slot cleanly into the same analysis pipeline.
+
+projdir=${PBS_O_WORKDIR}
+cd ${projdir}
+
+module load frameworks
+source ./venvs/biom3-env/bin/activate
+
+config_path=./configs/grpo/example_gdpo.json
+prompts_path=./configs/grpo/prompts/sh3_v04_mixed_4096.txt
+stage1_weights=./weights/PenCL/PenCL_V09152023_last.ckpt
+stage2_weights=./weights/Facilitator/Facilitator_MMD15.ckpt/last.ckpt
+stage3_init_weights=./weights/ProteoScribe/ProteoScribe_SH3_epoch52.ckpt/single_model.pth
+
+num_nodes=512
+num_generations=24
+batch_size=1024                   # K=48 per rank (each of 12 tiles handles 4 sequences)
+steps=20
+save_steps=10
+beta=0.01
+eps=0.20
+n_quadrature=2
+inner_mc=1
+kl_estimator=tokenwise_k3
+reward=esmfold_plddt
+
+device=xpu
+
+study_id=v03
+datetime=$(date +%Y%m%d_%H%M%S)
+config_name=$(basename "${config_path}" .json)
+run_id=${config_name}_scaling_${study_id}_n${num_nodes}_BG$((num_generations*batch_size))_s${steps}_V${datetime}
+
+mkdir -p logs
+log_fpath=logs/${run_id}.${PBS_JOBID}.o
+
+source environment.sh
+
+# Aurora CXI tunings — defensive. Single-mpiexec doesn't hit the
+# concurrent-allocation ACs limit, but bigger CQ + overflow buffer help
+# at the N=512 communication intensity. Same values as the combined job
+# for consistency.
+export FI_CXI_DEFAULT_CQ_SIZE=131072
+export FI_CXI_OFLOW_BUF_SIZE=8388608
+export FI_CXI_CQ_FILL_PERCENT=20
+echo "[n512] FI_CXI_DEFAULT_CQ_SIZE=${FI_CXI_DEFAULT_CQ_SIZE} FI_CXI_OFLOW_BUF_SIZE=${FI_CXI_OFLOW_BUF_SIZE} FI_CXI_CQ_FILL_PERCENT=${FI_CXI_CQ_FILL_PERCENT}"
+
+./scripts/gdpo_train_multinode.sh \
+    ${config_path} \
+    ${num_nodes} \
+    ${device} \
+    ${run_id} \
+    --steps ${steps} \
+    --num_generations ${num_generations} \
+    --batch_size ${batch_size} \
+    --beta ${beta} \
+    --eps ${eps} \
+    --n_quadrature ${n_quadrature} \
+    --inner_mc ${inner_mc} \
+    --kl_estimator ${kl_estimator} \
+    --save_steps ${save_steps} \
+    --reward ${reward} \
+    --prompts_path ${prompts_path} \
+    --stage1_weights ${stage1_weights} \
+    --stage2_weights ${stage2_weights} \
+    --stage3_init_weights ${stage3_init_weights} \
+> ${log_fpath} 2>&1

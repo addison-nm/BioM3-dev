@@ -24,6 +24,7 @@ from typing import List, Optional
 import torch
 
 from biom3.backend.device import get_device, setup_logger
+from biom3.core._dist_env import is_launched
 from biom3.core.helpers import convert_to_namespace, load_json_config
 from biom3.rl.gdpo import GDPOConfig, gdpo_train
 from biom3.rl.grpo import load_prompts
@@ -231,7 +232,35 @@ def main(args):
         rollout_devices=_parse_device_list(args.rollout_devices),
     )
 
-    reward_fn = build_reward(args.reward, device=device)
+    base_reward_fn = build_reward(args.reward, device=device)
+
+    if is_launched():
+        # Multi-node path: ranks shard rollout + base reward, rank 0
+        # composes diversity (if any) after gather. CompositeReward isn't
+        # used here because we already have pre-scored base rewards on
+        # rank 0 and don't want to re-score them.
+        from biom3.rl.gdpo_multinode import gdpo_train_multinode
+        logger.info("Launcher env detected → routing to gdpo_train_multinode")
+        gdpo_train_multinode(
+            gdpo_cfg=gdpo_cfg,
+            cfg1=cfg1,
+            cfg2=cfg2,
+            cfg3=cfg3,
+            prompts=prompts,
+            base_reward_fn=base_reward_fn,
+            device=device,
+            stage1_weights=args.stage1_weights,
+            stage2_weights=args.stage2_weights,
+            stage3_init_weights=args.stage3_init_weights,
+            base_reward_name=args.reward,
+            diversity_weight=float(args.diversity_weight),
+            diversity_mode=args.diversity_mode,
+            diversity_target=args.diversity_target,
+        )
+        return
+
+    # Single-node path (unchanged).
+    reward_fn = base_reward_fn
     if args.diversity_weight > 0:
         base_reward = reward_fn
         div_reward = DiversityReward(

@@ -155,13 +155,31 @@ class RolloutPool:
     def rollout(self, z_c: torch.Tensor, G: int) -> torch.Tensor:
         """Run ``G`` rollouts under the replicated policy.
 
-        ``z_c`` is the conditioning vector for a single prompt
-        (shape ``(1, emb_dim)``), produced on the master device. We
-        ``.to(d)`` it per worker. Returns ``(G, L_total)`` int64 on
-        the master device.
+        ``z_c`` shapes:
+          - ``(1, emb_dim)``: a single prompt's conditioning, broadcast
+            to all tiles. Each tile's worker rolls its chunk under the
+            same ``z_c``. Legacy single-prompt path.
+          - ``(G, emb_dim)``: per-replica conditioning (used by the
+            distributed trainer to batch multiple prompts' replicas
+            into a single rollout call). Each worker slices the rows
+            corresponding to the replicas it owns.
+
+        Returns ``(G, L_total)`` int64 on the master device, in the
+        original row order (worker 0's chunk first, then worker 1's,
+        etc.) — when ``z_c`` is per-row this matches the row order of
+        the input ``z_c``.
         """
         n_dev = len(self.devices)
         chunks = _split_evenly(G, n_dev)
+        per_row = (z_c.shape[0] == G and G > 1)
+        if (not per_row) and z_c.shape[0] != 1:
+            raise ValueError(
+                f"z_c.shape[0] must be 1 (broadcast) or G={G} (per-row), got {z_c.shape[0]}"
+            )
+        # Pre-compute per-worker row slices when z_c is per-row.
+        offsets = [0]
+        for c in chunks:
+            offsets.append(offsets[-1] + c)
 
         if n_dev == 1:
             # Fast path — same as the single-device call site.
@@ -178,7 +196,11 @@ class RolloutPool:
             d = self.devices[idx]
             cfg_d = self._cfgs[idx]
             model_d = self._models[idx]
-            z_d = z_c.to(d, non_blocking=True)
+            if per_row:
+                z_slice = z_c[offsets[idx]:offsets[idx + 1]]
+            else:
+                z_slice = z_c
+            z_d = z_slice.to(d, non_blocking=True)
             ids = self.rollout_fn(model_d, cfg_d, z_d, k, d)
             _device_synchronize(d)
             return ids.to(self.master_device, non_blocking=True)

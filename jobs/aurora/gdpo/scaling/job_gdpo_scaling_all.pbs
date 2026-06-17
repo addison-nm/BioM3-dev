@@ -1,0 +1,211 @@
+#!/bin/bash -l
+#PBS -A NLDesignProtein
+#PBS -N gdpo_scaling_all
+#PBS -l walltime=06:00:00
+#PBS -l select=512
+#PBS -l place=scatter
+#PBS -l filesystems=home:flare
+#PBS -q prod
+#PBS -j oe
+
+# Weak-scaling study, 8 N values running IN PARALLEL within one
+# 512-node allocation. Sub-runs N ∈ {2, 4, 8, 16, 32, 64, 128, 256} each
+# get their own disjoint slice of $PBS_NODEFILE, launched as background
+# mpiexec processes via HOSTFILE_OVERRIDE through aurora_multinode_rl.sh.
+# Each sub-run writes to its own log under logs/.
+#
+# Node accounting (disjoint slices):
+#   N=2    → lines   1..2     (2 nodes)
+#   N=4    → lines   3..6     (4 nodes)
+#   N=8    → lines   7..14    (8 nodes)
+#   N=16   → lines  15..30    (16 nodes)
+#   N=32   → lines  31..62    (32 nodes)
+#   N=64   → lines  63..126   (64 nodes)
+#   N=128  → lines 127..254   (128 nodes)
+#   N=256  → lines 255..510   (256 nodes)
+#   total used: 510 nodes; spare: 2 (lines 511..512)
+#
+# N=512 is excluded — it would need all 512 nodes by itself and would
+# conflict with every other sub-run. Submit N=512 as a separate qsub
+# against ``job_gdpo_scaling_n512.pbs`` (4 h prod allocation).
+#
+# Walltime: 6 h. Parallel execution means total wallclock is the slowest
+# single sub-run, not the sum. At K=48 / D=128 / 50 steps the slowest
+# (N=256) is estimated at ~5–5.5 h (roughly 2× the K=48 baseline of
+# ~3 h, since per-step rollout + ESMFold scales ~linearly with K and
+# they dominate per-step wallclock). 6 h gives ~30 min margin for the
+# ESMFold cold load + Python init.
+#
+# Isolation patch applied: per-sub-run CCL/libfabric log targeting, CXI
+# NIC pinning per sub-run, drmfd Level-Zero IPC exchange, and per-rank
+# diagnostic echo (in the RL launcher). Plus Aurora-wide CXI tunings
+# from ALCF guidance for concurrent-mpiexec stress
+# (argonne-lcf/AuroraBugTracking#12, Aurora known-issues page).
+
+projdir=${PBS_O_WORKDIR}
+cd ${projdir}
+
+module load frameworks
+source ./venvs/biom3-env/bin/activate
+
+# Don't abort the job if one sub-run's mpiexec exits non-zero — the
+# trainer's failure-fast handler returns from one rank, mpiexec then
+# unwinds with non-zero, and we want to keep the other sub-runs
+# running rather than tear them down by ``set -e``.
+set +e
+
+# ----- Configurations -----
+config_path=./configs/grpo/example_gdpo.json
+prompts_path=./configs/grpo/prompts/sh3_v04_mixed_4096.txt
+stage1_weights=./weights/PenCL/PenCL_V09152023_last.ckpt
+stage2_weights=./weights/Facilitator/Facilitator_MMD15.ckpt/last.ckpt
+stage3_init_weights=./weights/ProteoScribe/ProteoScribe_SH3_epoch52.ckpt/single_model.pth
+
+# Per-sub-run constants (K=48 per rank → 4 sequences per local tile,
+# D=128 set via configs/grpo/pre_unmask_sh3.json)
+num_generations=24
+steps=50
+save_steps=10
+beta=0.01
+eps=0.20
+n_quadrature=2
+inner_mc=1
+kl_estimator=tokenwise_k3
+reward=esmfold_plddt
+
+device=xpu
+
+# Shared study identifier
+study_id=v03
+datetime=$(date +%Y%m%d_%H%M%S)
+config_name=$(basename "${config_path}" .json)
+
+# Carve DISJOINT hostfile slices (one per sub-run). The job-ID suffix
+# scopes the files to this PBS allocation so concurrent combined-jobs
+# (unlikely but possible) don't collide.
+hostdir=/tmp/biom3_hostfiles_${PBS_JOBID}
+mkdir -p ${hostdir}
+sed -n '1,2p'      ${PBS_NODEFILE} > ${hostdir}/hostfile_n2
+sed -n '3,6p'      ${PBS_NODEFILE} > ${hostdir}/hostfile_n4
+sed -n '7,14p'     ${PBS_NODEFILE} > ${hostdir}/hostfile_n8
+sed -n '15,30p'    ${PBS_NODEFILE} > ${hostdir}/hostfile_n16
+sed -n '31,62p'    ${PBS_NODEFILE} > ${hostdir}/hostfile_n32
+sed -n '63,126p'   ${PBS_NODEFILE} > ${hostdir}/hostfile_n64
+sed -n '127,254p'  ${PBS_NODEFILE} > ${hostdir}/hostfile_n128
+sed -n '255,510p'  ${PBS_NODEFILE} > ${hostdir}/hostfile_n256
+
+echo "[combined] PBS_NODEFILE has $(wc -l < ${PBS_NODEFILE}) entries"
+for n in 2 4 8 16 32 64 128 256; do
+    echo "[combined]   hostfile_n${n}: $(wc -l < ${hostdir}/hostfile_n${n}) entries"
+done
+
+mkdir -p logs
+source environment.sh
+
+# ----- Aurora CXI tunings for concurrent-mpiexec -----
+# Per ALCF guidance for `CXI alloc failed ... request exceeds ACs limits`
+# (argonne-lcf/AuroraBugTracking#12) when multiple mpiexec calls share
+# one PBS allocation. Bigger CQ + overflow buffer + lower fill-percent
+# threshold reduces the chance that one sub-run gets starved on Cassini
+# event-queue resources while another is still occupying CXI ACs.
+export FI_CXI_DEFAULT_CQ_SIZE=131072
+export FI_CXI_OFLOW_BUF_SIZE=8388608
+export FI_CXI_CQ_FILL_PERCENT=20
+echo "[combined] FI_CXI_DEFAULT_CQ_SIZE=${FI_CXI_DEFAULT_CQ_SIZE} FI_CXI_OFLOW_BUF_SIZE=${FI_CXI_OFLOW_BUF_SIZE} FI_CXI_CQ_FILL_PERCENT=${FI_CXI_CQ_FILL_PERCENT}"
+
+# ----- Sub-run launcher (background, with isolation knobs) -----
+launch_subjob() {
+    local N=$1
+    local B=$((2 * N))
+    local BG=$((48 * N))
+    local hostfile="${hostdir}/hostfile_n${N}"
+    local run_id="${config_name}_scaling_${study_id}_n${N}_BG${BG}_s${steps}_V${datetime}"
+    local log_fpath="logs/${run_id}.${PBS_JOBID}.o"
+
+    # Each parallel sub-run MUST have its own rendezvous endpoint.
+    # Without per-sub-run MASTER_ADDR/PORT, every sub-run after the
+    # first hangs in init_process_group (the others' ranks try to talk
+    # to the first sub-run's master in a different PMIx namespace).
+    local master_addr=$(head -1 "${hostfile}")
+    local master_port=$((29500 + N))
+
+    # ----- Per-sub-run isolation -----
+    # Each knob is a defensive measure against one plausible cross-sub-
+    # run shared-resource collision. See job_gdpo_scaling_all_test_iso.pbs
+    # for the rationale of each individual knob.
+    local sub_ccl_log="${PBS_O_WORKDIR}/logs/ccl_n${N}_${PBS_JOBID}.log"
+    local sub_fi_log="${PBS_O_WORKDIR}/logs/fi_n${N}_${PBS_JOBID}.log"
+    local fi_cxi_device="cxi$((N % 8))"
+
+    echo "[combined] launching N=${N} (B=${B}, BG=${BG}) → ${log_fpath}"
+    echo "[combined]   MASTER_ADDR=${master_addr} MASTER_PORT=${master_port}"
+    echo "[combined]   FI_CXI_DEVICE_NAME=${fi_cxi_device}"
+    echo "[combined]   CCL_LOG_FILE=${sub_ccl_log}"
+
+    HOSTFILE_OVERRIDE="${hostfile}" \
+    MASTER_ADDR="${master_addr}" \
+    MASTER_PORT="${master_port}" \
+    CCL_LOG_LEVEL=info \
+    CCL_LOG_FILE="${sub_ccl_log}" \
+    CCL_ZE_IPC_EXCHANGE_MODE=drmfd \
+    FI_CXI_DEVICE_NAME="${fi_cxi_device}" \
+    FI_LOG_LEVEL=warn \
+    FI_LOG_FILE="${sub_fi_log}" \
+    ./scripts/gdpo_train_multinode.sh \
+        ${config_path} \
+        ${N} \
+        ${device} \
+        ${run_id} \
+        --steps ${steps} \
+        --num_generations ${num_generations} \
+        --batch_size ${B} \
+        --beta ${beta} \
+        --eps ${eps} \
+        --n_quadrature ${n_quadrature} \
+        --inner_mc ${inner_mc} \
+        --kl_estimator ${kl_estimator} \
+        --save_steps ${save_steps} \
+        --reward ${reward} \
+        --prompts_path ${prompts_path} \
+        --stage1_weights ${stage1_weights} \
+        --stage2_weights ${stage2_weights} \
+        --stage3_init_weights ${stage3_init_weights} \
+        > ${log_fpath} 2>&1 &
+
+    # Capture each background PID against its N so we can map them
+    # in the final summary.
+    declare -g "pid_n${N}=$!"
+    echo "[combined]   N=${N} background PID=$!"
+}
+
+# ----- Launch all 8 sub-runs in parallel -----
+# Stagger by 15s so each mpiexec's PALS/PMIx init gets a clean window
+# before the next starts. 7 × 15s = 105s of total stagger — negligible
+# against the 6 h walltime.
+echo "[combined] launching all sub-runs at $(date -Iseconds)"
+for N in 2 4 8 16 32 64 128 256; do
+    launch_subjob ${N}
+    sleep 15
+done
+
+# ----- Wait for all to complete -----
+echo "[combined] all sub-runs launched. Waiting on completion..."
+declare -A results
+for N in 2 4 8 16 32 64 128 256; do
+    pid_var="pid_n${N}"
+    pid="${!pid_var}"
+    wait ${pid}
+    results[${N}]=$?
+done
+
+# ----- Final summary -----
+echo
+echo "================================================================"
+echo "[combined] all sub-runs complete at $(date -Iseconds). Results:"
+for N in 2 4 8 16 32 64 128 256; do
+    rc=${results[${N}]}
+    status="OK"
+    [ ${rc} -ne 0 ] && status="FAILED (exit=${rc})"
+    echo "[combined]   N=${N}: ${status}"
+done
+echo "================================================================"

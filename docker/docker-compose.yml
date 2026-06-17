@@ -1,0 +1,48 @@
+# Optional convenience for long-running interactive uses (the streamlit app and
+# an interactive shell). Parametrized train/finetune/generate runs are better
+# driven by docker/run.sh, which assembles positional args cleanly.
+#
+# Requires the NVIDIA Container Toolkit on the host for GPU access.
+#
+# Build the image first:   docker/build.sh
+# Web app:                 docker compose -f docker/docker-compose.yml up app
+#                            -> http://localhost:8501
+# Interactive shell:       docker compose -f docker/docker-compose.yml run --rm shell
+#
+# Paths are relative to this file (docker/), so ../weights etc. resolve to the
+# repo-root dirs.
+
+x-gpu: &gpu
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+
+x-volumes: &volumes
+  - ../weights:/app/weights:ro
+  - ../data:/app/data:ro
+  - ../outputs:/app/outputs
+
+services:
+  app:
+    image: ${BIOM3_IMAGE:-biom3:gpu}
+    command: biom3_app --server.address=0.0.0.0 --server.port=8501 --server.headless=true
+    ports:
+      - "8501:8501"
+    volumes: *volumes
+    environment:
+      - WANDB_API_KEY
+    <<: *gpu
+
+  shell:
+    image: ${BIOM3_IMAGE:-biom3:gpu}
+    command: bash
+    stdin_open: true
+    tty: true
+    volumes: *volumes
+    environment:
+      - WANDB_API_KEY
+    <<: *gpu

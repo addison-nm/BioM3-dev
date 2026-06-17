@@ -13,14 +13,22 @@ export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1
 
 
 # --- Machine detection ---
-if [[ -d /flare ]]; then
-    BIOM3_MACHINE=aurora
-elif [[ -d /grand ]]; then
-    BIOM3_MACHINE=polaris
-elif [[ "$(hostname)" == spark* ]]; then
-    BIOM3_MACHINE=spark
-else
-    BIOM3_MACHINE=unknown
+# An explicit BIOM3_MACHINE (e.g. exported by the BioM3 Docker image) wins;
+# auto-detect only when it is unset. The HPC checks (/flare, /grand) come
+# first so ALCF apptainer runs resolve to aurora/polaris before the generic
+# /.dockerenv container fallback.
+if [[ -z "${BIOM3_MACHINE:-}" ]]; then
+    if [[ -d /flare ]]; then
+        BIOM3_MACHINE=aurora
+    elif [[ -d /grand ]]; then
+        BIOM3_MACHINE=polaris
+    elif [[ -f /.dockerenv ]]; then
+        BIOM3_MACHINE=container
+    elif [[ "$(hostname)" == spark* ]]; then
+        BIOM3_MACHINE=spark
+    else
+        BIOM3_MACHINE=unknown
+    fi
 fi
 export BIOM3_MACHINE
 echo "[environment.sh] Detected machine: $BIOM3_MACHINE"
@@ -79,6 +87,13 @@ elif [[ "$BIOM3_MACHINE" == aurora ]]; then
 elif [[ "$BIOM3_MACHINE" == spark ]]; then
     # --- DGX Spark — single NVIDIA GPU
     : # No Spark-specific exports currently.
+
+elif [[ "$BIOM3_MACHINE" == container ]]; then
+    # --- Containerized commercial cloud (AWS / Mithril) — NVIDIA GPU(s).
+    # Single-node only; torchrun handles multi-GPU rendezvous and sets a safe
+    # OMP_NUM_THREADS itself (see scripts/launchers/container_singlenode.sh).
+    # No HPC/MPI/PBS/CPU-binding settings apply here.
+    : # No container-specific exports currently needed.
 
 else
     echo "[environment.sh] Unknown machine: $(hostname) (using common settings only)"

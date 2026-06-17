@@ -75,6 +75,7 @@ For installation and setup instructions on the following machines, refer to the 
 | Polaris (ALCF) | [setup_polaris.md](./docs/setup/setup_polaris.md) |
 | Aurora (ALCF) | [setup_aurora.md](./docs/setup/setup_aurora.md) |
 | DGX Spark | [setup_spark.md](./docs/setup/setup_spark.md) |
+| Docker (AWS / Mithril GPU cloud) | [setup_docker.md](./docs/setup/setup_docker.md) |
 
 
 ## Reference databases

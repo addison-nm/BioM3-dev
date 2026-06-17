@@ -162,9 +162,6 @@ def get_args(parser):
     parser.add_argument('--metrics_history_every_n_epochs', type=int, default=None,
                         help='Also record training metrics every N epochs '
                              '(captures epoch-averaged values). None disables.')
-    parser.add_argument('--metrics_history_flush_every_n_steps', type=int, default=None,
-                        help='Flush metrics JSONL to disk every N global steps. '
-                             'None flushes only at train end.')
     parser.add_argument('--metrics_history_ranks', type=int, nargs='*', default=[0],
                         help='Rank indices that write metrics JSONL '
                              '(default: rank 0 only).')
@@ -469,7 +466,6 @@ def train_model(args, PL_model, data_module):
             save_ranks=args.metrics_history_ranks,
             every_n_steps=args.metrics_history_every_n_steps,
             every_n_epochs=args.metrics_history_every_n_epochs,
-            flush_every_n_steps=args.metrics_history_flush_every_n_steps,
             all_ranks_val_loss=args.metrics_history_all_ranks_val_loss,
         ))
 

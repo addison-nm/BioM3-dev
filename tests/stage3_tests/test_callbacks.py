@@ -951,7 +951,7 @@ class TestProgressiveMetricsHistorySnapshot:
         assert payload["val"]["val_loss"][0] == pytest.approx(1.5)
 
     def test_jsonl_fsynced_at_validation_end(self, tmp_output_dir):
-        # Even with flush_every_n_steps=None (default), val-end must fsync.
+        # Even without an explicit step flush, val-end must fsync.
         cb = MetricsHistoryCallback(output_dir=tmp_output_dir)
         pl_module = _mock_pl_module()
         trainer = _make_metrics_trainer(

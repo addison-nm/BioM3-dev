@@ -132,16 +132,19 @@ class TestBuildTemplateState:
 class TestBuildSamplingPathRow:
 
     def test_single_mask(self):
+        # Path values are offset by (seq_len - D) so the model time index counts
+        # the frozen residues as already revealed.
         mask_positions = torch.tensor([3])
         path = build_sampling_path_row(mask_positions, seq_len=10)
-        assert path[3].item() == 0
+        assert path[3].item() == 9  # offset = 10 - 1
         frozen = [i for i in range(10) if i != 3]
         assert torch.all(path[frozen] == -1)
 
     def test_scattered_masks_get_permutation(self):
         mask_positions = torch.tensor([2, 5, 7])
         path = build_sampling_path_row(mask_positions, seq_len=10)
-        assert set(path[mask_positions].tolist()) == {0, 1, 2}
+        offset = 10 - 3  # seq_len - D
+        assert set(path[mask_positions].tolist()) == {offset, offset + 1, offset + 2}
         frozen = [i for i in range(10) if i not in (2, 5, 7)]
         assert torch.all(path[frozen] == -1)
 
@@ -300,13 +303,18 @@ def test_inpaint_preserves_frozen_positions(mini_model_and_args, unmasking, toke
     init = state.unsqueeze(0).repeat(batch_size, 1)
     cond = torch.randn(batch_size, args.text_emb_dim)
 
+    # Frozen residues occupy the first (L - D) revealed slots, so the diffusion
+    # clock starts at that offset.
+    offset = _SEQ_LEN - D
+    extract_time = torch.full((batch_size,), offset, dtype=torch.long)
+
     torch.manual_seed(0)
     if unmasking == "confidence":
         mask_list, _, _ = Stage3_sample_tools.batch_generate_denoised_sampled_confidence(
             args=args,
             model=model,
             extract_digit_samples=init,
-            extract_time=torch.zeros(batch_size).long(),
+            extract_time=extract_time,
             extract_digit_label=cond,
         )
     else:
@@ -318,7 +326,7 @@ def test_inpaint_preserves_frozen_positions(mini_model_and_args, unmasking, toke
             args=args,
             model=model,
             extract_digit_samples=init,
-            extract_time=torch.zeros(batch_size).long(),
+            extract_time=extract_time,
             extract_digit_label=cond,
             sampling_path=perms,
         )

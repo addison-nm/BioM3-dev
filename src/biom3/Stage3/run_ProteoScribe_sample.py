@@ -291,6 +291,18 @@ def _make_sample_seeds(batch, base_seed: int) -> list:
     return [_derive_sample_seed(base_seed, p_idx, r_idx) for (_, p_idx, r_idx) in batch]
 
 
+def _pre_revealed_offset(args, diffusion_steps: int) -> int:
+    """Number of positions revealed before diffusion starts.
+
+    For default sampling this is 0 (``sequence_length == diffusion_steps``).
+    For pre_unmask the PAD tail and for in-painting the frozen template
+    residues occupy ``sequence_length - diffusion_steps`` slots that the model
+    must count as already-revealed when forming its time index. The diffusion
+    clock therefore starts at this offset, not 0.
+    """
+    return getattr(args, 'sequence_length', diffusion_steps) - diffusion_steps
+
+
 def _build_initial_mask_state(args, batch_size: int, tokens: list, sample_seeds: list = None):
     """Construct the starting tensor and sampling path for a generation batch.
 
@@ -308,7 +320,9 @@ def _build_initial_mask_state(args, batch_size: int, tokens: list, sample_seeds:
     When ``args.pre_unmask`` is True, positions ``[0, D)`` are left masked
     (value 0) and positions ``[D, sequence_length)`` are filled with the
     resolved ``fill_with`` token id. Only the first ``D`` positions are
-    unmasked during diffusion.
+    unmasked during diffusion, and the sampling-path values are shifted up by
+    ``offset = sequence_length - D`` so the model's time index (which equals
+    the path step) reflects the PAD tail as already revealed.
     """
     diffusion_steps = args.diffusion_steps
     sequence_length = getattr(args, 'sequence_length', diffusion_steps)
@@ -333,7 +347,12 @@ def _build_initial_mask_state(args, batch_size: int, tokens: list, sample_seeds:
     fill_id = _resolve_fill_token_id(fill_with, tokens)
     init = torch.full((batch_size, sequence_length), fill_id, dtype=torch.long)
     init[:, :diffusion_steps] = 0
-    sampling_path = torch.stack([_perm(i) for i in range(batch_size)])
+    # The PAD tail occupies the first (sequence_length - D) slots of the
+    # revealed timeline, so the content positions diffuse over path-values
+    # [offset, offset + D). Paired with extract_time = offset in the sampler,
+    # this keeps the model's time index equal to the true revealed count.
+    offset = sequence_length - diffusion_steps
+    sampling_path = torch.stack([_perm(i) for i in range(batch_size)]) + offset
     return init, sampling_path
 
 
@@ -549,12 +568,20 @@ def batch_stage3_generate_sequences(
             batch_prompt_indices = [p_idx for (_, p_idx, _) in batch]
             batched_z_text_sample = z_t[batch_prompt_indices]
 
+            # Pre-revealed positions (PAD tail for pre_unmask, frozen residues
+            # for in-painting) count toward the model's time index, so the
+            # diffusion clock starts at `offset`, not 0. The sampling path is
+            # shifted by the same offset, keeping path-step == time index ==
+            # true revealed count.
+            offset = _pre_revealed_offset(args, diffusion_steps)
+            extract_time = torch.full((len(batch),), offset, dtype=torch.long)
+
             if unmasking_order in ('confidence', 'confidence_no_pad'):
                 mask_realization_list, _, batch_probs = Stage3_sample_tools.batch_generate_denoised_sampled_confidence(
                     args=args,
                     model=model,
                     extract_digit_samples=initial_samples,
-                    extract_time=torch.zeros(len(batch)).long(),
+                    extract_time=extract_time,
                     extract_digit_label=batched_z_text_sample,
                     store_probabilities=store_probabilities,
                     skip_pad=(unmasking_order == 'confidence_no_pad'),
@@ -565,7 +592,7 @@ def batch_stage3_generate_sequences(
                     args=args,
                     model=model,
                     extract_digit_samples=initial_samples,
-                    extract_time=torch.zeros(len(batch)).long(),
+                    extract_time=extract_time,
                     extract_digit_label=batched_z_text_sample,
                     sampling_path=batch_perms,
                     store_probabilities=store_probabilities,

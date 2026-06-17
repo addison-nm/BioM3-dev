@@ -113,9 +113,15 @@ def build_sampling_path_row(mask_positions, seq_len, generator=None):
     """Build a per-item sampling path for in-painting.
 
     The returned row has shape ``[seq_len]``; masked positions hold a random
-    permutation of ``range(D)`` (the order in which they are unmasked) and all
-    frozen positions hold the sentinel ``-1`` so they are never selected by the
-    random-unmask loop.
+    permutation of ``range(offset, offset + D)`` where ``offset = seq_len - D``
+    is the number of frozen residues (the order in which masked positions are
+    unmasked), and all frozen positions hold the sentinel ``-1`` so they are
+    never selected by the random-unmask loop.
+
+    The offset shifts the path values so they equal the true revealed count at
+    each step: the ``offset`` frozen residues are already revealed when
+    diffusion starts. Paired with ``extract_time = offset`` in the sampler,
+    this keeps the model's time index correct.
 
     Args:
         mask_positions: 1-D tensor of positions to generate.
@@ -125,7 +131,8 @@ def build_sampling_path_row(mask_positions, seq_len, generator=None):
     mask_positions = torch.as_tensor(mask_positions, dtype=torch.long)
     D = mask_positions.numel()
     path = torch.full((seq_len,), _PATH_SENTINEL, dtype=torch.long)
-    order = torch.randperm(D, generator=generator)
+    offset = seq_len - D
+    order = torch.randperm(D, generator=generator) + offset
     path[mask_positions] = order
     return path
 

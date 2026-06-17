@@ -1,0 +1,88 @@
+#!/bin/bash -l
+#PBS -A NLDesignProtein
+#PBS -N gdpo_scaling_n256_debug
+#PBS -l walltime=01:00:00
+#PBS -l select=256
+#PBS -l place=scatter
+#PBS -l filesystems=home:flare
+#PBS -q debug-scaling
+#PBS -j oe
+
+# Debug-scaling smoke of the standalone N=256 run. Single mpiexec on
+# 256 nodes, 1 h max walltime. K=48 (the proven config). Used to validate
+# the per-step throughput at N=256 in isolation — apples-to-apples with
+# the same N in the parallel combined sweep but without any concurrent-
+# mpiexec contention.
+#
+# At K=48 / D=128 the per-step time at N=256 is estimated at ~222 s
+# (K=12 N=256 baseline was 89 s; K=48 = 2.5× rollout work). 10 steps
+# × 222 s ≈ 37 min compute + ~5 min ESMFold cold load = ~42 min,
+# leaving ~18 min margin on the 1 h walltime.
+
+projdir=${PBS_O_WORKDIR}
+cd ${projdir}
+
+module load frameworks
+source ./venvs/biom3-env/bin/activate
+
+config_path=./configs/grpo/example_gdpo.json
+prompts_path=./configs/grpo/prompts/sh3_v04_mixed_4096.txt
+stage1_weights=./weights/PenCL/PenCL_V09152023_last.ckpt
+stage2_weights=./weights/Facilitator/Facilitator_MMD15.ckpt/last.ckpt
+stage3_init_weights=./weights/ProteoScribe/ProteoScribe_SH3_epoch52.ckpt/single_model.pth
+
+num_nodes=256
+num_generations=24
+batch_size=512                   # K=48 per rank (each of 12 tiles handles 4 sequences)
+steps=10
+save_steps=5
+beta=0.01
+eps=0.20
+n_quadrature=2
+inner_mc=1
+kl_estimator=tokenwise_k3
+reward=esmfold_plddt
+
+device=xpu
+
+# Use the v03dbg study_id to separate these debug-scaling smokes from
+# the main v03 production sweep. The analysis pipeline can still glob
+# v03* if you want both included, or stick to v03 to exclude debug runs.
+study_id=v03dbg
+datetime=$(date +%Y%m%d_%H%M%S)
+config_name=$(basename "${config_path}" .json)
+run_id=${config_name}_scaling_${study_id}_n${num_nodes}_BG$((num_generations*batch_size))_s${steps}_V${datetime}
+
+mkdir -p logs
+log_fpath=logs/${run_id}.${PBS_JOBID}.o
+
+source environment.sh
+
+# Aurora CXI tunings — defensive. Single-mpiexec doesn't hit the
+# concurrent-allocation ACs limit, but bigger CQ + overflow buffer help
+# at the N=256 communication intensity.
+export FI_CXI_DEFAULT_CQ_SIZE=131072
+export FI_CXI_OFLOW_BUF_SIZE=8388608
+export FI_CXI_CQ_FILL_PERCENT=20
+echo "[n256_debug] FI_CXI_DEFAULT_CQ_SIZE=${FI_CXI_DEFAULT_CQ_SIZE} FI_CXI_OFLOW_BUF_SIZE=${FI_CXI_OFLOW_BUF_SIZE} FI_CXI_CQ_FILL_PERCENT=${FI_CXI_CQ_FILL_PERCENT}"
+
+./scripts/gdpo_train_multinode.sh \
+    ${config_path} \
+    ${num_nodes} \
+    ${device} \
+    ${run_id} \
+    --steps ${steps} \
+    --num_generations ${num_generations} \
+    --batch_size ${batch_size} \
+    --beta ${beta} \
+    --eps ${eps} \
+    --n_quadrature ${n_quadrature} \
+    --inner_mc ${inner_mc} \
+    --kl_estimator ${kl_estimator} \
+    --save_steps ${save_steps} \
+    --reward ${reward} \
+    --prompts_path ${prompts_path} \
+    --stage1_weights ${stage1_weights} \
+    --stage2_weights ${stage2_weights} \
+    --stage3_init_weights ${stage3_init_weights} \
+> ${log_fpath} 2>&1

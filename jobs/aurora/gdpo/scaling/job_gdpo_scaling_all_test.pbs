@@ -1,0 +1,155 @@
+#!/bin/bash -l
+#PBS -A NLDesignProtein
+#PBS -N gdpo_scaling_all_test
+#PBS -l walltime=01:00:00
+#PBS -l select=8
+#PBS -l place=scatter
+#PBS -l filesystems=home:flare
+#PBS -q debug-scaling
+#PBS -j oe
+
+# Minimal test of the SERIAL-mpiexec-within-one-allocation mechanic.
+# Allocates 8 nodes on debug-scaling for 1 hour and runs 2 sub-runs
+# SEQUENTIALLY against disjoint hostfile slices: N=2 runs to completion,
+# THEN N=4 launches. This is the hypothesis-(A) test from the
+# investigation of the "exactly-one-sub-run-crashes" failure pattern:
+# if both succeed when serialized, the bug is triggered by concurrent
+# execution (likely CCL/PMIx fabric resources); if N=2 still crashes
+# alone, the bug is intra-sub-run.
+#
+#   N=2  → lines 1..2 (2 nodes)
+#   N=4  → lines 3..6 (4 nodes)
+#   total used: 6 nodes; spare: 2 (lines 7..8)
+#
+# Verifies that HOSTFILE_OVERRIDE + background ``&`` mpiexec calls work
+# under one PBS allocation without colliding on ports, /tmp paths, or
+# rendezvous state. If this test passes, the production
+# job_gdpo_scaling_all.pbs (6 sub-runs over 512 nodes on prod) should
+# work the same way.
+#
+# Steps trimmed to 5 to fit 30-minute walltime (~135-180s/step at K=48,
+# D=128, with ~3 min ESMFold cold-load → 15-20 min total per sub-run).
+
+projdir=${PBS_O_WORKDIR}
+cd ${projdir}
+
+module load frameworks
+source ./venvs/biom3-env/bin/activate
+
+set +e
+
+# ----- Configurations -----
+config_path=./configs/grpo/example_gdpo.json
+prompts_path=./configs/grpo/prompts/sh3_v04_mixed_4096.txt
+stage1_weights=./weights/PenCL/PenCL_V09152023_last.ckpt
+stage2_weights=./weights/Facilitator/Facilitator_MMD15.ckpt/last.ckpt
+stage3_init_weights=./weights/ProteoScribe/ProteoScribe_SH3_epoch52.ckpt/single_model.pth
+
+# Per-sub-run constants (K=48 per rank, D=128 via pre_unmask config).
+# Steps trimmed to 5 for this 30-min mechanic test.
+num_generations=24
+steps=5
+save_steps=5
+beta=0.01
+eps=0.20
+n_quadrature=2
+inner_mc=1
+kl_estimator=tokenwise_k3
+reward=esmfold_plddt
+
+device=xpu
+
+study_id=v02test
+datetime=$(date +%Y%m%d_%H%M%S)
+config_name=$(basename "${config_path}" .json)
+
+# Disjoint hostfile slices
+hostdir=/tmp/biom3_hostfiles_${PBS_JOBID}
+mkdir -p ${hostdir}
+sed -n '1,2p' ${PBS_NODEFILE} > ${hostdir}/hostfile_n2
+sed -n '3,6p' ${PBS_NODEFILE} > ${hostdir}/hostfile_n4
+
+echo "[combined-test] PBS_NODEFILE has $(wc -l < ${PBS_NODEFILE}) entries"
+for n in 2 4; do
+    echo "[combined-test]   hostfile_n${n}: $(wc -l < ${hostdir}/hostfile_n${n}) entries"
+done
+
+mkdir -p logs
+source environment.sh
+
+# ----- Sub-run launcher (background) -----
+launch_subjob() {
+    local N=$1
+    local B=$((2 * N))
+    local BG=$((48 * N))
+    local hostfile="${hostdir}/hostfile_n${N}"
+    local run_id="${config_name}_scaling_${study_id}_n${N}_BG${BG}_s${steps}_V${datetime}"
+    local log_fpath="logs/${run_id}.${PBS_JOBID}.o"
+
+    # Each parallel sub-run MUST have its own rendezvous endpoint.
+    # Without per-sub-run MASTER_ADDR/PORT, every sub-run inherits
+    # biom3.core.distributed's default of "first host of PBS_NODEFILE"
+    # + port 29500 — only the FIRST sub-run's ranks can rendezvous
+    # successfully; all subsequent sub-runs hang in init_process_group
+    # because their ranks > 0 are trying to talk to the first sub-run's
+    # master (different PMIx namespace).
+    local master_addr=$(head -1 "${hostfile}")
+    local master_port=$((29500 + N))
+
+    echo "[combined-test] launching N=${N} (B=${B}, BG=${BG}) → ${log_fpath}"
+    echo "[combined-test]   MASTER_ADDR=${master_addr} MASTER_PORT=${master_port}"
+
+    # NOTE: no trailing ``&`` — serial execution. This call blocks
+    # until the sub-run's mpiexec exits. The trainer's failure-fast
+    # handler returns non-zero on crash; we capture that as ``rc``.
+    HOSTFILE_OVERRIDE="${hostfile}" \
+    MASTER_ADDR="${master_addr}" \
+    MASTER_PORT="${master_port}" \
+    ./scripts/gdpo_train_multinode.sh \
+        ${config_path} \
+        ${N} \
+        ${device} \
+        ${run_id} \
+        --steps ${steps} \
+        --num_generations ${num_generations} \
+        --batch_size ${B} \
+        --beta ${beta} \
+        --eps ${eps} \
+        --n_quadrature ${n_quadrature} \
+        --inner_mc ${inner_mc} \
+        --kl_estimator ${kl_estimator} \
+        --save_steps ${save_steps} \
+        --reward ${reward} \
+        --prompts_path ${prompts_path} \
+        --stage1_weights ${stage1_weights} \
+        --stage2_weights ${stage2_weights} \
+        --stage3_init_weights ${stage3_init_weights} \
+        > ${log_fpath} 2>&1
+    local rc=$?
+    echo "[combined-test] N=${N} finished at $(date -Iseconds), exit_code=${rc}"
+    declare -g "result_n${N}=${rc}"
+}
+
+# ----- Run sub-jobs SEQUENTIALLY -----
+# No background ``&``, no wait, no stagger — each launch_subjob call
+# blocks until that sub-run's mpiexec exits. If both N=2 and N=4
+# complete cleanly this way, the bug we've been chasing is exclusively
+# a concurrent-execution artifact. If N=2 still crashes when it's the
+# only thing running on this allocation, the bug is intra-sub-run.
+echo "[combined-test] starting at $(date -Iseconds) — SERIAL execution"
+for N in 2 4; do
+    launch_subjob ${N}
+done
+
+# ----- Summary -----
+echo
+echo "================================================================"
+echo "[combined-test] complete at $(date -Iseconds). Results:"
+for N in 2 4; do
+    rc_var="result_n${N}"
+    rc="${!rc_var}"
+    status="OK"
+    [ ${rc} -ne 0 ] && status="FAILED (exit=${rc})"
+    echo "[combined-test]   N=${N}: ${status}"
+done
+echo "================================================================"

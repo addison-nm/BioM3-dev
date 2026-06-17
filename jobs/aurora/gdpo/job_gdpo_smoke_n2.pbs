@@ -1,0 +1,82 @@
+#!/bin/bash -l
+#PBS -A NLDesignProtein
+#PBS -N gdpo_smoke_n2
+#PBS -l walltime=00:30:00
+#PBS -l select=2
+#PBS -l place=scatter
+#PBS -l filesystems=home:flare
+#PBS -q debug-scaling
+#PBS -j oe
+# PBS -M <emailaddress>
+# PBS -m be
+
+# 2-node smoke for the multi-node GDPO trainer.
+# - world_size=2 (one rank per node), --rollout_devices auto inside each
+#   rank fans across all 12 local Aurora tiles.
+# - G=24 → 12 replicas per rank → 1 sequence per tile per step. Small
+#   enough that rollout+ESMFold per step is short (~tens of seconds)
+#   yet exercises every piece of the cross-node path: state_dict
+#   broadcast, shard rollout, per-rank ESMFold, gather, rank-0 ELBO.
+# - 5 steps is enough to (a) catch deadlocks at startup + per-step
+#   barrier, (b) confirm distinct sequences across ranks (deterministic
+#   seeding bug would show duplicates), (c) verify train_log.json +
+#   debug.out land only on rank 0.
+
+projdir=${PBS_O_WORKDIR}
+cd ${projdir}
+
+module load frameworks
+source ./venvs/biom3-env/bin/activate
+
+# Configurations to edit
+config_path=./configs/grpo/example_gdpo.json
+prompts_path=./configs/grpo/prompts/sh3_v03_mixed_512.txt
+stage1_weights=./weights/PenCL/PenCL_V09152023_last.ckpt
+stage2_weights=./weights/Facilitator/Facilitator_MMD15.ckpt/last.ckpt
+stage3_init_weights=./weights/ProteoScribe/ProteoScribe_SH3_epoch52.ckpt/single_model.pth
+
+num_nodes=2
+num_generations=24              # G — 12 per rank → 1 per local tile
+batch_size=1
+steps=5
+save_steps=5
+beta=0.01
+eps=0.20
+n_quadrature=2
+inner_mc=1
+kl_estimator=tokenwise_k3
+reward=esmfold_plddt
+
+# Constant configurations
+device=xpu
+
+# Construct the run ID
+datetime=$(date +%Y%m%d_%H%M%S)
+config_name=$(basename "${config_path}" .json)
+run_id=${config_name}_smoke_multinode_n${num_nodes}_G${num_generations}_s${steps}_V${datetime}
+
+# Direct output to log file
+mkdir -p logs
+log_fpath=logs/${run_id}.${PBS_JOBID}.o
+
+source environment.sh
+./scripts/gdpo_train_multinode.sh \
+    ${config_path} \
+    ${num_nodes} \
+    ${device} \
+    ${run_id} \
+    --steps ${steps} \
+    --num_generations ${num_generations} \
+    --batch_size ${batch_size} \
+    --beta ${beta} \
+    --eps ${eps} \
+    --n_quadrature ${n_quadrature} \
+    --inner_mc ${inner_mc} \
+    --kl_estimator ${kl_estimator} \
+    --save_steps ${save_steps} \
+    --reward ${reward} \
+    --prompts_path ${prompts_path} \
+    --stage1_weights ${stage1_weights} \
+    --stage2_weights ${stage2_weights} \
+    --stage3_init_weights ${stage3_init_weights} \
+> ${log_fpath} 2>&1

@@ -272,7 +272,11 @@ def batch_generate_denoised_sampled(
     sync_per_step = int(getattr(args, "_world_size", 1)) <= 1
 
     with _inference_autocast(args.device):
-        for ii in tqdm(range(state.max_diffusion_step), desc=_diffusion_tqdm_desc(args)):
+        for ii in tqdm(
+            range(state.max_diffusion_step),
+            desc=_diffusion_tqdm_desc(args),
+            disable=bool(getattr(args, "_silent_tqdm", False)),
+        ):
             logits = _forward_logits(
                 model, state.temp_mask_realization, state.temp_idx, state.temp_y_c,
             )
@@ -339,7 +343,11 @@ def batch_generate_denoised_sampled_confidence(
     sync_per_step = int(getattr(args, "_world_size", 1)) <= 1
 
     with _inference_autocast(args.device):
-        for ii in tqdm(range(state.max_diffusion_step), desc=_diffusion_tqdm_desc(args)):
+        for ii in tqdm(
+            range(state.max_diffusion_step),
+            desc=_diffusion_tqdm_desc(args),
+            disable=bool(getattr(args, "_silent_tqdm", False)),
+        ):
             logits = _forward_logits(
                 model, state.temp_mask_realization, state.temp_idx, state.temp_y_c,
             )

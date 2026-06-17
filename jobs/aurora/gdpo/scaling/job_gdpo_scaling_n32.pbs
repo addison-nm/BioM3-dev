@@ -1,0 +1,68 @@
+#!/bin/bash -l
+#PBS -A NLDesignProtein
+#PBS -N gdpo_scaling_n32
+#PBS -l walltime=01:00:00
+#PBS -l select=32
+#PBS -l place=scatter
+#PBS -l filesystems=home:flare
+#PBS -q debug-scaling
+#PBS -j oe
+
+# Weak-scaling study, N=32 nodes. B=64, G=24, BG=1536 (K=48 per rank).
+# See scaling/README.md for the study design.
+
+projdir=${PBS_O_WORKDIR}
+cd ${projdir}
+
+module load frameworks
+source ./venvs/biom3-env/bin/activate
+
+config_path=./configs/grpo/example_gdpo.json
+prompts_path=./configs/grpo/prompts/sh3_v04_mixed_4096.txt
+stage1_weights=./weights/PenCL/PenCL_V09152023_last.ckpt
+stage2_weights=./weights/Facilitator/Facilitator_MMD15.ckpt/last.ckpt
+stage3_init_weights=./weights/ProteoScribe/ProteoScribe_SH3_epoch52.ckpt/single_model.pth
+
+num_nodes=32
+num_generations=24
+batch_size=64                   # K=48 per rank (each of 12 tiles handles 4 sequences)
+steps=20
+save_steps=10
+beta=0.01
+eps=0.20
+n_quadrature=2
+inner_mc=1
+kl_estimator=tokenwise_k3
+reward=esmfold_plddt
+
+device=xpu
+
+study_id=v01
+datetime=$(date +%Y%m%d_%H%M%S)
+config_name=$(basename "${config_path}" .json)
+run_id=${config_name}_scaling_${study_id}_n${num_nodes}_BG$((num_generations*batch_size))_s${steps}_V${datetime}
+
+mkdir -p logs
+log_fpath=logs/${run_id}.${PBS_JOBID}.o
+
+source environment.sh
+./scripts/gdpo_train_multinode.sh \
+    ${config_path} \
+    ${num_nodes} \
+    ${device} \
+    ${run_id} \
+    --steps ${steps} \
+    --num_generations ${num_generations} \
+    --batch_size ${batch_size} \
+    --beta ${beta} \
+    --eps ${eps} \
+    --n_quadrature ${n_quadrature} \
+    --inner_mc ${inner_mc} \
+    --kl_estimator ${kl_estimator} \
+    --save_steps ${save_steps} \
+    --reward ${reward} \
+    --prompts_path ${prompts_path} \
+    --stage1_weights ${stage1_weights} \
+    --stage2_weights ${stage2_weights} \
+    --stage3_init_weights ${stage3_init_weights} \
+> ${log_fpath} 2>&1

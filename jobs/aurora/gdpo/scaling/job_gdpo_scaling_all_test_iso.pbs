@@ -1,0 +1,191 @@
+#!/bin/bash -l
+#PBS -A NLDesignProtein
+#PBS -N gdpo_scaling_test_iso
+#PBS -l walltime=01:00:00
+#PBS -l select=8
+#PBS -l place=scatter
+#PBS -l filesystems=home:flare
+#PBS -q debug-scaling
+#PBS -j oe
+
+# Parallel-isolation test: same 2 sub-runs as job_gdpo_scaling_all_test.pbs
+# (N=2 on lines 1..2, N=4 on lines 3..6), but PARALLEL execution with the
+# per-sub-run isolation knobs added.
+#
+# This is the hypothesis-(A)-fix test: if the serial-execution test
+# (job_gdpo_scaling_all_test.pbs) showed both sub-runs complete cleanly
+# but parallel execution previously failed with SIGSEGV in exactly one
+# sub-run, the isolation knobs below should let both sub-runs run
+# concurrently to completion.
+#
+# Isolation knobs added (per launch_subjob call):
+#   1. CCL_LOG_LEVEL=info + per-sub-run CCL_LOG_FILE — captures the CCL
+#      state up to the failure point on a per-sub-run basis.
+#   2. FI_CXI_DEVICE_NAME=cxi$((N % 8)) — pins each sub-run's libfabric
+#      ranks to a distinct CXI NIC name (8 NICs/node), removing NIC-level
+#      resource contention as a possibility.
+#   3. CCL_ZE_IPC_EXCHANGE_MODE=drmfd — switches level-zero IPC handle
+#      exchange from default sockets (which use /tmp paths that may share
+#      across allocation-wide PALS sessions) to per-process DRM fds.
+#   4. FI_LOG_LEVEL=warn + per-sub-run FI_LOG_FILE — mirror diagnostic for
+#      libfabric warnings if CXI provider misbehaves under contention.
+#
+# If both N=2 and N=4 complete cleanly here, apply the same knobs to
+# job_gdpo_scaling_all.pbs (the production combined job) before the next
+# scaling sweep.
+#
+# Steps trimmed to 5 to fit ~30-min walltime, matching the serial test.
+
+projdir=${PBS_O_WORKDIR}
+cd ${projdir}
+
+module load frameworks
+source ./venvs/biom3-env/bin/activate
+
+set +e
+
+# ----- Configurations -----
+config_path=./configs/grpo/example_gdpo.json
+prompts_path=./configs/grpo/prompts/sh3_v04_mixed_4096.txt
+stage1_weights=./weights/PenCL/PenCL_V09152023_last.ckpt
+stage2_weights=./weights/Facilitator/Facilitator_MMD15.ckpt/last.ckpt
+stage3_init_weights=./weights/ProteoScribe/ProteoScribe_SH3_epoch52.ckpt/single_model.pth
+
+# Per-sub-run constants: K=48 per rank (each of 12 tiles handles 4
+# sequences), D=128 via configs/grpo/pre_unmask_sh3.json.
+# NOTE: at N=2 this is K=48 (B=4, BG=96); at N=4 it's K=48 (B=8, BG=192).
+# Matches the K=48 config of the prior successful serial test (8535167)
+# and parallel iso test (8539868). K=96 was tested but OOM'd at the
+# 64 GB HBM ceiling, so we stay at K=48 (4 seqs/tile) for stability.
+num_generations=24
+steps=5
+save_steps=5
+beta=0.01
+eps=0.20
+n_quadrature=2
+inner_mc=1
+kl_estimator=tokenwise_k3
+reward=esmfold_plddt
+
+device=xpu
+
+study_id=v03iso
+datetime=$(date +%Y%m%d_%H%M%S)
+config_name=$(basename "${config_path}" .json)
+
+# Disjoint hostfile slices
+hostdir=/tmp/biom3_hostfiles_${PBS_JOBID}
+mkdir -p ${hostdir}
+sed -n '1,2p' ${PBS_NODEFILE} > ${hostdir}/hostfile_n2
+sed -n '3,6p' ${PBS_NODEFILE} > ${hostdir}/hostfile_n4
+
+echo "[combined-iso] PBS_NODEFILE has $(wc -l < ${PBS_NODEFILE}) entries"
+for n in 2 4; do
+    echo "[combined-iso]   hostfile_n${n}: $(wc -l < ${hostdir}/hostfile_n${n}) entries"
+done
+
+mkdir -p logs
+source environment.sh
+
+# ----- Aurora CXI tunings for concurrent-mpiexec -----
+# Per ALCF guidance for `CXI alloc failed ... request exceeds ACs limits`
+# (argonne-lcf/AuroraBugTracking#12) when multiple mpiexec calls share one
+# PBS allocation. Bigger CQ + overflow buffer + lower fill-percent threshold
+# reduces the chance that the second sub-run gets starved on Cassini event-
+# queue resources while the first sub-run is still occupying CXI ACs. These
+# are exported here (not in environment.sh) so they only apply to combined-
+# job scaling experiments, not to single-mpiexec workloads.
+export FI_CXI_DEFAULT_CQ_SIZE=131072
+export FI_CXI_OFLOW_BUF_SIZE=8388608
+export FI_CXI_CQ_FILL_PERCENT=20
+echo "[combined-iso] FI_CXI_DEFAULT_CQ_SIZE=${FI_CXI_DEFAULT_CQ_SIZE} FI_CXI_OFLOW_BUF_SIZE=${FI_CXI_OFLOW_BUF_SIZE} FI_CXI_CQ_FILL_PERCENT=${FI_CXI_CQ_FILL_PERCENT}"
+
+# ----- Sub-run launcher (parallel, with isolation knobs) -----
+launch_subjob() {
+    local N=$1
+    local B=$((2 * N))
+    local BG=$((48 * N))
+    local hostfile="${hostdir}/hostfile_n${N}"
+    local run_id="${config_name}_scaling_${study_id}_n${N}_BG${BG}_s${steps}_V${datetime}"
+    local log_fpath="logs/${run_id}.${PBS_JOBID}.o"
+
+    local master_addr=$(head -1 "${hostfile}")
+    local master_port=$((29500 + N))
+
+    # ----- Per-sub-run isolation -----
+    # See header for rationale. Each knob is a defensive measure against
+    # one plausible cross-sub-run shared-resource collision.
+    local sub_ccl_log="${PBS_O_WORKDIR}/logs/ccl_n${N}_${PBS_JOBID}.log"
+    local sub_fi_log="${PBS_O_WORKDIR}/logs/fi_n${N}_${PBS_JOBID}.log"
+    local fi_cxi_device="cxi$((N % 8))"
+
+    echo "[combined-iso] launching N=${N} (B=${B}, BG=${BG}) → ${log_fpath}"
+    echo "[combined-iso]   MASTER_ADDR=${master_addr} MASTER_PORT=${master_port}"
+    echo "[combined-iso]   FI_CXI_DEVICE_NAME=${fi_cxi_device}"
+    echo "[combined-iso]   CCL_LOG_FILE=${sub_ccl_log}"
+
+    HOSTFILE_OVERRIDE="${hostfile}" \
+    MASTER_ADDR="${master_addr}" \
+    MASTER_PORT="${master_port}" \
+    CCL_LOG_LEVEL=info \
+    CCL_LOG_FILE="${sub_ccl_log}" \
+    CCL_ZE_IPC_EXCHANGE_MODE=drmfd \
+    FI_CXI_DEVICE_NAME="${fi_cxi_device}" \
+    FI_LOG_LEVEL=warn \
+    FI_LOG_FILE="${sub_fi_log}" \
+    ./scripts/gdpo_train_multinode.sh \
+        ${config_path} \
+        ${N} \
+        ${device} \
+        ${run_id} \
+        --steps ${steps} \
+        --num_generations ${num_generations} \
+        --batch_size ${B} \
+        --beta ${beta} \
+        --eps ${eps} \
+        --n_quadrature ${n_quadrature} \
+        --inner_mc ${inner_mc} \
+        --kl_estimator ${kl_estimator} \
+        --save_steps ${save_steps} \
+        --reward ${reward} \
+        --prompts_path ${prompts_path} \
+        --stage1_weights ${stage1_weights} \
+        --stage2_weights ${stage2_weights} \
+        --stage3_init_weights ${stage3_init_weights} \
+        > ${log_fpath} 2>&1 &
+
+    declare -g "pid_n${N}=$!"
+    echo "[combined-iso]   N=${N} background PID=$!"
+}
+
+# ----- Launch both sub-runs in PARALLEL -----
+# 15s stagger to give each mpiexec's PALS/PMIx init a clean window
+# (same as the production combined job). The isolation knobs above are
+# the primary defense; the stagger is belt-and-suspenders.
+echo "[combined-iso] starting at $(date -Iseconds) — PARALLEL execution"
+for N in 2 4; do
+    launch_subjob ${N}
+    sleep 15
+done
+
+# ----- Wait for both to complete -----
+echo "[combined-iso] all sub-runs launched. Waiting on completion..."
+declare -A results
+for N in 2 4; do
+    pid_var="pid_n${N}"
+    pid="${!pid_var}"
+    wait ${pid}
+    results[${N}]=$?
+done
+
+# ----- Summary -----
+echo
+echo "================================================================"
+echo "[combined-iso] complete at $(date -Iseconds). Results:"
+for N in 2 4; do
+    rc=${results[${N}]}
+    status="OK"
+    [ ${rc} -ne 0 ] && status="FAILED (exit=${rc})"
+    echo "[combined-iso]   N=${N}: ${status}"
+done
+echo "================================================================"

@@ -1,0 +1,68 @@
+#!/bin/bash -l
+#PBS -A NLDesignProtein
+#PBS -N <JOB_NAME>
+#PBS -l walltime=04:00:00
+#PBS -l select=<NUM_NODES>
+#PBS -l place=scatter
+#PBS -l filesystems=home:flare
+#PBS -q <QUEUE>
+#PBS -j oe
+# PBS -M <emailaddress>
+# PBS -m be
+
+# GDPO Stage 3 fine-tuning — multi-node variant.
+# One rank per node (NGPU_PER_NODE=1 in the launcher); within each rank,
+# the in-process RolloutPool fans diffusion rollouts across all 12 local
+# Aurora tiles. ESMFold is loaded once per node, not per tile. Per-step
+# wall-clock scales near-linearly with num_nodes for rollout + reward
+# (the dominant cost); the rank-0 gradient ELBO + optimizer step does
+# not scale. See docs/reinforcement_learning/gdpo_finetuning.md (TODO).
+#
+# Set num_generations to a multiple of (num_nodes × tiles_per_node)
+# so the round-robin shard balances cleanly. With 2 nodes × 12 tiles,
+# G=48 → 24 per rank → 2 per tile.
+
+projdir=${PBS_O_WORKDIR}  # Should submit job from the BioM3-dev directory
+cd ${projdir}
+
+module load frameworks
+source ./venvs/biom3-env/bin/activate
+
+# Configurations to edit
+config_path=./configs/grpo/<CONFIG_NAME>.json
+num_nodes=<NUM_NODES>           # Must match #PBS -l select=... above
+prompts_path=./configs/grpo/prompts/example_prompts.txt
+stage1_weights=<STAGE1_WEIGHTS_PATH>
+stage2_weights=<STAGE2_WEIGHTS_PATH>
+stage3_init_weights=<STAGE3_WEIGHTS_PATH>
+
+num_generations=48              # G — sequences per prompt; multiple of (nodes * tiles)
+steps=200
+save_steps=50
+
+# Constant configurations
+device=xpu
+
+# Construct the run ID
+datetime=$(date +%Y%m%d_%H%M%S)
+config_name=$(basename "${config_path}" .json)
+run_id=${config_name}_multinode_n${num_nodes}_G${num_generations}_s${steps}_V${datetime}
+
+# Direct output to log file
+mkdir -p logs
+log_fpath=logs/${run_id}.${PBS_JOBID}.o
+
+source environment.sh
+./scripts/gdpo_train_multinode.sh \
+    ${config_path} \
+    ${num_nodes} \
+    ${device} \
+    ${run_id} \
+    --num_generations ${num_generations} \
+    --prompts_path ${prompts_path} \
+    --stage1_weights ${stage1_weights} \
+    --stage2_weights ${stage2_weights} \
+    --stage3_init_weights ${stage3_init_weights} \
+    --steps ${steps} \
+    --save_steps ${save_steps} \
+> ${log_fpath} 2>&1

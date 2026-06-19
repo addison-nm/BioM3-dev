@@ -1,0 +1,84 @@
+# Mithril Task YAML (SkyPilot-compatible) — provision a B200, build the BioM3
+# image, and run the test suite on the GPU with weights pulled from S3.
+# Launch from the repo ROOT, with AWS creds in your shell:
+#
+#     eval "$(aws configure export-credentials --format env)"   # put AWS creds in this shell
+#     ml launch mithril/run_tests.task.yaml -c biom3-test
+#     ml logs biom3-test          # stream output
+#     ml down  biom3-test         # tear down (the cluster stays up / billing until you do)
+#
+# Flow (two nested layers):
+#   SkyPilot provisions a B200 and runs `setup`/`run` on the HOST  ── layer 1
+#     setup: builds the Docker image
+#     run:   docker run … pytest                                    ── layer 2 (the container)
+#            the container ENTRYPOINT first `aws s3 sync`s weights
+#            from BIOM3_WEIGHTS_URI into /app/weights, so the
+#            weight-gated tests actually run instead of skipping.
+
+workdir: .                       # sync this repo to ~/sky_workdir on the instance
+
+resources:
+  infra: mithril
+  accelerators: B200:1           # one B200; e.g. B200:8 for an 8-GPU node
+
+config:
+  mithril:
+    limit_price: 1.00            # max $/hr for the spot bid — set your ceiling
+
+# Sensitive values: masked in logs, not stored in the cluster YAML. These ${VAR}s
+# must be set in the shell you launch from (see the `eval` line in the header).
+secrets:
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+  AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN}
+
+# Non-sensitive config.
+envs:
+  AWS_DEFAULT_REGION: us-east-2
+  BIOM3_WEIGHTS_URI: s3://nm-portal-global-data-955510722784/biom3/weights
+  # Only the weights the pytest suite actually loads (traced from the test code).
+  # Files missing from S3 → just those tests skip. Directory-style ckpts use a
+  # trailing * so their contents come through; the esm2 `*` also grabs the
+  # -contact-regression companion that ESM loading needs.
+  BIOM3_WEIGHTS_INCLUDES: "LLMs/esm2_t33_650M_UR50D* LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext/* PenCL/BioM3_PenCL_epoch20.bin PenCL/PenCL_V09152023_last.ckpt* Facilitator/BioM3_Facilitator_epoch20.bin ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1*.bin ProteoScribe/epoch200_full.ckpt/single_model.pth"
+
+setup: |
+  # Build the image WITH awscli so the entrypoint can sync from S3.
+  # ~10-40 min first time; cached after. sudo: the task user may not be in the
+  # docker group; root docker always works.
+  cd ~/sky_workdir
+  sudo bash docker/build.sh --awscli --platform linux/amd64
+
+run: |
+  cd ~/sky_workdir
+  # Test suite inside the container, on the GPU. The entrypoint syncs weights
+  # (BIOM3_WEIGHTS_URI -> /app/weights) before pytest runs. --use_gpu exercises
+  # the B200 (also the cu129/Blackwell sm_100 check). Use `--quick --use_gpu`
+  # to skip the slow entrypoint/training tests.
+  #
+  # Forward creds INLINE ($VAR expands in this run-shell, which has the
+  # secrets/envs, BEFORE sudo) so the values are guaranteed to reach the
+  # container — including AWS_SESSION_TOKEN, which `sudo -E` may drop. (Tradeoff:
+  # the values appear in process args / logs; fine for short-lived temp creds.)
+  sudo docker run --rm --gpus all \
+    -e AWS_ACCESS_KEY_ID \
+    -e AWS_SECRET_ACCESS_KEY \
+    -e AWS_SESSION_TOKEN \
+    -e AWS_DEFAULT_REGION \
+    -e BIOM3_WEIGHTS_URI \
+    -e BIOM3_WEIGHTS_INCLUDES \
+    biom3:gpu pytest tests/ --use_gpu
+
+# ── Notes ────────────────────────────────────────────────────────────────────
+# • Data-free (no weights/creds): drop the secrets/envs blocks, build without
+#   --awscli, and `sudo docker run --rm --gpus all biom3:gpu pytest tests/ --quick`.
+# • If `sudo -E` doesn't preserve env on the box (sudoers policy), either add the
+#   task user to the docker group in `setup` and drop `sudo`, or pass values
+#   inline — `-e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"` (puts the value in the
+#   process args / logs).
+# • Training smoke instead of tests (still needs the creds -e flags for weights,
+#   or use the baked-in subset with no weights):
+#     sudo -E docker run --rm --gpus all -v "$PWD/outputs:/app/outputs" \
+#       biom3:gpu scripts/stage3_train_singlenode.sh \
+#         configs/stage3_training/pretrain_scratch_v1.json 1 cuda mithril_test01 \
+#         --epochs 1 --primary_data_path tests/_data/data/Stage2_MMD_swissprot_embedding_subset_1000.hdf5

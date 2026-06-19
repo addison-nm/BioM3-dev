@@ -42,20 +42,33 @@ def build_model_ProteoScribe(
     )
 
 
+def _strip_pl_model_prefix(state_dict: dict) -> dict:
+    """Strip the ``model.`` prefix added by PL_ProtARDM (``self.model = model``).
+
+    A no-op when no key carries the prefix, so raw state dicts saved as
+    ``PL_module.model.state_dict()`` pass through unchanged.
+    """
+    if not any(k.startswith(_PL_MODEL_PREFIX) for k in state_dict):
+        return state_dict
+    return {
+        (k[len(_PL_MODEL_PREFIX):] if k.startswith(_PL_MODEL_PREFIX) else k): v
+        for k, v in state_dict.items()
+    }
+
+
 def _load_state_dict_from_file(path: str, device=None) -> dict:
     """Load a state_dict from a single file, handling raw and PL checkpoint formats.
 
-    - Raw state dict (.bin, .pt): returned as-is.
+    - Raw state dict (.bin, .pt): returned as-is, stripping any ``model.``
+      prefix left over from saving ``PL_module.state_dict()`` directly.
     - PL checkpoint (.ckpt): extracts ``checkpoint["state_dict"]`` and strips
       the ``model.`` prefix added by PL_ProtARDM.
     """
     checkpoint = torch.load(path, map_location=device)
     if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
-        pl_state_dict = checkpoint["state_dict"]
-        return {
-            (k[len(_PL_MODEL_PREFIX):] if k.startswith(_PL_MODEL_PREFIX) else k): v
-            for k, v in pl_state_dict.items()
-        }
+        return _strip_pl_model_prefix(checkpoint["state_dict"])
+    if isinstance(checkpoint, dict):
+        return _strip_pl_model_prefix(checkpoint)
     return checkpoint
 
 

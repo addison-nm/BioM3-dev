@@ -1,18 +1,18 @@
 # Project specific items
-data/*
-outputs/*
-logs/
-weights/*/*
+/data/*
+/outputs/*
+/logs/
+/weights/*/*
 _my*/
-tests/_tmp/
-lightning/
-lightning_logs/
-_misc/
+/tests/_tmp/
+/lightning/
+/lightning_logs/
+/_misc/
 .uniprot_cache/
-demos/outputs/*
+/demos/outputs/*
 hang_dumps/
 *.core
-debug/
+/debug/
 
 # PBS / job artifacts at repo root
 jobscript.sh

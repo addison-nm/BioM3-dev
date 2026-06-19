@@ -19,3 +19,4 @@ nvidia-ml-py
 dask
 pyarrow
 py3Dmol
+omegaconf

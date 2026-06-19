@@ -44,3 +44,4 @@ tensorboard==2.20
 mpi4py==4.1
 nvidia-ml-py==13.580.82
 pyarrow
+omegaconf

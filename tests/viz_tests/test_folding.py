@@ -32,6 +32,11 @@ class TestModelCaching:
 @pytest.mark.use_gpu
 class TestFoldSequenceGPU:
     def test_fold_returns_pdb_string(self):
-        pdb = folding_mod.fold_sequence("AAAAAA")
+        # ESMFold pulls in heavy optional deps (omegaconf, openfold, ...). Skip
+        # cleanly when any of them is absent rather than erroring.
+        try:
+            pdb = folding_mod.fold_sequence("AAAAAA")
+        except ImportError as exc:
+            pytest.skip(f"ESMFold dependencies unavailable: {exc}")
         assert isinstance(pdb, str)
         assert "ATOM" in pdb

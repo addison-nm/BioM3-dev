@@ -43,6 +43,19 @@ TRANSFORMER_OUTPUT_LAYER_PARAMS = [
 
 def prefix_paths(args):
     """Prepend data files with path to test directories"""
+    # parse_arguments() maps the deprecated --swissprot_data_root / --pfam_data_root
+    # onto primary_data_path / secondary_data_paths *before* this runs, so the
+    # canonical fields must be prefixed too — prefixing the deprecated aliases
+    # alone no longer reaches the data loader.
+    if args.primary_data_path != "None" and args.primary_data_path is not None:
+        args.primary_data_path = os.path.join(
+            DATDIR, args.primary_data_path
+        )
+    if args.secondary_data_paths is not None:
+        args.secondary_data_paths = [
+            os.path.join(DATDIR, p) if p not in (None, "None") else p
+            for p in args.secondary_data_paths
+        ]
     if args.swissprot_data_root != "None" and args.swissprot_data_root is not None:
         args.swissprot_data_root = os.path.join(
             DATDIR, args.swissprot_data_root

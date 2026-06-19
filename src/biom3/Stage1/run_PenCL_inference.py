@@ -186,10 +186,11 @@ def prepare_model_from_checkpoint(
     logger.info('Loading weights from checkpoint...')
     PL_model = PL_wrapper_class.load_from_checkpoint(
         checkpoint_path=model_path,
+        map_location=device,
         args=config_args,
         model=model,
         text_tokenizer=model.text_encoder.tokenizer,
-        sequence_tokenizer=model.protein_encoder.alphabet, 
+        sequence_tokenizer=model.protein_encoder.alphabet,
         strict=False
     )
     # x = torch.load(model_path)

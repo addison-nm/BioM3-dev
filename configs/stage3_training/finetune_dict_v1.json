@@ -1,0 +1,71 @@
+{
+  "description": "Finetune ProteoScribe (1 block) on (text-dict, sequence) pairs. Prompts are randomized per epoch and embedded to z_c on-device via the frozen PenCL text branch + Facilitator.",
+  "model_name": "BioM3-v0",
+  "tags": ["finetuning", "dict-prompt"],
+  "notes": [],
+  "_base_configs": ["./models/_base_ProteoScribe_1block.json"],
+  "_overwrite_configs": [],
+
+  "finetune": true,
+  "pretrained_weights": "weights/ProteoScribe/ProteoScribe_epoch200.pth",
+  "finetune_last_n_blocks": 1,
+  "finetune_last_n_layers": -1,
+  "finetune_output_layers": true,
+  "resume_from_checkpoint": null,
+
+  "finetune_data_path": "data/datasets/finetune_dict_pairs.jsonl",
+  "sequence_keyname": "sequence",
+  "prompt_fields_key": "fields",
+  "prompt_shuffle": true,
+  "prompt_retention_probs": {
+    "protein_name": 1.0,
+    "function": 0.85,
+    "lineage": 0.85,
+    "catalytic_activity": 0.65,
+    "family": 0.65,
+    "domain": 0.55
+  },
+
+  "stage1_config_path": "configs/inference/stage1_PenCL.json",
+  "stage2_config_path": "configs/inference/stage2_Facilitator.json",
+  "pencl_weights": "weights/PenCL/BioM3_PenCL_epoch20.bin",
+  "facilitator_weights": "weights/Facilitator/BioM3_Facilitator_epoch20.bin",
+
+  "wandb": false,
+  "wandb_entity": "thenaturalmachine",
+  "wandb_project": "BioM3-dev",
+  "wandb_tags": ["finetuning", "dict-prompt"],
+
+  "choose_optim": "AdamW",
+  "lr": 1e-4,
+  "scale_learning_rate": false,
+  "weight_decay": 1e-6,
+  "scheduler_gamma": "coswarmup",
+
+  "seed": 0,
+  "epochs": 100,
+  "valid_size": 0.2,
+  "batch_size": 32,
+  "task": "proteins",
+  "max_steps": 3000000,
+
+  "device": "cuda",
+  "precision": "bf16",
+  "devices_per_node": 1,
+  "num_nodes": 1,
+  "acc_grad_batches": 1,
+
+  "val_check_interval": 20,
+  "limit_val_batches": 0.6,
+  "log_every_n_steps": 100,
+  "num_workers": 1,
+
+  "output_root": "./outputs/Stage3/finetuning_dict",
+  "checkpoints_folder": "checkpoints",
+  "runs_folder": "runs",
+
+  "early_stopping_metric": null,
+  "save_metrics_history": true,
+  "metrics_history_every_n_steps": 1,
+  "metrics_history_ranks": [0]
+}

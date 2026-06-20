@@ -1030,6 +1030,17 @@ def retrieve_all_args(args):
     args = parser.parse_args(args)
     args._argv = argv  # consumed by core.dry_run for CLI provenance attribution
 
+    apply_arg_type_conversions(args)
+
+    return args
+
+
+def apply_arg_type_conversions(args):
+    """Normalize string/None-sentinel args in place (CLI > JSON > defaults).
+
+    Extracted so alternative entrypoints (e.g. run_ProteoScribe_finetuning) can
+    reuse the exact same coercions after building their own parser.
+    """
     # Type conversions (idempotent — pass through values already of the target type)
     args.resume_from_checkpoint = nonestr_to_none(args.resume_from_checkpoint)
     args.download = str_to_bool(args.download)

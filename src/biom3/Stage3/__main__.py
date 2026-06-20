@@ -13,5 +13,10 @@ def run_stage3_training():
     args = parse_arguments(sys.argv[1:])
     main(args)
 
+def run_stage3_finetuning():
+    from biom3.Stage3.run_ProteoScribe_finetuning import parse_arguments, main
+    args = parse_arguments(sys.argv[1:])
+    main(args)
+
 if __name__ == "__main__":
     main()

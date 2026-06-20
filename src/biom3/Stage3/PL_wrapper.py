@@ -39,6 +39,7 @@ from sklearn.model_selection import train_test_split
 from transformers.optimization import Adafactor  # Efficient optimizer for transformers
 from deepspeed.ops.adam import DeepSpeedCPUAdam  # Memory-efficient Adam implementation
 from transformers import get_cosine_schedule_with_warmup  # Learning rate scheduler
+from transformers import AutoTokenizer  # BioBERT tokenizer for dict-prompt finetuning
 
 # ----- Standard Libraries & Utilities -----
 import functools
@@ -1034,4 +1035,157 @@ class HDF5DataModule(pl.LightningDataModule):
 
 # Backward compatibility alias
 HDF5_PFamDataModule = HDF5DataModule
+
+
+class PL_ProtARDM_Finetune(PL_ProtARDM):
+    """ProteoScribe finetuning module that embeds text prompts to z_c on-device.
+
+    Identical to :class:`PL_ProtARDM` except that each batch arrives as
+    ``(num_seqs, input_ids)`` rather than ``(num_seqs, z_c)``. A frozen
+    text->z_c front-end (PenCL text branch + Facilitator) computes z_c on the
+    device under ``no_grad`` before the inherited diffusion training step runs.
+
+    The embedder is intentionally kept *outside* the LightningModule's module
+    tree (stored in a one-element list): its frozen parameters then stay out of
+    ``self.parameters()`` (so the optimizer and DeepSpeed never see them) and out
+    of saved checkpoints (rebuilt from PenCL/Facilitator weights on resume). It
+    runs in fp32 eval mode so its embeddings match Stage 1/2 inference exactly.
+    """
+
+    def __init__(self, args, model, embedder):
+        super().__init__(args=args, model=model)
+        embedder.eval()
+        for p in embedder.parameters():
+            p.requires_grad = False
+        self._embedder_ref = [embedder]
+
+    @property
+    def embedder(self):
+        return self._embedder_ref[0]
+
+    def on_after_batch_transfer(self, batch, dataloader_idx):
+        num_seqs, input_ids = batch
+        embedder = self.embedder
+        if next(embedder.parameters()).device != input_ids.device:
+            embedder.to(input_ids.device)
+        with torch.no_grad():
+            z_c = embedder(input_ids)
+        return [num_seqs, z_c]
+
+
+class DictPromptDataModule(pl.LightningDataModule):
+    """DataModule for (text-fragment dict, sequence) finetuning data in JSONL.
+
+    Reads one JSONL file, builds a :class:`~biom3.Stage3.preprocess.DictPromptDataset`
+    that randomizes each prompt on access, splits train/val and filters by
+    sequence length (matching :class:`HDF5DataModule`), and tokenizes prompts in
+    the collate function with the BioBERT tokenizer at ``padding="max_length"``.
+    """
+
+    def __init__(
+        self, *,
+        jsonl_path,
+        text_model_path,
+        text_max_length,
+        retention_probs,
+        shuffle_prompt,
+        fields_key,
+        sequence_key,
+        batch_size,
+        num_workers,
+        valid_size,
+        seed,
+        diffusion_steps,
+        image_size,
+    ):
+        super().__init__()
+        self.jsonl_path = jsonl_path
+        self.text_model_path = text_model_path
+        self.text_max_length = text_max_length
+        self.retention_probs = retention_probs or {}
+        self.shuffle_prompt = shuffle_prompt
+        self.fields_key = fields_key
+        self.sequence_key = sequence_key
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.valid_size = valid_size
+        self.seed = seed
+        self.diffusion_steps = diffusion_steps
+        self.image_size = image_size
+        self.min_seq_length = diffusion_steps - 2
+
+    def setup(self, stage=None):
+        from biom3.core.prompt_assembly import RandomizedPromptConstructor
+
+        records = prep.read_dict_prompt_jsonl(
+            self.jsonl_path,
+            fields_key=self.fields_key,
+            sequence_key=self.sequence_key,
+        )
+        constructor = RandomizedPromptConstructor(
+            self.retention_probs, shuffle=self.shuffle_prompt,
+        )
+        dataset = prep.DictPromptDataset(
+            records=records,
+            prompt_constructor=constructor,
+            image_size=self.image_size,
+        )
+        self.text_tokenizer = AutoTokenizer.from_pretrained(self.text_model_path)
+
+        train_idx, val_idx = self._split_indices(dataset)
+        train_idx = self._filter_by_sequence_length(dataset, train_idx)
+        val_idx = self._filter_by_sequence_length(dataset, val_idx)
+        self.train_dataset = Subset(dataset, train_idx)
+        self.val_dataset = Subset(dataset, val_idx)
+        self.split_info = [{
+            "path": self.jsonl_path,
+            "train_indices": train_idx,
+            "val_indices": val_idx,
+            "test_indices": [],
+        }]
+        logger.info("Loaded dict-prompt dataset from %s (%d train, %d val)",
+                    self.jsonl_path, len(train_idx), len(val_idx))
+
+    def _split_indices(self, dataset):
+        train_size = int((1 - self.valid_size) * len(dataset))
+        indices = np.arange(len(dataset))
+        np.random.seed(self.seed)
+        np.random.shuffle(indices)
+        return indices[:train_size], indices[train_size:]
+
+    def _filter_by_sequence_length(self, dataset, indices):
+        sequence_lengths = dataset.get_sequence_lengths()
+        filtered = [idx for idx in indices if sequence_lengths[idx] <= self.min_seq_length]
+        logger.info("Original indices count: %s, Filtered indices count: %s",
+                    len(indices), len(filtered))
+        return filtered
+
+    def _collate(self, batch):
+        return prep.dict_prompt_collate_fn(
+            batch,
+            text_tokenizer=self.text_tokenizer,
+            text_max_length=self.text_max_length,
+        )
+
+    def train_dataloader(self):
+        sampler = _make_distributed_sampler(self.train_dataset, shuffle=True, seed=self.seed)
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            sampler=sampler,
+            shuffle=(sampler is None),
+            collate_fn=self._collate,
+        )
+
+    def val_dataloader(self):
+        sampler = _make_distributed_sampler(self.val_dataset, shuffle=False, seed=self.seed)
+        return DataLoader(
+            self.val_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            sampler=sampler,
+            shuffle=False,
+            collate_fn=self._collate,
+        )
 

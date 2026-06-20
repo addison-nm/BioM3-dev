@@ -29,6 +29,11 @@ from functools import partial
 # Progress tracking
 from tqdm import tqdm
 
+# JSON line parsing for dict-prompt finetuning datasets
+import json
+
+from biom3.core.prompt_assembly import RandomizedPromptConstructor
+
 def get_mnist_dataset(args: any) -> DataLoader:
     """
     Create a DataLoader for the MNIST dataset with appropriate transformations.
@@ -331,6 +336,116 @@ def HDF5_prepare_protein_data(args, sequences):
     padded_seq_list = pad_ends(seqs=filter_seq_list, max_seq_length=int(image_size * image_size))
     num_seq_list = create_num_seqs(padded_seq_list)  # Numerical representations
     return [num_seq_list]
+
+
+#########################################################
+# Dict-prompt finetuning dataset                        #
+# text dict --> randomized prompt --> (on-GPU) z_c      #
+#########################################################
+
+def encode_protein_sequence(sequence: str, image_size: int) -> list:
+    """Tokenize one protein sequence to padded numerical form for ProteoScribe.
+
+    Mirrors :func:`HDF5_prepare_protein_data` for a single sequence: strip gaps,
+    add ``<START>``/``<END>``, pad to ``image_size**2`` with gap tokens, and map
+    to integer indices. Length filtering is handled upstream by the data module.
+    """
+    seq_list = ['<START>'] + [aa for aa in sequence.replace('-', '')] + ['<END>']
+    padded = pad_ends(seqs=seq_list, max_seq_length=int(image_size * image_size))
+    return create_num_seqs(padded)
+
+
+def read_dict_prompt_jsonl(jsonl_path: str, fields_key: str, sequence_key: str):
+    """Read a JSONL file of dict-sequence pairs.
+
+    Each line is a JSON object with a ``fields_key`` entry (a mapping of fragment
+    key -> already-assembled fragment string) and a ``sequence_key`` entry (the
+    protein sequence). Returns a list of ``(fields_dict, sequence_str)`` tuples.
+    """
+    records = []
+    with open(jsonl_path, 'r') as fh:
+        for line_num, line in enumerate(fh, start=1):
+            line = line.strip()
+            if not line:
+                continue
+            obj = json.loads(line)
+            if fields_key not in obj:
+                raise KeyError(
+                    f"{jsonl_path}:{line_num}: missing fields key {fields_key!r}"
+                )
+            if sequence_key not in obj:
+                raise KeyError(
+                    f"{jsonl_path}:{line_num}: missing sequence key {sequence_key!r}"
+                )
+            fields = obj[fields_key]
+            if not isinstance(fields, dict):
+                raise TypeError(
+                    f"{jsonl_path}:{line_num}: {fields_key!r} must be an object, "
+                    f"got {type(fields).__name__}"
+                )
+            records.append((fields, obj[sequence_key]))
+    return records
+
+
+class DictPromptDataset(Dataset):
+    """Dataset of (text-fragment dict, protein sequence) pairs for finetuning.
+
+    On each access, the fragment dict is collapsed into a single prompt string
+    via :class:`RandomizedPromptConstructor` (stochastic dropout + optional
+    reordering, re-rolled every epoch), and the protein sequence is tokenized to
+    a padded numerical tensor. The prompt is returned as a *string*; batched
+    BioBERT tokenization happens in :func:`dict_prompt_collate_fn` so it matches
+    Stage 1 inference exactly (``padding="max_length"``).
+    """
+
+    def __init__(self, records, prompt_constructor: RandomizedPromptConstructor,
+                 image_size: int):
+        self.records = records
+        self.prompt_constructor = prompt_constructor
+        self.image_size = int(image_size)
+
+    def __len__(self):
+        return len(self.records)
+
+    def get_sequence_lengths(self):
+        """Raw (ungapped) sequence lengths, for length-based filtering."""
+        return np.array(
+            [len(seq.replace('-', '')) for _, seq in self.records],
+            dtype=np.int64,
+        )
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+        fields, sequence = self.records[idx]
+        prompt = self.prompt_constructor.build(fields)
+        num_seqs = torch.tensor(
+            encode_protein_sequence(sequence, self.image_size)
+        ).float()
+        return num_seqs, prompt
+
+
+def dict_prompt_collate_fn(batch, *, text_tokenizer, text_max_length):
+    """Collate (num_seqs, prompt_str) samples into model-ready tensors.
+
+    Stacks the numerical sequences and tokenizes the batch of prompt strings with
+    the BioBERT tokenizer using ``padding="max_length"`` / ``max_length=512`` —
+    the configuration ProteoScribe's conditioning embeddings were trained under
+    (see docs/bug_reports/bert_embedding_mismatch.md). Returns
+    ``(num_seqs [B, image_size**2], input_ids [B, text_max_length])``.
+    """
+    num_seqs, prompts = zip(*batch)
+    num_seqs = torch.stack(list(num_seqs))
+    text_inputs = text_tokenizer.batch_encode_plus(
+        list(prompts),
+        truncation=True,
+        max_length=text_max_length,
+        padding="max_length",
+        return_tensors="pt",
+        return_attention_mask=False,
+        return_token_type_ids=False,
+    )
+    return num_seqs, text_inputs["input_ids"]
 
 
 

@@ -1,0 +1,302 @@
+"""BioM3 Stage 3: ProteoScribe finetuning on dict-prompt / sequence pairs.
+
+Unlike ``run_PL_training`` (which trains on precomputed z_c embeddings stored in
+HDF5), this script finetunes ProteoScribe directly on a JSONL dataset of
+``(text-fragment dict, protein sequence)`` pairs. For each example the fragment
+dict is collapsed into a single prompt string with stochastic dropout/reordering
+(:class:`RandomizedPromptConstructor`), then embedded to z_c on-device through a
+frozen text->z_c front-end (PenCL text branch + Facilitator) before the standard
+ProteoScribe diffusion objective runs. Because the prompt is re-randomized every
+epoch, z_c cannot be precomputed.
+
+This is purely a *finetuning* script: it always loads pretrained ProteoScribe
+weights (or resumes from a Lightning checkpoint) and freezes all but a chosen
+subset of the transformer. Most of the training infrastructure (trainer setup,
+callbacks, checkpoint saving, freezing, arg coercion) is reused from
+``run_PL_training``.
+
+Example usage:
+
+    biom3_finetune_stage3 \
+        --config_path configs/stage3_training/finetune_dict_v1.json \
+        --run_id my_finetune_run
+"""
+
+import os
+import sys
+import time
+import logging
+import warnings
+import argparse
+from datetime import datetime
+
+import numpy as np
+import torch
+
+import biom3.Stage3.cond_diff_transformer_layer as mod
+import biom3.Stage3.PL_wrapper as PL_mod
+import biom3.Stage3.run_PL_training as base
+from biom3.Stage3.io import prepare_model_ProteoScribe
+from biom3.Stage3.finetune_embedder import build_text_to_zc_embedder
+from biom3.core.helpers import load_json_config, convert_to_namespace
+from biom3.core.run_utils import setup_file_logging, teardown_file_logging
+from biom3.core.distributed import get_global_rank
+from biom3.backend.device import print_gpu_initialization, setup_logger
+
+logger = setup_logger(__name__)
+
+
+def get_finetune_args(parser):
+    """Finetuning-specific arguments (data, prompt randomization, embedder)."""
+    parser.add_argument('--finetune_data_path', default=None, type=str,
+                        help='path to JSONL of {fields: {...}, sequence: ...} pairs')
+    parser.add_argument('--prompt_fields_key', default='fields', type=str,
+                        help='JSON key holding the fragment dict for each record')
+    parser.add_argument('--prompt_retention_probs', default=None, type=str,
+                        help='per-fragment-key retention probabilities, as a JSON '
+                             'object string (or set directly via config). Keys '
+                             'absent here are always retained.')
+    parser.add_argument('--prompt_shuffle', default='True', type=str,
+                        help='whether to shuffle retained fragments before joining')
+
+    # Frozen text -> z_c embedding front-end (PenCL text branch + Facilitator)
+    parser.add_argument('--stage1_config_path', default=None, type=str,
+                        help='PenCL (Stage 1) inference config for the text encoder')
+    parser.add_argument('--stage2_config_path', default=None, type=str,
+                        help='Facilitator (Stage 2) inference config')
+    parser.add_argument('--pencl_weights', default=None, type=str,
+                        help='PenCL weights (.bin/.pt/.ckpt); only text branch is used')
+    parser.add_argument('--facilitator_weights', default=None, type=str,
+                        help='Facilitator weights (.bin/.pt/.ckpt)')
+    return parser
+
+
+def retrieve_all_args(argv):
+    """Build the finetuning arg namespace (CLI > JSON config > defaults)."""
+    pre_parser = argparse.ArgumentParser(add_help=False)
+    pre_parser.add_argument('--config_path', '-c', type=str, default=None)
+    pre_args, _ = pre_parser.parse_known_args(argv)
+
+    parser = argparse.ArgumentParser(description='Stage 3: ProteoScribe finetuning')
+    parser.add_argument('--config_path', '-c', type=str, default=None,
+                        help='Path to JSON config file. Values are overridden by CLI args.')
+    base.get_args(parser=parser)
+    base.get_model_args(parser=parser)
+    mod.add_model_args(parser=parser)
+    base.get_path_args(parser=parser)
+    base.get_wrapper_args(parser=parser)
+    get_finetune_args(parser=parser)
+
+    if pre_args.config_path is not None:
+        json_config = load_json_config(pre_args.config_path)
+        parser.set_defaults(**json_config)
+
+    raw_argv = list(argv)
+    args = parser.parse_args(argv)
+    args._argv = raw_argv
+
+    base.apply_arg_type_conversions(args)
+    _apply_finetune_arg_conversions(args)
+    return args
+
+
+def _apply_finetune_arg_conversions(args):
+    args.prompt_shuffle = base.str_to_bool(args.prompt_shuffle)
+    args.finetune_data_path = base.nonestr_to_none(args.finetune_data_path)
+    args.pencl_weights = base.nonestr_to_none(args.pencl_weights)
+    args.facilitator_weights = base.nonestr_to_none(args.facilitator_weights)
+    args.stage1_config_path = base.nonestr_to_none(args.stage1_config_path)
+    args.stage2_config_path = base.nonestr_to_none(args.stage2_config_path)
+
+    probs = args.prompt_retention_probs
+    if isinstance(probs, str):
+        import json
+        probs = json.loads(probs)
+    args.prompt_retention_probs = probs or {}
+
+    # Coerce the finetune subset selectors the same way run_PL_training.main does
+    # (-2 sentinel == "unspecified" -> -1 == all).
+    if args.finetune_last_n_blocks == -2:
+        args.finetune_last_n_blocks = -1
+    if args.finetune_last_n_layers == -2:
+        args.finetune_last_n_layers = -1
+    return args
+
+
+def parse_arguments(argv):
+    return retrieve_all_args(argv)
+
+
+def load_embedder_configs(args):
+    if args.stage1_config_path is None or args.stage2_config_path is None:
+        raise ValueError(
+            "Both --stage1_config_path and --stage2_config_path are required for "
+            "finetuning (they configure the frozen text->z_c embedder)."
+        )
+    stage1_args = convert_to_namespace(load_json_config(args.stage1_config_path))
+    stage2_args = convert_to_namespace(load_json_config(args.stage2_config_path))
+    return stage1_args, stage2_args
+
+
+def load_data(args, stage1_args):
+    if args.finetune_data_path is None:
+        raise ValueError("--finetune_data_path (JSONL) is required for finetuning.")
+    data_module = PL_mod.DictPromptDataModule(
+        jsonl_path=args.finetune_data_path,
+        text_model_path=stage1_args.text_model_path,
+        text_max_length=stage1_args.text_max_length,
+        retention_probs=args.prompt_retention_probs,
+        shuffle_prompt=args.prompt_shuffle,
+        fields_key=args.prompt_fields_key,
+        sequence_key=args.sequence_keyname,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        valid_size=args.valid_size,
+        seed=args.seed,
+        diffusion_steps=args.diffusion_steps,
+        image_size=args.image_size,
+    )
+    data_module.setup()
+    return data_module
+
+
+def load_model(args, data_module, stage1_args, stage2_args):
+    args.traindata_len = (
+        len(data_module.train_dataloader()) // args.devices_per_node // args.acc_grad_batches
+    )
+    logger.info('Length of a training epoch in batch gradient updates: %s',
+                args.traindata_len)
+
+    if stage2_args.emb_dim != args.text_emb_dim:
+        raise ValueError(
+            f"Facilitator output dim ({stage2_args.emb_dim}) != ProteoScribe "
+            f"text_emb_dim ({args.text_emb_dim}); z_c would not match the "
+            f"conditioning MLP. Align the configs."
+        )
+
+    if get_global_rank() == 0:
+        print_gpu_initialization()
+
+    # On resume, weights come from the Lightning checkpoint via trainer.fit; on a
+    # fresh finetune, load the pretrained ProteoScribe.
+    model_fpath = None if args.resume_from_checkpoint is not None else args.pretrained_weights
+    model = prepare_model_ProteoScribe(
+        config_args=args,
+        model_fpath=model_fpath,
+        device=args.device,
+        strict=True,
+        eval=False,
+        attempt_correction=True,
+        verbosity=2,
+    )
+    logger.info('ProteoScribe model size: %s',
+                sum(p.numel() for p in model.parameters()))
+
+    embedder = build_text_to_zc_embedder(
+        stage1_args=stage1_args,
+        stage2_args=stage2_args,
+        pencl_weights=args.pencl_weights,
+        facilitator_weights=args.facilitator_weights,
+        device=None,
+    )
+
+    PL_model = PL_mod.PL_ProtARDM_Finetune(
+        args=args,
+        model=model,
+        embedder=embedder,
+    )
+    return PL_model
+
+
+def main(args, ds_config=None):
+    base._MAIN_START_MONOTONIC = time.perf_counter()
+    base._LAST_TRAINER = None
+    base._BACKUP_HISTORY.clear()
+    start_time = datetime.now()
+
+    warnings.filterwarnings("ignore", message=".*LeafSpec.*is deprecated.*")
+    warnings.filterwarnings("ignore", message=".*TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD.*")
+    logging.getLogger("tensorboardX.x2num").setLevel(logging.ERROR)
+
+    run_dir = os.path.join(args.output_root, args.runs_folder, args.run_id)
+    logs_dir = os.path.join(run_dir, base._LOGS_SUBDIR)
+    artifacts_dir = os.path.join(run_dir, base._ARTIFACTS_SUBDIR)
+    checkpoint_dir = os.path.join(args.output_root, args.checkpoints_folder, args.run_id)
+    if get_global_rank() == 0:
+        os.makedirs(logs_dir, exist_ok=True)
+        os.makedirs(artifacts_dir, exist_ok=True)
+        os.makedirs(checkpoint_dir, exist_ok=True)
+    log_path, file_handler = setup_file_logging(artifacts_dir)
+
+    base.clear_gpu_cache()
+
+    seed = args.seed
+    if seed <= 0:
+        seed = np.random.randint(2**32)
+        args.seed = seed
+    base.set_seed(seed)
+    logger.info("Using seed: %s", seed)
+
+    stage1_args, stage2_args = load_embedder_configs(args)
+    data_module = load_data(args, stage1_args=stage1_args)
+    PL_model = load_model(
+        args, data_module=data_module,
+        stage1_args=stage1_args, stage2_args=stage2_args,
+    )
+
+    # Finetuning script: always freeze all but the requested subset. requires_grad
+    # flags are not persisted in Lightning checkpoints, so re-apply on resume too.
+    PL_model = base.freeze_except_last_n_blocks_and_layers(
+        PL_model=PL_model,
+        n_blocks=args.finetune_last_n_blocks,
+        n_layers=args.finetune_last_n_layers,
+        finetune_output_layers=args.finetune_output_layers,
+    )
+
+    base._write_build_manifest(
+        args=args,
+        artifacts_dir=artifacts_dir,
+        checkpoint_dir=checkpoint_dir,
+        PL_model=PL_model,
+        start_time=start_time,
+    )
+
+    exit_reason = "completed"
+    exception = None
+    try:
+        base.train_model(
+            args=args,
+            PL_model=PL_model,
+            data_module=data_module,
+            ds_config=ds_config,
+        )
+    except KeyboardInterrupt as e:
+        exit_reason = "interrupted"
+        exception = e
+        raise
+    except BaseException as e:
+        exit_reason = "exception"
+        exception = e
+        raise
+    finally:
+        completed_epochs = (
+            base._LAST_TRAINER.current_epoch if base._LAST_TRAINER is not None else None
+        )
+        completed_steps = (
+            base._LAST_TRAINER.global_step if base._LAST_TRAINER is not None else None
+        )
+        base._write_run_summary(
+            artifacts_dir=artifacts_dir,
+            start_time=start_time,
+            exit_reason=exit_reason,
+            exception=exception,
+            completed_epochs=completed_epochs,
+            completed_steps=completed_steps,
+        )
+
+    teardown_file_logging("biom3", file_handler)
+
+
+if __name__ == '__main__':
+    args = parse_arguments(sys.argv[1:])
+    main(args)

@@ -1,0 +1,51 @@
+# TEMPLATE — BioM3 Stage-3 finetuning on AWS (SkyPilot), running INSIDE the
+# prebuilt ECR image. Identical job + envs to cloud/finetune.mithril.yaml —
+# only `resources` differ. Fill in every <PLACEHOLDER>. See docs/setup/cloud_jobs.md.
+#
+# Prereqs in your launch shell:
+#   eval "$(aws configure export-credentials --format env)"
+#   export ECR_PASSWORD="$(aws ecr get-login-password --region us-east-2)"
+# On AWS you may instead leave SKYPILOT_DOCKER_USERNAME/PASSWORD empty to let the
+# instance IAM role authenticate to ECR (S3 creds below still needed unless the
+# role grants S3 access).
+
+resources:
+  infra: aws
+  accelerators: <GPU>:1                # e.g. H100:1, A100:1, A10G:1, L4:1 — match quota/region
+  region: us-east-2
+  image_id: docker:955510722784.dkr.ecr.us-east-2.amazonaws.com/biom3:gpu
+
+envs:
+  RUN_ID: <RUN_ID>
+  DEVICE: cuda
+  NGPU: "1"
+  EPOCHS: "<EPOCHS>"
+  WEIGHT_SET: configs/weights/run1_base.json
+  FINETUNE_CONFIG: configs/stage3_training/finetune_v1.json
+
+  # Input — provide ONE (in-container paths under /app):
+  # PRIMARY_HDF5: <data/your.compiled_emb.hdf5>
+  # DATASET_CSV:  <data/your_dataset.csv>
+
+  AWS_DEFAULT_REGION: us-east-2
+  SKYPILOT_DOCKER_USERNAME: AWS
+  SKYPILOT_DOCKER_SERVER: 955510722784.dkr.ecr.us-east-2.amazonaws.com
+
+  BIOM3_WEIGHTS_URI: s3://nm-portal-global-data-955510722784/biom3/weights
+  BIOM3_WEIGHTS_INCLUDES: "ProteoScribe/run1_base_proteoscribe.ckpt*"
+  #   + for the embed path: "PenCL/run1_base_pencl.ckpt* Facilitator/run1_base_facilitator.ckpt*"
+  # BIOM3_DATA_URI: <s3://BUCKET/PREFIX>                 # or use file_mounts (below)
+  # BIOM3_OUTPUTS_PUSH_URI: <s3://BUCKET/PREFIX/RUN_ID>
+
+# file_mounts:
+#   /app/data: <./local/path/to/data>
+
+secrets:
+  SKYPILOT_DOCKER_PASSWORD: ${ECR_PASSWORD}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+  AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN}
+
+run: |
+  cd /app
+  /usr/local/bin/entrypoint.sh scripts/cloud/finetune.sh

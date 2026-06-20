@@ -1,0 +1,42 @@
+# TEMPLATE — BioM3 test suite on Mithril (SkyPilot), running INSIDE the prebuilt
+# ECR image. The generalized, image_id form of mithril/run_tests.task.yaml (which
+# builds + nested-docker-runs). The job is scripts/cloud/test.sh, baked in.
+# The weight includes below are the confirmed paper-weight keys traced from the
+# test suite (same as run_tests.task.yaml). See docs/setup/cloud_jobs.md.
+#
+# Prereqs in your launch shell:
+#   eval "$(aws configure export-credentials --format env)"
+#   export ECR_PASSWORD="$(aws ecr get-login-password --region us-east-2)"
+# Launch:
+#   ml launch cloud/test.mithril.yaml -c biom3-test
+#   ml logs biom3-test ; ml down biom3-test
+
+resources:
+  infra: mithril
+  accelerators: B200:1
+  image_id: docker:955510722784.dkr.ecr.us-east-2.amazonaws.com/biom3:gpu
+
+config:
+  mithril:
+    limit_price: <MAX_USD_PER_HR>      # e.g. 1.00
+
+envs:
+  PYTEST_ARGS: tests/ --use_gpu
+  # Weights for the weight-gated tests (traced from the test code). Omit the
+  # weights block entirely + set PYTEST_ARGS="tests/ --quick --use_gpu" to run
+  # data-free.
+  BIOM3_WEIGHTS_URI: s3://nm-portal-global-data-955510722784/biom3/weights
+  BIOM3_WEIGHTS_INCLUDES: "LLMs/esm2_t33_650M_UR50D* LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext/* PenCL/BioM3_PenCL_epoch20.bin PenCL/PenCL_V09152023_last.ckpt* Facilitator/BioM3_Facilitator_epoch20.bin ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1*.bin ProteoScribe/epoch200_full.ckpt/single_model.pth"
+  AWS_DEFAULT_REGION: us-east-2
+  SKYPILOT_DOCKER_USERNAME: AWS
+  SKYPILOT_DOCKER_SERVER: 955510722784.dkr.ecr.us-east-2.amazonaws.com
+
+secrets:
+  SKYPILOT_DOCKER_PASSWORD: ${ECR_PASSWORD}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+  AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN}
+
+run: |
+  cd /app
+  /usr/local/bin/entrypoint.sh scripts/cloud/test.sh

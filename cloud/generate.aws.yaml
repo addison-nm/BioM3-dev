@@ -1,0 +1,42 @@
+# TEMPLATE — BioM3 sequence generation (Stage-3 inference) on AWS (SkyPilot),
+# running INSIDE the prebuilt ECR image. Identical job + envs to
+# cloud/generate.mithril.yaml — only `resources` differ. Fill in every
+# <PLACEHOLDER>. See docs/setup/cloud_jobs.md.
+
+resources:
+  infra: aws
+  accelerators: <GPU>:1               # generation is light; e.g. L4:1, A10G:1
+  region: us-east-2
+  image_id: docker:955510722784.dkr.ecr.us-east-2.amazonaws.com/biom3:gpu
+
+envs:
+  OUTPUT_PREFIX: <OUTPUT_PREFIX>
+  DEVICE: cuda
+  FASTA: "true"
+  WEIGHT_SET: configs/weights/run1_base.json
+  # TOKEN_STRATEGY: sample
+  # UNMASKING_ORDER: confidence
+
+  PROMPTS_CSV: <data/your_prompts.csv>
+
+  AWS_DEFAULT_REGION: us-east-2
+  SKYPILOT_DOCKER_USERNAME: AWS
+  SKYPILOT_DOCKER_SERVER: 955510722784.dkr.ecr.us-east-2.amazonaws.com
+
+  BIOM3_WEIGHTS_URI: s3://nm-portal-global-data-955510722784/biom3/weights
+  BIOM3_WEIGHTS_INCLUDES: "PenCL/run1_base_pencl.ckpt* Facilitator/run1_base_facilitator.ckpt* ProteoScribe/run1_base_proteoscribe.ckpt*"
+  # BIOM3_DATA_URI: <s3://BUCKET/PREFIX>                # or use file_mounts (below)
+  # BIOM3_OUTPUTS_PUSH_URI: <s3://BUCKET/PREFIX/OUTPUT_PREFIX>
+
+# file_mounts:
+#   /app/data: <./local/path/to/prompts_dir>
+
+secrets:
+  SKYPILOT_DOCKER_PASSWORD: ${ECR_PASSWORD}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+  AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN}
+
+run: |
+  cd /app
+  /usr/local/bin/entrypoint.sh scripts/cloud/generate.sh

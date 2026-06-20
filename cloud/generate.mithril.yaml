@@ -1,0 +1,60 @@
+# TEMPLATE — BioM3 sequence generation (Stage-3 inference) on Mithril (SkyPilot),
+# running INSIDE the prebuilt ECR image. The job is scripts/cloud/generate.sh,
+# baked in. Fill in every <PLACEHOLDER>. See docs/setup/cloud_jobs.md.
+#
+# Prereqs in your launch shell:
+#   eval "$(aws configure export-credentials --format env)"
+#   export ECR_PASSWORD="$(aws ecr get-login-password --region us-east-2)"
+# Launch:
+#   ml launch cloud/generate.mithril.yaml -c biom3-gen
+#   ml logs biom3-gen ; ml down biom3-gen
+
+resources:
+  infra: mithril
+  accelerators: B200:1
+  image_id: docker:955510722784.dkr.ecr.us-east-2.amazonaws.com/biom3:gpu
+
+config:
+  mithril:
+    limit_price: <MAX_USD_PER_HR>      # e.g. 1.00
+
+envs:
+  OUTPUT_PREFIX: <OUTPUT_PREFIX>       # e.g. sh3_gen_v1
+  DEVICE: cuda
+  FASTA: "true"
+  WEIGHT_SET: configs/weights/run1_base.json
+  # TOKEN_STRATEGY: sample             # sample | argmax (optional)
+  # UNMASKING_ORDER: confidence        # random | confidence | confidence_no_pad (optional)
+
+  # Input prompts CSV — in-container path under /app:
+  PROMPTS_CSV: <data/your_prompts.csv>
+
+  AWS_DEFAULT_REGION: us-east-2
+  SKYPILOT_DOCKER_USERNAME: AWS
+  SKYPILOT_DOCKER_SERVER: 955510722784.dkr.ecr.us-east-2.amazonaws.com
+
+  # Weights (run1_base bundle, confirmed in S3 under biom3/weights). Generation
+  # needs all three stages.
+  BIOM3_WEIGHTS_URI: s3://nm-portal-global-data-955510722784/biom3/weights
+  BIOM3_WEIGHTS_INCLUDES: "PenCL/run1_base_pencl.ckpt* Facilitator/run1_base_facilitator.ckpt* ProteoScribe/run1_base_proteoscribe.ckpt*"
+  #
+  # PROMPTS data (in) — choose A or B (data-staging not yet finalized; see docs):
+  #   A) S3 sync:  BIOM3_DATA_URI: <s3://BUCKET/PREFIX>     # -> /app/data
+  #   B) local FS: use the file_mounts: block below, leave BIOM3_DATA_URI unset.
+  # BIOM3_DATA_URI: <s3://BUCKET/PREFIX>
+  #
+  # OUTPUTS (out) — optional push on exit:
+  # BIOM3_OUTPUTS_PUSH_URI: <s3://BUCKET/PREFIX/OUTPUT_PREFIX>
+
+# file_mounts:
+#   /app/data: <./local/path/to/prompts_dir>
+
+secrets:
+  SKYPILOT_DOCKER_PASSWORD: ${ECR_PASSWORD}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+  AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN}
+
+run: |
+  cd /app
+  /usr/local/bin/entrypoint.sh scripts/cloud/generate.sh

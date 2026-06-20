@@ -1,0 +1,27 @@
+# TEMPLATE — BioM3 test suite on AWS (SkyPilot), running INSIDE the prebuilt ECR
+# image. Identical job to cloud/test.mithril.yaml — only `resources` differ.
+# See docs/setup/cloud_jobs.md.
+
+resources:
+  infra: aws
+  accelerators: <GPU>:1        # any single GPU exercises the CUDA path, e.g. L4:1
+  region: us-east-2
+  image_id: docker:955510722784.dkr.ecr.us-east-2.amazonaws.com/biom3:gpu
+
+envs:
+  PYTEST_ARGS: tests/ --use_gpu
+  BIOM3_WEIGHTS_URI: s3://nm-portal-global-data-955510722784/biom3/weights
+  BIOM3_WEIGHTS_INCLUDES: "LLMs/esm2_t33_650M_UR50D* LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext/* PenCL/BioM3_PenCL_epoch20.bin PenCL/PenCL_V09152023_last.ckpt* Facilitator/BioM3_Facilitator_epoch20.bin ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1*.bin ProteoScribe/epoch200_full.ckpt/single_model.pth"
+  AWS_DEFAULT_REGION: us-east-2
+  SKYPILOT_DOCKER_USERNAME: AWS
+  SKYPILOT_DOCKER_SERVER: 955510722784.dkr.ecr.us-east-2.amazonaws.com
+
+secrets:
+  SKYPILOT_DOCKER_PASSWORD: ${ECR_PASSWORD}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+  AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN}
+
+run: |
+  cd /app
+  /usr/local/bin/entrypoint.sh scripts/cloud/test.sh

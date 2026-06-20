@@ -1,0 +1,72 @@
+# TEMPLATE — BioM3 Stage-3 finetuning on Mithril (SkyPilot), running INSIDE the
+# prebuilt ECR image (no per-instance build). The job is scripts/cloud/finetune.sh,
+# baked into the image. Fill in every <PLACEHOLDER> before launching.
+# See docs/setup/cloud_jobs.md for the full env-var reference.
+#
+# Prereqs in your launch shell (temporary IAM creds + ECR password):
+#   eval "$(aws configure export-credentials --format env)"
+#   export ECR_PASSWORD="$(aws ecr get-login-password --region us-east-2)"
+# Launch:
+#   ml launch cloud/finetune.mithril.yaml -c biom3-ft
+#   ml logs biom3-ft ; ml down biom3-ft
+
+resources:
+  infra: mithril
+  accelerators: B200:1
+  image_id: docker:955510722784.dkr.ecr.us-east-2.amazonaws.com/biom3:gpu
+
+config:
+  mithril:
+    limit_price: <MAX_USD_PER_HR>      # e.g. 1.00 — your spot-bid ceiling
+
+# ── Job spec: edit these per run ─────────────────────────────────────────────
+envs:
+  RUN_ID: <RUN_ID>                     # e.g. sh3_run1_v1
+  DEVICE: cuda
+  NGPU: "1"
+  EPOCHS: "<EPOCHS>"                   # e.g. 100
+  WEIGHT_SET: configs/weights/run1_base.json
+  FINETUNE_CONFIG: configs/stage3_training/finetune_v1.json
+
+  # Input — provide ONE (paths are INSIDE the container, i.e. under /app):
+  # PRIMARY_HDF5: <data/your.compiled_emb.hdf5>   # precompiled Stage-2 HDF5 (skips embedding)
+  # DATASET_CSV:  <data/your_dataset.csv>         # CSV of seqs+prompts (embedded first)
+
+  # Registry + region (non-sensitive; leave as-is unless your ECR differs).
+  AWS_DEFAULT_REGION: us-east-2
+  SKYPILOT_DOCKER_USERNAME: AWS
+  SKYPILOT_DOCKER_SERVER: 955510722784.dkr.ecr.us-east-2.amazonaws.com
+
+  # ── How bytes reach/leave the container — pick per input/output ──────────────
+  # Weights live in S3 (run1_base bundle, confirmed under biom3/weights). For a
+  # finetune from a precompiled HDF5 only proteoscribe_weights is needed; add the
+  # pencl/facilitator lines too if you embed a CSV.
+  BIOM3_WEIGHTS_URI: s3://nm-portal-global-data-955510722784/biom3/weights
+  BIOM3_WEIGHTS_INCLUDES: "ProteoScribe/run1_base_proteoscribe.ckpt*"
+  #   + for the embed path: "PenCL/run1_base_pencl.ckpt* Facilitator/run1_base_facilitator.ckpt*"
+  #
+  # DATA (in) — choose A or B (data-staging not yet finalized; see docs):
+  #   A) S3 sync:   BIOM3_DATA_URI: <s3://BUCKET/PREFIX>      # synced -> /app/data
+  #   B) local FS:  use the file_mounts: block below instead, and leave BIOM3_DATA_URI unset.
+  # BIOM3_DATA_URI: <s3://BUCKET/PREFIX>
+  #
+  # OUTPUTS (out) — optional push to S3 on exit (the mounted /app/outputs is primary):
+  # BIOM3_OUTPUTS_PUSH_URI: <s3://BUCKET/PREFIX/RUN_ID>
+
+# Local-data alternative to BIOM3_DATA_URI (option B above): upload a local dir
+# into the container's /app/data. Uncomment and point at your data.
+# file_mounts:
+#   /app/data: <./local/path/to/data>
+
+# Sensitive values: masked in logs. Must be set in the launch shell (see header).
+secrets:
+  SKYPILOT_DOCKER_PASSWORD: ${ECR_PASSWORD}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+  AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN}
+
+# image_id mode bypasses the image ENTRYPOINT — invoke it explicitly so the job
+# still sources environment.sh and runs the S3 sync-in/out.
+run: |
+  cd /app
+  /usr/local/bin/entrypoint.sh scripts/cloud/finetune.sh

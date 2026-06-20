@@ -39,6 +39,7 @@ import biom3.Stage3.run_PL_training as base
 from biom3.Stage3.io import prepare_model_ProteoScribe
 from biom3.Stage3.finetune_embedder import build_text_to_zc_embedder
 from biom3.core.helpers import load_json_config, convert_to_namespace
+from biom3.core.dry_run import run_dry_run
 from biom3.core.run_utils import setup_file_logging, teardown_file_logging
 from biom3.core.distributed import get_global_rank
 from biom3.backend.device import print_gpu_initialization, setup_logger
@@ -208,6 +209,33 @@ def load_model(args, data_module, stage1_args, stage2_args):
     return PL_model
 
 
+def _finetune_dataset_probe(args):
+    """CPU-only data-module probe for the dry-run report.
+
+    Returns ``(train_len, val_len, sample_batch)``. Building the data module
+    instantiates the BioBERT tokenizer; if its weights are absent the failure
+    is surfaced as a note in the report by run_dry_run.
+    """
+    stage1_args, _ = load_embedder_configs(args)
+    data_module = load_data(args, stage1_args=stage1_args)
+    train_dl = data_module.train_dataloader()
+    val_dl = data_module.val_dataloader()
+    train_len = len(train_dl.dataset) if hasattr(train_dl.dataset, '__len__') else None
+    val_len = len(val_dl.dataset) if hasattr(val_dl.dataset, '__len__') else None
+    sample = next(iter(train_dl), None)
+    return train_len, val_len, sample
+
+
+def _finetune_model_probe(args):
+    """CPU-only ProteoScribe model probe for the dry-run report."""
+    args.device = 'cpu'
+    return mod.get_model(
+        args=args,
+        data_shape=(args.image_size, args.image_size),
+        num_classes=args.num_classes,
+    )
+
+
 def main(args, ds_config=None):
     base._MAIN_START_MONOTONIC = time.perf_counter()
     base._LAST_TRAINER = None
@@ -215,8 +243,22 @@ def main(args, ds_config=None):
     start_time = datetime.now()
 
     warnings.filterwarnings("ignore", message=".*LeafSpec.*is deprecated.*")
+    warnings.filterwarnings("ignore", message=".*isinstance.*treespec.*")
     warnings.filterwarnings("ignore", message=".*TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD.*")
+    warnings.filterwarnings(
+        "once",
+        message=r".*barrier\(\): using the device under current context.*",
+    )
     logging.getLogger("tensorboardX.x2num").setLevel(logging.ERROR)
+
+    # ----- Dry-run preview (no training executed) -----
+    if getattr(args, 'dry_run', False):
+        return run_dry_run(
+            args,
+            stage="stage3_finetune",
+            dataset_probe=lambda: _finetune_dataset_probe(args),
+            model_probe=lambda: _finetune_model_probe(args),
+        )
 
     run_dir = os.path.join(args.output_root, args.runs_folder, args.run_id)
     logs_dir = os.path.join(run_dir, base._LOGS_SUBDIR)
@@ -279,6 +321,11 @@ def main(args, ds_config=None):
         exception = e
         raise
     finally:
+        time_limit_seconds = getattr(args, 'time_limit_seconds', None)
+        if exit_reason == "completed" and time_limit_seconds is not None:
+            elapsed = time.perf_counter() - base._MAIN_START_MONOTONIC
+            if elapsed >= time_limit_seconds:
+                exit_reason = "time_limit_exceeded"
         completed_epochs = (
             base._LAST_TRAINER.current_epoch if base._LAST_TRAINER is not None else None
         )
@@ -293,6 +340,13 @@ def main(args, ds_config=None):
             completed_epochs=completed_epochs,
             completed_steps=completed_steps,
         )
+        if base._MAIN_START_MONOTONIC is not None:
+            total = int(time.perf_counter() - base._MAIN_START_MONOTONIC)
+            h, rem = divmod(total, 3600)
+            m, s = divmod(rem, 60)
+            logger.info(
+                "Program exiting. Total elapsed time: %d:%02d:%02d", h, m, s,
+            )
 
     teardown_file_logging("biom3", file_handler)
 

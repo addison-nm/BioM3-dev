@@ -1,0 +1,5 @@
+{
+    "pencl_weights": "./weights/PenCL/PenCL_V09152023_last.ckpt",
+    "facilitator_weights": "./weights/Facilitator/Facilitator_MMD15.ckpt/last.ckpt",
+    "proteoscribe_weights": "./weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.renamed.bin"
+}

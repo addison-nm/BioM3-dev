@@ -39,12 +39,17 @@ def parse_arguments(args):
         help="Directory for all output files"
     )
     parser.add_argument(
-        "--pencl_weights", type=str, required=True,
-        help="Path to PenCL model weights or checkpoint"
+        "--weight_set", type=str, default=None,
+        help="Path to a weight-set bundle JSON (e.g. configs/weights/run1_base.json) "
+             "providing pencl/facilitator weights. Explicit --*_weights override it."
     )
     parser.add_argument(
-        "--facilitator_weights", type=str, required=True,
-        help="Path to Facilitator model weights or checkpoint"
+        "--pencl_weights", type=str, default=None,
+        help="Path to PenCL model weights or checkpoint (overrides --weight_set)"
+    )
+    parser.add_argument(
+        "--facilitator_weights", type=str, default=None,
+        help="Path to Facilitator model weights or checkpoint (overrides --weight_set)"
     )
     parser.add_argument(
         "--pencl_config", type=str, required=True,
@@ -81,7 +86,19 @@ def parse_arguments(args):
         "--dataset_key", type=str, default="MMD_data",
         help="HDF5 group name for compiled output (default: MMD_data)"
     )
-    return parser.parse_args(args)
+    parsed = parser.parse_args(args)
+
+    from biom3.core.weight_sets import merge_weight_set
+    merge_weight_set(parsed, parsed.weight_set,
+                     keys=("pencl_weights", "facilitator_weights"))
+    missing = [k for k in ("pencl_weights", "facilitator_weights")
+               if not getattr(parsed, k)]
+    if missing:
+        parser.error(
+            "missing weight path(s): " + ", ".join("--" + m for m in missing)
+            + " (provide them directly or via --weight_set)"
+        )
+    return parsed
 
 
 def main(args):
@@ -173,6 +190,7 @@ def main(args):
         },
         resolved_paths={
             "input_data_path": os.path.abspath(args.input_data_path),
+            "weight_set": os.path.abspath(args.weight_set) if args.weight_set else None,
             "pencl_weights": os.path.abspath(args.pencl_weights),
             "facilitator_weights": os.path.abspath(args.facilitator_weights),
             "pencl_config": os.path.abspath(args.pencl_config),

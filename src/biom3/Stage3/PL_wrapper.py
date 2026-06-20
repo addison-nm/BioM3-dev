@@ -856,6 +856,7 @@ class HDF5DataModule(pl.LightningDataModule):
         primary_path=None,
         secondary_paths=None,
         group_name='data',
+        split_manifest_path=None,
         # Deprecated aliases
         swissprot_path=None,
         pfam_path=None,
@@ -878,6 +879,7 @@ class HDF5DataModule(pl.LightningDataModule):
         self.primary_path = primary_path
         self.secondary_paths = secondary_paths or []
         self.group_name = group_name
+        self.split_manifest_path = split_manifest_path
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.valid_size = valid_size
@@ -893,14 +895,37 @@ class HDF5DataModule(pl.LightningDataModule):
             all_paths.append(self.primary_path)
         all_paths.extend(self.secondary_paths)
 
+        manifest = None
+        if self.split_manifest_path is not None:
+            from biom3.split import manifest as split_manifest
+            manifest = split_manifest.read_manifest(self.split_manifest_path)
+            if len(manifest["files"]) != len(all_paths):
+                raise ValueError(
+                    f"split manifest describes {len(manifest['files'])} file(s) "
+                    f"but {len(all_paths)} data path(s) were provided; the "
+                    f"manifest must be regenerated for this set of inputs"
+                )
+            logger.info("Using curated split manifest %s", self.split_manifest_path)
+
         self.split_info = []
-        for path in all_paths:
+        for file_index, path in enumerate(all_paths):
             dataset = HDF5Dataset(
                 args=self.args,
                 file_path=path,
                 group_name=self.group_name,
             )
-            train_idx, val_idx = self.split_indices(dataset)
+            test_idx = []
+            if manifest is not None:
+                from biom3.split import manifest as split_manifest
+                entry = manifest["files"][file_index]
+                split_manifest.validate_file_entry(
+                    entry,
+                    n_rows=len(dataset),
+                    fingerprint=split_manifest.compute_fingerprint(dataset.sequences),
+                )
+                train_idx, val_idx, test_idx = entry["train"], entry["val"], entry["test"]
+            else:
+                train_idx, val_idx = self.split_indices(dataset)
             train_idx = self.filter_by_sequence_length(dataset, train_idx)
             val_idx = self.filter_by_sequence_length(dataset, val_idx)
             train_datasets.append(Subset(dataset, train_idx))
@@ -909,9 +934,10 @@ class HDF5DataModule(pl.LightningDataModule):
                 "path": path,
                 "train_indices": train_idx,
                 "val_indices": val_idx,
+                "test_indices": test_idx,
             })
-            logger.info("Loaded dataset from %s (%d train, %d val)",
-                        path, len(train_idx), len(val_idx))
+            logger.info("Loaded dataset from %s (%d train, %d val, %d held-out test)",
+                        path, len(train_idx), len(val_idx), len(test_idx))
 
         if not train_datasets:
             raise ValueError("No dataset paths provided")

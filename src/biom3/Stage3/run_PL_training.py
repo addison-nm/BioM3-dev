@@ -216,6 +216,10 @@ def get_args(parser):
     parser.add_argument('--training_strategy', default='auto', type=str,
                         choices=['auto', 'primary_only', 'combine'],
                         help='data handling strategy (auto: primary_only if no secondary, combine otherwise)')
+    parser.add_argument('--split_manifest_path', default=None, type=str,
+                        help='path to a curated train/val/test split manifest '
+                             '(from biom3_cluster_split). When set, the random '
+                             '80/20 split is bypassed and the test split is held out.')
     # Deprecated aliases (mapped to primary/secondary in retrieve_all_args)
     parser.add_argument('--swissprot_data_root', default='None', type=str,
                         help='(deprecated, use --primary_data_path) path to SwissProt data')
@@ -1032,6 +1036,7 @@ def retrieve_all_args(args):
 
     # New generalized dataset args
     args.primary_data_path = nonestr_to_none(args.primary_data_path)
+    args.split_manifest_path = nonestr_to_none(getattr(args, 'split_manifest_path', None))
     args.start_secondary = str_to_bool(args.start_secondary)
 
     # Map deprecated aliases to new names
@@ -1122,6 +1127,7 @@ def load_data(
         primary_path=primary_data_path,
         secondary_paths=secondary_data_paths,
         group_name=facilitator + '_data',
+        split_manifest_path=getattr(args, 'split_manifest_path', None),
     )
     data_module.setup()
     return data_module

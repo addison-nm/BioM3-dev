@@ -411,6 +411,8 @@ def _generate_inpaint(args, tokens, rank_work_items, base_seed,
                 auto_add_start=cfg.get('auto_add_start', True),
                 auto_add_stop=cfg.get('auto_add_stop', True),
                 tokens=tokens,
+                mask_symbol=cfg.get('mask_symbol', '*'),
+                pad_symbol=cfg.get('pad_symbol', '-'),
             )
         state_row, mask_positions = state_cache[p_idx]
         D = int(mask_positions.numel())

@@ -50,9 +50,10 @@ def test_vocab_constants_match_runtime_tokens():
 # ---------------------------------------------------------------------------
 
 class TestBuildTemplateState:
+    # Default symbols: '*' = mask, '-' = pad (mirrors the training vocabulary).
 
     def test_basic_with_start_stop(self):
-        state, mask_positions = build_template_state("AC-G", seq_len=10)
+        state, mask_positions = build_template_state("AC*G", seq_len=10)
         # [START, A, C, MASK, G, END, PAD, PAD, PAD, PAD]
         expected = [START_ID, 2, 3, MASK_ID, 7, END_ID, PAD_ID, PAD_ID, PAD_ID, PAD_ID]
         assert state.tolist() == expected
@@ -60,7 +61,7 @@ class TestBuildTemplateState:
 
     def test_no_start_no_stop(self):
         state, mask_positions = build_template_state(
-            "AC-G", seq_len=6, auto_add_start=False, auto_add_stop=False,
+            "AC*G", seq_len=6, auto_add_start=False, auto_add_stop=False,
         )
         expected = [2, 3, MASK_ID, 7, PAD_ID, PAD_ID]
         assert state.tolist() == expected
@@ -74,31 +75,96 @@ class TestBuildTemplateState:
 
     def test_multiple_scattered_masks(self):
         state, mask_positions = build_template_state(
-            "A--C--G", seq_len=12, auto_add_start=False, auto_add_stop=False,
+            "A**C**G", seq_len=12, auto_add_start=False, auto_add_stop=False,
         )
-        # positions of '-' are 1,2,4,5
+        # positions of '*' are 1,2,4,5
         assert mask_positions.tolist() == [1, 2, 4, 5]
         assert (state == MASK_ID).sum().item() == 4
 
     def test_all_masks(self):
         state, mask_positions = build_template_state(
-            "----", seq_len=8, auto_add_start=False, auto_add_stop=False,
+            "****", seq_len=8, auto_add_start=False, auto_add_stop=False,
         )
         assert mask_positions.tolist() == [0, 1, 2, 3]
 
     def test_extra_amino_acids_frozen(self):
-        # X, U, Z, B, O are valid (frozen) residues; only '-' is a mask
+        # X, U, Z, B, O are valid (frozen) residues; only '*' is a mask
         state, mask_positions = build_template_state(
-            "XUZBO-", seq_len=10, auto_add_start=False, auto_add_stop=False,
+            "XUZBO*", seq_len=10, auto_add_start=False, auto_add_stop=False,
         )
         assert mask_positions.tolist() == [5]
         for i, ch in enumerate("XUZBO"):
             assert state[i].item() == RUNTIME_TOKENS.index(ch)
 
+    def test_explicit_pad_symbol_is_frozen(self):
+        # '-' = pad: frozen context, not a mask position.
+        state, mask_positions = build_template_state(
+            "A-*C", seq_len=6, auto_add_start=False, auto_add_stop=False,
+        )
+        # [A, PAD, MASK, C, PAD, PAD]
+        assert state.tolist() == [2, PAD_ID, MASK_ID, 3, PAD_ID, PAD_ID]
+        assert mask_positions.tolist() == [2]
+
+    def test_symbols_are_swappable(self):
+        # Reverse the convention: '-' = mask, '*' = pad.
+        state, mask_positions = build_template_state(
+            "A-C*", seq_len=6, auto_add_start=False, auto_add_stop=False,
+            mask_symbol='-', pad_symbol='*',
+        )
+        # [A, MASK, C, PAD, PAD, PAD]
+        assert state.tolist() == [2, MASK_ID, 3, PAD_ID, PAD_ID, PAD_ID]
+        assert mask_positions.tolist() == [1]
+
+    def test_pad_symbol_none_disables_in_template_pad(self):
+        # With pad_symbol=None, '-' is no longer a valid symbol.
+        with pytest.raises(ValueError, match="Invalid template character"):
+            build_template_state(
+                "A-*", seq_len=8, auto_add_start=False, auto_add_stop=False,
+                pad_symbol=None,
+            )
+
     def test_tail_is_padded(self):
-        state, _ = build_template_state("A-", seq_len=20)
+        state, _ = build_template_state("A*", seq_len=20)
         # everything after the auto-added <END> is PAD
         assert torch.all(state[4:] == PAD_ID)
+
+    def test_runlength_expansion(self):
+        state, mask_positions = build_template_state(
+            "A(*:3)C", seq_len=8, auto_add_start=False, auto_add_stop=False,
+        )
+        # A *** C  -> masks at 1,2,3
+        assert state[:5].tolist() == [2, MASK_ID, MASK_ID, MASK_ID, 3]
+        assert mask_positions.tolist() == [1, 2, 3]
+
+    def test_runlength_multichar_pattern(self):
+        state, _ = build_template_state(
+            "(GS:2)", seq_len=8, auto_add_start=False, auto_add_stop=False,
+        )
+        # GSGS frozen
+        g, s = RUNTIME_TOKENS.index('G'), RUNTIME_TOKENS.index('S')
+        assert state[:4].tolist() == [g, s, g, s]
+
+    def test_runlength_only_masks(self):
+        _, mask_positions = build_template_state(
+            "(*:5)", seq_len=10, auto_add_start=False, auto_add_stop=False,
+        )
+        assert mask_positions.tolist() == [0, 1, 2, 3, 4]
+
+    def test_runlength_malformed_raises(self):
+        with pytest.raises(ValueError, match="run-length"):
+            build_template_state("A(*:5", seq_len=10, auto_add_start=False)
+
+    def test_runlength_empty_pattern_raises(self):
+        with pytest.raises(ValueError, match="Empty run-length"):
+            build_template_state("(:5)", seq_len=10, auto_add_start=False)
+
+    def test_symbol_amino_acid_collision_raises(self):
+        with pytest.raises(ValueError, match="collides with an amino-acid"):
+            build_template_state("AAA", seq_len=10, mask_symbol='A')
+
+    def test_mask_pad_clash_raises(self):
+        with pytest.raises(ValueError, match="must differ"):
+            build_template_state("A*", seq_len=10, mask_symbol='*', pad_symbol='*')
 
     def test_overflow_raises(self):
         # 9 chars + START + STOP = 11 > seq_len 10
@@ -215,6 +281,38 @@ class TestLoadInpaintConfig:
         with pytest.raises(ValueError, match="must be a boolean"):
             load_inpaint_config(str(path))
 
+    def test_symbols_default_to_training_convention(self, tmp_path):
+        path = tmp_path / "inpaint.json"
+        path.write_text(json.dumps({"template": "A*-"}))
+        cfg = load_inpaint_config(str(path))
+        assert cfg["mask_symbol"] == "*"
+        assert cfg["pad_symbol"] == "-"
+
+    def test_custom_symbols_kept(self, tmp_path):
+        path = tmp_path / "inpaint.json"
+        path.write_text(json.dumps({"template": "A-", "mask_symbol": "-", "pad_symbol": "*"}))
+        cfg = load_inpaint_config(str(path))
+        assert cfg["mask_symbol"] == "-"
+        assert cfg["pad_symbol"] == "*"
+
+    def test_null_pad_symbol_allowed(self, tmp_path):
+        path = tmp_path / "inpaint.json"
+        path.write_text(json.dumps({"template": "A*", "pad_symbol": None}))
+        cfg = load_inpaint_config(str(path))
+        assert cfg["pad_symbol"] is None
+
+    def test_symbol_collision_raises(self, tmp_path):
+        path = tmp_path / "inpaint.json"
+        path.write_text(json.dumps({"template": "A*", "mask_symbol": "*", "pad_symbol": "*"}))
+        with pytest.raises(ValueError, match="must differ"):
+            load_inpaint_config(str(path))
+
+    def test_symbol_amino_acid_collision_raises(self, tmp_path):
+        path = tmp_path / "inpaint.json"
+        path.write_text(json.dumps({"template": "A*", "mask_symbol": "G"}))
+        with pytest.raises(ValueError, match="collides with an amino-acid"):
+            load_inpaint_config(str(path))
+
 
 class TestResolveInpaintArgs:
 
@@ -283,7 +381,7 @@ def mini_model_and_args():
 
 
 # A template with frozen residues at both ends and a masked region in the middle.
-_TEMPLATE = "ACDEFGHIK" + "-" * 8 + "LMNPQRST"
+_TEMPLATE = "ACDEFGHIK" + "*" * 8 + "LMNPQRST"
 _SEQ_LEN = 128
 
 

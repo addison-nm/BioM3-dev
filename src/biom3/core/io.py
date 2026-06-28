@@ -45,7 +45,10 @@ def load_and_prepare_model(
 
 def load_state_dict(weights_path: str, device=None) -> dict:
     """Load a state_dict from disk, handling different checkpoint formats."""
-    checkpoint = torch.load(weights_path, map_location=device)
+    # Map to CPU when no device is given so checkpoints saved on another backend
+    # (e.g. Aurora/XPU) deserialize on CUDA/CPU; prepare_model moves to the
+    # target device afterward. Mirrors the Stage 1 inference fix (eb2920b).
+    checkpoint = torch.load(weights_path, map_location=device or "cpu")
     # Handle lightning-style checkpoints
     if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
         return checkpoint["state_dict"]

@@ -4,7 +4,7 @@
   "tags": ["finetuning", "generalized", "aurora"],
   "notes": [
     "Global batch = batch_size * num_nodes * devices_per_node. At 64 nodes x 12 tiles x batch_size=8 that is 6144; on ~27.8k train records that is only ~4-5 optimizer steps/epoch. Fine for an infra/scaling test, NOT for convergence. For real SH3 finetuning use far fewer nodes (1-8) or many epochs.",
-    "Validation on Aurora XPU has shown a first-validation hang on larger datasets; val is kept minimal here. Disable val (limit_val_batches 0.0) for a pure training-loop smoke if needed.",
+    "Validation runs once per epoch on the full val split (limit_val_batches=1.0 = 100% of the loader). At 768 ranks the val set shards to ~2 batches/rank, so val metrics are coarse but valid (a fractional limit like 0.1 would round to 0 batches and error). training_strategy=primary_only keeps validation epoch-based; val_check_interval is ignored in this mode (it would otherwise be invalid at ~3-4 train batches/epoch). Aurora XPU has shown a first-validation hang on larger datasets; if the run stalls entering validation, reduce node count or limit_val_batches.",
     "weights/ and data/ paths are repo-relative symlinks; they must resolve on Aurora (re-link from /flare/NLDesignProtein/sharepoint/BioM3-data-share)."
   ],
   "_base_configs": [
@@ -14,6 +14,7 @@
   "_overwrite_configs": [],
 
   "finetune": true,
+  "training_strategy": "primary_only",
   "pretrained_weights": "weights/ProteoScribe/run1_base_proteoscribe.ckpt",
   "finetune_last_n_blocks": 1,
   "finetune_last_n_layers": -1,
@@ -84,7 +85,7 @@
   "distributed_strategy": "deepspeed_zero2",
 
   "val_check_interval": 200,
-  "limit_val_batches": 0.1,
+  "limit_val_batches": 1.0,
   "log_every_n_steps": 50,
   "num_workers": 4,
 

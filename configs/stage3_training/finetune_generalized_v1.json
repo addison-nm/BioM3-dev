@@ -1,0 +1,93 @@
+{
+  "description": "Finetune ProteoScribe (1 block) on cleaned (sequence, fields) records. A record_schema composes a caption per epoch (per-key dropout + shuffle + label-adding) which is embedded to z_c on-device via the frozen PenCL text branch + Facilitator.",
+  "model_name": "BioM3-v0",
+  "tags": ["finetuning", "generalized"],
+  "notes": [],
+  "_base_configs": ["./models/_base_ProteoScribe_1block.json"],
+  "_overwrite_configs": [],
+
+  "finetune": true,
+  "pretrained_weights": "weights/ProteoScribe/run1_base_proteoscribe.ckpt",
+  "finetune_last_n_blocks": 1,
+  "finetune_last_n_layers": -1,
+  "finetune_output_layers": true,
+  "resume_from_checkpoint": null,
+
+  "finetune_data_path": "data/SH3_caption_fields_all.jsonl",
+  "sequence_keyname": "sequence",
+  "length_field": "sequence_length",
+  "caption_key": "caption",
+  "sequence_output_key": "sequence",
+  "lazy_records": false,
+  "record_schema": {
+    "sequence": {"from": "sequence"},
+    "caption": {
+      "compose": "fields_to_caption",
+      "args": {
+        "fields_key": "caption_fields",
+        "shuffle": true,
+        "add_label": true,
+        "key_transform": "upper_spaced",
+        "default_dropout": 0.5,
+        "dropout_rates": {
+          "protein_name": 0.0,
+          "lineage": 0.15,
+          "family_description": 0.3,
+          "family_name": 0.5,
+          "family_names": 0.3,
+          "function": 0.3,
+          "gene_ontology": 0.4,
+          "subcellular_location": 0.5,
+          "similarity": 0.5,
+          "subunit": 0.5,
+          "catalytic_activity": 0.4,
+          "paralog_function": 0.2,
+          "sh3_paralog_name": 0.3
+        }
+      }
+    }
+  },
+
+  "stage1_config_path": "configs/inference/stage1_PenCL.json",
+  "stage2_config_path": "configs/inference/stage2_Facilitator.json",
+  "pencl_weights": "weights/PenCL/run1_base_pencl.ckpt",
+  "facilitator_weights": "weights/Facilitator/run1_base_facilitator.ckpt",
+
+  "wandb": false,
+  "wandb_entity": "thenaturalmachine",
+  "wandb_project": "BioM3-dev",
+  "wandb_tags": ["finetuning", "generalized"],
+
+  "choose_optim": "AdamW",
+  "lr": 1e-4,
+  "scale_learning_rate": false,
+  "weight_decay": 1e-6,
+  "scheduler_gamma": "coswarmup",
+
+  "seed": 0,
+  "epochs": 100,
+  "valid_size": 0.2,
+  "batch_size": 32,
+  "task": "proteins",
+  "max_steps": 3000000,
+
+  "device": "cuda",
+  "precision": "bf16",
+  "devices_per_node": 1,
+  "num_nodes": 1,
+  "acc_grad_batches": 1,
+
+  "val_check_interval": 20,
+  "limit_val_batches": 0.6,
+  "log_every_n_steps": 100,
+  "num_workers": 1,
+
+  "output_root": "./outputs/Stage3/finetuning_generalized",
+  "checkpoints_folder": "checkpoints",
+  "runs_folder": "runs",
+
+  "early_stopping_metric": null,
+  "save_metrics_history": true,
+  "metrics_history_every_n_steps": 1,
+  "metrics_history_ranks": [0]
+}

@@ -1,21 +1,21 @@
-"""Tests for ProteoScribe dict-prompt finetuning (CPU, no weights required).
+"""Tests for ProteoScribe generalized finetuning (CPU, no weights required).
 
 Covers:
-1. JSONL parsing (read_dict_prompt_jsonl) and its error handling.
-2. DictPromptDataset: prompt randomization (dropout + shuffle) and sequence
-   tokenization shapes / lengths.
-3. dict_prompt_collate_fn: max_length padding and tensor shapes/dtypes.
-4. DictPromptDataModule: deterministic split + length filtering.
-5. PL_ProtARDM_Finetune: on-device z_c embedding wiring, and the design
+1. encode_protein_sequence: tokenization shapes / lengths / gap handling.
+2. make_seq_caption_collate_fn: max_length padding and tensor shapes/dtypes.
+3. GeneralizedDataModule: deterministic split, length filtering via length_field
+   (with fallback), eager vs lazy equivalence, and schema-driven caption wiring.
+4. PL_ProtARDM_Finetune: on-device z_c embedding wiring, and the design
    invariant that the frozen embedder stays out of self.parameters() and out
    of train() mode.
 
-A real BioBERT tokenizer / weights are not needed; a fake tokenizer/embedder is
-used so these run under `pytest --quick`.
+The schema-driven composition engine itself (GeneralizedRecordDataset,
+JsonlRecordStore, fields_to_caption) is covered by tests/core_tests/. A real
+BioBERT tokenizer / weights are not needed; a fake tokenizer/embedder is used so
+these run under `pytest --quick`.
 """
 
 import json
-import random
 from argparse import Namespace
 
 import numpy as np
@@ -24,29 +24,34 @@ import torch
 from torch import nn
 
 import biom3.Stage3.preprocess as prep
-from biom3.Stage3.preprocess import (
-    DictPromptDataset,
-    dict_prompt_collate_fn,
-    encode_protein_sequence,
-    read_dict_prompt_jsonl,
-)
-from biom3.core.prompt_assembly import RandomizedPromptConstructor
+from biom3.Stage3.preprocess import encode_protein_sequence, make_seq_caption_collate_fn
 
 
 # ----------------------------- fixtures / fakes -----------------------------
 
-def _write_jsonl(path, records, fields_key="fields", sequence_key="sequence"):
+def _write_jsonl(path, records):
     with open(path, "w") as fh:
-        for fields, seq in records:
-            fh.write(json.dumps({fields_key: fields, sequence_key: seq}) + "\n")
+        for rec in records:
+            fh.write(json.dumps(rec) + "\n")
 
 
+# Cleaned records: {sequence, fields: {key: raw_description}, sequence_length}
 _SAMPLE_RECORDS = [
-    ({"protein_name": "PROTEIN NAME: SH3", "function": "FUNCTION: binding"}, "ACDEF"),
-    ({"protein_name": "PROTEIN NAME: PDZ", "function": "FUNCTION: signaling"}, "GHIKLM"),
-    ({"protein_name": "PROTEIN NAME: WW", "domain": "DOMAIN: WW"}, "NPQRS"),
-    ({"protein_name": "PROTEIN NAME: SH2"}, "TVWY"),
+    {"sequence": "ACDEF", "fields": {"protein_name": "SH3", "function": "binding"},
+     "sequence_length": 5},
+    {"sequence": "GHIKLM", "fields": {"protein_name": "PDZ", "function": "signaling"},
+     "sequence_length": 6},
+    {"sequence": "NPQRS", "fields": {"protein_name": "WW", "domain": "WW"},
+     "sequence_length": 5},
+    {"sequence": "TVWY", "fields": {"protein_name": "SH2"},
+     "sequence_length": 4},
 ]
+
+_NO_DROPOUT_SCHEMA = {
+    "sequence": {"from": "sequence"},
+    "caption": {"compose": "fields_to_caption",
+                "args": {"fields_key": "fields", "shuffle": False, "add_label": True}},
+}
 
 
 class _FakeTokenizer:
@@ -71,42 +76,6 @@ class _FakeAutoTokenizer:
         return _FakeTokenizer()
 
 
-# ------------------------------ JSONL parsing -------------------------------
-
-class TestReadJsonl:
-    def test_parses_records(self, tmp_path):
-        path = tmp_path / "d.jsonl"
-        _write_jsonl(path, _SAMPLE_RECORDS)
-        recs = read_dict_prompt_jsonl(str(path), fields_key="fields", sequence_key="sequence")
-        assert len(recs) == len(_SAMPLE_RECORDS)
-        fields, seq = recs[0]
-        assert fields["protein_name"] == "PROTEIN NAME: SH3"
-        assert seq == "ACDEF"
-
-    def test_blank_lines_skipped(self, tmp_path):
-        path = tmp_path / "d.jsonl"
-        with open(path, "w") as fh:
-            fh.write(json.dumps({"fields": {"a": "A: x"}, "sequence": "AC"}) + "\n")
-            fh.write("\n")
-            fh.write(json.dumps({"fields": {"a": "A: y"}, "sequence": "DE"}) + "\n")
-        recs = read_dict_prompt_jsonl(str(path), fields_key="fields", sequence_key="sequence")
-        assert len(recs) == 2
-
-    def test_missing_keys_raise(self, tmp_path):
-        path = tmp_path / "d.jsonl"
-        with open(path, "w") as fh:
-            fh.write(json.dumps({"sequence": "AC"}) + "\n")
-        with pytest.raises(KeyError):
-            read_dict_prompt_jsonl(str(path), fields_key="fields", sequence_key="sequence")
-
-    def test_non_dict_fields_raise(self, tmp_path):
-        path = tmp_path / "d.jsonl"
-        with open(path, "w") as fh:
-            fh.write(json.dumps({"fields": "not a dict", "sequence": "AC"}) + "\n")
-        with pytest.raises(TypeError):
-            read_dict_prompt_jsonl(str(path), fields_key="fields", sequence_key="sequence")
-
-
 # --------------------------- sequence encoding ------------------------------
 
 class TestEncodeSequence:
@@ -122,77 +91,47 @@ class TestEncodeSequence:
             encode_protein_sequence("ACDE", image_size=4)
 
 
-# ----------------------------- dataset behavior -----------------------------
-
-class TestDictPromptDataset:
-    def test_shapes_and_lengths(self):
-        ctor = RandomizedPromptConstructor(shuffle=False)
-        ds = DictPromptDataset(_SAMPLE_RECORDS, ctor, image_size=4)
-        assert len(ds) == 4
-        num_seqs, prompt = ds[0]
-        assert num_seqs.shape == (16,)
-        assert num_seqs.dtype == torch.float32
-        assert isinstance(prompt, str)
-        lengths = ds.get_sequence_lengths()
-        np.testing.assert_array_equal(lengths, [5, 6, 5, 4])
-
-    def test_no_dropout_keeps_all_fragments_in_order(self):
-        ctor = RandomizedPromptConstructor(shuffle=False)  # probs empty -> retain all
-        ds = DictPromptDataset(_SAMPLE_RECORDS, ctor, image_size=4)
-        _, prompt = ds[0]
-        assert prompt == "PROTEIN NAME: SH3. FUNCTION: binding."
-
-    def test_dropout_removes_fragments(self):
-        # function retained 0% of the time -> never present
-        ctor = RandomizedPromptConstructor({"function": 0.0}, shuffle=False)
-        ds = DictPromptDataset(_SAMPLE_RECORDS, ctor, image_size=4)
-        random.seed(0)
-        for _ in range(20):
-            _, prompt = ds[0]
-            assert "FUNCTION" not in prompt
-            assert "PROTEIN NAME: SH3" in prompt
-
-    def test_shuffle_can_reorder(self):
-        ctor = RandomizedPromptConstructor(shuffle=True)
-        ds = DictPromptDataset(_SAMPLE_RECORDS, ctor, image_size=4)
-        random.seed(1)
-        seen = {ds[0][1] for _ in range(40)}
-        # both orderings of the two retained fragments should appear
-        assert len(seen) >= 2
-
-
 # ------------------------------- collate fn ---------------------------------
 
-class TestCollate:
+class TestSeqCaptionCollate:
     def test_padding_and_shapes(self):
-        ctor = RandomizedPromptConstructor(shuffle=False)
-        ds = DictPromptDataset(_SAMPLE_RECORDS, ctor, image_size=4)
-        batch = [ds[i] for i in range(3)]
-        num_seqs, input_ids = dict_prompt_collate_fn(
-            batch, text_tokenizer=_FakeTokenizer(), text_max_length=32,
+        collate = make_seq_caption_collate_fn(
+            text_tokenizer=_FakeTokenizer(), text_max_length=32, image_size=4,
         )
+        batch = [
+            {"sequence": "ACDEF", "caption": "PROTEIN_NAME: SH3."},
+            {"sequence": "GHIKLM", "caption": "PROTEIN_NAME: PDZ."},
+            {"sequence": "NPQRS", "caption": "PROTEIN_NAME: WW."},
+        ]
+        num_seqs, input_ids = collate(batch)
         assert num_seqs.shape == (3, 16)
         assert num_seqs.dtype == torch.float32
         assert input_ids.shape == (3, 32)  # padded to max_length
         assert input_ids.dtype == torch.long
 
+    def test_custom_output_keys(self):
+        collate = make_seq_caption_collate_fn(
+            text_tokenizer=_FakeTokenizer(), text_max_length=16, image_size=4,
+            sequence_key="seq", caption_key="text",
+        )
+        num_seqs, input_ids = collate([{"seq": "AC", "text": "x"}])
+        assert num_seqs.shape == (1, 16)
+        assert input_ids.shape == (1, 16)
+
 
 # ------------------------------ data module ---------------------------------
 
-class TestDictPromptDataModule:
-    def _make_dm(self, tmp_path, monkeypatch, **overrides):
+class TestGeneralizedDataModule:
+    def _make_dm(self, tmp_path, monkeypatch, records=None, **overrides):
         import biom3.Stage3.PL_wrapper as plw
         monkeypatch.setattr(plw, "AutoTokenizer", _FakeAutoTokenizer)
         path = tmp_path / "d.jsonl"
-        _write_jsonl(path, _SAMPLE_RECORDS * 10)  # 40 records
+        _write_jsonl(path, records if records is not None else _SAMPLE_RECORDS * 10)
         kwargs = dict(
             jsonl_path=str(path),
+            record_schema=_NO_DROPOUT_SCHEMA,
             text_model_path="unused",
             text_max_length=32,
-            retention_probs={},
-            shuffle_prompt=False,
-            fields_key="fields",
-            sequence_key="sequence",
             batch_size=4,
             num_workers=0,
             valid_size=0.25,
@@ -201,7 +140,7 @@ class TestDictPromptDataModule:
             image_size=4,
         )
         kwargs.update(overrides)
-        dm = plw.DictPromptDataModule(**kwargs)
+        dm = plw.GeneralizedDataModule(**kwargs)
         dm.setup()
         return dm
 
@@ -220,11 +159,49 @@ class TestDictPromptDataModule:
             dm2.split_info[0]["train_indices"],
         )
 
+    def test_length_filter_drops_long_sequences(self, tmp_path, monkeypatch):
+        records = [
+            {"sequence": "AC", "fields": {"a": "x"}, "sequence_length": 2},
+            {"sequence": "DEFGHIKLMN", "fields": {"a": "y"}, "sequence_length": 10},
+        ] * 10  # 20 records, half exceed min_seq_length=6
+        dm = self._make_dm(tmp_path, monkeypatch, records=records, valid_size=0.0)
+        kept = dm.split_info[0]["train_indices"]
+        assert len(kept) == 10  # only the length-2 records survive
+
+    def test_missing_length_field_falls_back_to_sequence(self, tmp_path, monkeypatch):
+        records = [
+            {"sequence": "AC", "fields": {"a": "x"}},                       # no length
+            {"sequence": "DEFGHIKLMN", "fields": {"a": "y"}},               # no length, len 10
+        ] * 10
+        dm = self._make_dm(tmp_path, monkeypatch, records=records, valid_size=0.0)
+        # fallback computes ungapped length; the length-10 records are filtered out
+        assert len(dm.split_info[0]["train_indices"]) == 10
+
+    def test_lazy_matches_eager(self, tmp_path, monkeypatch):
+        eager = self._make_dm(tmp_path, monkeypatch, lazy=False)
+        lazy = self._make_dm(tmp_path, monkeypatch, lazy=True)
+        np.testing.assert_array_equal(
+            eager.split_info[0]["train_indices"],
+            lazy.split_info[0]["train_indices"],
+        )
+        e_seqs, e_ids = next(iter(eager.train_dataloader()))
+        l_seqs, l_ids = next(iter(lazy.train_dataloader()))
+        assert e_seqs.shape == l_seqs.shape == (4, 16)
+        assert e_ids.shape == l_ids.shape == (4, 32)
+
     def test_dataloader_batch_shapes(self, tmp_path, monkeypatch):
         dm = self._make_dm(tmp_path, monkeypatch)
         num_seqs, input_ids = next(iter(dm.train_dataloader()))
         assert num_seqs.shape == (4, 16)
         assert input_ids.shape == (4, 32)
+
+    def test_schema_composes_caption(self, tmp_path, monkeypatch):
+        dm = self._make_dm(tmp_path, monkeypatch)
+        # the underlying GeneralizedRecordDataset composes a labeled caption
+        underlying = dm.train_dataset.dataset
+        sample = underlying[0]
+        assert "PROTEIN_NAME" in sample["caption"]
+        assert isinstance(sample["sequence"], str)
 
 
 # --------------------------- finetune PL wrapper ----------------------------

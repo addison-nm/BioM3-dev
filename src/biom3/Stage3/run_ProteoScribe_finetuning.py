@@ -1,12 +1,13 @@
-"""BioM3 Stage 3: ProteoScribe finetuning on dict-prompt / sequence pairs.
+"""BioM3 Stage 3: ProteoScribe finetuning on cleaned record / sequence data.
 
 Unlike ``run_PL_training`` (which trains on precomputed z_c embeddings stored in
-HDF5), this script finetunes ProteoScribe directly on a JSONL dataset of
-``(text-fragment dict, protein sequence)`` pairs. For each example the fragment
-dict is collapsed into a single prompt string with stochastic dropout/reordering
-(:class:`RandomizedPromptConstructor`), then embedded to z_c on-device through a
+HDF5), this script finetunes ProteoScribe directly on a JSONL dataset of cleaned
+records ``{sequence, fields: {key: raw_description, ...}, sequence_length}``. For
+each example a ``record_schema`` composes a caption from the fields (per-key
+dropout, optional label-adding, shuffle, concatenate; see
+:mod:`biom3.core.dataloaders`), which is then embedded to z_c on-device through a
 frozen text->z_c front-end (PenCL text branch + Facilitator) before the standard
-ProteoScribe diffusion objective runs. Because the prompt is re-randomized every
+ProteoScribe diffusion objective runs. Because the caption is re-composed every
 epoch, z_c cannot be precomputed.
 
 This is purely a *finetuning* script: it always loads pretrained ProteoScribe
@@ -18,7 +19,7 @@ callbacks, checkpoint saving, freezing, arg coercion) is reused from
 Example usage:
 
     biom3_finetune_stage3 \
-        --config_path configs/stage3_training/finetune_dict_v1.json \
+        --config_path configs/stage3_training/finetune_generalized_v1.json \
         --run_id my_finetune_run
 """
 
@@ -48,17 +49,26 @@ logger = setup_logger(__name__)
 
 
 def get_finetune_args(parser):
-    """Finetuning-specific arguments (data, prompt randomization, embedder)."""
+    """Finetuning-specific arguments (data, record schema, embedder)."""
     parser.add_argument('--finetune_data_path', default=None, type=str,
-                        help='path to JSONL of {fields: {...}, sequence: ...} pairs')
-    parser.add_argument('--prompt_fields_key', default='fields', type=str,
-                        help='JSON key holding the fragment dict for each record')
-    parser.add_argument('--prompt_retention_probs', default=None, type=str,
-                        help='per-fragment-key retention probabilities, as a JSON '
-                             'object string (or set directly via config). Keys '
-                             'absent here are always retained.')
-    parser.add_argument('--prompt_shuffle', default='True', type=str,
-                        help='whether to shuffle retained fragments before joining')
+                        help='path to JSONL of cleaned {sequence, fields: {...}, '
+                             'sequence_length} records')
+    parser.add_argument('--record_schema', default=None, type=str,
+                        help='output schema mapping output name -> spec, as a JSON '
+                             'object string (or set directly via config). Composes '
+                             'the caption via a registered compose function '
+                             '(referenced by name) and passes the sequence through.')
+    parser.add_argument('--length_field', default='sequence_length', type=str,
+                        help='record key holding the precomputed (ungapped) '
+                             'sequence length used for length filtering; computed '
+                             'from the sequence when absent')
+    parser.add_argument('--caption_key', default='caption', type=str,
+                        help='schema output key feeding the text tokenizer')
+    parser.add_argument('--sequence_output_key', default='sequence', type=str,
+                        help='schema output key feeding the protein-sequence encoder')
+    parser.add_argument('--lazy_records', default='False', type=str,
+                        help='read records lazily (JsonlRecordStore) instead of '
+                             'eagerly into memory')
 
     # Frozen text -> z_c embedding front-end (PenCL text branch + Facilitator)
     parser.add_argument('--stage1_config_path', default=None, type=str,
@@ -102,18 +112,22 @@ def retrieve_all_args(argv):
 
 
 def _apply_finetune_arg_conversions(args):
-    args.prompt_shuffle = base.str_to_bool(args.prompt_shuffle)
+    args.lazy_records = base.str_to_bool(args.lazy_records)
     args.finetune_data_path = base.nonestr_to_none(args.finetune_data_path)
     args.pencl_weights = base.nonestr_to_none(args.pencl_weights)
     args.facilitator_weights = base.nonestr_to_none(args.facilitator_weights)
     args.stage1_config_path = base.nonestr_to_none(args.stage1_config_path)
     args.stage2_config_path = base.nonestr_to_none(args.stage2_config_path)
 
-    probs = args.prompt_retention_probs
-    if isinstance(probs, str):
+    schema = args.record_schema
+    if isinstance(schema, str):
         import json
-        probs = json.loads(probs)
-    args.prompt_retention_probs = probs or {}
+        schema = json.loads(schema)
+    if not schema:
+        raise ValueError(
+            "--record_schema (a JSON object) is required for finetuning"
+        )
+    args.record_schema = schema
 
     # Coerce the finetune subset selectors the same way run_PL_training.main does
     # (-2 sentinel == "unspecified" -> -1 == all).
@@ -142,20 +156,21 @@ def load_embedder_configs(args):
 def load_data(args, stage1_args):
     if args.finetune_data_path is None:
         raise ValueError("--finetune_data_path (JSONL) is required for finetuning.")
-    data_module = PL_mod.DictPromptDataModule(
+    data_module = PL_mod.GeneralizedDataModule(
         jsonl_path=args.finetune_data_path,
+        record_schema=args.record_schema,
         text_model_path=stage1_args.text_model_path,
         text_max_length=stage1_args.text_max_length,
-        retention_probs=args.prompt_retention_probs,
-        shuffle_prompt=args.prompt_shuffle,
-        fields_key=args.prompt_fields_key,
-        sequence_key=args.sequence_keyname,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         valid_size=args.valid_size,
         seed=args.seed,
         diffusion_steps=args.diffusion_steps,
         image_size=args.image_size,
+        sequence_key=args.sequence_output_key,
+        caption_key=args.caption_key,
+        length_field=args.length_field,
+        lazy=args.lazy_records,
     )
     data_module.setup()
     return data_module

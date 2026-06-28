@@ -39,7 +39,7 @@ from sklearn.model_selection import train_test_split
 from transformers.optimization import Adafactor  # Efficient optimizer for transformers
 from deepspeed.ops.adam import DeepSpeedCPUAdam  # Memory-efficient Adam implementation
 from transformers import get_cosine_schedule_with_warmup  # Learning rate scheduler
-from transformers import AutoTokenizer  # BioBERT tokenizer for dict-prompt finetuning
+from transformers import AutoTokenizer  # BioBERT tokenizer for finetuning
 
 # ----- Standard Libraries & Utilities -----
 import functools
@@ -51,6 +51,11 @@ from biom3.Stage3.DSEma import moving_average, clone_zero_model  # EMA implement
 import biom3.Stage3.transformer_training_helper as trainer_tools
 import biom3.Stage3.eval_metrics as eval_funcs
 import biom3.Stage3.preprocess as prep
+from biom3.core.dataloaders import (
+    GeneralizedRecordDataset,
+    JsonlRecordStore,
+    read_jsonl_records,
+)
 from biom3.backend.device import print_gpu_initialization, setup_logger
 
 logger = setup_logger(__name__)
@@ -1073,68 +1078,82 @@ class PL_ProtARDM_Finetune(PL_ProtARDM):
         return [num_seqs, z_c]
 
 
-class DictPromptDataModule(pl.LightningDataModule):
-    """DataModule for (text-fragment dict, sequence) finetuning data in JSONL.
+class GeneralizedDataModule(pl.LightningDataModule):
+    """Schema-driven finetuning DataModule over cleaned records in JSONL.
 
-    Reads one JSONL file, builds a :class:`~biom3.Stage3.preprocess.DictPromptDataset`
-    that randomizes each prompt on access, splits train/val and filters by
-    sequence length (matching :class:`HDF5DataModule`), and tokenizes prompts in
-    the collate function with the BioBERT tokenizer at ``padding="max_length"``.
+    Each record is ``{sequence, fields: {key: raw_description, ...}, <length_field>}``.
+    A ``record_schema`` composes a ``caption`` (via the ``fields_to_caption``
+    compose function) and passes the sequence through; on each access the
+    composition is re-rolled (per-key dropout + optional shuffle). The collate
+    tokenizes both into ``(num_seqs, input_ids)`` for :class:`PL_ProtARDM_Finetune`.
+
+    Records are read eagerly (:func:`~biom3.core.dataloaders.read_jsonl_records`)
+    by default, or lazily (:class:`~biom3.core.dataloaders.JsonlRecordStore`) when
+    ``lazy=True``. Train/val splitting and sequence-length filtering mirror
+    :class:`HDF5DataModule`; lengths come from ``length_field`` when present and
+    are otherwise computed from the (ungapped) sequence.
     """
 
     def __init__(
         self, *,
         jsonl_path,
+        record_schema,
         text_model_path,
         text_max_length,
-        retention_probs,
-        shuffle_prompt,
-        fields_key,
-        sequence_key,
         batch_size,
         num_workers,
         valid_size,
         seed,
         diffusion_steps,
         image_size,
+        sequence_key="sequence",
+        caption_key="caption",
+        length_field="sequence_length",
+        lazy=False,
     ):
         super().__init__()
         self.jsonl_path = jsonl_path
+        self.record_schema = record_schema
         self.text_model_path = text_model_path
         self.text_max_length = text_max_length
-        self.retention_probs = retention_probs or {}
-        self.shuffle_prompt = shuffle_prompt
-        self.fields_key = fields_key
-        self.sequence_key = sequence_key
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.valid_size = valid_size
         self.seed = seed
         self.diffusion_steps = diffusion_steps
         self.image_size = image_size
+        self.sequence_key = sequence_key
+        self.caption_key = caption_key
+        self.length_field = length_field
+        self.lazy = lazy
         self.min_seq_length = diffusion_steps - 2
 
     def setup(self, stage=None):
-        from biom3.core.prompt_assembly import RandomizedPromptConstructor
+        if self.lazy:
+            source = JsonlRecordStore(
+                self.jsonl_path, scalar_fields=[self.length_field],
+            )
+            lengths = list(source.get_scalar(self.length_field))
+        else:
+            source = read_jsonl_records(self.jsonl_path)
+            lengths = [rec.get(self.length_field) for rec in source]
 
-        records = prep.read_dict_prompt_jsonl(
-            self.jsonl_path,
-            fields_key=self.fields_key,
-            sequence_key=self.sequence_key,
-        )
-        constructor = RandomizedPromptConstructor(
-            self.retention_probs, shuffle=self.shuffle_prompt,
-        )
-        dataset = prep.DictPromptDataset(
-            records=records,
-            prompt_constructor=constructor,
-            image_size=self.image_size,
+        dataset = GeneralizedRecordDataset(
+            source, schema=self.record_schema, rng=None,
         )
         self.text_tokenizer = AutoTokenizer.from_pretrained(self.text_model_path)
+        self._collate_fn = prep.make_seq_caption_collate_fn(
+            text_tokenizer=self.text_tokenizer,
+            text_max_length=self.text_max_length,
+            image_size=self.image_size,
+            sequence_key=self.sequence_key,
+            caption_key=self.caption_key,
+        )
 
-        train_idx, val_idx = self._split_indices(dataset)
-        train_idx = self._filter_by_sequence_length(dataset, train_idx)
-        val_idx = self._filter_by_sequence_length(dataset, val_idx)
+        lengths = self._resolve_lengths(source, dataset, lengths)
+        train_idx, val_idx = self._split_indices(len(dataset))
+        train_idx = self._filter_by_length(train_idx, lengths)
+        val_idx = self._filter_by_length(val_idx, lengths)
         self.train_dataset = Subset(dataset, train_idx)
         self.val_dataset = Subset(dataset, val_idx)
         self.split_info = [{
@@ -1143,39 +1162,71 @@ class DictPromptDataModule(pl.LightningDataModule):
             "val_indices": val_idx,
             "test_indices": [],
         }]
-        logger.info("Loaded dict-prompt dataset from %s (%d train, %d val)",
+        logger.info("Loaded generalized dataset from %s (%d train, %d val)",
                     self.jsonl_path, len(train_idx), len(val_idx))
 
-    def _split_indices(self, dataset):
-        train_size = int((1 - self.valid_size) * len(dataset))
-        indices = np.arange(len(dataset))
+    def _raw_sequence_key(self):
+        """Raw record key for the sequence when it is a plain passthrough.
+
+        Returns the source key for ``sequence_key`` when its schema spec is a
+        simple ``{"from": key}`` / bare-string passthrough, else ``None`` (the
+        sequence is composed and must be read through the dataset).
+        """
+        spec = self.record_schema.get(self.sequence_key)
+        if isinstance(spec, str):
+            return spec
+        if isinstance(spec, dict) and "from" in spec:
+            return spec["from"]
+        return None
+
+    def _resolve_lengths(self, source, dataset, lengths):
+        """Fill in any missing ``length_field`` values from the ungapped sequence.
+
+        Reads the raw sequence directly when it is a passthrough output (avoiding
+        a throwaway caption composition per record); otherwise falls back to the
+        composed dataset output.
+        """
+        lengths = list(lengths)
+        raw_key = self._raw_sequence_key()
+        fallbacks = 0
+        for i, length in enumerate(lengths):
+            if length is None:
+                if raw_key is not None:
+                    seq = source[i][raw_key]
+                else:
+                    seq = dataset[i][self.sequence_key]
+                lengths[i] = len(seq.replace('-', ''))
+                fallbacks += 1
+        if fallbacks:
+            logger.info("Computed %d/%d sequence lengths from sequence (missing %r)",
+                        fallbacks, len(lengths), self.length_field)
+        return lengths
+
+    def _split_indices(self, n):
+        train_size = int((1 - self.valid_size) * n)
+        indices = np.arange(n)
         np.random.seed(self.seed)
         np.random.shuffle(indices)
         return indices[:train_size], indices[train_size:]
 
-    def _filter_by_sequence_length(self, dataset, indices):
-        sequence_lengths = dataset.get_sequence_lengths()
-        filtered = [idx for idx in indices if sequence_lengths[idx] <= self.min_seq_length]
+    def _filter_by_length(self, indices, lengths):
+        filtered = [idx for idx in indices if lengths[idx] <= self.min_seq_length]
         logger.info("Original indices count: %s, Filtered indices count: %s",
                     len(indices), len(filtered))
         return filtered
 
-    def _collate(self, batch):
-        return prep.dict_prompt_collate_fn(
-            batch,
-            text_tokenizer=self.text_tokenizer,
-            text_max_length=self.text_max_length,
-        )
-
     def train_dataloader(self):
         sampler = _make_distributed_sampler(self.train_dataset, shuffle=True, seed=self.seed)
+        # persistent_workers is left False so workers re-spawn each epoch and torch
+        # reseeds them, which is what makes GeneralizedRecordDataset's per-worker RNG
+        # vary across epochs (see its docstring caveat).
         return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             sampler=sampler,
             shuffle=(sampler is None),
-            collate_fn=self._collate,
+            collate_fn=self._collate_fn,
         )
 
     def val_dataloader(self):
@@ -1186,6 +1237,6 @@ class DictPromptDataModule(pl.LightningDataModule):
             num_workers=self.num_workers,
             sampler=sampler,
             shuffle=False,
-            collate_fn=self._collate,
+            collate_fn=self._collate_fn,
         )
 

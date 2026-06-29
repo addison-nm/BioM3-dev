@@ -202,4 +202,5 @@ docker/run.sh scripts/cloud/finetune.sh --epochs 1
 - **Temp AWS creds expire** (1–12 h); refresh the launch-shell `eval` + `ECR_PASSWORD`
   for long runs.
 - **`mmseqs` absent** → `SPLIT=cluster` fails; use `SPLIT=none` or add the binary.
-- See also the Mithril-specific gotchas in [`HANDOFF.md`](../../HANDOFF.md).
+- See also the Mithril-specific gotchas (⚠-annotated) in
+  [`mithril/INSTRUCTIONS.md`](../../mithril/INSTRUCTIONS.md).

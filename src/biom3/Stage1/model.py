@@ -34,7 +34,7 @@ class ProteinEncoder(nn.Module):
         
         for p in self.model.parameters():
             if self.trainable and self.n_layers_to_finetune == 0:
-                p.required_grad = True
+                p.requires_grad = True
             else:
                 p.requires_grad = False
         
@@ -100,10 +100,10 @@ class TextEncoder(nn.Module):
 
         for p in self.model.parameters():
             if self.trainable and self.n_layers_to_finetune == 0:
-                p.required_grad = True
+                p.requires_grad = True
             else:
                 p.requires_grad = False
-       
+
         # Make the last n_layers_to_finetune layers trainable
         if self.trainable and self.n_layers_to_finetune != 0:
             for layer in self.model.bert.encoder.layer[-self.n_layers_to_finetune:]:

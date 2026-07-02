@@ -23,13 +23,19 @@
   "record_schema": {
     "sequence": {"from": "sequence"},
     "caption": {
-      "compose": "fields_to_caption",
+      "compose": "list_fields_to_caption",
       "args": {
-        "fields_key": "caption_fields",
+        "fields_key": "fields",
+        "source_key": "source",
+        "max_item_chars": 585,
         "shuffle": true,
         "add_label": true,
         "key_transform": "upper_spaced",
         "default_dropout": 0.5,
+        "field_policies": {
+          "gene_ontology": {"keep": 30, "exclude_sources": ["swissprot"]},
+          "lineage": {"keep": "all_but_last"}
+        },
         "dropout_rates": {
           "protein_name": 0.0,
           "lineage": 0.15,

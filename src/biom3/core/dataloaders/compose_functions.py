@@ -224,3 +224,99 @@ def fields_to_caption(obj, args=None, rng=random):
         separator=args.get("separator", ". "),
         trailing_period=args.get("trailing_period", True),
     )
+
+
+def reduce_list_field(items, policy, default_max_item_chars=None):
+    """Reduce a field's list of raw items to a single string per ``policy``.
+
+    ``items`` is a list of strings (one per raw annotation comment / term).
+    ``policy`` keys (all optional):
+        keep: "first" (default) | "all" | "all_but_last" | int (first N items)
+        join: separator joining kept items (default ", ")
+        max_item_chars: per-field override of the char cutoff (only for "first")
+
+    For ``keep == "first"`` (the comment-field default), items longer than the
+    char cutoff are dropped first, then the first survivor is returned; if every
+    item exceeds the cutoff the field is dropped (returns ""). All character
+    comparisons are on raw ``len(str)`` — no tokenization — so this is cheap
+    enough to run per access. Other ``keep`` modes are not char-filtered.
+    """
+    items = [str(x).strip() for x in items if x is not None and str(x).strip()]
+    if not items:
+        return ""
+    keep = policy.get("keep", "first")
+    join = policy.get("join", ", ")
+    if keep == "all":
+        return join.join(items)
+    if keep == "all_but_last":
+        return join.join(items[:-1] if len(items) > 1 else items)
+    if isinstance(keep, int):
+        return join.join(items[:keep])
+    # keep == "first": drop over-long items, take the first survivor.
+    cap = policy.get("max_item_chars", default_max_item_chars)
+    if cap is not None:
+        items = [x for x in items if len(x) <= cap]
+    return items[0] if items else ""
+
+
+@register_compose("list_fields_to_caption")
+def list_fields_to_caption(obj, args=None, rng=random):
+    """Compose a caption from raw list-valued fields with per-field selection.
+
+    Unlike :func:`fields_to_caption` (which joins the already-cleaned strings in
+    ``caption_fields``), this composes from the raw ``fields`` lists, reducing
+    each field to a single string via :func:`reduce_list_field` (default: drop
+    items longer than ``max_item_chars`` and take the first survivor). Fields can
+    be dropped for specific sources (e.g. gene_ontology for swissprot). The
+    reduced fields then get the usual per-key dropout, optional shuffle,
+    label-adding, and concatenation.
+
+    args keys (all optional unless noted):
+        fields_key       record key holding {field: [items]} (default "fields")
+        source_key       record key holding the data source (default "source")
+        max_item_chars   global per-item char cutoff for the "first" policy
+        field_policies   {field: policy} overrides (see reduce_list_field); a
+                         policy may also set ``exclude_sources`` (list) to drop
+                         that field for the given sources
+        dropout_rates    {field: removal_prob}
+        default_dropout  removal prob for keys absent from dropout_rates (0.0)
+        shuffle, add_label, label_format, key_transform, separator,
+        trailing_period  -- as in fields_to_caption
+    """
+    args = args or {}
+    fields = obj[args.get("fields_key", "fields")]
+    source = obj.get(args.get("source_key", "source"))
+    policies = args.get("field_policies", {})
+    default_cap = args.get("max_item_chars")
+
+    items = []
+    for key, value in fields_to_items(fields):
+        policy = policies.get(key, {})
+        if source is not None and source in policy.get("exclude_sources", ()):
+            continue
+        value = value if isinstance(value, list) else [value]
+        reduced = reduce_list_field(value, policy, default_cap)
+        if reduced:
+            items.append((key, reduced))
+
+    items = dropout_items(
+        items,
+        rates=args.get("dropout_rates"),
+        default=args.get("default_dropout", 0.0),
+        rng=rng,
+    )
+    if args.get("shuffle", False):
+        items = shuffle_items(items, rng=rng)
+    if args.get("add_label", True):
+        values = add_labels(
+            items,
+            label_format=args.get("label_format", "{key}: {value}"),
+            key_transform=args.get("key_transform", "upper"),
+        )
+    else:
+        values = [value for _, value in items]
+    return concatenate(
+        values,
+        separator=args.get("separator", ". "),
+        trailing_period=args.get("trailing_period", True),
+    )

@@ -205,3 +205,87 @@ class TestFieldsToCaption:
             obj, {"shuffle": False, "key_transform": "upper_spaced"}, random.Random(0)
         )
         assert caption == "SH3 PARALOG NAME: SLA1."
+
+
+class TestReduceListField:
+
+    def test_first_default(self):
+        assert cf.reduce_list_field(["a", "b", "c"], {}) == "a"
+
+    def test_first_char_filter_drops_long(self):
+        assert cf.reduce_list_field(["toolong", "ok"], {}, default_max_item_chars=3) == "ok"
+
+    def test_first_all_filtered_returns_empty(self):
+        assert cf.reduce_list_field(["toolong", "alsolong"], {}, default_max_item_chars=3) == ""
+
+    def test_policy_char_cap_overrides_default(self):
+        assert cf.reduce_list_field(["abcd", "xy"], {"max_item_chars": 2}, 100) == "xy"
+
+    def test_all(self):
+        assert cf.reduce_list_field(["a", "b"], {"keep": "all"}) == "a, b"
+
+    def test_all_but_last(self):
+        assert cf.reduce_list_field(["a", "b", "c"], {"keep": "all_but_last"}) == "a, b"
+
+    def test_all_but_last_single_kept(self):
+        assert cf.reduce_list_field(["only"], {"keep": "all_but_last"}) == "only"
+
+    def test_first_n(self):
+        assert cf.reduce_list_field(["a", "b", "c", "d"], {"keep": 2}) == "a, b"
+
+    def test_custom_join(self):
+        assert cf.reduce_list_field(["a", "b"], {"keep": "all", "join": " | "}) == "a | b"
+
+
+class TestListFieldsToCaption:
+
+    def _obj(self, source="swissprot"):
+        return {
+            "source": source,
+            "fields": {
+                "protein_name": ["Abl interactor 1"],
+                "subunit": ["Interacts with ABL1, ENAH, and a very long list " * 6,
+                            "(Microbial infection) Interacts with HHV-5."],
+                "gene_ontology": ["cytoplasm", "membrane", "binding"],
+                "lineage": ["Eukaryota", "Metazoa", "Homo"],
+            },
+        }
+
+    def _args(self, **over):
+        a = {
+            "fields_key": "fields", "source_key": "source", "max_item_chars": 80,
+            "add_label": True, "key_transform": "upper_spaced", "shuffle": False,
+            "field_policies": {
+                "gene_ontology": {"keep": 2, "exclude_sources": ["swissprot"]},
+                "lineage": {"keep": "all_but_last"},
+            },
+        }
+        a.update(over)
+        return a
+
+    def test_char_filter_picks_short_survivor(self):
+        cap = cf.list_fields_to_caption(self._obj(), self._args(), random.Random(0))
+        # the long subunit comment (>80 chars) is dropped, the short one survives
+        assert "(Microbial infection) Interacts with HHV-5." in cap
+        assert "very long list" not in cap
+
+    def test_go_excluded_for_swissprot(self):
+        cap = cf.list_fields_to_caption(self._obj("swissprot"), self._args(), random.Random(0))
+        assert "GENE ONTOLOGY" not in cap
+
+    def test_go_kept_for_pfam_capped(self):
+        cap = cf.list_fields_to_caption(self._obj("pfam"), self._args(), random.Random(0))
+        assert "GENE ONTOLOGY: cytoplasm, membrane." in cap  # first 2 terms only
+
+    def test_lineage_drops_last(self):
+        cap = cf.list_fields_to_caption(self._obj(), self._args(), random.Random(0))
+        assert "LINEAGE: Eukaryota, Metazoa." in cap
+        assert "Homo" not in cap
+
+    def test_dropout_removes_field(self):
+        args = self._args(dropout_rates={"protein_name": 1.0})
+        cap = cf.list_fields_to_caption(self._obj(), args, random.Random(0))
+        assert "PROTEIN NAME" not in cap
+
+    def test_registered(self):
+        assert cf.get_compose_function("list_fields_to_caption") is cf.list_fields_to_caption

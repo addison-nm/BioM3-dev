@@ -25,6 +25,8 @@ from torch import nn
 
 import biom3.Stage3.preprocess as prep
 from biom3.Stage3.preprocess import encode_protein_sequence, make_seq_caption_collate_fn
+from biom3.split.manifest import write_manifest
+from biom3.split.run_stratified_split import build_stratified_split_manifest
 
 
 # ----------------------------- fixtures / fakes -----------------------------
@@ -202,6 +204,93 @@ class TestGeneralizedDataModule:
         sample = underlying[0]
         assert "PROTEIN_NAME" in sample["caption"]
         assert isinstance(sample["sequence"], str)
+
+
+# --------------------- data module: manifest-driven split -------------------
+
+_MANIFEST_RECORDS = [
+    {"sequence": "AC" * (i % 3 + 1),
+     "fields": {"protein_name": f"p{i}"},
+     "sequence_length": 2 * (i % 3 + 1),
+     "source": "pfam" if i % 3 else "swissprot"}
+    for i in range(24)
+]
+
+
+def _make_manifest(tmp_path, records, ratios):
+    data = tmp_path / "records.jsonl"
+    _write_jsonl(data, records)
+    tsv = tmp_path / "clusters.tsv"
+    with open(tsv, "w") as fh:
+        for row in range(len(records)):
+            fh.write(f"0-{row}\t0-{row}\n")  # singleton clusters
+    manifest, _ = build_stratified_split_manifest(
+        data_path=str(data), ratios=ratios,
+        clusters_tsv=str(tsv), min_seq_length=None,
+    )
+    manifest_path = tmp_path / "manifest.json"
+    write_manifest(str(manifest_path), manifest)
+    return str(data), str(manifest_path), manifest
+
+
+class TestGeneralizedDataModuleManifest:
+    def _dm(self, tmp_path, monkeypatch, data_path, manifest_path, **overrides):
+        import biom3.Stage3.PL_wrapper as plw
+        monkeypatch.setattr(plw, "AutoTokenizer", _FakeAutoTokenizer)
+        kwargs = dict(
+            jsonl_path=data_path,
+            record_schema=_NO_DROPOUT_SCHEMA,
+            text_model_path="unused",
+            text_max_length=32,
+            batch_size=4,
+            num_workers=0,
+            valid_size=0.25,   # ignored when a manifest is given
+            seed=42,
+            diffusion_steps=8,
+            image_size=4,
+            split_manifest_path=manifest_path,
+        )
+        kwargs.update(overrides)
+        dm = plw.GeneralizedDataModule(**kwargs)
+        dm.setup()
+        return dm
+
+    def test_split_indices_come_from_manifest(self, tmp_path, monkeypatch):
+        ratios = {"train": 0.7, "val": 0.2, "test": 0.1}
+        data, manifest_path, manifest = _make_manifest(tmp_path, _MANIFEST_RECORDS, ratios)
+        dm = self._dm(tmp_path, monkeypatch, data, manifest_path)
+        entry = manifest["files"][0]
+        info = dm.split_info[0]
+        assert info["train_indices"] == entry["train"]
+        assert info["val_indices"] == entry["val"]
+        assert info["test_indices"] == entry["test"]
+
+    def test_test_split_held_out(self, tmp_path, monkeypatch):
+        ratios = {"train": 0.7, "val": 0.2, "test": 0.1}
+        data, manifest_path, manifest = _make_manifest(tmp_path, _MANIFEST_RECORDS, ratios)
+        dm = self._dm(tmp_path, monkeypatch, data, manifest_path)
+        test_idx = set(dm.split_info[0]["test_indices"])
+        assert test_idx  # non-empty
+        train_val = set(dm.train_dataset.indices) | set(dm.val_dataset.indices)
+        assert test_idx.isdisjoint(train_val)
+
+    def test_lazy_matches_eager_under_manifest(self, tmp_path, monkeypatch):
+        ratios = {"train": 0.7, "val": 0.3}
+        data, manifest_path, _ = _make_manifest(tmp_path, _MANIFEST_RECORDS, ratios)
+        eager = self._dm(tmp_path, monkeypatch, data, manifest_path, lazy=False)
+        lazy = self._dm(tmp_path, monkeypatch, data, manifest_path, lazy=True)
+        assert eager.split_info[0]["train_indices"] == lazy.split_info[0]["train_indices"]
+        assert eager.split_info[0]["val_indices"] == lazy.split_info[0]["val_indices"]
+
+    def test_fingerprint_mismatch_raises(self, tmp_path, monkeypatch):
+        ratios = {"train": 0.8, "val": 0.2}
+        data, manifest_path, _ = _make_manifest(tmp_path, _MANIFEST_RECORDS, ratios)
+        # Mutate the JSONL after the manifest was built -> fingerprint no longer matches.
+        mutated = [dict(r) for r in _MANIFEST_RECORDS]
+        mutated[0]["sequence"] = "WWWWWW"
+        _write_jsonl(tmp_path / "records.jsonl", mutated)
+        with pytest.raises(ValueError, match="fingerprint"):
+            self._dm(tmp_path, monkeypatch, data, manifest_path)
 
 
 # --------------------------- finetune PL wrapper ----------------------------

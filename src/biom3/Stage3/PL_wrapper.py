@@ -1078,6 +1078,25 @@ class PL_ProtARDM_Finetune(PL_ProtARDM):
         return [num_seqs, z_c]
 
 
+class _SequenceView:
+    """Indexable view over a record source exposing each row's raw sequence.
+
+    Lets :func:`biom3.split.manifest.compute_fingerprint` sample sequences by row
+    index without materializing them all (it only reads a handful of positions),
+    so it stays cheap even over a lazy :class:`JsonlRecordStore`.
+    """
+
+    def __init__(self, source, key):
+        self._source = source
+        self._key = key
+
+    def __len__(self):
+        return len(self._source)
+
+    def __getitem__(self, idx):
+        return self._source[idx][self._key]
+
+
 class GeneralizedDataModule(pl.LightningDataModule):
     """Schema-driven finetuning DataModule over cleaned records in JSONL.
 
@@ -1110,6 +1129,7 @@ class GeneralizedDataModule(pl.LightningDataModule):
         caption_key="caption",
         length_field="sequence_length",
         lazy=False,
+        split_manifest_path=None,
     ):
         super().__init__()
         self.jsonl_path = jsonl_path
@@ -1126,6 +1146,7 @@ class GeneralizedDataModule(pl.LightningDataModule):
         self.caption_key = caption_key
         self.length_field = length_field
         self.lazy = lazy
+        self.split_manifest_path = split_manifest_path
         self.min_seq_length = diffusion_steps - 2
 
     def setup(self, stage=None):
@@ -1151,7 +1172,11 @@ class GeneralizedDataModule(pl.LightningDataModule):
         )
 
         lengths = self._resolve_lengths(source, dataset, lengths)
-        train_idx, val_idx = self._split_indices(len(dataset))
+        if self.split_manifest_path is not None:
+            train_idx, val_idx, test_idx = self._manifest_split(source)
+        else:
+            train_idx, val_idx = self._split_indices(len(dataset))
+            test_idx = []
         train_idx = self._filter_by_length(train_idx, lengths)
         val_idx = self._filter_by_length(val_idx, lengths)
         self.train_dataset = Subset(dataset, train_idx)
@@ -1160,10 +1185,44 @@ class GeneralizedDataModule(pl.LightningDataModule):
             "path": self.jsonl_path,
             "train_indices": train_idx,
             "val_indices": val_idx,
-            "test_indices": [],
+            "test_indices": test_idx,
         }]
-        logger.info("Loaded generalized dataset from %s (%d train, %d val)",
-                    self.jsonl_path, len(train_idx), len(val_idx))
+        logger.info(
+            "Loaded generalized dataset from %s (%d train, %d val, %d held-out test)",
+            self.jsonl_path, len(train_idx), len(val_idx), len(test_idx))
+
+    def _manifest_split(self, source):
+        """Read train/val/test row indices from a curated split manifest.
+
+        Validates that the manifest was built for this exact JSONL (row count +
+        content fingerprint over the raw sequences) before trusting its indices.
+        The test split is returned for record-keeping but held out of training.
+        """
+        from biom3.split import manifest as split_manifest
+
+        manifest = split_manifest.read_manifest(self.split_manifest_path)
+        if len(manifest["files"]) != 1:
+            raise ValueError(
+                f"split manifest describes {len(manifest['files'])} file(s) but the "
+                f"generalized dataloader reads a single JSONL; regenerate the manifest"
+            )
+        raw_key = self._raw_sequence_key()
+        if raw_key is None:
+            raise ValueError(
+                "split_manifest_path requires the sequence output to be a plain "
+                "passthrough ({'from': <key>}); fingerprint validation needs the "
+                "raw record sequences"
+            )
+        entry = manifest["files"][0]
+        split_manifest.validate_file_entry(
+            entry,
+            n_rows=len(source),
+            fingerprint=split_manifest.compute_fingerprint(
+                _SequenceView(source, raw_key)
+            ),
+        )
+        logger.info("Using curated split manifest %s", self.split_manifest_path)
+        return entry["train"], entry["val"], entry["test"]
 
     def _raw_sequence_key(self):
         """Raw record key for the sequence when it is a plain passthrough.

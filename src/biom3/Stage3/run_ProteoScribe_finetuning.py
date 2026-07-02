@@ -69,6 +69,10 @@ def get_finetune_args(parser):
     parser.add_argument('--lazy_records', default='False', type=str,
                         help='read records lazily (JsonlRecordStore) instead of '
                              'eagerly into memory')
+    parser.add_argument('--split_manifest_path', default=None, type=str,
+                        help='curated train/val/test split manifest (e.g. from '
+                             'biom3_stratified_cluster_split); replaces the random '
+                             'split. Fingerprint-validated against the JSONL.')
 
     # Frozen text -> z_c embedding front-end (PenCL text branch + Facilitator)
     parser.add_argument('--stage1_config_path', default=None, type=str,
@@ -114,6 +118,7 @@ def retrieve_all_args(argv):
 def _apply_finetune_arg_conversions(args):
     args.lazy_records = base.str_to_bool(args.lazy_records)
     args.finetune_data_path = base.nonestr_to_none(args.finetune_data_path)
+    args.split_manifest_path = base.nonestr_to_none(args.split_manifest_path)
     args.pencl_weights = base.nonestr_to_none(args.pencl_weights)
     args.facilitator_weights = base.nonestr_to_none(args.facilitator_weights)
     args.stage1_config_path = base.nonestr_to_none(args.stage1_config_path)
@@ -171,6 +176,7 @@ def load_data(args, stage1_args):
         caption_key=args.caption_key,
         length_field=args.length_field,
         lazy=args.lazy_records,
+        split_manifest_path=args.split_manifest_path,
     )
     data_module.setup()
     return data_module

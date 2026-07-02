@@ -27,6 +27,7 @@
   "caption_key": "caption",
   "sequence_output_key": "sequence",
   "lazy_records": false,
+  "split_manifest_path": null,
   "record_schema": {
     "sequence": {"from": "sequence"},
     "caption": {

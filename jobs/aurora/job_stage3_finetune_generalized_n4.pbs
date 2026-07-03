@@ -1,8 +1,8 @@
 #!/bin/bash -l
 #PBS -A NLDesignProtein
-#PBS -N stage3_ft_generalized_n64
+#PBS -N stage3_ft_generalized_n4
 #PBS -l walltime=01:00:00
-#PBS -l select=64
+#PBS -l select=4
 #PBS -l place=scatter
 #PBS -l filesystems=home:flare
 #PBS -q debug-scaling
@@ -10,9 +10,9 @@
 # PBS -M <emailaddress>
 # PBS -m be
 
-# Aurora (XPU) 64-node test of the GENERALIZED Stage 3 finetuning path
+# Aurora (XPU) 4-node run of the GENERALIZED Stage 3 finetuning path
 # (biom3_finetune_stage3 / record_schema JSONL data). Submit from the
-# BioM3-dev directory: `qsub jobs/aurora/job_stage3_finetune_generalized_n64.pbs`.
+# BioM3-dev directory: `qsub jobs/aurora/job_stage3_finetune_generalized_n4.pbs`.
 #
 # Data path, embedder configs/weights, pretrained weights, finetune-block
 # selection, and the record_schema all live in the config below. Only runtime
@@ -26,11 +26,11 @@ source ./venvs/biom3-env/bin/activate
 
 # Configurations to edit
 config_path=./configs/stage3_training/finetune_generalized_aurora.json
-num_nodes=64                    # Must match #PBS -l select above
+num_nodes=4                     # Must match #PBS -l select above
 epochs=50                       # Number of epochs to finetune
 batch_size=8                    # PER-RANK batch. Global = batch_size * num_nodes * num_devices.
-                                # At 64*12*8 = 6144 this is ~4-5 steps/epoch on ~27.8k records
-                                # (infra/scaling test, not convergence). Lower nodes for real training.
+                                # At 4*12*8 = 384 this is ~72 steps/epoch on ~27.8k records,
+                                # a more realistic finetuning regime than the 64-node scaling test.
 use_wandb=True                 # set True only with WANDB_API_KEY exported
 resume_from_checkpoint=None     # None to start finetuning fresh
 

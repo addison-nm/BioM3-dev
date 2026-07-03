@@ -28,10 +28,13 @@ envs:
   BIOM3_WEIGHTS_URI: s3://nm-portal-global-data-955510722784/biom3/weights
   BIOM3_WEIGHTS_INCLUDES: "LLMs/esm2_t33_650M_UR50D* LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext/* PenCL/BioM3_PenCL_epoch20.bin PenCL/PenCL_V09152023_last.ckpt* Facilitator/BioM3_Facilitator_epoch20.bin ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1*.bin ProteoScribe/epoch200_full.ckpt/single_model.pth"
   AWS_DEFAULT_REGION: us-east-2
-  SKYPILOT_DOCKER_USERNAME: AWS
-  SKYPILOT_DOCKER_SERVER: 955510722784.dkr.ecr.us-east-2.amazonaws.com
 
 secrets:
+  # The SKYPILOT_DOCKER_* trio must all live in one block (envs OR secrets, not
+  # split) — newer SkyPilot rejects a split. Kept here so the ECR token stays
+  # redacted; USERNAME/SERVER ride along to satisfy the all-together rule.
+  SKYPILOT_DOCKER_USERNAME: AWS
+  SKYPILOT_DOCKER_SERVER: 955510722784.dkr.ecr.us-east-2.amazonaws.com
   SKYPILOT_DOCKER_PASSWORD: ${ECR_PASSWORD}
   AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
   AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}

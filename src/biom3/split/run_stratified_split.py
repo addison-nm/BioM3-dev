@@ -65,8 +65,23 @@ def build_stratified_split_manifest(
     min_seq_length=None,
     clusters_tsv=None,
     tmp_dir=None,
+    cluster_method="connected_components",
+    sensitivity=7.5,
+    search_max_seqs=2000,
+    edges_tsv=None,
 ):
-    """Cluster JSONL sequences globally and pack them into a stratified manifest."""
+    """Cluster JSONL sequences globally and pack them into a stratified manifest.
+
+    cluster_method:
+        "connected_components" (default) -- all-vs-all mmseqs search + connected
+            components. Reliable: no cross-cluster pair exceeds the threshold, so
+            no near-duplicate leaks across the split (fixes easy-cluster's
+            prefilter misses on short domains). Slower (all-vs-all).
+        "easy_cluster" -- mmseqs easy-cluster set-cover heuristic. Faster but may
+            leave similar short sequences in different clusters.
+    A precomputed clustering (clusters_tsv) or precomputed search edges
+    (edges_tsv) short-circuit mmseqs for reproducible / offline runs.
+    """
     records = read_jsonl_records(data_path)
     n_rows = len(records)
     sequences = [str(rec[sequence_key]) for rec in records]
@@ -97,7 +112,25 @@ def build_stratified_split_manifest(
     if clusters_tsv is not None:
         logger.info("Using precomputed clustering from %s", clusters_tsv)
         raw_clusters = clu.parse_cluster_tsv(clusters_tsv)
-    else:
+    elif cluster_method == "connected_components":
+        member_ids = [mid for mid, _ in fasta_records]
+        if edges_tsv is not None:
+            logger.info("Using precomputed search edges from %s", edges_tsv)
+            edges = clu.parse_edges_tsv(edges_tsv)
+        else:
+            work_dir = tmp_dir or tempfile.mkdtemp(prefix="biom3_stratsplit_")
+            os.makedirs(work_dir, exist_ok=True)
+            fasta_path = os.path.join(work_dir, "pooled.fasta")
+            clu.write_pooled_fasta(fasta_path, fasta_records)
+            search_tsv = clu.run_mmseqs_search(
+                fasta_path, work_dir,
+                min_seq_id=min_seq_id, coverage=coverage, cov_mode=cov_mode,
+                sensitivity=sensitivity, max_seqs=search_max_seqs,
+                threads=threads, extra_args=mmseqs_extra,
+            )
+            edges = clu.parse_edges_tsv(search_tsv)
+        raw_clusters = clu.connected_components(member_ids, edges)
+    elif cluster_method == "easy_cluster":
         work_dir = tmp_dir or tempfile.mkdtemp(prefix="biom3_stratsplit_")
         os.makedirs(work_dir, exist_ok=True)
         fasta_path = os.path.join(work_dir, "pooled.fasta")
@@ -109,6 +142,11 @@ def build_stratified_split_manifest(
             threads=threads, extra_args=mmseqs_extra,
         )
         raw_clusters = clu.parse_cluster_tsv(tsv)
+    else:
+        raise ValueError(
+            f"unknown cluster_method {cluster_method!r}; "
+            f"choose 'connected_components' or 'easy_cluster'"
+        )
 
     clusters = []
     seen = set()
@@ -144,13 +182,15 @@ def build_stratified_split_manifest(
         "fingerprint": mf.compute_fingerprint(sequences),
     }]
     tool = {
-        "name": "precomputed" if clusters_tsv is not None else "mmseqs",
+        "name": "precomputed" if (clusters_tsv or edges_tsv) else "mmseqs",
+        "method": cluster_method if clusters_tsv is None else "easy_cluster",
         "clustering": "global",
         "stratified_by": source_key,
         "min_seq_id": min_seq_id,
         "coverage": coverage,
         "cov_mode": cov_mode,
         "cluster_mode": cluster_mode,
+        "sensitivity": sensitivity if cluster_method == "connected_components" else None,
         "min_seq_length": min_seq_length,
     }
     manifest = mf.build_manifest(
@@ -216,6 +256,10 @@ def main(args):
         min_seq_length=min_seq_length,
         clusters_tsv=args.clusters_tsv,
         tmp_dir=args.tmp_dir,
+        cluster_method=args.cluster_method,
+        sensitivity=args.sensitivity,
+        search_max_seqs=args.search_max_seqs,
+        edges_tsv=args.edges_tsv,
     )
 
     out = args.output
@@ -270,6 +314,19 @@ def parse_arguments(argv):
     parser.add_argument("--test_frac", type=float, default=0.1)
     parser.add_argument("--seed", type=int, default=0,
                         help="Deterministic packing seed (ties among equal-size clusters).")
+    parser.add_argument("--cluster_method", type=str, default="connected_components",
+                        choices=["connected_components", "easy_cluster"],
+                        help="connected_components (default): all-vs-all search + "
+                             "connected components (reliable, no cross-cluster pair "
+                             "over threshold). easy_cluster: faster set-cover "
+                             "heuristic that can leak similar short sequences.")
+    parser.add_argument("--sensitivity", type=float, default=7.5,
+                        help="mmseqs -s for the connected_components search.")
+    parser.add_argument("--search_max_seqs", type=int, default=2000,
+                        help="mmseqs --max-seqs for the search (neighbors per query).")
+    parser.add_argument("--edges_tsv", type=str, default=None,
+                        help="Precomputed query<TAB>target edges TSV (member ids as "
+                             "'0-<row>'); skips the search for connected_components.")
     parser.add_argument("--min_seq_id", type=float, default=0.3,
                         help="mmseqs --min-seq-id (sequence identity threshold).")
     parser.add_argument("--coverage", type=float, default=0.8,

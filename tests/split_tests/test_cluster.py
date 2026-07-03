@@ -39,3 +39,42 @@ def test_missing_mmseqs_raises(monkeypatch, tmp_path):
     monkeypatch.setattr(clu.shutil, "which", lambda _: None)
     with pytest.raises(RuntimeError, match="mmseqs not found"):
         clu.run_mmseqs_easy_cluster(str(tmp_path / "x.fasta"), str(tmp_path))
+
+
+def test_parse_edges_tsv(tmp_path):
+    tsv = os.path.join(tmp_path, "edges.tsv")
+    with open(tsv, "w") as fh:
+        fh.write("0-0\t0-1\n")
+        fh.write("0-1\t0-2\n")
+        fh.write("bad-line-no-tab\n")
+    assert list(clu.parse_edges_tsv(tsv)) == [("0-0", "0-1"), ("0-1", "0-2")]
+
+
+def test_connected_components_transitive_merge():
+    # 0~1, 1~2 -> one component {0,1,2}; 3 isolated -> singleton
+    ids = ["0-0", "0-1", "0-2", "0-3"]
+    edges = [("0-0", "0-1"), ("0-1", "0-2")]
+    comps = clu.connected_components(ids, edges)
+    as_sets = sorted((sorted(c) for c in comps), key=len, reverse=True)
+    assert as_sets[0] == ["0-0", "0-1", "0-2"]
+    assert ["0-3"] in comps
+
+
+def test_connected_components_covers_all_ids_once():
+    ids = [f"0-{i}" for i in range(6)]
+    edges = [("0-0", "0-5"), ("0-2", "0-3")]
+    comps = clu.connected_components(ids, edges)
+    flat = [m for c in comps for m in c]
+    assert sorted(flat) == sorted(ids)  # every id exactly once
+    assert len(flat) == len(set(flat))
+
+
+def test_connected_components_ignores_unknown_ids():
+    comps = clu.connected_components(["0-0", "0-1"], [("0-0", "9-9")])
+    assert sorted(sorted(c) for c in comps) == [["0-0"], ["0-1"]]
+
+
+def test_run_mmseqs_search_requires_binary(monkeypatch, tmp_path):
+    monkeypatch.setattr(clu.shutil, "which", lambda _: None)
+    with pytest.raises(RuntimeError, match="mmseqs not found"):
+        clu.run_mmseqs_search(str(tmp_path / "x.fasta"), str(tmp_path))

@@ -125,3 +125,39 @@ def test_missing_length_field_computes_from_sequence(tmp_path):
     )
     assigned = manifest["files"][0]["train"]
     assert assigned == [0]  # row 1 computed length 50 > 8, filtered
+
+
+class TestConnectedComponentsPath:
+    def test_edges_merge_into_same_split(self, tmp_path):
+        # 30 pfam + 15 swissprot; connect rows 0,1,2 into one component.
+        recs = ([{"sequence": "AC" * (i % 6 + 1), "source": "pfam"} for i in range(30)]
+                + [{"sequence": "DE" * (i % 4 + 1), "source": "swissprot"} for i in range(15)])
+        data = tmp_path / "d.jsonl"
+        _write_jsonl(data, recs)
+        edges = tmp_path / "edges.tsv"
+        with open(edges, "w") as fh:
+            fh.write("0-0\t0-1\n")
+            fh.write("0-1\t0-2\n")  # transitive: {0,1,2} one cluster
+
+        manifest, _ = build_stratified_split_manifest(
+            data_path=str(data), ratios={"train": 0.7, "val": 0.2, "test": 0.1},
+            cluster_method="connected_components", edges_tsv=str(edges),
+            min_seq_length=None, seed=0,
+        )
+        e = manifest["files"][0]
+        assert manifest["tool"]["method"] == "connected_components"
+        # all rows covered, disjoint
+        allrows = sorted(e["train"] + e["val"] + e["test"])
+        assert allrows == list(range(len(recs)))
+        # the connected rows 0,1,2 land in one split (whole cluster)
+        where = {r: s for s in ("train", "val", "test") for r in e[s]}
+        assert where[0] == where[1] == where[2]
+
+    def test_unknown_method_raises(self, tmp_path):
+        data = tmp_path / "d.jsonl"
+        _write_jsonl(data, [{"sequence": "AC", "source": "pfam"}])
+        with pytest.raises(ValueError, match="unknown cluster_method"):
+            build_stratified_split_manifest(
+                data_path=str(data), ratios={"train": 1.0},
+                cluster_method="bogus", min_seq_length=None,
+            )

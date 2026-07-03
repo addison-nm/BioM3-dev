@@ -1,0 +1,56 @@
+{
+  "description": "PRODUCTION Aurora (XPU) SH3 finetune of ProteoScribe (1 block) on the SH3 record JSONL, composing captions on the fly with the PenCL-faithful custom composer (caption_plugins/pencl_caption.py). Bases the 64-node infra config and overrides for a real convergence run: 16 nodes, per-rank batch 16, 500 epochs, identity-controlled split, validate every 20 epochs.",
+  "tags": ["finetuning", "generalized", "aurora", "sh3", "production"],
+  "notes": [
+    "Global batch = batch_size * num_nodes * devices_per_node = 16 * 16 * 12 = 3072. Split search_id0.7 has train=24353 -> ~7-8 optimizer steps/epoch; over 500 epochs ~3800 steps. coswarmup LR schedule spans the full 500 epochs.",
+    "Caption composition uses the external plugin pencl_caption (compose_plugins below). It reproduces PenCL's caption distribution: KEY: value in fixed canonical order (PROTEIN NAME first), LINEAGE -> 'The organism lineage is ...', family_name/family_description fused into 'FAMILY NAMES: Family names are ...', out-of-vocab labels (GENE ONTOLOGY etc.) dropped by whitelist, and max_item_chars=585 drops over-length field values so long captions cannot truncate the tail (LINEAGE / FAMILY NAMES) past the 512-token text encoder budget.",
+    "Reproducible 70/20/10 split via split_manifest_path (identity threshold <=0.7); valid_size is ignored when a manifest is supplied. The manifest fingerprint (n34918-...) is tied to this exact JSONL.",
+    "training_strategy=primary_only keeps validation epoch-based; check_val_every_n_epoch=20 so validation runs ~25 times over the run. val_check_interval is ignored in this mode.",
+    "weights/ and data/ paths are repo-relative symlinks; on Aurora they must resolve to /flare/NLDesignProtein/sharepoint/BioM3-data-share (re-run the link script and verify run1_base_{proteoscribe,pencl,facilitator} resolve before submitting).",
+    "Aurora XPU has shown a first-validation hang on larger datasets (see project_aurora_val_hang); if the run stalls entering validation, reduce node count or limit_val_batches."
+  ],
+  "_base_configs": [
+    "./finetune_generalized_aurora.json"
+  ],
+  "_overwrite_configs": [],
+
+  "compose_plugins": ["./caption_plugins/pencl_caption.py"],
+
+  "finetune_data_path": "data/SH3_caption_fields_all.jsonl",
+  "split_manifest_path": "data/SH3_split_manifest_search_id0.7.json",
+
+  "record_schema": {
+    "sequence": {"from": "sequence"},
+    "caption": {
+      "compose": "pencl_caption",
+      "args": {
+        "fields_key": "fields",
+        "source_key": "source",
+        "max_item_chars": 585,
+        "shuffle": false,
+        "add_label": true,
+        "key_transform": "upper_spaced",
+        "default_dropout": 0.5,
+        "dropout_rates": {
+          "protein_name": 0.0,
+          "lineage": 0.15,
+          "family_names": 0.3,
+          "function": 0.3,
+          "catalytic_activity": 0.4,
+          "subunit": 0.5,
+          "subcellular_location": 0.5,
+          "similarity": 0.5,
+          "sh3_paralog_name": 0.3,
+          "paralog_function": 0.2
+        }
+      }
+    }
+  },
+
+  "num_nodes": 16,
+  "batch_size": 16,
+  "epochs": 500,
+  "check_val_every_n_epoch": 20,
+
+  "output_root": "./outputs/Stage3/finetuning_generalized_aurora_sh3_prod"
+}

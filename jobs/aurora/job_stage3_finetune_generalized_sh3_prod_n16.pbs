@@ -1,0 +1,65 @@
+#!/bin/bash -l
+#PBS -A NLDesignProtein
+#PBS -N stage3_ft_sh3_prod_n16
+#PBS -l walltime=06:00:00
+#PBS -l select=16
+#PBS -l place=scatter
+#PBS -l filesystems=home:flare
+#PBS -q prod
+#PBS -j oe
+# PBS -M <emailaddress>
+# PBS -m be
+
+# Aurora (XPU) 16-node PRODUCTION SH3 finetune via the GENERALIZED Stage 3 path
+# (biom3_finetune_stage3 / record_schema JSONL). Captions are composed on the fly
+# with the PenCL-faithful custom composer (caption_plugins/pencl_caption.py, wired
+# through the config's compose_plugins). Submit from the BioM3-dev directory:
+#   qsub jobs/aurora/job_stage3_finetune_generalized_sh3_prod_n16.pbs
+#
+# Before submitting: re-link weights/ and data/ on Aurora so the run1_base_*
+# checkpoints resolve to /flare/NLDesignProtein/sharepoint/BioM3-data-share, and
+# smoke-test once on the debug queue (see the sibling n4 job) to catch the known
+# XPU first-validation hang early.
+#
+# walltime is an estimate (~3800 optimizer steps + validation/checkpointing);
+# tune after the first run.
+
+projdir=${PBS_O_WORKDIR}  # Should submit job from the BioM3-dev directory
+cd ${projdir}
+
+module load frameworks
+source ./venvs/biom3-env/bin/activate
+
+# Configurations to edit
+config_path=./configs/stage3_training/finetune_generalized_aurora_sh3_prod.json
+num_nodes=16                    # Must match #PBS -l select above
+epochs=500                      # Number of epochs to finetune
+batch_size=16                   # PER-RANK batch. Global = batch_size * num_nodes * num_devices = 16*16*12 = 3072.
+use_wandb=True                  # set True only with WANDB_API_KEY exported
+resume_from_checkpoint=None     # None to start finetuning fresh
+
+# Constant configurations
+num_devices=12                  # tiles per Aurora node
+device=xpu
+
+# Construct the run ID
+datetime=$(date +%Y%m%d_%H%M%S)
+config_name=$(basename "${config_path}" .json)
+run_id=${config_name}_n${num_nodes}_d${num_devices}_e${epochs}_V${datetime}
+
+# Direct output to log file
+mkdir -p logs
+log_fpath=logs/${run_id}.${PBS_JOBID}.o
+
+source environment.sh
+./scripts/stage3_finetune_multinode.sh \
+    ${config_path} \
+    ${num_nodes} \
+    ${num_devices} \
+    ${device} \
+    ${run_id} \
+    --epochs ${epochs} \
+    --batch_size ${batch_size} \
+    --resume_from_checkpoint ${resume_from_checkpoint} \
+    --wandb ${use_wandb} \
+> ${log_fpath} 2>&1

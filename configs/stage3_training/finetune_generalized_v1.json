@@ -28,12 +28,12 @@
         "fields_key": "fields",
         "source_key": "source",
         "max_item_chars": 585,
-        "shuffle": true,
+        "shuffle": false,
         "add_label": true,
         "key_transform": "upper_spaced",
         "default_dropout": 0.5,
         "field_policies": {
-          "gene_ontology": {"keep": 30, "exclude_sources": ["swissprot"]},
+          "gene_ontology": {"keep": 30, "exclude_sources": ["swissprot", "pfam", "supplemental"]},
           "lineage": {"keep": "all_but_last"}
         },
         "dropout_rates": {
@@ -43,7 +43,6 @@
           "family_name": 0.5,
           "family_names": 0.3,
           "function": 0.3,
-          "gene_ontology": 0.4,
           "subcellular_location": 0.5,
           "similarity": 0.5,
           "subunit": 0.5,

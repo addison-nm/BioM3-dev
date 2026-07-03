@@ -1,0 +1,14 @@
+{
+  "_base_configs": ["./finetune_generalized_v1.json"],
+
+  "description": "LoRA variant of the generalized SH3 finetune: base fully frozen, low-rank adapters on attention Q/V of every block + trainable y_mlp, instead of last-N-block unfreezing.",
+
+  "use_lora": true,
+  "lora_r": 16,
+  "lora_alpha": 32,
+  "lora_dropout": 0.05,
+  "lora_target_patterns": ".fn.to_q,.fn.to_v",
+  "lora_unfreeze_y_mlp": true,
+
+  "output_root": "./outputs/Stage3/finetuning_generalized_lora"
+}

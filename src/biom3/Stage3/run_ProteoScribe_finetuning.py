@@ -79,6 +79,21 @@ def get_finetune_args(parser):
                         help='PenCL weights (.bin/.pt/.ckpt); only text branch is used')
     parser.add_argument('--facilitator_weights', default=None, type=str,
                         help='Facilitator weights (.bin/.pt/.ckpt)')
+
+    # LoRA finetuning — an alternative to block-freezing. When enabled the base
+    # is fully frozen and low-rank adapters are trained on the attention Q/V
+    # projections (+ y_mlp), instead of unfreezing the last N blocks/layers.
+    parser.add_argument('--use_lora', default='False', type=str,
+                        help='use LoRA adapters instead of block-freezing')
+    parser.add_argument('--lora_r', default=16, type=int, help='LoRA rank')
+    parser.add_argument('--lora_alpha', default=32, type=int,
+                        help='LoRA scaling alpha (typically ~2*r)')
+    parser.add_argument('--lora_dropout', default=0.05, type=float,
+                        help='dropout applied to the LoRA input')
+    parser.add_argument('--lora_target_patterns', default='.fn.to_q,.fn.to_v', type=str,
+                        help='comma-separated module-name substrings to wrap with LoRA')
+    parser.add_argument('--lora_unfreeze_y_mlp', default='True', type=str,
+                        help='also train the y_mlp z_c-conditioning MLP')
     return parser
 
 
@@ -136,6 +151,13 @@ def _apply_finetune_arg_conversions(args):
         args.finetune_last_n_blocks = -1
     if args.finetune_last_n_layers == -2:
         args.finetune_last_n_layers = -1
+
+    # LoRA options
+    args.use_lora = base.str_to_bool(args.use_lora)
+    args.lora_unfreeze_y_mlp = base.str_to_bool(args.lora_unfreeze_y_mlp)
+    if isinstance(args.lora_target_patterns, str):
+        args.lora_target_patterns = tuple(
+            p.strip() for p in args.lora_target_patterns.split(',') if p.strip())
     return args
 
 
@@ -303,14 +325,41 @@ def main(args, ds_config=None):
         stage1_args=stage1_args, stage2_args=stage2_args,
     )
 
-    # Finetuning script: always freeze all but the requested subset. requires_grad
-    # flags are not persisted in Lightning checkpoints, so re-apply on resume too.
-    PL_model = base.freeze_except_last_n_blocks_and_layers(
-        PL_model=PL_model,
-        n_blocks=args.finetune_last_n_blocks,
-        n_layers=args.finetune_last_n_layers,
-        finetune_output_layers=args.finetune_output_layers,
-    )
+    # Finetuning script: freeze the base and expose only the requested trainable
+    # subset. requires_grad flags are not persisted in Lightning checkpoints, so
+    # this is re-applied on resume too. LoRA is an alternative to block-freezing.
+    if getattr(args, "use_lora", False):
+        from biom3.Stage3.lora import apply_lora_finetuning
+        # LoRA and block-freezing are mutually exclusive strategies: under LoRA the
+        # whole base is frozen and only adapters (+ y_mlp) train, so the
+        # block-freezing selectors do not apply. Warn if they were set to anything
+        # other than the "all/unspecified" sentinels so the ignore isn't silent.
+        if (args.finetune_last_n_blocks not in (-1, -2)
+                or args.finetune_last_n_layers not in (-1, -2)
+                or args.finetune_output_layers):
+            logger.warning(
+                "use_lora=True: ignoring block-freezing args "
+                "(finetune_last_n_blocks=%s, finetune_last_n_layers=%s, "
+                "finetune_output_layers=%s). LoRA freezes the full base and trains "
+                "only the adapters + y_mlp.",
+                args.finetune_last_n_blocks, args.finetune_last_n_layers,
+                args.finetune_output_layers,
+            )
+        PL_model = apply_lora_finetuning(
+            PL_model,
+            r=args.lora_r,
+            alpha=args.lora_alpha,
+            dropout=args.lora_dropout,
+            target_patterns=args.lora_target_patterns,
+            unfreeze_y_mlp=args.lora_unfreeze_y_mlp,
+        )
+    else:
+        PL_model = base.freeze_except_last_n_blocks_and_layers(
+            PL_model=PL_model,
+            n_blocks=args.finetune_last_n_blocks,
+            n_layers=args.finetune_last_n_layers,
+            finetune_output_layers=args.finetune_output_layers,
+        )
 
     base._write_build_manifest(
         args=args,
@@ -357,6 +406,24 @@ def main(args, ds_config=None):
             completed_epochs=completed_epochs,
             completed_steps=completed_steps,
         )
+        # LoRA runs emit BOTH the small adapter delta (portable, per-family) and
+        # the full merged plain ProteoScribe checkpoint (drop-in for continued
+        # training / downstream). Rank 0 only; ZeRO-2 replicates params so
+        # PL_model.model is complete. Merge mutates the model in place, so do this
+        # after the run summary and guard it so an export hiccup is non-fatal.
+        if (getattr(args, "use_lora", False)
+                and exit_reason in ("completed", "time_limit_exceeded")
+                and get_global_rank() == 0):
+            try:
+                from biom3.Stage3.lora import export_lora_finetuned
+                export_lora_finetuned(
+                    PL_model.model,
+                    lora_path=os.path.join(artifacts_dir, "lora_weights.pt"),
+                    merged_path=os.path.join(artifacts_dir, "state_dict.merged.pth"),
+                    target_patterns=args.lora_target_patterns,
+                )
+            except Exception as e:  # pragma: no cover
+                logger.warning("LoRA export failed (non-fatal): %s", e)
         if base._MAIN_START_MONOTONIC is not None:
             total = int(time.perf_counter() - base._MAIN_START_MONOTONIC)
             h, rem = divmod(total, 3600)

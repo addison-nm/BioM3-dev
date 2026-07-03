@@ -69,10 +69,6 @@ def get_finetune_args(parser):
     parser.add_argument('--lazy_records', default='False', type=str,
                         help='read records lazily (JsonlRecordStore) instead of '
                              'eagerly into memory')
-    parser.add_argument('--split_manifest_path', default=None, type=str,
-                        help='curated train/val/test split manifest (e.g. from '
-                             'biom3_stratified_cluster_split); replaces the random '
-                             'split. Fingerprint-validated against the JSONL.')
 
     # Frozen text -> z_c embedding front-end (PenCL text branch + Facilitator)
     parser.add_argument('--stage1_config_path', default=None, type=str,

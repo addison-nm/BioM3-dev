@@ -27,6 +27,25 @@ def get_args(fpath):
     arglist = argstring.split()
     return arglist
 
+@pytest.fixture(autouse=True)
+def _isolate_matmul_precision():
+    """Prevent one test's global float32 matmul precision from leaking to the next.
+
+    The training entrypoints (Stage{1,2,3}/run_PL_training.py::main) call
+    torch.set_float32_matmul_precision('medium') for production throughput. In a
+    full-suite run that setting persists process-wide and silently lowers matmul
+    precision for later tests — breaking exact-arithmetic assertions such as the
+    LoRA merge-equivalence checks (folded weight vs runtime path diverge under
+    bf16 accumulation). Snapshot and restore around every test.
+    """
+    import torch
+    prev = torch.get_float32_matmul_precision()
+    try:
+        yield
+    finally:
+        torch.set_float32_matmul_precision(prev)
+
+
 def check_downloads(paths_to_check):
     """Returns list of missing files and a warning message."""
     issues = []

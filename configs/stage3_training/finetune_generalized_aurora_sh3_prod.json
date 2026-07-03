@@ -3,6 +3,7 @@
   "tags": ["finetuning", "generalized", "aurora", "sh3", "production"],
   "notes": [
     "Global batch = batch_size * num_nodes * devices_per_node = 16 * 16 * 12 = 3072. Split search_id0.7 has train=24353 -> ~7-8 optimizer steps/epoch; over 500 epochs ~3800 steps. coswarmup LR schedule spans the full 500 epochs.",
+    "scale_learning_rate='sqrt' scales the base lr by sqrt(num_nodes * devices_per_node) = sqrt(192) ~= 13.86, so effective lr ~= 1e-4 * 13.86 = 1.39e-3 (a large-batch-Adam heuristic; 'linear' would give 1.92e-2 which is too high). Treat as a principled starting point, not a validated value.",
     "Caption composition uses the external plugin pencl_caption (compose_plugins below). It reproduces PenCL's caption distribution: KEY: value in fixed canonical order (PROTEIN NAME first), LINEAGE -> 'The organism lineage is ...', family_name/family_description fused into 'FAMILY NAMES: Family names are ...', out-of-vocab labels (GENE ONTOLOGY etc.) dropped by whitelist, and max_item_chars=585 drops over-length field values so long captions cannot truncate the tail (LINEAGE / FAMILY NAMES) past the 512-token text encoder budget.",
     "Reproducible 70/20/10 split via split_manifest_path (identity threshold <=0.7); valid_size is ignored when a manifest is supplied. The manifest fingerprint (n34918-...) is tied to this exact JSONL.",
     "training_strategy=primary_only keeps validation epoch-based; check_val_every_n_epoch=20 so validation runs ~25 times over the run. val_check_interval is ignored in this mode.",
@@ -51,6 +52,7 @@
   "batch_size": 16,
   "epochs": 500,
   "check_val_every_n_epoch": 20,
+  "scale_learning_rate": "sqrt",
 
   "output_root": "./outputs/Stage3/finetuning_generalized_aurora_sh3_prod"
 }

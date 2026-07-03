@@ -663,7 +663,8 @@ def test_parse_from_json_config(json_filename):
     assert args.num_classes == 29
     assert isinstance(args.wandb, bool) and args.wandb is False
     assert isinstance(args.start_pfam_trainer, bool)
-    assert isinstance(args.scale_learning_rate, bool)
+    # scale_learning_rate is normalized to a scaling mode, not a bool.
+    assert args.scale_learning_rate in (None, 'linear', 'sqrt')
 
 
 def test_cli_overrides_json():

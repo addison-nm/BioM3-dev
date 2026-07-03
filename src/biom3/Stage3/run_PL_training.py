@@ -230,7 +230,10 @@ def get_args(parser):
                         help='path to .bin weight or checkpoint file containing model weights')
     
     parser.add_argument('--scale_learning_rate', default='True', type=str,
-                        help='scale the specified learning rate by the number of devices')
+                        help="scale the learning rate by the total number of devices "
+                             "(num_nodes x devices_per_node): 'true'/'linear' scales "
+                             "linearly, 'sqrt' scales by its square root, 'false' "
+                             "disables scaling")
 
     parser.add_argument('--distributed_strategy', default='deepspeed_zero2', type=str,
                         choices=['deepspeed_zero2', 'ddp'],
@@ -963,6 +966,27 @@ def str_to_bool(s):
         raise ValueError("Input must be 'True' or 'False'")
 
 
+def parse_lr_scaling(value):
+    """Normalize --scale_learning_rate to a scaling mode.
+
+    Returns ``None`` (no scaling), ``'linear'`` (lr * total_devices), or
+    ``'sqrt'`` (lr * sqrt(total_devices)). Accepts booleans and the
+    case-insensitive strings true/false/linear/sqrt; ``True``/``'true'`` map to
+    ``'linear'`` for backward compatibility. Raises ValueError on anything else.
+    """
+    if isinstance(value, bool):
+        return 'linear' if value else None
+    s = str(value).strip().lower()
+    if s in ('false', 'none', ''):
+        return None
+    if s in ('true', 'linear'):
+        return 'linear'
+    if s == 'sqrt':
+        return 'sqrt'
+    raise ValueError(
+        f"scale_learning_rate must be one of true/false/linear/sqrt, got {value!r}")
+
+
 def nonestr_to_none(s):
     if isinstance(s, str):
         return None if s.lower() == 'none' else s
@@ -1076,7 +1100,7 @@ def apply_arg_type_conversions(args):
     args.finetune_output_layers = str_to_bool(args.finetune_output_layers)
     args.pretrained_weights = nonestr_to_none(args.pretrained_weights)
     args.wandb = str_to_bool(args.wandb)
-    args.scale_learning_rate = str_to_bool(args.scale_learning_rate)
+    args.scale_learning_rate = parse_lr_scaling(args.scale_learning_rate)
     args.save_metrics_history = str_to_bool(args.save_metrics_history)
     args.metrics_history_all_ranks_val_loss = str_to_bool(
         args.metrics_history_all_ranks_val_loss
@@ -1414,12 +1438,14 @@ def train_model(
     precision = args.precision
     use_wandb = args.wandb
 
-    # Scale the learning rate with number of total devices
+    # Scale the learning rate with number of total devices (None disables it).
     if args.scale_learning_rate:
         n = num_nodes * devices_per_node
-        logger.info("Scaling learning rate with effective batch size: "
-                     "num_nodes x devices_per_node = %s x %s = %s", num_nodes, devices_per_node, n)
-        args.lr = args.lr * n
+        factor = n ** 0.5 if args.scale_learning_rate == 'sqrt' else n
+        logger.info("Scaling learning rate (%s) by num_nodes x devices_per_node "
+                    "= %s x %s -> factor %.4g", args.scale_learning_rate,
+                    num_nodes, devices_per_node, factor)
+        args.lr = args.lr * factor
     logger.info("Effective learning rate: %s", args.lr)
     
     # Configure DeepSpeed optimization settings

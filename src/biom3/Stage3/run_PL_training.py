@@ -281,6 +281,10 @@ def get_args(parser):
                         help='number of iteration steps for training...')
     parser.add_argument('--val_check_interval', default=10000, type=int,
                         help='number of steps before starting evaluation on validation...')
+    parser.add_argument('--check_val_every_n_epoch', default=1, type=int,
+                        help='run validation (and, since checkpoints are monitored, '
+                             'checkpoint saving) every N epochs in primary_only mode. '
+                             'Default 1 = every epoch.')
     parser.add_argument('--limit_val_batches', default=200, type=float,
                         help='Cap validation batches per epoch. Values >1 are an '
                              'absolute batch count (predictable wall time across '
@@ -1661,6 +1665,9 @@ def train_model(
     trainer_params['limit_val_batches'] = coerce_limit_batches(limit_val_batches)
     if training_strategy == 'primary_only':
         trainer_params['max_epochs'] = epochs
+        trainer_params['check_val_every_n_epoch'] = max(
+            1, int(getattr(args, 'check_val_every_n_epoch', 1) or 1)
+        )
     else:
         trainer_params['max_steps'] = max_steps
         trainer_params['val_check_interval'] = val_check_interval

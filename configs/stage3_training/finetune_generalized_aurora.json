@@ -86,9 +86,10 @@
   "distributed_strategy": "deepspeed_zero2",
 
   "val_check_interval": 200,
+  "check_val_every_n_epoch": 10,
   "limit_val_batches": 1.0,
   "log_every_n_steps": 50,
-  "num_workers": 4,
+  "num_workers": 0,
 
   "output_root": "./outputs/Stage3/finetuning_generalized_aurora",
   "checkpoints_folder": "checkpoints",

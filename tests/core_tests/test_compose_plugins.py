@@ -95,3 +95,21 @@ class TestPenCLCaption:
         cap = pencl_plugin_loaded(PFAM_RECORD, args, random.Random(1))
         assert "PROTEIN NAME" in cap
         assert "SIMILARITY" not in cap
+
+    def test_max_item_chars_drops_overlength_field(self, pencl_plugin_loaded):
+        record = {
+            "fields": {
+                "protein_name": "Kinase",
+                "function": "x" * 5000,  # over any sane per-field cap
+                "similarity": "Belongs to the SRC family",
+            }
+        }
+        cap = pencl_plugin_loaded(record, {"max_item_chars": 585}, random.Random(0))
+        assert "PROTEIN NAME: Kinase" in cap
+        assert "FUNCTION" not in cap  # dropped for length, tail preserved
+        assert "SIMILARITY: Belongs to the SRC family" in cap
+
+    def test_protein_name_exempt_from_cap(self, pencl_plugin_loaded):
+        record = {"fields": {"protein_name": "N" * 1000}}
+        cap = pencl_plugin_loaded(record, {"max_item_chars": 100}, random.Random(0))
+        assert cap.startswith("PROTEIN NAME: " + "N" * 1000)

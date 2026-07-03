@@ -88,7 +88,8 @@ def pencl_caption(obj, args=None, rng=random):
     composers; adds a lineage value-transform, family-field fusion, and a fixed
     canonical field order. Honors the usual args: ``fields_key``, ``dropout_rates``,
     ``default_dropout``, ``shuffle``, ``label_format``, ``key_transform``,
-    ``separator``, ``trailing_period``, ``list_separator``.
+    ``separator``, ``trailing_period``, ``list_separator``, and ``max_item_chars``
+    (drop any field value longer than this, PROTEIN NAME exempt).
     """
     args = args or {}
     raw_items = fields_to_items(obj[args.get("fields_key", "fields")])
@@ -102,7 +103,19 @@ def pencl_caption(obj, args=None, rng=random):
     if fam:
         built["family_names"] = fam
 
-    ordered = [(k, built[k]) for k in CANONICAL_ORDER if built.get(k)]
+    # Drop over-length field values, mirroring list_fields_to_caption's
+    # max_item_chars policy, so a single huge field can't push the caption past
+    # the text encoder's token budget and truncate the tail (LINEAGE / FAMILY
+    # NAMES sit last). PROTEIN NAME is exempt — it is short and never dropped.
+    max_chars = args.get("max_item_chars")
+    ordered = []
+    for key in CANONICAL_ORDER:
+        value = built.get(key)
+        if not value:
+            continue
+        if max_chars and key != "protein_name" and len(value) > max_chars:
+            continue
+        ordered.append((key, value))
     ordered = dropout_items(
         ordered,
         rates=args.get("dropout_rates"),

@@ -1,0 +1,32 @@
+{
+  "_base_configs": ["./_base_dpo.json"],
+
+  "loss_type": "paired",
+  "pairing": "label",
+  "label_smoothing": 0.0,
+
+  "data_csv": "./data/rl/processed/biom3_designs.csv",
+  "group_by": "prompt_text",
+
+  "beta": 0.1,
+  "length_normalize": true,
+  "learning_rate": 1e-5,
+  "lr_scheduler": "linear",
+  "warmup_steps": 20,
+  "weight_decay": 1e-6,
+  "steps": 500,
+  "batch_size": 8,
+  "save_steps": 100,
+  "max_grad_norm": 1.0,
+  "seed": 42,
+
+  "n_quadrature": 3,
+  "quadrature_grid": "uniform",
+  "inner_mc": 1,
+  "eps_t": 1e-3,
+
+  "pre_unmask": true,
+  "pre_unmask_config": "./configs/grpo/pre_unmask_sh3.json",
+
+  "output_root": "./outputs/dpo"
+}

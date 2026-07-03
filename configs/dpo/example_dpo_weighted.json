@@ -1,0 +1,17 @@
+{
+  "_base_configs": ["./_base_dpo.json"],
+
+  "loss_type": "weighted",
+  "num_candidates": 4,
+  "temperature": 0.1,
+
+  "data_csv": "./data/rl/processed/vae_designs.csv",
+  "group_by": "prompt_text",
+  "default_caption": "SH3 domain protein.",
+
+  "steps": 100,
+  "batch_size": 4,
+  "beta": 0.1,
+
+  "output_root": "./outputs/dpo"
+}

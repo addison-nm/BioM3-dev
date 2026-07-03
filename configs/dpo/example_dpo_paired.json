@@ -1,0 +1,18 @@
+{
+  "_base_configs": ["./_base_dpo.json"],
+
+  "loss_type": "paired",
+  "pairing": "label",
+  "gap_level": 0.5,
+  "min_margin": 0.0,
+  "label_smoothing": 0.0,
+
+  "data_csv": "./data/rl/processed/biom3_designs.csv",
+  "group_by": "prompt_text",
+
+  "steps": 100,
+  "batch_size": 4,
+  "beta": 0.1,
+
+  "output_root": "./outputs/dpo"
+}

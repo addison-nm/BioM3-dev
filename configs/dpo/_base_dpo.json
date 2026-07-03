@@ -1,0 +1,36 @@
+{
+  "stage1_config": "./configs/inference/stage1_PenCL.json",
+  "stage2_config": "./configs/inference/stage2_Facilitator.json",
+  "stage3_config": "./configs/inference/stage3_ProteoScribe_sample.json",
+
+  "stage1_weights": null,
+  "stage2_weights": null,
+  "stage3_init_weights": null,
+
+  "data_csv": "./data/rl/processed/biom3_designs.csv",
+  "dataset_filter": null,
+  "group_by": "prompt_text",
+  "default_caption": "SH3 domain protein.",
+  "max_len": null,
+  "min_group_size": 2,
+
+  "beta": 0.1,
+  "length_normalize": true,
+  "learning_rate": 1e-6,
+  "weight_decay": 1e-6,
+  "steps": 200,
+  "batch_size": 4,
+  "save_steps": 50,
+  "max_grad_norm": 1.0,
+  "seed": 42,
+
+  "n_quadrature": 3,
+  "quadrature_grid": "uniform",
+  "inner_mc": 1,
+  "eps_t": 1e-3,
+
+  "pre_unmask": false,
+  "pre_unmask_config": null,
+
+  "output_root": "./outputs/dpo"
+}

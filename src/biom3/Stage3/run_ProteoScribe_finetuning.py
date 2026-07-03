@@ -39,6 +39,7 @@ import biom3.Stage3.PL_wrapper as PL_mod
 import biom3.Stage3.run_PL_training as base
 from biom3.Stage3.io import prepare_model_ProteoScribe
 from biom3.Stage3.finetune_embedder import build_text_to_zc_embedder
+from biom3.core.dataloaders import load_compose_plugins
 from biom3.core.helpers import load_json_config, convert_to_namespace
 from biom3.core.dry_run import run_dry_run
 from biom3.core.run_utils import setup_file_logging, teardown_file_logging
@@ -58,6 +59,13 @@ def get_finetune_args(parser):
                              'object string (or set directly via config). Composes '
                              'the caption via a registered compose function '
                              '(referenced by name) and passes the sequence through.')
+    parser.add_argument('--compose_plugins', default=None,
+                        help='external .py files (or dotted module names) to import '
+                             'before the dataset is built, so their @register_compose '
+                             'functions become referenceable by name in the '
+                             'record_schema. Keeps dataset-specific caption logic out '
+                             'of the biom3 package. JSON list in config, or a single '
+                             'path on the CLI.')
     parser.add_argument('--length_field', default='sequence_length', type=str,
                         help='record key holding the precomputed (ungapped) '
                              'sequence length used for length filtering; computed '
@@ -144,6 +152,22 @@ def _apply_finetune_arg_conversions(args):
             "--record_schema (a JSON object) is required for finetuning"
         )
     args.record_schema = schema
+
+    # Load any external compose-function plugins now, before the record_schema is
+    # resolved against the registry (at dataset construction). Their module-body
+    # @register_compose decorators run as an import side effect.
+    plugins = args.compose_plugins
+    if isinstance(plugins, str):
+        plugins = plugins.strip()
+        if plugins.startswith('['):
+            import json
+            plugins = json.loads(plugins)
+        elif plugins:
+            plugins = [plugins]
+        else:
+            plugins = []
+    args.compose_plugins = plugins or []
+    load_compose_plugins(args.compose_plugins)
 
     # Coerce the finetune subset selectors the same way run_PL_training.main does
     # (-2 sentinel == "unspecified" -> -1 == all).

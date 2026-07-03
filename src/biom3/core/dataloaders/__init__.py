@@ -18,6 +18,7 @@ Modules:
 from biom3.core.dataloaders.compose_functions import (
     get_compose_function,
     list_compose_functions,
+    load_compose_plugins,
     register_compose,
 )
 from biom3.core.dataloaders.generalized_dataloader import (
@@ -34,5 +35,6 @@ __all__ = [
     "read_jsonl_records",
     "get_compose_function",
     "list_compose_functions",
+    "load_compose_plugins",
     "register_compose",
 ]

@@ -22,9 +22,56 @@ probabilities (the complement of a *retention* probability) — an item with a
 removal rate of 0.5 is kept half the time.
 """
 
+import importlib
+import importlib.util
+import os
 import random
+import sys
 
 _COMPOSE_REGISTRY = {}
+
+
+def load_compose_plugins(entries):
+    """Import external modules/files so their ``@register_compose`` side effects run.
+
+    Each entry is either a dotted module name (imported via
+    :func:`importlib.import_module`) or a filesystem path to a ``.py`` file
+    (loaded via :func:`importlib.util.spec_from_file_location`). Importing a
+    plugin runs its module body, which registers any compose functions it
+    declares into the shared registry — so a schema can then reference them by
+    name without the function living inside the biom3 package.
+
+    Idempotent: a file already loaded under its synthetic module name (or a
+    module already in ``sys.modules``) is not re-executed, so calling this more
+    than once per process (e.g. dry-run then real run) will not raise a
+    duplicate-registration error.
+
+    Returns the list of loaded module objects.
+    """
+    loaded = []
+    for entry in entries or []:
+        looks_like_path = (
+            os.sep in entry or entry.endswith(".py") or os.path.exists(entry)
+        )
+        if looks_like_path:
+            path = os.path.abspath(os.path.expanduser(entry))
+            if not os.path.isfile(path):
+                raise FileNotFoundError(f"compose plugin not found: {entry!r}")
+            mod_name = "biom3_compose_plugin_" + os.path.splitext(
+                os.path.basename(path))[0]
+            if mod_name in sys.modules:
+                loaded.append(sys.modules[mod_name])
+                continue
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            if spec is None or spec.loader is None:
+                raise ImportError(f"cannot load compose plugin from {entry!r}")
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = module
+            spec.loader.exec_module(module)
+        else:
+            module = importlib.import_module(entry)
+        loaded.append(module)
+    return loaded
 
 
 def register_compose(name):

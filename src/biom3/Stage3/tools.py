@@ -292,7 +292,7 @@ def _build_corruptions(
     if Q == 0:
         raise ValueError("no QUERY positions to score (empty query set)")
     n_context = int((roles == _CONTEXT).sum().item())
-    context_and_unknown = roles != _QUERY  # positions never carrying a revealed query token
+    unknown = roles == _UNKNOWN  # masked base: UNKNOWN only — CONTEXT stays concrete
 
     inner = max(1, cfg.inner_mc)
     corruptions: List[dict] = []
@@ -310,8 +310,10 @@ def _build_corruptions(
 
                 revealed_flag = torch.zeros(L, dtype=torch.bool, device=device)
                 revealed_flag[revealed_pos] = True
-                # Masked = every non-context position that is not a revealed query.
-                masked_flag = context_and_unknown.clone()
+                # Masked = every non-context position that is not a revealed
+                # query: UNKNOWN positions, plus query residues not revealed this
+                # draw. CONTEXT positions stay at their concrete token.
+                masked_flag = unknown.clone()
                 masked_flag[query_idx] = True
                 masked_flag[revealed_pos] = False
 

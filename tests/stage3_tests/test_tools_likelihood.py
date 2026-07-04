@@ -14,6 +14,7 @@ import torch
 from biom3.Stage3.tools import (
     LikelihoodConfig,
     ProteoScribeLikelihoodEstimator,
+    _build_corruptions,
     _build_query_grid,
     _classify_sequence,
     _CONTEXT,
@@ -177,3 +178,42 @@ def test_empty_query_raises(estimator, z_c):
     with pytest.raises(ValueError, match="no QUERY positions"):
         estimator.estimate("ACD", z_c, context_mask=ctx,
                             config=LikelihoodConfig(add_special_tokens=False))
+
+
+# ── corruptions: context stays concrete (regression for tools.py bug) ──────
+
+
+def test_corruptions_keep_context_positions_concrete():
+    """Regression: _build_corruptions must never mask CONTEXT positions.
+
+    <START>, the PAD tail, and any pinned context must keep their concrete
+    token in x_t (the time index claims they are revealed). The original code
+    seeded the mask from ``roles != _QUERY``, masking CONTEXT too — this test
+    fails on that code and passes on the fix.
+    """
+    cfg = LikelihoodConfig(n_quadrature=6, n_repeats=2, seed=3)
+    dev = torch.device("cpu")
+    # "MK#TA": pin the first residue as context; '#' is an UNKNOWN position,
+    # so all three role types are present (plus <START>/<END>/PAD).
+    ctx = [True, False, False, False, False]
+    ids, roles = _classify_sequence("MK#TA", SEQ_LEN, ctx, cfg, dev)
+    t, w = _build_query_grid(cfg, dev)
+    gen = torch.Generator(device=dev).manual_seed(0)
+    corruptions, _ = _build_corruptions(ids, roles, t, w, cfg, gen, dev)
+
+    context_pos = roles == _CONTEXT
+    unknown_pos = roles == _UNKNOWN
+    query_pos = roles == _QUERY
+    assert corruptions and context_pos.any() and unknown_pos.any() and query_pos.any()
+    for c in corruptions:
+        x_t = c["x_t"]
+        # CONTEXT positions keep their concrete token (the bug masked these).
+        assert torch.equal(x_t[context_pos], ids[context_pos])
+        # UNKNOWN positions are always masked.
+        assert torch.all(x_t[unknown_pos] == MASK_ID)
+        # Every query position is either its concrete token (revealed) or MASK.
+        revealed_q = query_pos & (x_t == ids)
+        masked_q = query_pos & (x_t == MASK_ID)
+        assert torch.all(revealed_q | masked_q | ~query_pos)
+        # Only currently-masked query positions are scored.
+        assert torch.equal(c["score_mask"], masked_q)

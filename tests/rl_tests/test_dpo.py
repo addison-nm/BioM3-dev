@@ -146,7 +146,7 @@ def test_paired_logratio_zero_at_init_and_loss_log2(mini_s3):
     l_ids = torch.randint(1, cfg.num_classes, (B, L))
     z_c = torch.randn(B, cfg.text_emb_dim)
 
-    rho_w, rho_l = _paired_elbos(s3, ref, w_ids, l_ids, z_c, grid, cfg, dpo_cfg, L)
+    rho_w, rho_l, _, _ = _paired_elbos(s3, ref, w_ids, l_ids, z_c, grid, cfg, dpo_cfg, L)
     # pi_theta == pi_ref with shared corruptions -> log-ratio is exactly 0.
     assert torch.allclose(rho_w, torch.zeros_like(rho_w), atol=1e-4)
     assert torch.allclose(rho_l, torch.zeros_like(rho_l), atol=1e-4)
@@ -164,7 +164,7 @@ def test_paired_loss_grad_flows(mini_s3):
     w_ids = torch.randint(1, cfg.num_classes, (B, L))
     l_ids = torch.randint(1, cfg.num_classes, (B, L))
     z_c = torch.randn(B, cfg.text_emb_dim)
-    rho_w, rho_l = _paired_elbos(s3, ref, w_ids, l_ids, z_c, grid, cfg, dpo_cfg, L)
+    rho_w, rho_l, _, _ = _paired_elbos(s3, ref, w_ids, l_ids, z_c, grid, cfg, dpo_cfg, L)
     loss = -F.logsigmoid(rho_w - rho_l).mean()
     assert torch.isfinite(loss)
     loss.backward()
@@ -183,7 +183,7 @@ def test_weighted_logratio_zero_at_init_and_loss_logK(mini_s3):
     grid = _build_grid(dpo_cfg, L, CPU)
     ids = torch.randint(1, cfg.num_classes, (B, K, L))
     z_c = torch.randn(B, K, cfg.text_emb_dim)
-    rho = _weighted_elbos(s3, ref, ids, z_c, grid, cfg, dpo_cfg, L)
+    rho, _ = _weighted_elbos(s3, ref, ids, z_c, grid, cfg, dpo_cfg, L)
     assert rho.shape == (B, K)
     assert torch.allclose(rho, torch.zeros_like(rho), atol=1e-4)
 

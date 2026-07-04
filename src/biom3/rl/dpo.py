@@ -126,7 +126,12 @@ def _resolve_pre_unmask(cfg3: Namespace, dpo_cfg: DPOConfig):
 
 
 def _paired_elbos(s3, ref_s3, w_ids, l_ids, z_c, grid, cfg3, dpo_cfg, D):
-    """Return length-normalized ELBO log-ratios (rho_w, rho_l), each (B,)."""
+    """Return ``(rho_w, rho_l, e_w, e_l)``, each ``(B,)``.
+
+    ``rho_*`` are the (length-normalized) ELBO log-ratios scaled by beta (the DPO
+    implicit reward, reference-relative). ``e_*`` are the reference-free,
+    length-normalized policy ELBOs, exposed only for a diagnostic accuracy.
+    """
     idx_grid, t_floats, weights = grid
     B = w_ids.shape[0]
     ids = torch.cat([w_ids, l_ids], dim=0)                 # (2B, L)
@@ -143,14 +148,22 @@ def _paired_elbos(s3, ref_s3, w_ids, l_ids, z_c, grid, cfg3, dpo_cfg, D):
                               dpo_cfg.eps_t, dpo_cfg.inner_mc,
                               gradient_checkpoint=False)
     logratio = elbo_new - elbo_ref                         # (2B,)
+    lengths = valid_length(ids)
     if dpo_cfg.length_normalize:
-        logratio = logratio / valid_length(ids)
+        logratio = logratio / lengths
     rho = dpo_cfg.beta * logratio
-    return rho[:B], rho[B:]
+    # Reference-free, length-normalized policy ELBO — for the abs_acc diagnostic.
+    elbo_norm = elbo_new.detach() / lengths                # (2B,)
+    return rho[:B], rho[B:], elbo_norm[:B], elbo_norm[B:]
 
 
 def _weighted_elbos(s3, ref_s3, ids_bk, z_c_bk, grid, cfg3, dpo_cfg, D):
-    """Return rho (B, K) length-normalized ELBO log-ratios for a candidate set."""
+    """Return ``(rho, e)``, each ``(B, K)``.
+
+    ``rho`` is the beta-scaled (length-normalized) ELBO log-ratio (the DPO
+    implicit reward). ``e`` is the reference-free, length-normalized policy ELBO,
+    exposed only for the ``abs_top1_agree`` diagnostic.
+    """
     idx_grid, t_floats, weights = grid
     B, K, L = ids_bk.shape
     ids = ids_bk.reshape(B * K, L)
@@ -167,10 +180,12 @@ def _weighted_elbos(s3, ref_s3, ids_bk, z_c_bk, grid, cfg3, dpo_cfg, D):
                               dpo_cfg.eps_t, dpo_cfg.inner_mc,
                               gradient_checkpoint=False)
     logratio = elbo_new - elbo_ref
+    lengths = valid_length(ids)
     if dpo_cfg.length_normalize:
-        logratio = logratio / valid_length(ids)
+        logratio = logratio / lengths
     rho = dpo_cfg.beta * logratio
-    return rho.reshape(B, K)
+    elbo_norm = elbo_new.detach() / lengths        # reference-free policy ELBO
+    return rho.reshape(B, K), elbo_norm.reshape(B, K)
 
 
 def _build_scheduler(optimizer, dpo_cfg: DPOConfig):
@@ -261,15 +276,20 @@ def dpo_train(
                 B, pairing=dpo_cfg.pairing, gap_level=dpo_cfg.gap_level,
                 min_margin=dpo_cfg.min_margin)
             z_c = torch.cat([z_c_by_key[k] for k in batch["caption_keys"]], dim=0)
-            rho_w, rho_l = _paired_elbos(
+            rho_w, rho_l, elbo_w, elbo_l = _paired_elbos(
                 s3, ref_s3, batch["w_ids"].to(device), batch["l_ids"].to(device),
                 z_c, grid, cfg3, dpo_cfg, D)
             margin = rho_w - rho_l
             ls = dpo_cfg.label_smoothing
             loss = -((1 - ls) * F.logsigmoid(margin)
                      + ls * F.logsigmoid(-margin)).mean()
+            # pref_acc: DPO reward accuracy (reference-relative, what the loss
+            # optimizes). abs_acc: reference-free — does the policy's own
+            # length-normalized ELBO rank chosen above rejected.
             acc = (margin.detach() > 0).float().mean().item()
+            abs_acc = (elbo_w > elbo_l).float().mean().item()
             metric = {"pref_acc": round(acc, 4),
+                      "abs_acc": round(abs_acc, 4),
                       "margin": round(margin.detach().mean().item(), 4)}
         elif dpo_cfg.loss_type == "weighted":
             batch = sampler.sample_weighted_batch(B, dpo_cfg.num_candidates)
@@ -277,12 +297,16 @@ def dpo_train(
             K = dpo_cfg.num_candidates
             z_c_bk = torch.stack([z_c_by_key[k].expand(K, -1) for k in keys], dim=0)
             scores = batch["scores"].to(device)
-            rho = _weighted_elbos(s3, ref_s3, batch["ids"].to(device),
-                                  z_c_bk, grid, cfg3, dpo_cfg, D)
+            rho, elbo = _weighted_elbos(s3, ref_s3, batch["ids"].to(device),
+                                        z_c_bk, grid, cfg3, dpo_cfg, D)
             target = F.softmax(scores / dpo_cfg.temperature, dim=1)
             loss = -(target * F.log_softmax(rho, dim=1)).sum(dim=1).mean()
+            # top1_agree: DPO reward argmax vs score argmax (reference-relative).
+            # abs_top1_agree: reference-free — the policy's own ELBO argmax.
             top1 = (rho.argmax(dim=1) == scores.argmax(dim=1)).float().mean().item()
-            metric = {"top1_agree": round(top1, 4)}
+            abs_top1 = (elbo.argmax(dim=1) == scores.argmax(dim=1)).float().mean().item()
+            metric = {"top1_agree": round(top1, 4),
+                      "abs_top1_agree": round(abs_top1, 4)}
         else:
             raise ValueError(f"loss_type must be 'paired' or 'weighted', got {dpo_cfg.loss_type!r}")
 

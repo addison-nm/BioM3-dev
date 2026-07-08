@@ -1,0 +1,4 @@
+I want to add some features for biom3 for obtaining and analyzing blast hits for generated sequences. In a git worktree, we should create a new subpackage biom3.utils.blast.py that allows us to run and analyze blast hits from sequences generated from a given prompt. I want to be able to run blast queries, generate data, and analyze it using a number of useful plots and visualizations. In particular, I want to analyze the following:
+1. Novelty: How different are generated sequences from their nearest (natural) blast hit.
+2. Diversity: How different are generated sequences from each other.
+3. length distribution of generated sequences.

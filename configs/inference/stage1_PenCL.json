@@ -1,5 +1,5 @@
 {
-  "_base_configs": ["models/_base_PenCL.json"],
+  "_base_configs": ["_base_runtime.json", "models/_base_PenCL.json"],
   "_overwrite_configs": [],
 
   "model_type": "pfam",

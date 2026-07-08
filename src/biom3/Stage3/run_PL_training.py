@@ -70,7 +70,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 # ----- Retrieve available device -----
-from biom3.backend.device import BACKEND_NAME, _XPU, setup_logger
+from biom3.backend.device import BACKEND_NAME, _XPU, setup_logger, set_float32_matmul_precision
 
 # Import pytorch lightning based on device
 if BACKEND_NAME == _XPU:
@@ -194,6 +194,11 @@ def get_args(parser):
                         help='max value parameter for exponential moving average')
     parser.add_argument('--precision', default='no', type=str, choices=['no', 'fp16', 'bf16', '32'],
                         help='whether to use 16-bit or 32-bit training')
+    parser.add_argument('--float32_matmul_precision', default='medium', type=str,
+                        choices=['highest', 'high', 'medium'],
+                        help="fp32 matmul precision. 'medium' (default) uses the bf16 "
+                             "path; 'high' uses TF32 tensor cores; 'highest' keeps full "
+                             "fp32. CLI overrides the config value.")
     parser.add_argument('--seed', default=0, type=int,
                         help='random number seed')
     parser.add_argument('--checkpoint_dir', default='./checkpoint/', type=Path,
@@ -999,22 +1004,19 @@ def clear_gpu_cache():
     """
     Free up GPU memory by clearing caches and running garbage collection.
     
-    This utility function performs three operations to optimize GPU memory usage:
-    1. Sets PyTorch's float32 matrix multiplication precision to 'medium' 
-       (balances performance and accuracy)
-    2. Empties the CUDA memory cache to release unused memory
-    3. Runs Python's garbage collector to remove unreferenced objects
-    
+    This utility function performs the following operations to optimize GPU memory usage:
+    1. Empties the CUDA memory cache to release unused memory
+    2. Runs Python's garbage collector to remove unreferenced objects
+
     This function is useful to call between training runs or when switching between
     memory-intensive operations to prevent out-of-memory errors.
-    
+
     Args:
         None
-        
+
     Returns:
         None
     """
-    torch.set_float32_matmul_precision('medium')
     # torch.cuda.empty_cache()
     # torch.xpu.empty_cache()
     gc.collect()
@@ -1904,6 +1906,7 @@ def main(args, use_hydra=False, ds_config=None,):
     facilitator = args.facilitator
 
     # ----- Clear the GPU cache -----
+    set_float32_matmul_precision(args.float32_matmul_precision)
     clear_gpu_cache()
 
     # ----- For reproducibility -----

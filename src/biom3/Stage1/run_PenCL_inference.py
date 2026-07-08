@@ -73,7 +73,7 @@ from biom3.core.run_utils import (
     teardown_file_logging,
     write_manifest,
 )
-from biom3.backend.device import setup_logger
+from biom3.backend.device import setup_logger, set_float32_matmul_precision
 
 logger = setup_logger(__name__)
 
@@ -104,7 +104,12 @@ def parse_arguments(args):
                              "metrics (dot-product probabilities, homology matrix). "
                              "If -1, use all. Cross-comparison results are print-only; "
                              "saved embeddings are unaffected.")
-    
+    parser.add_argument("--float32_matmul_precision", type=str, default=None,
+                        choices=["highest", "high", "medium"],
+                        help="fp32 matmul precision. 'high' (config default) enables "
+                             "TF32 tensor cores; 'highest' forces full fp32 for bitwise "
+                             "reproducibility. Overrides the config value when set.")
+
     return parser.parse_args(args)
 
 
@@ -287,6 +292,12 @@ def main(args, _setup_logging=True):
     config_dict = load_json_config(config_args_parser.config_path)
     raw_config = copy.deepcopy(config_dict)
     config_args = convert_to_namespace(config_dict)
+
+    # fp32 matmul precision (TF32): CLI overrides config, config default is "high".
+    set_float32_matmul_precision(
+        config_args_parser.float32_matmul_precision
+        or getattr(config_args, "float32_matmul_precision", "high")
+    )
 
     # Set the device
     device = torch.device(config_args_parser.device)

@@ -168,6 +168,28 @@ def print_memory_usage() -> float:
     return mb
 
 
+_MATMUL_PRECISIONS = ("highest", "high", "medium")
+
+
+def set_float32_matmul_precision(precision: str = "high") -> str:
+    """Set the global fp32 matmul precision and return the applied value.
+
+    ``"high"`` routes fp32 GEMMs through TF32 tensor cores (~1.5-1.8x faster
+    on Ampere-and-later NVIDIA GPUs; a harmless no-op on hardware without TF32
+    tensor cores). ``"highest"`` keeps full fp32 for bitwise reproducibility;
+    ``"medium"`` uses the bf16 path. This is a process-global runtime setting,
+    so it must be called before the first matmul.
+    """
+    if precision not in _MATMUL_PRECISIONS:
+        raise ValueError(
+            f"float32_matmul_precision must be one of {_MATMUL_PRECISIONS}, "
+            f"got {precision!r}"
+        )
+    torch.set_float32_matmul_precision(precision)
+    _logger.info("float32 matmul precision: %s", precision)
+    return precision
+
+
 # Pull in the active backend's symbols (DIST_BACKEND, resolve_/set_device_for_local_rank,
 # print_gpu_initialization, print_gpu_utilization, etc.). BACKEND_NAME was
 # computed near the top of this module.

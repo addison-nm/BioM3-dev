@@ -20,7 +20,7 @@ from datetime import datetime
 import numpy as np
 import torch
 
-from biom3.backend.device import BACKEND_NAME, _XPU, setup_logger
+from biom3.backend.device import BACKEND_NAME, _XPU, setup_logger, set_float32_matmul_precision
 
 if BACKEND_NAME == _XPU:
     import lightning as pl
@@ -138,6 +138,11 @@ def get_args(parser):
 
     parser.add_argument('--precision', type=str, default='32',
                         help="Training precision: '32', '16', 'bf16', 'bf16-mixed'.")
+    parser.add_argument('--float32_matmul_precision', type=str, default='medium',
+                        choices=['highest', 'high', 'medium'],
+                        help="fp32 matmul precision. 'medium' (default) uses the bf16 "
+                             "path; 'high' uses TF32 tensor cores; 'highest' keeps full "
+                             "fp32. CLI overrides the config value.")
     parser.add_argument('--device', type=str, default='cuda',
                         choices=['cuda', 'xpu', 'cpu'],
                         help='Compute device for training.')
@@ -318,7 +323,6 @@ def set_seed(seed):
 
 
 def clear_gpu_cache():
-    torch.set_float32_matmul_precision('medium')
     gc.collect()
 
 
@@ -586,6 +590,7 @@ def main(args):
         os.makedirs(artifacts_dir, exist_ok=True)
     log_path, file_handler = setup_file_logging(artifacts_dir)
 
+    set_float32_matmul_precision(args.float32_matmul_precision)
     clear_gpu_cache()
 
     seed = args.seed

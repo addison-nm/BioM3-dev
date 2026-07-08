@@ -53,7 +53,7 @@ from biom3.core.run_utils import (
     teardown_file_logging,
     write_manifest,
 )
-from biom3.backend.device import setup_logger, get_backend_name
+from biom3.backend.device import setup_logger, get_backend_name, set_float32_matmul_precision
 from biom3.core.distributed import (
     barrier,
     broadcast_int,
@@ -150,6 +150,11 @@ def parse_arguments(args):
                              "template(s): keys 'template', 'per_prompt', "
                              "'auto_add_start', 'auto_add_stop'. Required when "
                              "--inpaint is set.")
+    parser.add_argument('--float32_matmul_precision', type=str, default=None,
+                        choices=["highest", "high", "medium"],
+                        help="fp32 matmul precision. 'high' (config default) enables "
+                             "TF32 tensor cores; 'highest' forces full fp32 for bitwise "
+                             "reproducibility. Overrides the config value when set.")
     return parser.parse_args(args)
 
 
@@ -755,6 +760,12 @@ def main(args, _setup_logging=True):
     config_dict = load_json_config(config_args_parser.config_path)
     raw_config = copy.deepcopy(config_dict)
     config_args = convert_to_namespace(config_dict)
+
+    # fp32 matmul precision (TF32): CLI overrides config, config default is "high".
+    set_float32_matmul_precision(
+        config_args_parser.float32_matmul_precision
+        or getattr(config_args, "float32_matmul_precision", "high")
+    )
 
     config_args.device = config_args_parser.device
     config_args._rank = rank

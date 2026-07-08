@@ -5,6 +5,7 @@
 /weights/*/*
 _my*/
 /tests/_tmp/
+/_tmp/
 /lightning/
 /lightning_logs/
 /_misc/

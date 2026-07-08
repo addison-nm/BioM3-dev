@@ -1,0 +1,10 @@
+{
+  "_base_configs": ["./production_dpo_sh3_paired.json"],
+
+  "description": "Paired DPO on the SH3 experimental RE preferences, using the SH3 full-FT ProteoScribe as the base (finetune-then-align). Stage 1/2 stay run1_base (the encoders the finetune used). pi_ref = a frozen copy of the finetuned model.",
+
+  "run_id": "dpo_sh3_ftbase_v1",
+  "stage3_init_weights": "./weights/ProteoScribe/sh3_ft_prod.pth",
+
+  "output_root": "./outputs/dpo"
+}

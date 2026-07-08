@@ -15,7 +15,7 @@ from biom3.Stage3.tools import (
     LikelihoodConfig,
     ProteoScribeLikelihoodEstimator,
     _build_corruptions,
-    _build_query_grid,
+    _build_masked_levels,
     _classify_sequence,
     _CONTEXT,
     _QUERY,
@@ -95,6 +95,40 @@ def test_classify_context_mask_pins_positions():
     assert roles[3].item() == _QUERY
 
 
+def test_score_end_false_holds_end_as_context():
+    cfg = LikelihoodConfig(score_end=False)
+    ids, roles = _classify_sequence("ACD", SEQ_LEN, None, cfg, torch.device("cpu"))
+    assert ids[4].item() == END_ID
+    assert roles[4].item() == _CONTEXT          # END not scored
+    assert all(roles[i].item() == _QUERY for i in (1, 2, 3))
+
+
+def test_score_start_true_scores_start():
+    cfg = LikelihoodConfig(score_start=True)
+    ids, roles = _classify_sequence("ACD", SEQ_LEN, None, cfg, torch.device("cpu"))
+    assert ids[0].item() == START_ID
+    assert roles[0].item() == _QUERY            # START scored
+
+
+def test_score_end_false_excludes_end_from_query_count(estimator, z_c):
+    cfg = LikelihoodConfig(n_quadrature=6, n_repeats=1, seed=7)
+    with_end = estimator.estimate("MKTAYIAK", z_c, config=cfg)
+    cfg_no_end = LikelihoodConfig(n_quadrature=6, n_repeats=1, seed=7, score_end=False)
+    no_end = estimator.estimate("MKTAYIAK", z_c, config=cfg_no_end)
+    assert with_end.n_query == 9                # 8 residues + END
+    assert no_end.n_query == 8                  # END dropped from the query
+
+
+def test_loop_only_no_end(estimator, z_c):
+    """The motivating case: score only an interior loop, END held as context."""
+    cfg = LikelihoodConfig(n_quadrature=6, n_repeats=1, seed=7, score_end=False)
+    ctx = [True] * 8
+    for j in (3, 4, 5):
+        ctx[j] = False
+    res = estimator.estimate("MKTAYIAK", z_c, context_mask=ctx, config=cfg)
+    assert res.n_query == 3                     # exactly the 3 loop residues
+
+
 def test_classify_score_padding_promotes_pad_to_query():
     cfg = LikelihoodConfig(score_padding=True)
     _, roles = _classify_sequence("ACD", SEQ_LEN, None, cfg, torch.device("cpu"))
@@ -107,21 +141,28 @@ def test_classify_rejects_unknown_residue():
         _classify_sequence("AC1", SEQ_LEN, None, cfg, torch.device("cpu"))
 
 
-# ── quadrature grid ───────────────────────────────────────────────────────
+# ── masked-count levels ───────────────────────────────────────────────────
 
 
-def test_uniform_grid_weights_sum_to_one():
+def test_levels_are_integer_masked_counts_summing_to_one():
     cfg = LikelihoodConfig(n_quadrature=8)
-    t, w = _build_query_grid(cfg, torch.device("cpu"))
-    assert t.numel() == 8
-    assert torch.all((t > 0) & (t <= 1))
+    m, w = _build_masked_levels(cfg, Q=20, device=torch.device("cpu"))
+    assert m.numel() == 8
+    assert torch.all((m >= 1) & (m <= 20))
+    assert m.dtype == torch.long
     assert pytest.approx(1.0, abs=1e-6) == float(w.sum())
+
+
+def test_levels_use_all_when_nquadrature_exceeds_Q():
+    cfg = LikelihoodConfig(n_quadrature=64)
+    m, w = _build_masked_levels(cfg, Q=5, device=torch.device("cpu"))
+    assert m.tolist() == [1, 2, 3, 4, 5]     # every level, exact
 
 
 def test_explicit_grid_requires_points():
     cfg = LikelihoodConfig(quadrature_grid="explicit", quadrature_points=None)
     with pytest.raises(ValueError, match="requires quadrature_points"):
-        _build_query_grid(cfg, torch.device("cpu"))
+        _build_masked_levels(cfg, Q=10, device=torch.device("cpu"))
 
 
 # ── end-to-end estimation ─────────────────────────────────────────────────
@@ -197,9 +238,10 @@ def test_corruptions_keep_context_positions_concrete():
     # so all three role types are present (plus <START>/<END>/PAD).
     ctx = [True, False, False, False, False]
     ids, roles = _classify_sequence("MK#TA", SEQ_LEN, ctx, cfg, dev)
-    t, w = _build_query_grid(cfg, dev)
+    Q = int((roles == _QUERY).sum())
+    m, w = _build_masked_levels(cfg, Q, dev)
     gen = torch.Generator(device=dev).manual_seed(0)
-    corruptions, _ = _build_corruptions(ids, roles, t, w, cfg, gen, dev)
+    corruptions, _ = _build_corruptions(ids, roles, m, w, cfg, gen, dev)
 
     context_pos = roles == _CONTEXT
     unknown_pos = roles == _UNKNOWN
@@ -217,3 +259,51 @@ def test_corruptions_keep_context_positions_concrete():
         assert torch.all(revealed_q | masked_q | ~query_pos)
         # Only currently-masked query positions are scored.
         assert torch.equal(c["score_mask"], masked_q)
+
+
+def test_no_empty_corruptions():
+    """Every corruption masks >= 1 query position (the masked-count grid can't
+    produce the degenerate 'reveal everything, score nothing' levels the old
+    continuous-t grid did for small Q)."""
+    cfg = LikelihoodConfig(n_quadrature=32, n_repeats=2, seed=0)
+    dev = torch.device("cpu")
+    ids, roles = _classify_sequence("AKQ", SEQ_LEN, None, cfg, dev)   # tiny Q
+    Q = int((roles == _QUERY).sum())
+    m, w = _build_masked_levels(cfg, Q, dev)
+    corruptions, _ = _build_corruptions(ids, roles, m, w, cfg,
+                                        torch.Generator(device=dev).manual_seed(0), dev)
+    for c in corruptions:
+        assert int(c["score_mask"].sum()) >= 1
+
+
+# ── weighting correctness: uniform model → exactly log2(V) bits/residue ─────
+
+
+class _UniformModel(torch.nn.Module):
+    """Context-independent model: equal logits over all V classes."""
+
+    def __init__(self, v):
+        super().__init__()
+        self.v = v
+
+    def forward(self, x, t, y_c):
+        return torch.zeros(x.shape[0], self.v, x.shape[1])
+
+
+def test_uniform_model_gives_exact_bits_per_residue():
+    """A uniform model's ELBO is tight and equals -Q·log V, i.e. exactly
+    log2(V) bits/residue. This validates the Q·w/m weighting end-to-end;
+    the old 1/t weighting failed this by ~0.2 bits and did not converge."""
+    import math
+
+    est = ProteoScribeLikelihoodEstimator.from_weights(
+        config=dict(TINY_CONFIG), weights_path=None, device="cpu"
+    )
+    est.model = _UniformModel(TINY_CONFIG["num_classes"]).eval()
+    z = torch.zeros(EMB_DIM)
+    expected = math.log2(TINY_CONFIG["num_classes"])
+    for nq in (4, 16, 64):
+        res = est.estimate("MKTAYIAKQR", z,
+                           config=LikelihoodConfig(n_quadrature=nq, n_repeats=1, seed=0))
+        assert res.bits_per_residue == pytest.approx(expected, abs=1e-4)
+        assert res.log_likelihood == pytest.approx(-res.n_query * math.log(TINY_CONFIG["num_classes"]), abs=1e-3)

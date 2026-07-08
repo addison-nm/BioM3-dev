@@ -19,10 +19,13 @@ Position roles
 Every position in the (length-``diffusion_steps``) tensor is one of:
 
 - ``QUERY``   — a concrete residue whose likelihood is estimated. Diffused
-  over (revealed/masked across the SDMC trajectory) and scored.
+  over (revealed/masked across the SDMC trajectory) and scored. ``<END>`` is
+  QUERY by default (``score_end``).
 - ``CONTEXT`` — a concrete residue that is *always revealed* and conditioned
   upon but never scored (the ``<START>`` anchor, the ``<PAD>`` tail, and any
-  position the caller pins via ``context_mask``).
+  position the caller pins via ``context_mask``). Whether ``<START>``/``<END>``
+  and the ``<PAD>`` tail are CONTEXT or QUERY is set by ``score_start`` /
+  ``score_end`` / ``score_padding``.
 - ``UNKNOWN`` — an absorbing/mask position (``#`` in an input string). Never
   revealed, never scored; marginalized out of the likelihood.
 
@@ -32,6 +35,7 @@ the index fed to the model is ``n_context + r`` (see
 ``run_ProteoScribe_sample._pre_revealed_offset`` for the same convention).
 """
 
+import math
 from argparse import Namespace
 from dataclasses import dataclass, field
 from typing import List, Optional, Sequence, Union
@@ -70,25 +74,34 @@ class LikelihoodConfig:
     ``n_quadrature`` / ``n_repeats`` for a quick approximate score.
     """
 
-    # SDMC time grid over the query-masking fraction t in (0, 1].
+    # SDMC levels over the integer masked-count m in {1..Q}. n_quadrature caps
+    # the number of levels; >= Q uses all of them (exact any-order NLL).
     n_quadrature: int = 16
-    quadrature_grid: str = "uniform"          # "uniform" midpoints | "explicit"
-    quadrature_points: Optional[List[float]] = None   # for "explicit"
+    quadrature_grid: str = "uniform"          # "uniform" spaced | "explicit"
+    quadrature_points: Optional[List[float]] = None   # explicit masked fractions m/Q
     quadrature_weights: Optional[List[float]] = None  # for "explicit"; else uniform
 
-    inner_mc: int = 1        # mask samples per grid point (per repeat)
+    inner_mc: int = 1        # mask samples per level (per repeat)
     n_repeats: int = 4       # independent estimates → mean + std
-    eps_t: float = 1e-3      # clamp t away from 0 in the 1/t factor
 
     # Include the <PAD> tail (and any padding beyond <END>) in the query set.
-    # Off by default: padding is deterministic given <END> and would inflate
+    # Off by default: padding is typically likely given <END> and would inflate
     # the log-likelihood with trivially-predicted tokens.
     score_padding: bool = False
 
-    # Wrap the raw AA string with <START>/<END> before scoring. The <START>
-    # anchor is always CONTEXT; <END> is QUERY (the model must decide where
-    # the protein terminates), unless the input already carries them.
+    # Wrap the raw AA string with <START> … <END> before scoring, then pad to
+    # diffusion_steps. Turn off if the input already carries special tokens.
     add_special_tokens: bool = True
+
+    # Whether the <START>/<END> anchors are scored (QUERY) or held as fixed
+    # context (revealed, conditioned on, not scored). Governs these two tokens
+    # authoritatively (over context_mask). <START> is deterministic, so scoring
+    # it rarely helps. <END> encodes where the protein terminates and is scored
+    # by default; set score_end=False to score, e.g., only an interior loop
+    # given a fixed scaffold without also paying for the terminus. No effect on
+    # inputs that lack these tokens (e.g. add_special_tokens=False).
+    score_start: bool = False
+    score_end: bool = True
 
     # Max corruptions per model forward pass. Lower it if a long sequence /
     # large grid overflows device memory.
@@ -121,8 +134,6 @@ class LikelihoodResult:
     def probability(self) -> float:
         """``exp(log_likelihood)``. Underflows to 0.0 for realistic lengths —
         prefer ``log_likelihood`` / ``bits_per_residue`` for comparison."""
-        import math
-
         try:
             return math.exp(self.log_likelihood)
         except OverflowError:
@@ -164,9 +175,8 @@ def _classify_sequence(
 
         pos = 0
         if cfg.add_special_tokens:
-            ids[pos], roles[pos] = START_ID, _CONTEXT
+            ids[pos] = START_ID          # role set by the policy pass below
             pos += 1
-        content_start = pos
         for j, ch in enumerate(residues):
             if pos >= seq_len:
                 raise ValueError(
@@ -186,41 +196,30 @@ def _classify_sequence(
                 raise ValueError(
                     f"sequence (+special tokens) exceeds diffusion_steps={seq_len}"
                 )
-            ids[pos], roles[pos] = END_ID, _QUERY
+            ids[pos] = END_ID            # role set by the policy pass below
             pos += 1
-        content_end = pos  # first PAD index
     else:
         ids = torch.as_tensor(sequence, dtype=torch.long).reshape(-1).clone()
         if ids.numel() != seq_len:
             raise ValueError(
                 f"id sequence length {ids.numel()} != diffusion_steps={seq_len}"
             )
-        roles = torch.empty(seq_len, dtype=torch.long)
-        for i, tok in enumerate(ids.tolist()):
-            if tok == MASK_ID:
-                roles[i] = _UNKNOWN
-            elif tok in (PAD_ID, START_ID):
-                roles[i] = _CONTEXT
-            else:
-                roles[i] = _QUERY
+        roles = torch.full((seq_len,), _QUERY, dtype=torch.long)
+        roles[ids == MASK_ID] = _UNKNOWN
         if context_mask is not None:
             if len(context_mask) != seq_len:
                 raise ValueError(
                     f"context_mask length {len(context_mask)} != seq_len {seq_len}"
                 )
-            for i, flag in enumerate(context_mask):
-                if flag and roles[i] == _QUERY:
-                    roles[i] = _CONTEXT
-        content_end = seq_len
+            cm = torch.as_tensor(list(context_mask), dtype=torch.bool)
+            roles[cm & (roles == _QUERY)] = _CONTEXT
 
-    if not cfg.score_padding:
-        # PAD tail already CONTEXT for the string path; enforce for the id path.
-        roles[(ids == PAD_ID)] = _CONTEXT
-    else:
-        # Promote padding to QUERY so its prediction is scored too.
-        pad_mask = ids == PAD_ID
-        roles[pad_mask] = _QUERY
-
+    # Special-token roles are set here (authoritative over context_mask), then
+    # the PAD tail. START/END/PAD are uniquely-valued tokens, so keying on id
+    # is unambiguous; residues never collide with them.
+    roles[ids == START_ID] = _QUERY if cfg.score_start else _CONTEXT
+    roles[ids == END_ID] = _QUERY if cfg.score_end else _CONTEXT
+    roles[ids == PAD_ID] = _QUERY if cfg.score_padding else _CONTEXT
     return ids.to(device), roles.to(device)
 
 
@@ -229,61 +228,72 @@ def _classify_sequence(
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def _build_query_grid(cfg: LikelihoodConfig, device: torch.device):
-    """Build the SDMC grid over the query-masking fraction t in (0, 1].
+def _build_masked_levels(cfg: LikelihoodConfig, Q: int, device: torch.device):
+    """Build the SDMC levels over the integer masked-count ``m in {1..Q}``.
 
-    Returns ``(t_floats, weights)`` with ``weights`` summing to 1. ``t`` is the
-    fraction of *query* residues that are masked; the number revealed at grid
-    point ``n`` is ``round((1 - t_n) * Q)``.
+    Returns ``(masked_counts, weights)`` with ``weights`` summing to 1. At level
+    ``m`` exactly ``m`` query positions are masked (``Q - m`` revealed) and the
+    ``m`` masked positions are scored. The estimator sums
+    ``coeff_i · Σ_{masked} log p`` with ``coeff_i = Q · w_i / m_i`` (assembled in
+    ``_build_corruptions``); this is the any-order ARDM NLL (Hoogeboom et al.
+    2021) and is *exact* for a context-consistent model when every level is used.
+
+    Gridding over the integer count (rather than a continuous fraction ``t``
+    mapped through ``round((1 - t)·Q)``) avoids two failure modes of the earlier
+    scheme: degenerate levels that reveal everything (``m = 0``, zero
+    contribution) and the ``1/t`` weighting bias where ``m/t ≠ Q`` after
+    rounding.
+
+    ``uniform``: evenly-spaced distinct levels in ``{1..Q}`` (all ``Q`` when
+    ``n_quadrature >= Q``, i.e. exact). ``explicit``: ``quadrature_points`` are
+    read as masked *fractions* ``m/Q in (0, 1]`` (with optional
+    ``quadrature_weights``).
     """
+    if Q < 1:
+        raise ValueError(f"Q must be >= 1, got {Q}")
     if cfg.quadrature_grid == "uniform":
-        N = max(1, int(cfg.n_quadrature))
-        t_floats = torch.tensor(
-            [(n - 0.5) / N for n in range(1, N + 1)], dtype=torch.float32, device=device
-        )
-        weights = torch.full((N,), 1.0 / N, dtype=torch.float32, device=device)
+        K = min(max(1, int(cfg.n_quadrature)), Q)
+        m = torch.linspace(1, Q, K, device=device).round().long().unique()
     elif cfg.quadrature_grid == "explicit":
         if not cfg.quadrature_points:
             raise ValueError("quadrature_grid='explicit' requires quadrature_points")
-        t_floats = torch.tensor(cfg.quadrature_points, dtype=torch.float32, device=device)
-        N = t_floats.numel()
+        f = torch.tensor(cfg.quadrature_points, dtype=torch.float32, device=device)
+        if (f <= 0).any() or (f > 1).any():
+            raise ValueError(f"explicit quadrature_points are masked fractions in (0, 1]; got {f.tolist()}")
+        m = torch.clamp(torch.round(f * Q).long(), min=1, max=Q)
         if cfg.quadrature_weights:
-            if len(cfg.quadrature_weights) != N:
+            if len(cfg.quadrature_weights) != f.numel():
                 raise ValueError("quadrature_weights length must match quadrature_points")
-            weights = torch.tensor(
-                cfg.quadrature_weights, dtype=torch.float32, device=device
-            )
-        else:
-            weights = torch.full((N,), 1.0 / N, dtype=torch.float32, device=device)
+            w = torch.tensor(cfg.quadrature_weights, dtype=torch.float32, device=device)
+            return m, w / w.sum()
     else:
         raise ValueError(
             f"quadrature_grid must be 'uniform' or 'explicit', got {cfg.quadrature_grid!r}"
         )
-    if (t_floats <= 0).any() or (t_floats > 1).any():
-        raise ValueError(f"quadrature t values must be in (0, 1]; got {t_floats.tolist()}")
-    return t_floats, weights
+    weights = torch.full((m.numel(),), 1.0 / m.numel(), dtype=torch.float32, device=device)
+    return m, weights
 
 
 def _build_corruptions(
-    ids: torch.Tensor,        # (L,) concrete target tokens; MASK at unknown
-    roles: torch.Tensor,      # (L,) role per position
-    t_floats: torch.Tensor,   # (N,)
-    weights: torch.Tensor,    # (N,)
+    ids: torch.Tensor,           # (L,) concrete target tokens; MASK at unknown
+    roles: torch.Tensor,         # (L,) role per position
+    masked_counts: torch.Tensor, # (K,) integer m per level
+    weights: torch.Tensor,       # (K,) level weights summing to 1
     cfg: LikelihoodConfig,
     generator: Optional[torch.Generator],
     device: torch.device,
 ):
-    """Sample masked corruptions, one bundle per (repeat, grid point, inner_mc).
+    """Sample masked corruptions, one bundle per (repeat, level, inner_mc).
 
-    Each corruption reveals a random subset of the query residues, masks the
-    rest (plus all UNKNOWN positions), keeps every CONTEXT position at its
-    concrete token, and scores only the currently-masked query residues.
+    At level ``m`` exactly ``m`` query positions are masked (``Q - m`` revealed
+    at random); UNKNOWN positions are always masked, CONTEXT positions stay at
+    their concrete token, and only the ``m`` masked query positions are scored.
 
-    Returns a list of dicts with:
+    Returns ``(corruptions, Q)`` where each corruption is a dict with:
         x_t        (L,) long  — model input (MASK at masked/unknown)
-        idx        int        — model time index = n_context + r
-        coeff      float      — w_n / (inner_mc * max(t_n, eps_t))
-        score_mask (L,) bool  — currently-masked query positions
+        idx        int        — model time index = n_context + (Q - m)
+        coeff      float      — Q · w_i / (m · inner_mc)
+        score_mask (L,) bool  — the m currently-masked query positions
         repeat     int        — which repeat this corruption belongs to
     """
     L = ids.numel()
@@ -297,29 +307,22 @@ def _build_corruptions(
     inner = max(1, cfg.inner_mc)
     corruptions: List[dict] = []
     for rep in range(max(1, cfg.n_repeats)):
-        for n in range(t_floats.numel()):
-            t_n = float(t_floats[n].item())
-            w_n = float(weights[n].item())
-            r = int(round((1.0 - t_n) * Q))
-            r = max(0, min(Q, r))
-            coeff = w_n / (inner * max(t_n, cfg.eps_t))
+        for i in range(masked_counts.numel()):
+            m = int(masked_counts[i].item())
+            w_i = float(weights[i].item())
+            r = Q - m                            # query positions revealed
+            coeff = (Q * w_i) / (m * inner)      # 1/t_eff = Q/m, exact by level
             for _ in range(inner):
                 perm = torch.randperm(Q, generator=generator, device=device)
-                revealed_local = perm[:r]
-                revealed_pos = query_idx[revealed_local]
+                revealed_pos = query_idx[perm[:r]]
 
-                revealed_flag = torch.zeros(L, dtype=torch.bool, device=device)
-                revealed_flag[revealed_pos] = True
-                # Masked = every non-context position that is not a revealed
-                # query: UNKNOWN positions, plus query residues not revealed this
-                # draw. CONTEXT positions stay at their concrete token.
+                # Masked = UNKNOWN positions plus query residues not revealed
+                # this draw. CONTEXT positions stay at their concrete token.
                 masked_flag = unknown.clone()
                 masked_flag[query_idx] = True
                 masked_flag[revealed_pos] = False
 
-                x_t = torch.where(
-                    masked_flag, torch.full_like(ids, MASK_ID), ids
-                )
+                x_t = torch.where(masked_flag, torch.full_like(ids, MASK_ID), ids)
                 # Currently-masked *query* positions are the only scored ones.
                 score_mask = torch.zeros(L, dtype=torch.bool, device=device)
                 score_mask[query_idx] = True
@@ -466,9 +469,12 @@ class ProteoScribeLikelihoodEstimator:
         ids, roles = _classify_sequence(
             sequence, self.seq_len, context_mask, cfg, self.device
         )
-        t_floats, weights = _build_query_grid(cfg, self.device)
+        Q = int((roles == _QUERY).sum().item())
+        if Q == 0:
+            raise ValueError("no QUERY positions to score (empty query set)")
+        masked_counts, weights = _build_masked_levels(cfg, Q, self.device)
         corruptions, Q = _build_corruptions(
-            ids, roles, t_floats, weights, cfg, generator, self.device
+            ids, roles, masked_counts, weights, cfg, generator, self.device
         )
         n_repeats = max(1, cfg.n_repeats)
         elbo_per_repeat = _score_corruptions(
@@ -481,15 +487,14 @@ class ProteoScribeLikelihoodEstimator:
         n_context = int((roles == _CONTEXT).sum().item())
         n_unknown = int((roles == _UNKNOWN).sum().item())
 
-        import math
-
-        nats_per_res = -ll / Q if Q > 0 else float("nan")
-        perplexity = math.exp(nats_per_res) if Q > 0 else float("nan")
-        bits_per_res = nats_per_res / math.log(2) if Q > 0 else float("nan")
+        # Q >= 1 here: _build_corruptions raises on an empty query set.
+        nats_per_res = -ll / Q
+        perplexity = math.exp(nats_per_res)
+        bits_per_res = nats_per_res / math.log(2)
 
         per_quadrature = [
-            {"t": round(float(t), 6), "w": round(float(w), 6)}
-            for t, w in zip(t_floats.tolist(), weights.tolist())
+            {"masked": int(m), "revealed": Q - int(m), "w": round(float(w), 6)}
+            for m, w in zip(masked_counts.tolist(), weights.tolist())
         ]
 
         return LikelihoodResult(

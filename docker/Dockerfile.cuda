@@ -1,7 +1,8 @@
-# BioM3 — NVIDIA GPU image for commercial cloud (AWS / Mithril).
+# BioM3 — NVIDIA CUDA image (biom3:cuda) for commercial cloud (AWS / Mithril).
+# The Intel-XPU variant is docker/Dockerfile.xpu.
 #
-# One image, all uses: training (all stages), finetuning, generation, and
-# the streamlit app. The command is chosen at `docker run` time.
+# One image per device, all uses: training (all stages), finetuning, generation,
+# and the streamlit app. The command is chosen at `docker run` time.
 #
 # Arch-portable: build for x86_64 (AWS p3/p4/p5, g4/g5/g6; Mithril H100/H200)
 # or ARM64 (Grace / GH200) from THIS SAME Dockerfile — there are no arch
@@ -12,7 +13,7 @@
 #
 # Build context is the BioM3-dev repo ROOT (so source + requirements are in
 # scope). Build with docker/build.sh, or:
-#   docker buildx build -f docker/Dockerfile -t biom3:gpu --load .
+#   docker buildx build -f docker/Dockerfile.cuda -t biom3:cuda --load .
 #
 # ALCF HPC (Polaris/Aurora) is NOT a target here — those use apptainer and a
 # different software stack (see docs/setup/setup_{polaris,aurora}.md).

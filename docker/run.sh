@@ -29,8 +29,10 @@
 #       --output_path outputs/generated.pt --device cuda
 #
 # ENV (all optional):
-#   BIOM3_IMAGE        image tag (default: biom3:gpu)
-#   BIOM3_GPUS         value for --gpus (default: all; "none" omits --gpus)
+#   BIOM3_IMAGE        image tag (default: biom3:cuda)
+#   BIOM3_DEVICE_KIND  cuda | xpu (default: inferred from the image tag) —
+#                      selects --gpus (cuda) vs --device /dev/dri (xpu)
+#   BIOM3_GPUS         value for --gpus on cuda (default: all; "none" omits it)
 #   BIOM3_WEIGHTS_DIR  host weights dir  (default: ./weights, mounted ro)
 #   BIOM3_DATA_DIR     host data dir     (default: ./data,    mounted ro)
 #   BIOM3_OUTPUTS_DIR  host outputs dir  (default: ./outputs, mounted rw)
@@ -40,18 +42,36 @@
 #=============================================================================
 set -euo pipefail
 
-IMAGE="${BIOM3_IMAGE:-biom3:gpu}"
+IMAGE="${BIOM3_IMAGE:-biom3:cuda}"
 GPUS="${BIOM3_GPUS:-all}"
 W="${BIOM3_WEIGHTS_DIR:-$PWD/weights}"
 D="${BIOM3_DATA_DIR:-$PWD/data}"
 O="${BIOM3_OUTPUTS_DIR:-$PWD/outputs}"
 C="${BIOM3_CONFIGS_DIR:-}"
 
+# Device kind: explicit override, else infer from the image tag (":xpu" -> xpu).
+if [[ -n "${BIOM3_DEVICE_KIND:-}" ]]; then
+    DEVICE_KIND="${BIOM3_DEVICE_KIND}"
+elif [[ "${IMAGE}" == *:xpu || "${IMAGE}" == *:xpu-* ]]; then
+    DEVICE_KIND="xpu"
+else
+    DEVICE_KIND="cuda"
+fi
+
 mkdir -p "${O}"
 
 ARGS=(run --rm)
 [[ -t 0 && -t 1 ]] && ARGS+=(-it)
-[[ "${GPUS}" != "none" ]] && ARGS+=(--gpus "${GPUS}")
+if [[ "${DEVICE_KIND}" == "xpu" ]]; then
+    # Intel GPU: expose the DRI render nodes + render/video group membership.
+    ARGS+=(--device /dev/dri)
+    for grp in render video; do
+        gid="$(getent group "${grp}" 2>/dev/null | cut -d: -f3)"
+        [[ -n "${gid}" ]] && ARGS+=(--group-add "${gid}")
+    done
+elif [[ "${GPUS}" != "none" ]]; then
+    ARGS+=(--gpus "${GPUS}")
+fi
 
 # Bind-mount weights/data unless an S3 (or other) sync URI is set for them —
 # in sync mode the entrypoint writes into the container's own dir, so a

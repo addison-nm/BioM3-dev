@@ -28,7 +28,7 @@ x-volumes: &volumes
 
 services:
   app:
-    image: ${BIOM3_IMAGE:-biom3:gpu}
+    image: ${BIOM3_IMAGE:-biom3:cuda}
     command: biom3_app --server.address=0.0.0.0 --server.port=8501 --server.headless=true
     ports:
       - "8501:8501"
@@ -38,7 +38,7 @@ services:
     <<: *gpu
 
   shell:
-    image: ${BIOM3_IMAGE:-biom3:gpu}
+    image: ${BIOM3_IMAGE:-biom3:cuda}
     command: bash
     stdin_open: true
     tty: true

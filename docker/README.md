@@ -31,7 +31,7 @@ the ~3 GB torch cu129 wheel (10–40 min). Subsequent builds reuse the buildx la
 
 ```bash
 # Native architecture (Apple Silicon → arm64; x86 Linux/Mac → amd64):
-docker/build.sh                      # tags biom3:gpu
+docker/build.sh                      # tags biom3:cuda
 
 # Explicit platform:
 docker/build.sh --platform linux/amd64
@@ -41,7 +41,7 @@ docker/build.sh --platform linux/arm64
 docker/build.sh --awscli
 
 # Multi-arch (requires --push; buildx --load is single-platform only):
-docker/build.sh --platform linux/amd64,linux/arm64 --tag <registry>/biom3:gpu --push
+docker/build.sh --platform linux/amd64,linux/arm64 --tag <registry>/biom3:cuda --push
 ```
 
 Cross-arch builds (building arm64 on an x86 host or vice-versa) need QEMU/binfmt
@@ -246,15 +246,41 @@ entrypoint syncs into the container's own dirs. Two caveats for the disk-less mo
 
 ```bash
 docker/build.sh
-docker run --rm biom3:gpu python -c "import biom3, torch; print(torch.__version__)"
-docker run --rm biom3:gpu pytest tests/ --quick
+docker run --rm biom3:cuda python -c "import biom3, torch; print(torch.__version__)"
+docker run --rm biom3:cuda pytest tests/ --quick
 ```
 
-## Multi-node training — not supported here (yet)
+## Multi-node training (SkyPilot)
 
-This image targets **single-node, multi-GPU** (one container, up to 8 GPUs), which covers
-the vast majority of AWS/Mithril usage. Training across multiple instances needs
-cross-host rendezvous (a shared `MASTER_ADDR`, networked NCCL, an orchestrator like k8s
-or a multi-node `torchrun --rdzv_endpoint`). It is intentionally out of scope for v1; the
-ALCF multi-node path (`scripts/launchers/{aurora,polaris}_multinode.sh`) remains the
-reference for distributed runs.
+Finetuning, pretraining, and generation run across multiple instances via
+[`scripts/launchers/container_multinode.sh`](../scripts/launchers/container_multinode.sh),
+the multi-node analog of `container_singlenode.sh`. SkyPilot launches the task once per
+**node** and sets `SKYPILOT_NODE_RANK` / `SKYPILOT_NUM_NODES` / `SKYPILOT_NODE_IPS`; the
+launcher translates those into a **`torchrun` static rendezvous**
+(`--nnodes --node-rank --master-addr --nproc-per-node`), which sets
+`RANK`/`LOCAL_RANK`/`WORLD_SIZE`/`GROUP_RANK` — the same env BioM3
+([`core/_dist_env.py`](../src/biom3/core/_dist_env.py)) and Lightning already read. No
+Python changes.
+
+- **Enable it:** in `cloud/{finetune,generate,pretrain}.mithril.yaml`, set
+  `resources.num_nodes > 1` and `accelerators` to the **per-node** GPU count (`NGPU` must
+  match). The job scripts dispatch on `NNODES` (defaulting to `$SKYPILOT_NUM_NODES`) to
+  `stage3_train_multinode.sh`.
+- **Checkpointing = DDP, not DeepSpeed.** Mithril/AWS spot clusters have **no shared
+  filesystem**, so DeepSpeed ZeRO's per-rank optimizer shards would scatter across nodes'
+  local disks and can't be consolidated. The scripts default `--distributed_strategy ddp`
+  when `NNODES>1`: a single `.ckpt` is written entirely by **global rank 0** (on the
+  `SKYPILOT_NODE_RANK==0` node), so the task yaml gates `BIOM3_OUTPUTS_PUSH_URI` to that
+  node. Revisit DeepSpeed multi-node only with a shared FS.
+- **NCCL:** the launcher auto-detects the private-net (`10.x`) interface for
+  `NCCL_SOCKET_IFNAME` and disables InfiniBand (`NCCL_IB_DISABLE=1`); the task uses
+  `--net=host --ipc=host`. Debug a first run with `NCCL_DEBUG=INFO`.
+- **Data:** each node's container S3-syncs its own copy — prefer `PRIMARY_HDF5`/
+  `BIOM3_DATA_URI` (identical bytes per node) over on-the-fly CSV embedding so every rank
+  builds identical `DistributedSampler` shards.
+- **Generation** parallelizes only Stage-3 sampling (the sampler is rank-aware; only rank
+  0 writes). Stages 1–2 run per node and Facilitator sampling is stochastic — verify
+  determinism with a fixed `SEED` before trusting multi-node output.
+
+The ALCF path (`scripts/launchers/{aurora,polaris}_multinode.sh`, mpiexec/PBS) remains the
+reference for the HPC clusters.

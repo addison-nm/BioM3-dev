@@ -3,70 +3,81 @@
 #
 # FILE: docker/push.sh
 #
-# Register (tag + push) an existing local BioM3 image to AWS ECR, so cloud
-# instances pull it instead of rebuilding (~10-40 min build -> seconds). The
-# SkyPilot tasks under cloud/ reference the ECR ref via
-# `resources.image_id: docker:<ECR_REF>`.
+# Tag + push a locally-built BioM3 image to GHCR with git-derived version tags, so
+# cloud instances pull it instead of rebuilding (~10-40 min build -> seconds). The
+# image is published PUBLIC, so cloud/*.yaml pull it anonymously (no registry token).
 #
-# This is the build-elsewhere-then-push path. To build AND push in one step on
-# a linux/amd64 builder, use build.sh directly:
-#   docker/build.sh --awscli --platform linux/amd64 \
-#       --tag 955510722784.dkr.ecr.us-east-2.amazonaws.com/biom3:gpu --push
+# Pushes TWO tags per call:
+#   <variant>-<shortsha>   immutable, tied to the exact commit (reproducible)
+#   <variant>-dev          moving pointer for the dev line (what cloud/*.yaml track)
+#
+# Prereqs: docker; a local biom3:<variant> image (docker/build.sh --variant ...); and a
+# GHCR login on the PUSH side (pulling a public image needs no login):
+#   echo "$GHCR_TOKEN" | docker login ghcr.io -u <github-user> --password-stdin
+# GHCR_TOKEN = a classic PAT with write:packages (+ read:packages), SSO-authorized for
+# the org. See cloud/README.md for the full one-time runbook.
 #
 # USAGE:
-#   docker/push.sh [--local-tag T] [--repo R] [--region X] [--create-repo]
+#   docker/push.sh [--variant cuda|xpu] [--repo R] [--local-tag T] [--allow-dirty]
 #
-#   --local-tag T   local image to push (default: biom3:gpu)
-#   --repo R        ECR repo ref WITHOUT the tag
-#                   (default: 955510722784.dkr.ecr.us-east-2.amazonaws.com/biom3)
-#   --region X      AWS region (default: us-east-2)
-#   --create-repo   create the ECR repository first (one-time, idempotent)
-#
-# Requires: docker, awscli, and valid AWS creds in the environment
-# (e.g. `eval "$(aws configure export-credentials --format env)"`).
+#   --variant V    cuda | xpu (default cuda) -> pushes biom3:<V> as <V>-<sha> + <V>-dev
+#   --repo R       registry repo WITHOUT the tag
+#                  (default: ghcr.io/natural-machine/biom3)
+#   --local-tag T  local image to push (default: biom3:<variant>)
+#   --allow-dirty  push from a dirty tree; the sha tag gets a -dirty suffix
 #
 #=============================================================================
 set -euo pipefail
 
-LOCAL_TAG="biom3:gpu"
-REPO="955510722784.dkr.ecr.us-east-2.amazonaws.com/biom3"
-REGION="us-east-2"
-CREATE_REPO=0
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+VARIANT="cuda"
+REPO="ghcr.io/natural-machine/biom3"
+LOCAL_TAG=""
+ALLOW_DIRTY=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --local-tag)   LOCAL_TAG="$2"; shift 2 ;;
+        --variant)     VARIANT="$2"; shift 2 ;;
         --repo)        REPO="$2"; shift 2 ;;
-        --region)      REGION="$2"; shift 2 ;;
-        --create-repo) CREATE_REPO=1; shift ;;
-        -h|--help)     sed -n '3,33p' "$0"; exit 0 ;;
+        --local-tag)   LOCAL_TAG="$2"; shift 2 ;;
+        --allow-dirty) ALLOW_DIRTY=1; shift ;;
+        -h|--help)     sed -n '3,27p' "$0"; exit 0 ;;
         *)             echo "Unknown arg: $1" >&2; exit 1 ;;
     esac
 done
 
-# The image tag (e.g. ":gpu") rides along from the local tag.
-TAG="${LOCAL_TAG##*:}"
-REMOTE="${REPO}:${TAG}"
-REGISTRY="${REPO%%/*}"          # <acct>.dkr.ecr.<region>.amazonaws.com
-REPO_NAME="${REPO#*/}"          # everything after the registry host
+LOCAL_TAG="${LOCAL_TAG:-biom3:${VARIANT}}"
 
-command -v aws >/dev/null 2>&1 || { echo "ERROR: awscli not found." >&2; exit 1; }
+command -v docker >/dev/null 2>&1 || { echo "ERROR: docker not found." >&2; exit 1; }
 
-if [[ "${CREATE_REPO}" -eq 1 ]]; then
-    echo "+ aws ecr create-repository --repository-name ${REPO_NAME}" >&2
-    aws ecr create-repository --repository-name "${REPO_NAME}" --region "${REGION}" \
-        >/dev/null 2>&1 || echo "  (repository already exists; continuing)" >&2
+# Version from git: <shortsha>, guarded so the tag is truthful (the image is built
+# from the working tree, so a dirty tree means the tag would not match the commit).
+SHA="$(git -C "${REPO_ROOT}" rev-parse --short HEAD 2>/dev/null || echo nogit)"
+if [[ -n "$(git -C "${REPO_ROOT}" status --porcelain 2>/dev/null)" ]]; then
+    if [[ "${ALLOW_DIRTY}" -eq 1 ]]; then
+        SHA="${SHA}-dirty"
+        echo "WARNING: working tree is dirty; tagging ${VARIANT}-${SHA} (NOT reproducible)." >&2
+    else
+        echo "ERROR: working tree is dirty. Commit first so ${VARIANT}-<sha> is truthful," >&2
+        echo "       or pass --allow-dirty to tag ${VARIANT}-${SHA}." >&2
+        exit 1
+    fi
 fi
 
-echo "+ docker login ${REGISTRY}" >&2
-aws ecr get-login-password --region "${REGION}" \
-    | docker login --username AWS --password-stdin "${REGISTRY}"
+VERSION_TAG="${REPO}:${VARIANT}-${SHA}"
+MOVING_TAG="${REPO}:${VARIANT}-dev"
 
-echo "+ docker tag ${LOCAL_TAG} ${REMOTE}" >&2
-docker tag "${LOCAL_TAG}" "${REMOTE}"
+echo "+ docker tag ${LOCAL_TAG} -> ${VERSION_TAG} , ${MOVING_TAG}" >&2
+docker tag "${LOCAL_TAG}" "${VERSION_TAG}"
+docker tag "${LOCAL_TAG}" "${MOVING_TAG}"
 
-echo "+ docker push ${REMOTE}" >&2
-docker push "${REMOTE}"
+echo "+ docker push ${VERSION_TAG}" >&2
+docker push "${VERSION_TAG}"
+echo "+ docker push ${MOVING_TAG}" >&2
+docker push "${MOVING_TAG}"
 
-echo "Pushed ${REMOTE}" >&2
-echo "Use in cloud/*.yaml:  image_id: docker:${REMOTE}" >&2
+echo "Pushed:" >&2
+echo "  ${VERSION_TAG}   (immutable)" >&2
+echo "  ${MOVING_TAG}    (moving dev pointer — what cloud/*.yaml reference)" >&2

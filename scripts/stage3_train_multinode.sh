@@ -55,8 +55,9 @@ if [ ! -x "${LAUNCHER}" ]; then
     exit 1
 fi
 
-# Export args the launcher reads from env
-export NGPU_PER_NODE NGPU_TOTAL
+# Export args the launcher reads from env (NUM_NODES lets the container
+# torchrun launcher get node count without relying on a SkyPilot fallback).
+export NGPU_PER_NODE NGPU_TOTAL NUM_NODES
 
 exec "${LAUNCHER}" \
     biom3_train_stage3 \

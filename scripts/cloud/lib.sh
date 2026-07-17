@@ -29,19 +29,26 @@ require_one() {
     die "set one of: ${*/#/\$}"
 }
 
-# cloud_run_id CONFIG_PATH NGPU EPOCHS [EXTRA_TAG]
+# default_device  -> the backend the installed torch resolves to (cuda|xpu|cpu),
+# so one job script + one image variant pick the right device automatically.
+# DEVICE=... still overrides. Falls back to cuda if biom3 isn't importable.
+default_device() {
+    python -c 'from biom3.backend.device import BACKEND_NAME; print(BACKEND_NAME)' \
+        2>/dev/null || echo cuda
+}
+
+# cloud_run_id CONFIG_PATH NGPU EPOCHS [EXTRA_TAG] [NNODES]
 #   Mirrors the ALCF HPC run_id convention
 #   (jobs/aurora/job_pretrain_from_scratch_v1_n2.pbs):
-#     {config_name}[_EXTRA]_n1_d{NGPU}_e{EPOCHS}_V{YYYYMMDD_HHMMSS}
-#   Single-node only here (cloud jobs are single-instance), so nodes is fixed
-#   at 1. Only used when RUN_ID is unset.
+#     {config_name}[_EXTRA]_n{NNODES}_d{NGPU}_e{EPOCHS}_V{YYYYMMDD_HHMMSS}
+#   NNODES defaults to 1 (single-instance). Only used when RUN_ID is unset.
 cloud_run_id() {
-    local config_path="$1" ngpu="$2" epochs="$3" extra="${4:-}"
+    local config_path="$1" ngpu="$2" epochs="$3" extra="${4:-}" nnodes="${5:-1}"
     local config_name datetime
     config_name="$(basename "${config_path}" .json)"
     datetime="$(date +%Y%m%d_%H%M%S)"
     [[ -n "${extra}" ]] && extra="_${extra}"
-    echo "${config_name}${extra}_n1_d${ngpu}_e${epochs}_V${datetime}"
+    echo "${config_name}${extra}_n${nnodes}_d${ngpu}_e${epochs}_V${datetime}"
 }
 
 # weight_from_set WEIGHT_SET_JSON KEY   -> print the path stored under KEY, or

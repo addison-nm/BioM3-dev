@@ -1,0 +1,78 @@
+# BioM3 on Mithril — GENERIC runner: a GPU + the biom3 container, running any command.
+#
+# This is the primary way to run BioM3 on Mithril. The job's parameters live in the
+# CMD string (biom3's own CLI args), NOT in env vars — so the -e list below is a
+# FIXED infra set (credentials + S3 staging + multi-node rank) that never grows when
+# you add a job knob. cloud/{pretrain,finetune,generate}.mithril.yaml are just
+# presets of this file with a default CMD and the right weight includes.
+#
+# Why we docker-run by hand instead of resources.image_id (SkyPilot's native docker
+# mode): image_id requires the client to SSH into the container on port 10022, and
+# Mithril's edge only exposes 22 (verified: container sshd healthy on 10022,
+# localhost:10022 OPEN, external 10022 REFUSED, host iptables empty). SkyPilot also
+# documents image_id support for AWS/Azure/GCP only. Revisit if Mithril exposes
+# 10022 or adds ssh_proxy_command to its provider config.
+#
+# Launch:
+#   scripts/cloud/mithril_launch.sh cloud/run.mithril.yaml biom3-run \
+#     --env CMD="pytest tests/ --use_gpu"
+#
+# Examples (anything the image can run):
+#   --env CMD="biom3_ProteoScribe_sample -i data/x.pt -o outputs/y.pt --device cuda"
+#   --env CMD="biom3_train_stage3 --config_path configs/stage3_training/pretrain_scratch_v1.json --epochs 1"
+#   --env CMD="RUN_ID=ft1 EPOCHS=1 PRIMARY_HDF5=data/x.hdf5 bash scripts/cloud/finetune.sh"
+#   --env CMD="nvidia-smi"           # sanity check
+#
+# The container ENTRYPOINT runs first, syncing BIOM3_WEIGHTS_URI/BIOM3_DATA_URI into
+# /app before CMD executes, and pushing /app/outputs to BIOM3_OUTPUTS_PUSH_URI after.
+
+resources:
+  infra: mithril
+  accelerators: A100:1        # PER-NODE GPUs
+
+num_nodes: 1                  # >1 for multi-node (SkyPilot sets the rank env we forward)
+
+config:
+  mithril:
+    limit_price: 1.00
+
+secrets:
+  AWS_ACCESS_KEY_ID: null
+  AWS_SECRET_ACCESS_KEY: null
+  AWS_SESSION_TOKEN: null
+
+envs:
+  # ── The job: any command the image can run ───────────────────────────────────
+  CMD: null                  # REQUIRED — supply via --env CMD="..."
+
+  # ── Infra / data staging (fixed surface; does not grow with job knobs) ───────
+  IMAGE: ghcr.io/natural-machine/biom3:cuda-dev
+  AWS_DEFAULT_REGION: us-east-2
+  # Weights sync is OFF by default: an empty URI means the entrypoint skips it.
+  # Set BOTH when you need weights — a URI with an empty INCLUDES pulls the whole
+  # ~40 GB tree. e.g. URI=s3://<WEIGHTS_BUCKET>/biom3/weights
+  #                  INCLUDES="ProteoScribe/run1_base_proteoscribe.ckpt*"
+  BIOM3_WEIGHTS_URI: ""
+  BIOM3_WEIGHTS_INCLUDES: ""
+  BIOM3_DATA_URI: ""          # e.g. s3://BUCKET/PREFIX -> /app/data on every node
+  BIOM3_OUTPUTS_PUSH_URI: ""  # e.g. s3://BUCKET/PREFIX/RUN -> pushed from the rank-0 node only
+  WANDB_API_KEY: ""
+
+setup: |
+  set -euo pipefail
+  sudo docker pull "$IMAGE"
+
+# Runs on EVERY node. `-e VAR` with no value forwards VAR from this shell.
+run: |
+  set -euo pipefail
+  HEAD_IP="$(echo "${SKYPILOT_NODE_IPS:-}" | head -n1)"
+  # Only the rank-0 node holds the (DDP) outputs -> gate the push to it.
+  PUSH_URI=""
+  if [ "${SKYPILOT_NODE_RANK:-0}" = "0" ]; then PUSH_URI="${BIOM3_OUTPUTS_PUSH_URI:-}"; fi
+  sudo docker run --rm --gpus all --net=host --ipc=host \
+    -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN -e AWS_DEFAULT_REGION \
+    -e BIOM3_WEIGHTS_URI -e BIOM3_WEIGHTS_INCLUDES -e BIOM3_DATA_URI \
+    -e BIOM3_OUTPUTS_PUSH_URI="$PUSH_URI" \
+    -e MASTER_ADDR="$HEAD_IP" -e SKYPILOT_NODE_RANK -e SKYPILOT_NUM_NODES \
+    -e WANDB_API_KEY \
+    "$IMAGE" bash -lc "$CMD"

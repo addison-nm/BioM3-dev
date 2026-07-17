@@ -34,8 +34,10 @@
 # RUN / OUTPUT:
 #   RUN_ID              run identifier (default: auto, HPC-style naming)
 #   PREFIX              filename prefix for embedding artifacts (default: RUN_ID)
-#   DEVICE              cpu | cuda | xpu (default cuda)
-#   NGPU                GPUs for the trainer (default 1; >1 -> torchrun)
+#   DEVICE              cpu | cuda | xpu (default: auto-detected backend)
+#   NGPU                GPUs per node for the trainer (default 1; >1 -> torchrun)
+#   NNODES              nodes (default 1 or $SKYPILOT_NUM_NODES; >1 -> multi-node DDP)
+#   DISTRIBUTED_STRATEGY  trainer strategy (default ddp when NNODES>1)
 #   EPOCHS              passed to the trainer + used in the auto RUN_ID (optional)
 #
 # SPLIT (optional cluster-aware split; default off):
@@ -62,8 +64,9 @@ WEIGHT_SET="${WEIGHT_SET:-configs/weights/run1_base.json}"
 FINETUNE_CONFIG="${FINETUNE_CONFIG:-configs/stage3_training/finetune_v1.json}"
 PENCL_CONFIG="${PENCL_CONFIG:-configs/inference/stage1_PenCL.json}"
 FACILITATOR_CONFIG="${FACILITATOR_CONFIG:-configs/inference/stage2_Facilitator.json}"
-DEVICE="${DEVICE:-cuda}"
+DEVICE="${DEVICE:-$(default_device)}"
 NGPU="${NGPU:-1}"
+NNODES="${NNODES:-${SKYPILOT_NUM_NODES:-1}}"
 SPLIT="${SPLIT:-none}"
 
 require_one DATASET_CSV PRIMARY_HDF5
@@ -71,10 +74,10 @@ require_one DATASET_CSV PRIMARY_HDF5
 # .ckpt init weights are loaded via torch.load without weights_only.
 export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=true
 
-RUN_ID="${RUN_ID:-$(cloud_run_id "${FINETUNE_CONFIG}" "${NGPU}" "${EPOCHS:-na}" ft)}"
+RUN_ID="${RUN_ID:-$(cloud_run_id "${FINETUNE_CONFIG}" "${NGPU}" "${EPOCHS:-na}" ft "${NNODES}")}"
 PREFIX="${PREFIX:-${RUN_ID}}"
 EMB_DIR="outputs/${RUN_ID}/embeddings"
-log "RUN_ID=${RUN_ID} device=${DEVICE} ngpu=${NGPU} split=${SPLIT}"
+log "RUN_ID=${RUN_ID} device=${DEVICE} nnodes=${NNODES} ngpu=${NGPU} split=${SPLIT}"
 
 # ── 1. Embeddings (Stage 1 PenCL + Stage 2 Facilitator -> HDF5) ──────────────
 if [[ -n "${PRIMARY_HDF5:-}" ]]; then
@@ -130,12 +133,26 @@ PROTEOSCRIBE_INIT="${PROTEOSCRIBE_INIT:-$(weight_from_set "${WEIGHT_SET}" proteo
 EPOCH_ARGS=()
 [[ -n "${EPOCHS:-}" ]] && EPOCH_ARGS=(--epochs "${EPOCHS}")
 
-log "[3/3] Finetuning ProteoScribe from ${PROTEOSCRIBE_INIT}"
-exec "${SCRIPT_DIR}/../stage3_train_singlenode.sh" \
-    "${FINETUNE_CONFIG}" "${NGPU}" "${DEVICE}" "${RUN_ID}" \
-    --finetune True \
-    --pretrained_weights "${PROTEOSCRIBE_INIT}" \
-    --primary_data_path "${HDF5}" \
-    "${SPLIT_ARGS[@]}" \
-    "${EPOCH_ARGS[@]}" \
-    "$@"
+log "[3/3] Finetuning ProteoScribe from ${PROTEOSCRIBE_INIT} (nnodes=${NNODES})"
+if [[ "${NNODES}" -le 1 ]]; then
+    exec "${SCRIPT_DIR}/../stage3_train_singlenode.sh" \
+        "${FINETUNE_CONFIG}" "${NGPU}" "${DEVICE}" "${RUN_ID}" \
+        --finetune True \
+        --pretrained_weights "${PROTEOSCRIBE_INIT}" \
+        --primary_data_path "${HDF5}" \
+        "${SPLIT_ARGS[@]}" \
+        "${EPOCH_ARGS[@]}" \
+        "$@"
+else
+    # NGPU is per-node here. Cloud multi-node has no shared filesystem, so DDP
+    # (single .ckpt written by global rank 0) rather than sharded DeepSpeed.
+    exec "${SCRIPT_DIR}/../stage3_train_multinode.sh" \
+        "${FINETUNE_CONFIG}" "${NNODES}" "${NGPU}" "${DEVICE}" "${RUN_ID}" \
+        --finetune True \
+        --pretrained_weights "${PROTEOSCRIBE_INIT}" \
+        --primary_data_path "${HDF5}" \
+        --distributed_strategy "${DISTRIBUTED_STRATEGY:-ddp}" \
+        "${SPLIT_ARGS[@]}" \
+        "${EPOCH_ARGS[@]}" \
+        "$@"
+fi

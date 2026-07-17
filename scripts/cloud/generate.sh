@@ -33,7 +33,9 @@
 # RUN / OUTPUT:
 #   OUTPUT_PREFIX       filename prefix (default: gen_<YYYYMMDD_HHMMSS>)
 #   OUTPUT_DIR          output directory (default: outputs/<OUTPUT_PREFIX>)
-#   DEVICE              cpu | cuda | xpu (default cuda)
+#   DEVICE              cpu | cuda | xpu (default: auto-detected backend)
+#   NGPU                GPUs per node for Stage-3 sampling (default 1; >1 -> torchrun)
+#   NNODES              nodes (default 1 or $SKYPILOT_NUM_NODES; >1 -> multi-node sampling)
 #   BATCH_SIZE          Stage-1 batch size (default 256)
 #   MMD_SAMPLE_LIMIT    Stage-2 MMD limit (default 1000)
 #   SEED                ProteoScribe sampling seed (default 0)
@@ -54,7 +56,9 @@ WEIGHT_SET="${WEIGHT_SET:-configs/weights/run1_base.json}"
 PENCL_CONFIG="${PENCL_CONFIG:-configs/inference/stage1_PenCL.json}"
 FACILITATOR_CONFIG="${FACILITATOR_CONFIG:-configs/inference/stage2_Facilitator.json}"
 PROTEOSCRIBE_CONFIG="${PROTEOSCRIBE_CONFIG:-configs/inference/stage3_ProteoScribe_sample.json}"
-DEVICE="${DEVICE:-cuda}"
+DEVICE="${DEVICE:-$(default_device)}"
+NGPU="${NGPU:-1}"
+NNODES="${NNODES:-${SKYPILOT_NUM_NODES:-1}}"
 
 [[ -n "${PROMPTS_CSV:-}" ]] || die "set PROMPTS_CSV (input CSV of prompts)"
 
@@ -96,5 +100,18 @@ GEN_ARGS=(-i "${FAC_PT}" -c "${PROTEOSCRIBE_CONFIG}" -m "${PROTEOSCRIBE_WEIGHTS}
 [[ -n "${TOKEN_STRATEGY:-}" ]] && GEN_ARGS+=(--token_strategy "${TOKEN_STRATEGY}")
 [[ -n "${UNMASKING_ORDER:-}" ]] && GEN_ARGS+=(--unmasking_order "${UNMASKING_ORDER}")
 
-log "[3/3] ProteoScribe sample -> ${GEN_PT}"
-exec biom3_ProteoScribe_sample "${GEN_ARGS[@]}" "$@"
+log "[3/3] ProteoScribe sample -> ${GEN_PT} (nnodes=${NNODES} ngpu=${NGPU})"
+# Only Stage 3 is parallelizable; the sampler shards work across ranks and only
+# rank 0 writes. Stages 1-2 above ran once per node — Facilitator sampling is
+# stochastic, so for deterministic multi-node output stage FAC_PT from rank 0
+# (see docker/README.md); pass a fixed --seed and verify determinism first.
+if [[ "${NNODES}" -gt 1 ]]; then
+    NGPU_PER_NODE="${NGPU}" NUM_NODES="${NNODES}" \
+      exec "${SCRIPT_DIR}/../launchers/container_multinode.sh" \
+        biom3_ProteoScribe_sample "${GEN_ARGS[@]}" "$@"
+elif [[ "${NGPU}" -gt 1 ]]; then
+    NGPU="${NGPU}" exec "${SCRIPT_DIR}/../launchers/container_singlenode.sh" \
+        biom3_ProteoScribe_sample "${GEN_ARGS[@]}" "$@"
+else
+    exec biom3_ProteoScribe_sample "${GEN_ARGS[@]}" "$@"
+fi

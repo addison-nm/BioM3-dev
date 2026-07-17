@@ -1,51 +1,64 @@
-# TEMPLATE — BioM3 Stage-3 finetuning on AWS (SkyPilot), running INSIDE the
-# prebuilt ECR image. Identical job + envs to cloud/finetune.mithril.yaml —
-# only `resources` differ. Fill in every <PLACEHOLDER>. See docs/setup/cloud_jobs.md.
+# TEMPLATE — BioM3 Stage-3 finetuning on AWS, single- or multi-node. Same
+# host-docker-pull job + envs as cloud/finetune.mithril.yaml — only `resources`
+# differ. See docs/setup/cloud_jobs.md.
 #
-# Prereqs in your launch shell:
+# Launch with native sky (--secret redacts the creds in logs):
 #   eval "$(aws configure export-credentials --format env)"
-#   export ECR_PASSWORD="$(aws ecr get-login-password --region us-east-2)"
-# On AWS you may instead leave SKYPILOT_DOCKER_USERNAME/PASSWORD empty to let the
-# instance IAM role authenticate to ECR (S3 creds below still needed unless the
-# role grants S3 access).
+#   sky launch -c biom3-ft-$(date +%y%m%d-%H%M%S) cloud/finetune.aws.yaml -y --down \
+#     --secret AWS_ACCESS_KEY_ID \
+#     --secret AWS_SECRET_ACCESS_KEY --secret AWS_SESSION_TOKEN
+#
+# MULTI-NODE: set resources.num_nodes > 1 and accelerators to the PER-NODE GPU
+# count (see cloud/finetune.mithril.yaml for the DDP/no-shared-FS notes).
 
 resources:
-  infra: aws
-  accelerators: <GPU>:1                # e.g. H100:1, A100:1, A10G:1, L4:1 — match quota/region
-  region: us-east-2
-  image_id: docker:955510722784.dkr.ecr.us-east-2.amazonaws.com/biom3:gpu
+  infra: aws/us-east-2         # provider/region (can't combine infra: with a separate region:)
+  accelerators: A10G:1         # PER-NODE GPUs; NGPU below must match this count
 
-envs:
-  RUN_ID: <RUN_ID>
-  DEVICE: cuda
-  NGPU: "1"
-  EPOCHS: "<EPOCHS>"
-  WEIGHT_SET: configs/weights/run1_base.json
-  FINETUNE_CONFIG: configs/stage3_training/finetune_v1.json
-
-  # Input — provide ONE (in-container paths under /app):
-  # PRIMARY_HDF5: <data/your.compiled_emb.hdf5>
-  # DATASET_CSV:  <data/your_dataset.csv>
-
-  AWS_DEFAULT_REGION: us-east-2
-  SKYPILOT_DOCKER_USERNAME: AWS
-  SKYPILOT_DOCKER_SERVER: 955510722784.dkr.ecr.us-east-2.amazonaws.com
-
-  BIOM3_WEIGHTS_URI: s3://nm-portal-global-data-955510722784/biom3/weights
-  BIOM3_WEIGHTS_INCLUDES: "ProteoScribe/run1_base_proteoscribe.ckpt*"
-  #   + for the embed path: "PenCL/run1_base_pencl.ckpt* Facilitator/run1_base_facilitator.ckpt*"
-  # BIOM3_DATA_URI: <s3://BUCKET/PREFIX>                 # or use file_mounts (below)
-  # BIOM3_OUTPUTS_PUSH_URI: <s3://BUCKET/PREFIX/RUN_ID>
-
-# file_mounts:
-#   /app/data: <./local/path/to/data>
+num_nodes: 1                   # top-level (not under resources:); >1 for multi-node
 
 secrets:
-  SKYPILOT_DOCKER_PASSWORD: ${ECR_PASSWORD}
-  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-  AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN}
+  AWS_ACCESS_KEY_ID: null
+  AWS_SECRET_ACCESS_KEY: null
+  AWS_SESSION_TOKEN: null
+
+envs:
+  # ── BioM3 job spec (edit per run) ────────────────────────────────────────────
+  RUN_ID: sh3_ft_v1          # default; override via --env RUN_ID=... or --env-file
+  NGPU: "1"
+  EPOCHS: "100"
+  WEIGHT_SET: configs/weights/run1_base.json
+  FINETUNE_CONFIG: configs/stage3_training/finetune_v1.json
+  PRIMARY_HDF5: ""           # e.g. data/your.compiled_emb.hdf5 (skips embedding)
+  DATASET_CSV: ""            # e.g. data/your_dataset.csv (embedded first; single-node)
+  EXTRA_ARGS: ""             # extra flags forwarded verbatim to the trainer ("$@")
+
+  # ── Infra / data staging (ECR image, AWS region, S3 URIs) ────────────────────
+  IMAGE: ghcr.io/natural-machine/biom3:cuda-dev
+  AWS_DEFAULT_REGION: us-east-2
+  BIOM3_WEIGHTS_URI: s3://<WEIGHTS_BUCKET>/biom3/weights
+  BIOM3_WEIGHTS_INCLUDES: "ProteoScribe/run1_base_proteoscribe.ckpt*"
+  BIOM3_DATA_URI: ""
+  BIOM3_OUTPUTS_PUSH_URI: ""
+  WANDB_API_KEY: ""
+
+setup: |
+  set -euo pipefail
+  sudo docker pull "$IMAGE"
 
 run: |
-  cd /app
-  /usr/local/bin/entrypoint.sh scripts/cloud/finetune.sh
+  set -euo pipefail
+  HEAD_IP="$(echo "${SKYPILOT_NODE_IPS:-}" | head -n1)"
+  EFLAGS=(-e MASTER_ADDR="$HEAD_IP")
+  for v in SKYPILOT_NODE_RANK SKYPILOT_NUM_NODES NGPU DEVICE DISTRIBUTED_STRATEGY \
+           RUN_ID EPOCHS WEIGHT_SET FINETUNE_CONFIG PRIMARY_HDF5 DATASET_CSV SPLIT \
+           AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_DEFAULT_REGION \
+           BIOM3_WEIGHTS_URI BIOM3_WEIGHTS_INCLUDES BIOM3_DATA_URI \
+           WANDB_API_KEY NCCL_DEBUG NCCL_SOCKET_IFNAME; do
+    [ -n "${!v:-}" ] && EFLAGS+=(-e "$v=${!v}")
+  done
+  if [ "${SKYPILOT_NODE_RANK:-0}" = "0" ] && [ -n "${BIOM3_OUTPUTS_PUSH_URI:-}" ]; then
+    EFLAGS+=(-e "BIOM3_OUTPUTS_PUSH_URI=$BIOM3_OUTPUTS_PUSH_URI")
+  fi
+  sudo docker run --rm --gpus all --net=host --ipc=host \
+    "${EFLAGS[@]}" "$IMAGE" bash scripts/cloud/finetune.sh ${EXTRA_ARGS:-}

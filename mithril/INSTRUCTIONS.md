@@ -111,7 +111,7 @@ push once to a registry and pull next time** — see [§9](#9-optional-skip-the-
 Also settles the Blackwell/`sm_100` question. No data needed:
 
 ```bash
-docker run --rm --gpus all biom3:gpu python -c \
+docker run --rm --gpus all biom3:cuda python -c \
  "import torch; x=torch.randn(4096,4096,device='cuda'); print('cuda ok:', torch.cuda.get_device_name(0), (x@x).sum().item())"
 ```
 
@@ -138,7 +138,7 @@ land in `./outputs/`. A completed step proves: image → GPU → BioM3 training 
 ### 7b. Generation — weights from S3, built-in test input
 
 ```bash
-export BIOM3_WEIGHTS_URI=s3://nm-portal-global-data-955510722784/biom3/weights
+export BIOM3_WEIGHTS_URI=s3://<WEIGHTS_BUCKET>/biom3/weights
 # ⚠ ALWAYS narrow the pull — without this it syncs the whole ~40 GB weights tree:
 export BIOM3_WEIGHTS_INCLUDES="LLMs/* PenCL/*.bin Facilitator/*.bin ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin"
 unset BIOM3_DATA_URI
@@ -165,12 +165,12 @@ Build once, reuse the image on every future instance:
 ECR=<acct>.dkr.ecr.us-east-2.amazonaws.com
 aws ecr create-repository --repository-name biom3 --region us-east-2          # one-time
 aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin $ECR
-docker tag biom3:gpu $ECR/biom3:gpu && docker push $ECR/biom3:gpu
+docker tag biom3:cuda $ECR/biom3:cuda && docker push $ECR/biom3:cuda
 
 # on a future instance — no build:
 aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin $ECR
-docker pull $ECR/biom3:gpu
-BIOM3_IMAGE=$ECR/biom3:gpu docker/run.sh ...
+docker pull $ECR/biom3:cuda
+BIOM3_IMAGE=$ECR/biom3:cuda docker/run.sh ...
 ```
 
 ## 10. Tear down
@@ -179,5 +179,5 @@ Stop/terminate the instance to stop billing — `ml instance delete biom3-test -
 via the Mithril console. Nothing on the instance persists, so save anything you need first
 (results are in `./outputs/`; push them to S3 if you want them).
 ```bash
-aws s3 cp --recursive ./outputs s3://nm-portal-global-data-955510722784/biom3/outputs/mithril_test01
+aws s3 cp --recursive ./outputs s3://<WEIGHTS_BUCKET>/biom3/outputs/mithril_test01
 ```

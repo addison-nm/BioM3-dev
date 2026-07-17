@@ -45,14 +45,14 @@ eval "$(aws configure export-credentials --format env)"      # AWS creds in shel
 
 # Build + push in one step:
 docker/build.sh --awscli --platform linux/amd64 \
-    --tag 955510722784.dkr.ecr.us-east-2.amazonaws.com/biom3:gpu --push
+    --tag <ACCOUNT>.dkr.ecr.us-east-2.amazonaws.com/biom3:cuda --push
 
 # …or push an image you already built locally:
-docker/push.sh --create-repo        # tag + ECR login + push biom3:gpu
+docker/push.sh --create-repo        # tag + ECR login + push biom3:cuda
 ```
 
 The `cloud/*.yaml` files already point at
-`955510722784.dkr.ecr.us-east-2.amazonaws.com/biom3:gpu`. Rebuild + repush
+`<ACCOUNT>.dkr.ecr.us-east-2.amazonaws.com/biom3:cuda`. Rebuild + repush
 whenever you change `scripts/cloud/*.sh` or `src/` (image_id mode runs the baked
 code, not your working tree).
 

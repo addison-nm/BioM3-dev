@@ -21,7 +21,7 @@ One image, all uses (train/finetune/generate + the app). Built per architecture:
 
 ```bash
 cd /path/to/BioM3-dev
-docker/build.sh                          # native arch → tags biom3:gpu
+docker/build.sh                          # native arch → tags biom3:cuda
 # or pin: docker/build.sh --platform linux/amd64   (AWS/Mithril x86)
 #         docker/build.sh --platform linux/arm64   (Grace / GH200)
 ```
@@ -29,8 +29,8 @@ docker/build.sh                          # native arch → tags biom3:gpu
 Verify the build (no GPU needed):
 
 ```bash
-docker run --rm biom3:gpu python -c "import biom3, torch; print(torch.__version__)"
-docker run --rm biom3:gpu pytest tests/ --quick
+docker run --rm biom3:cuda python -c "import biom3, torch; print(torch.__version__)"
+docker run --rm biom3:cuda pytest tests/ --quick
 ```
 
 ## Supplying weights and data

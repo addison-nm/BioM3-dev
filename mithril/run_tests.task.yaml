@@ -19,7 +19,7 @@ workdir: .                       # sync this repo to ~/sky_workdir on the instan
 
 resources:
   infra: mithril
-  accelerators: B200:1           # one B200; e.g. B200:8 for an 8-GPU node
+  accelerators: A100           # one B200; e.g. B200:8 for an 8-GPU node
 
 config:
   mithril:
@@ -35,7 +35,7 @@ secrets:
 # Non-sensitive config.
 envs:
   AWS_DEFAULT_REGION: us-east-2
-  BIOM3_WEIGHTS_URI: s3://nm-portal-global-data-955510722784/biom3/weights
+  BIOM3_WEIGHTS_URI: s3://<WEIGHTS_BUCKET>/biom3/weights
   # Only the weights the pytest suite actually loads (traced from the test code).
   # Files missing from S3 → just those tests skip. Directory-style ckpts use a
   # trailing * so their contents come through; the esm2 `*` also grabs the
@@ -61,17 +61,11 @@ run: |
   # container — including AWS_SESSION_TOKEN, which `sudo -E` may drop. (Tradeoff:
   # the values appear in process args / logs; fine for short-lived temp creds.)
   sudo docker run --rm --gpus all \
-    -e AWS_ACCESS_KEY_ID \
-    -e AWS_SECRET_ACCESS_KEY \
-    -e AWS_SESSION_TOKEN \
-    -e AWS_DEFAULT_REGION \
-    -e BIOM3_WEIGHTS_URI \
-    -e BIOM3_WEIGHTS_INCLUDES \
-    biom3:gpu pytest tests/ --use_gpu
+    biom3:cuda pytest tests/ --use_gpu
 
 # ── Notes ────────────────────────────────────────────────────────────────────
 # • Data-free (no weights/creds): drop the secrets/envs blocks, build without
-#   --awscli, and `sudo docker run --rm --gpus all biom3:gpu pytest tests/ --quick`.
+#   --awscli, and `sudo docker run --rm --gpus all biom3:cuda pytest tests/ --quick`.
 # • If `sudo -E` doesn't preserve env on the box (sudoers policy), either add the
 #   task user to the docker group in `setup` and drop `sudo`, or pass values
 #   inline — `-e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"` (puts the value in the
@@ -79,6 +73,6 @@ run: |
 # • Training smoke instead of tests (still needs the creds -e flags for weights,
 #   or use the baked-in subset with no weights):
 #     sudo -E docker run --rm --gpus all -v "$PWD/outputs:/app/outputs" \
-#       biom3:gpu scripts/stage3_train_singlenode.sh \
+#       biom3:cuda scripts/stage3_train_singlenode.sh \
 #         configs/stage3_training/pretrain_scratch_v1.json 1 cuda mithril_test01 \
 #         --epochs 1 --primary_data_path tests/_data/data/Stage2_MMD_swissprot_embedding_subset_1000.hdf5

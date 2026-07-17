@@ -11,7 +11,13 @@ from biom3.core.dataloaders import compose_functions as cf
 from biom3.core.dataloaders import load_compose_plugins
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PLUGIN_PATH = REPO_ROOT / "caption_plugins" / "pencl_caption.py"
+# Self-contained fixture copy of the plugin: the loader + captioning-logic tests
+# load THIS, so they never depend on the repo-root caption_plugins/ dir (which is
+# not shipped in the container image).
+PLUGIN_PATH = Path(__file__).resolve().parent / "plugins" / "pencl_caption.py"
+# The shipped production plugin (referenced by the Aurora finetune configs). The
+# drift guard in TestShippedPlugin asserts it stays byte-identical to the fixture.
+SHIPPED_PLUGIN = REPO_ROOT / "caption_plugins" / "pencl_caption.py"
 
 # A Pfam-style record carrying labels that are out-of-vocabulary for PenCL
 # (gene_ontology, family_name, family_description) alongside in-vocab fields.
@@ -60,7 +66,7 @@ class TestLoader:
 
     def test_missing_file_raises(self):
         with pytest.raises(FileNotFoundError):
-            load_compose_plugins(["./caption_plugins/does_not_exist.py"])
+            load_compose_plugins([str(PLUGIN_PATH.parent / "does_not_exist.py")])
 
 
 class TestPenCLCaption:
@@ -113,3 +119,22 @@ class TestPenCLCaption:
         record = {"fields": {"protein_name": "N" * 1000}}
         cap = pencl_plugin_loaded(record, {"max_item_chars": 100}, random.Random(0))
         assert cap.startswith("PROTEIN NAME: " + "N" * 1000)
+
+
+class TestShippedPlugin:
+    """Drift guard for the production plugin caption_plugins/pencl_caption.py
+    (referenced by the Aurora finetune configs). The behavior tests above run
+    against the in-tree fixture; this asserts the shipped file stays identical to
+    it, so that coverage transitively applies to the shipped plugin. Skips where
+    the shipped file isn't present (e.g. a minimal container that doesn't ship it).
+    """
+
+    @pytest.mark.skipif(
+        not SHIPPED_PLUGIN.is_file(),
+        reason="shipped caption_plugins/pencl_caption.py not present",
+    )
+    def test_shipped_matches_fixture(self):
+        assert SHIPPED_PLUGIN.read_text() == PLUGIN_PATH.read_text(), (
+            "caption_plugins/pencl_caption.py has drifted from the fixture "
+            "tests/core_tests/plugins/pencl_caption.py — keep them in sync."
+        )

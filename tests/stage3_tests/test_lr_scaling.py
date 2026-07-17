@@ -2,12 +2,19 @@
 resulting learning-rate scaling factor. CPU-only, no weights.
 """
 
+from pathlib import Path
+
 import pytest
 
 from biom3.Stage3.run_PL_training import parse_lr_scaling
 from biom3.Stage3.run_ProteoScribe_finetuning import parse_arguments
 
-PROD_CONFIG = "configs/stage3_training/finetune_generalized_aurora_sh3_prod.json"
+# Self-contained minimal config (record_schema + scale_learning_rate, no
+# compose_plugins) so parsing does not load external plugin files. Absolute path
+# -> CWD-independent.
+TEST_CONFIG = str(
+    Path(__file__).resolve().parents[1] / "_data" / "configs" / "test_lr_scaling_config.json"
+)
 
 
 class TestParseLrScaling:
@@ -37,17 +44,17 @@ class TestEntrypointParsing:
     (config value, and a CLI override) — it previously raised via str_to_bool."""
 
     def test_config_value_sqrt(self):
-        args = parse_arguments(['--config_path', PROD_CONFIG])
+        args = parse_arguments(['--config_path', TEST_CONFIG])
         assert args.scale_learning_rate == 'sqrt'
 
     def test_cli_overrides_to_linear(self):
         args = parse_arguments(
-            ['--config_path', PROD_CONFIG, '--scale_learning_rate', 'true'])
+            ['--config_path', TEST_CONFIG, '--scale_learning_rate', 'true'])
         assert args.scale_learning_rate == 'linear'
 
     def test_cli_overrides_to_disabled(self):
         args = parse_arguments(
-            ['--config_path', PROD_CONFIG, '--scale_learning_rate', 'false'])
+            ['--config_path', TEST_CONFIG, '--scale_learning_rate', 'false'])
         assert args.scale_learning_rate is None
 
 

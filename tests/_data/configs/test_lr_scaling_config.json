@@ -1,0 +1,9 @@
+{
+  "description": "Minimal, self-contained finetuning config for tests/stage3_tests/test_lr_scaling.py. Only the fields the finetuning arg parser requires (record_schema) plus scale_learning_rate. NO compose_plugins, so parsing does not load external plugin files.",
+  "record_schema": {
+    "fields": [
+      {"key": "protein_name", "label": "PROTEIN NAME"}
+    ]
+  },
+  "scale_learning_rate": "sqrt"
+}

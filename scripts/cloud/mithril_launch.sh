@@ -2,19 +2,17 @@
 # Launch a BioM3 cloud/*.yaml on Mithril via the bundled sky CLI (`mithril sky
 # launch`), with a UNIQUE cluster name and AWS credentials passed as redacted secrets.
 #
-# The image is PUBLIC on GHCR (ghcr.io/natural-machine/biom3), so there is NO registry
+# The image is PUBLIC on GHCR (ghcr.io/natural-machine/biom3), so there is no registry
 # login or token — Mithril pulls it anonymously. AWS credentials are still required
-# for the container's S3 weight-sync. Real infra identifiers (e.g. the weights bucket)
+# for the container's S3 weight-sync. Real identifiers (e.g. the weights bucket)
 # live in the gitignored configs/jobs/local.env, auto-loaded below via --env-file when
 # present (copy configs/jobs/local.env.example to create it).
 #
-# Why `mithril sky launch` (not the `mithril launch` wrapper): only the bundled sky CLI
-# supports --secret (redacted) and fills `secrets: KEY: null`.
-# Why a unique cluster name: Mithril retains bid names, so reuse fails with a
-# misleading "ResourcesUnavailableError".
+# `mithril sky launch` supports --secret (redacted) and fills `secrets: KEY: null` 
+# whereas `mithril launch` wrapper does not. A unique cluster name prevents Mithril
+# side "ResourcesUnavailableError" failures.
 #
 # Usage: scripts/cloud/mithril_launch.sh <task.yaml> [cluster-prefix] [extra sky args...]
-#   scripts/cloud/mithril_launch.sh cloud/test.mithril.yaml    biom3-test
 #   scripts/cloud/mithril_launch.sh cloud/run.mithril.yaml biom3-run --env CMD="nvidia-smi"
 set -euo pipefail
 
@@ -34,7 +32,7 @@ if ! aws sts get-caller-identity >/dev/null 2>&1; then
          "(or refresh your profile) and retry." >&2
     exit 1
 fi
-eval "$(aws configure export-credentials --format env)"        # harvest fresh from the profile
+eval "$(aws configure export-credentials --format env)"  # harvest fresh from the profile
 
 # Auto-load gitignored local infra defaults (real weights bucket, etc.) when present.
 LOCAL_ENV="${REPO_ROOT}/configs/jobs/local.env"

@@ -1,43 +1,165 @@
 # BioM3 cloud jobs (`cloud/`)
 
-SkyPilot task files that run BioM3 jobs on commercial GPU cloud — **Mithril** or
-**AWS** — inside the prebuilt public GHCR image `ghcr.io/natural-machine/biom3:cuda-dev`. Same job scripts
-(`scripts/cloud/<job>.sh`, baked into the image), different provider.
+`run.mithril.yaml` provisions a GPU on Mithril, pulls the public GHCR image
+`ghcr.io/natural-machine/biom3:cuda-dev`, and runs whatever `CMD` you give it. The job
+lives in `CMD`; the yaml only describes the machine. Nothing about where data lives is
+baked into the image.
 
-- Per-job env-var reference: [`../docs/setup/cloud_jobs.md`](../docs/setup/cloud_jobs.md)
-- The image itself + multi-node notes: [`../docker/README.md`](../docker/README.md)
+The image itself: [`../docker/README.md`](../docker/README.md).
 
-## Files
+## Launch
 
-| Job | Mithril | AWS |
-| --- | --- | --- |
-| test (pytest) | `test.mithril.yaml` | `test.aws.yaml` |
-| pretrain (Stage-3 from scratch) | `pretrain.mithril.yaml` | — |
-| finetune (Stage-3) | `finetune.mithril.yaml` | `finetune.aws.yaml` |
-| generate (Stage-3 inference) | `generate.mithril.yaml` | `generate.aws.yaml` |
+```bash
+scripts/cloud/mithril_launch.sh cloud/run.mithril.yaml <name-prefix> \
+  --config mithril.limit_price=<max $/hr> \
+  --env CMD="<command>" \
+  2>&1 | tee run.log
+```
 
-All use the **host-docker-pull** pattern (no `image_id`): `setup:` pulls the image;
-`run:` executes `docker run … scripts/cloud/<job>.sh` on each node. Multi-node is
-enabled by `num_nodes > 1` (see the docker README).
+`mithril_launch.sh` harvests AWS credentials, picks a unique cluster name (Mithril
+retains bid names, so reuse fails with a misleading `ResourcesUnavailableError`), and
+auto-loads `configs/jobs/local.env`. The launch streams the job output — the trailing
+`tee` is what keeps a local copy.
+
+Add `--num-nodes N` for multi-node, `--gpus A100:4` for a different GPU count.
+
+## Data staging
+
+The container entrypoint stages inputs before `CMD` and pushes outputs after, all from
+runtime env:
+
+| Var | Direction |
+| --- | --- |
+| `BIOM3_WEIGHTS_URI` + `BIOM3_WEIGHTS_INCLUDES` | → `/app/weights` |
+| `BIOM3_DATA_URI` | → `/app/data` |
+| `BIOM3_OUTPUTS_PUSH_URI` | `/app/outputs` → (rank-0 node only) |
+| `BIOM3_SYNC_CMD` / `BIOM3_SYNC_CMD_OUT` | custom pull/push command; `s3://` uses awscli |
+| `BIOM3_SYNC_MODE` | `auto` (skip if dest populated) / `always` / `never` |
+
+`BIOM3_WEIGHTS_URI` comes from the gitignored `configs/jobs/local.env`, so the examples
+below only set `INCLUDES`. A URI with no `INCLUDES` is refused rather than pulling the
+whole tree — pass `INCLUDES="*"` to opt into everything, or `BIOM3_WEIGHTS_URI=""` to
+skip the weight sync.
+
+Not on S3: set `BIOM3_SYNC_CMD` to any pull command. It runs with `BIOM3_SYNC_URI` and
+`BIOM3_SYNC_DEST` exported, so rclone/gsutil/curl work without changing the image.
+
+## Examples
+
+### test
+
+```bash
+scripts/cloud/mithril_launch.sh cloud/run.mithril.yaml biom3-test \
+  --config mithril.limit_price=6.00 \
+  --env CMD="pytest tests/ --include_requires_gpu" \
+  --env BIOM3_WEIGHTS_INCLUDES="LLMs/esm2_t33_650M_UR50D* LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext/* PenCL/BioM3_PenCL_epoch20.bin PenCL/PenCL_V09152023_last.ckpt* Facilitator/BioM3_Facilitator_epoch20.bin ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1*.bin ProteoScribe/epoch200_full.ckpt/single_model.pth" \
+  2>&1 | tee test.log
+```
+
+No weights (weight-gated tests skip):
+
+```bash
+scripts/cloud/mithril_launch.sh cloud/run.mithril.yaml biom3-test \
+  --config mithril.limit_price=6.00 \
+  --env CMD="pytest tests/ --quick" --env BIOM3_WEIGHTS_URI="" \
+  2>&1 | tee test.log
+```
+
+### pretrain — Stage 3 from scratch
+
+From-scratch needs no pretrained weights. This uses the test HDF5 baked into the image:
+
+```bash
+scripts/cloud/mithril_launch.sh cloud/run.mithril.yaml biom3-pt \
+  --config mithril.limit_price=6.00 \
+  --env BIOM3_WEIGHTS_URI="" \
+  --env CMD="bash scripts/stage3_train_singlenode.sh \
+      configs/stage3_training/pretrain_scratch_v1.json 1 cuda pt1 \
+      --primary_data_path tests/_data/data/Stage2_MMD_swissprot_embedding_subset_1000.hdf5 \
+      --epochs 1 --limit_val_batches 1.0" \
+  2>&1 | tee pretrain.log
+```
+
+Positional args are `CONFIG_PATH NGPU DEVICE RUN_ID`; everything after is forwarded to
+`biom3_train_stage3`. For a real dataset, sync it with `--env BIOM3_DATA_URI=s3://…` and
+point `--primary_data_path` at `/app/data/…`.
+
+### finetune — Stage 3
+
+```bash
+scripts/cloud/mithril_launch.sh cloud/run.mithril.yaml biom3-ft \
+  --config mithril.limit_price=6.00 \
+  --env BIOM3_WEIGHTS_INCLUDES="ProteoScribe/run1_base_proteoscribe.ckpt*" \
+  --env CMD="bash scripts/stage3_train_singlenode.sh \
+      configs/stage3_training/finetune_v1.json 1 cuda ft1 \
+      --finetune True \
+      --pretrained_weights weights/ProteoScribe/run1_base_proteoscribe.ckpt \
+      --primary_data_path tests/_data/data/Stage2_MMD_swissprot_embedding_subset_1000.hdf5 \
+      --epochs 1 --limit_val_batches 1.0" \
+  2>&1 | tee finetune.log
+```
+
+Starting from a CSV instead of a precompiled HDF5, chain the embedding pipeline first
+(this also needs the PenCL + Facilitator weights in `INCLUDES`):
+
+```bash
+  --env CMD="biom3_embedding_pipeline -i /app/data/my.csv -o /app/outputs/emb --prefix ds1 \
+        --weight_set configs/weights/run1_base.json \
+        --pencl_config configs/inference/stage1_PenCL.json \
+        --facilitator_config configs/inference/stage2_Facilitator.json \
+      && bash scripts/stage3_train_singlenode.sh \
+        configs/stage3_training/finetune_v1.json 1 cuda ft1 \
+        --finetune True --pretrained_weights weights/ProteoScribe/run1_base_proteoscribe.ckpt \
+        --primary_data_path /app/outputs/emb/ds1.compiled_emb.hdf5 --epochs 1"
+```
+
+### generate — Stage 1 → 2 → 3
+
+```bash
+scripts/cloud/mithril_launch.sh cloud/run.mithril.yaml biom3-gen \
+  --config mithril.limit_price=6.00 \
+  --env BIOM3_WEIGHTS_INCLUDES="LLMs/esm2_t33_650M_UR50D* LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext/* PenCL/run1_base_pencl.ckpt* Facilitator/run1_base_facilitator.ckpt* ProteoScribe/run1_base_proteoscribe.ckpt*" \
+  --env CMD="biom3_embedding_pipeline --generate \
+      -i tests/_data/stage1_inputs/sample_text_seqs1.csv \
+      -o /app/outputs/gen1 --prefix gen1 \
+      --weight_set configs/weights/run1_base.json \
+      --pencl_config configs/inference/stage1_PenCL.json \
+      --facilitator_config configs/inference/stage2_Facilitator.json \
+      --proteoscribe_config configs/inference/stage3_ProteoScribe_sample.json" \
+  2>&1 | tee generate.log
+```
+
+The prompts CSV needs the columns the PenCL config expects (`protein_sequence` +
+`primary_Accession`). FASTA is written by default; `--no_fasta` disables it.
+
+Multi-GPU or multi-node sampling: run the same command under a launcher, e.g.
+`NGPU=4 bash scripts/launchers/container_singlenode.sh biom3_embedding_pipeline --generate …`.
+Stages 1-2 are deterministic, so every rank computes identical embeddings; the Stage 3
+sampler shards by rank and only rank 0 writes.
+
+### keeping outputs
+
+Add `--env BIOM3_OUTPUTS_PUSH_URI=s3://<bucket>/<prefix>/<run>` to any of the above.
+`/app/outputs` is pushed when `CMD` exits, from the rank-0 node only.
 
 ---
 
 ## Publishing the image (GHCR) — runbook
 
 The image is published **public** at **`ghcr.io/natural-machine/biom3`**, tagged
-`cuda-<sha>` (immutable, per commit) and `cuda-dev` (moving; what `cloud/*.yaml` track).
+`cuda-<sha>` (immutable, per commit) and `cuda-dev` (moving; what `run.mithril.yaml`
+tracks).
 
 Why GHCR + public:
 - **Cost**: Mithril instances are ephemeral, so *every launch pulls the whole ~11.6 GB
   image*. From ECR that is internet egress (~$0.09/GB ≈ **$1/launch**, billed under the
-  AWS EC2/"EC2-Other" line). GitHub Packages is **free for public packages** ("usage is
-  free for public packages … data transferred in from any source is free").
+  AWS EC2/"EC2-Other" line). GitHub Packages is **free for public packages**.
 - **Simplicity**: a public image needs **no pull authentication**, so the launch path
-  carries no registry token at all (no 2420-char, 12-hour ECR token to re-mint).
+  carries no registry token at all.
 
 > **Before you publish**: the image bakes `src/`, `scripts/`, `tests/` (incl. the test
 > HDF5s) and `configs/`. Publishing it **makes all of that world-readable** — confirm
-> that is intended, especially if `natural-machine/BioM3-dev` is a private repo.
+> that is intended.
 
 ### One-time: create a token and publish
 
@@ -59,17 +181,16 @@ docker/push.sh --variant cuda
 # 4. Make the package PUBLIC — the first push creates it PRIVATE by default.
 #    Web: https://github.com/orgs/natural-machine/packages → biom3
 #         → Package settings → Danger Zone → Change visibility → Public
-#    (Optionally under "Manage Actions access", link the BioM3-dev repo.)
 
 # 5. Verify an ANONYMOUS pull — this is exactly what a Mithril instance does.
 docker logout ghcr.io
 docker pull ghcr.io/natural-machine/biom3:cuda-dev
 ```
 
-### On every image change (code, deps, job scripts)
+### On every image change
 
-The image bakes `src/ scripts/ tests/ configs/`, so any change to them needs a rebuild
-and repush before it reaches a cloud run:
+The image bakes `src/ scripts/ tests/ configs/`, so any change to them — or to
+`docker/entrypoint.sh` — needs a rebuild and repush before it reaches a cloud run:
 
 ```bash
 echo "$GHCR_TOKEN" | docker login ghcr.io -u addison-nm --password-stdin
@@ -79,96 +200,48 @@ docker/push.sh --variant cuda       # commit first — push.sh refuses a dirty t
 
 ### What this does NOT remove
 
-**AWS credentials are still required** — GHCR only replaces the *image registry*. The
-container entrypoint still `aws s3 sync`s weights/data from S3, so launches still pass
-`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN`, and the S3 egress
-for weight syncs still bills to AWS. Narrow it with `BIOM3_WEIGHTS_INCLUDES`.
-
-## Launching (Mithril)
-
-Launch via the **bundled sky CLI** (`mithril sky launch`), not the `mithril launch`
-wrapper — only the former honors `--secret` (redacted creds), the `secrets: null`
-pattern, and `config.mithril.limit_price`.
-
-```bash
-eval "$(aws configure export-credentials --format env)"
-mithril sky launch -c biom3-ft-$(date +%y%m%d-%H%M%S) cloud/finetune.mithril.yaml -y --down \
-  --secret AWS_ACCESS_KEY_ID --secret AWS_SECRET_ACCESS_KEY --secret AWS_SESSION_TOKEN \
-  --env RUN_ID=my_run --env NGPU=4
-```
-(The image is public on GHCR — pulled anonymously — so there's no registry token; AWS
-creds are passed only for the container's S3 weight-sync. `scripts/cloud/mithril_launch.sh`
-wraps this and auto-loads `configs/jobs/local.env`.)
-
-Or the helper, which harvests AWS creds, auto-loads `configs/jobs/local.env`, and picks a unique name:
-
-```bash
-scripts/cloud/mithril_launch.sh cloud/finetune.mithril.yaml biom3-ft --env RUN_ID=my_run
-```
-
-### Overriding job values (never edit the stable yaml)
-
-The `envs:` in each task file are **defaults**, grouped into a *BioM3 job spec* block
-and an *infra / data-staging* block. Override per run (precedence: `--env` > `--env-file`
-> `envs:`):
-
-- `--env RUN_ID=foo --env NGPU=4` — individual overrides
-- `--env-file configs/jobs/finetune.env` — sidecar dotenv (see `configs/jobs/*.example.env`)
-- `--env EXTRA_ARGS="--batch_size 8 --lr 1e-4"` — extra trainer/sampler flags (forwarded to `"$@"`)
-- Set any field to `null` in a yaml to make it **required** (the launch fails, before a
-  GPU is provisioned, unless the user supplies it).
+**AWS credentials are still required** when your data is on S3 — GHCR only replaces the
+*image registry*. The entrypoint still syncs from S3, so launches pass the `AWS_*` trio
+and that egress still bills to AWS. Narrow it with `BIOM3_WEIGHTS_INCLUDES`.
 
 ---
 
-## Mithril: launching from a separate machine
+## Launching from a separate machine
 
 You can drive Mithril launches from any host — e.g. an EC2 instance hosting a web app.
 The launching machine is a **thin client**: no GPU, no Docker, no repo, no weights.
-Everything heavy happens on the Mithril-provisioned instance.
 
-### The launching machine needs
+### It needs
 
 1. **`uv`** (or pip) — to install the CLI.
 2. **`mithril-client`** — `uv tool install -U mithril-client` (provides `mithril` + the
    bundled `sky`).
-3. **Mithril auth** *(separate from AWS — easy to forget)*: `~/.config/mithril/config.yaml`
-   with `api_key` + `project_id`. Interactive `mithril setup`, or headless via the
-   `MITHRIL_API_KEY` / `MITHRIL_PROJECT` env vars (best for a service).
-4. **AWS CLI + credentials** — needed **only for the S3 weight-sync** (the public GHCR
-   image pulls anonymously — no registry auth). `aws configure export-credentials`
-   harvests them to pass as `--secret`; the container uses them to `aws s3 sync` weights.
-   So the identity needs just `s3:GetObject`/`ListBucket` on the weights bucket. On EC2,
-   an **IAM instance role** with that permission is cleanest — no static keys.
-5. **The task YAML file** (`cloud/<job>.mithril.yaml`) — and, if used, the
-   `scripts/cloud/mithril_launch.sh` helper and any `--env-file` sidecar. **Not the whole
-   repo**: the host-pull yamls have no `workdir:`; the code is baked into the image.
-6. **Outbound HTTPS egress** to `api.mithril.ai`, `ghcr.io` (image pull), and the AWS
-   S3 / STS endpoints (matters in a locked-down VPC).
-7. A little local disk — `mithril sky launch` runs a **local SkyPilot API server** and
-   keeps state in `~/.sky/` (it generates its own SSH keys, cluster records, logs).
+3. **Mithril auth** *(separate from AWS)*: `~/.config/mithril/config.yaml` with
+   `api_key` + `project_id`, or the `MITHRIL_API_KEY` / `MITHRIL_PROJECT` env vars.
+4. **AWS CLI + credentials** — only if your data is on S3. The identity needs
+   `s3:GetObject`/`ListBucket` on the bucket. On EC2 an **IAM instance role** is cleanest.
+5. **`cloud/run.mithril.yaml`** and `scripts/cloud/mithril_launch.sh` — **not** the whole
+   repo; the code is baked into the image.
+6. **Outbound HTTPS** to `api.mithril.ai`, `ghcr.io`, and your object store.
+7. A little local disk — `mithril sky launch` runs a local SkyPilot API server and keeps
+   state in `~/.sky/`.
 
-### The launching machine does NOT need
+### It does NOT need
 
-- ❌ **Docker** — the pull / run happen on the *remote* GPU instance.
-- ❌ a **registry token** — the GHCR image is public, pulled anonymously.
+- ❌ **Docker** — the pull/run happen on the remote GPU instance.
+- ❌ a **registry token** — the GHCR image is public.
 - ❌ a **GPU**, the **weights**, or the **BioM3-dev repo**.
 
-### Cross-account note
-
-The GHCR image is public, so there's no cross-account *registry* concern. The only
-cross-account consideration is **S3 read on the weights bucket**: if the launching
-identity is in a different AWS account than the bucket owner, it needs cross-account S3
-access (bucket policy) or must assume a role in the bucket's account.
-
-### Operational notes for a service that launches repeatedly
+### Operational notes
 
 - **Use a unique cluster name every launch.** Mithril retains bid names indefinitely, so
-  reusing a name fails with a *misleading* `ResourcesUnavailableError` (not real GPU
-  scarcity). The helper appends a timestamp; a web app must do the same.
-- **`--down` only fires after a *job* finishes.** A provision-stage failure leaves the
-  instance billing — reconcile on error with `mithril sky status` / `mithril sky down <c>`.
-- **The local API server accumulates state / occasional zombie executors.** Ship
-  [`scripts/cloud/mithril_reset.sh`](../scripts/cloud/mithril_reset.sh) alongside; run it
-  when a launch wedges (it stops the API server, reaps zombies, clears stale locks).
-- **Temporary creds expire** (SSO/role, ~1–12 h). Re-harvest AWS creds
-  per launch (the helper does this every time).
+  reuse fails with a *misleading* `ResourcesUnavailableError`. The helper appends a
+  timestamp; a web app must do the same.
+- **`--down` only fires after a job finishes.** A provision-stage failure leaves the
+  instance billing — reconcile with `mithril sky status` / `mithril sky down <c>`.
+- **Instances that never get an SSH IP** are a Mithril-side failure: the bid clears, an
+  instance is allocated, then SkyPilot waits out a hardcoded 3600 s timeout and cancels
+  the bid. Ctrl-C rather than waiting the hour.
+- **The local API server accumulates state.** Run
+  [`scripts/cloud/mithril_reset.sh`](../scripts/cloud/mithril_reset.sh) when a launch wedges.
+- **Temporary creds expire** (SSO/role, ~1–12 h). The helper re-harvests every launch.

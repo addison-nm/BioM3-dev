@@ -16,8 +16,9 @@
 # --build-arg INSTALL_AWSCLI=true). Env vars:
 #   BIOM3_WEIGHTS_URI       e.g. s3://bucket/biom3/weights  -> /app/weights
 #   BIOM3_DATA_URI          e.g. s3://bucket/biom3/data     -> /app/data
-#   BIOM3_WEIGHTS_INCLUDES  optional space-separated --include globs (weights
-#                           only); when set, prefixes --exclude "*".
+#   BIOM3_WEIGHTS_INCLUDES  required with BIOM3_WEIGHTS_URI; space-separated
+#                           --include globs (weights only), prefixed by
+#                           --exclude "*". Use "*" to sync the whole tree.
 #   BIOM3_SYNC_MODE         auto (default) | always | never
 #                             auto   = skip if the dest dir already has files
 #                             always = sync (aws/rclone only re-transfer deltas)
@@ -91,13 +92,21 @@ _sync_out() {
     fi
 }
 
-# Build the optional weights --include filter list.
+# Build the weights --include filter list. A URI without includes is refused rather
+# than pulling the whole tree; "*" opts in explicitly.
 WEIGHTS_FILTER=()
-if [[ -n "${BIOM3_WEIGHTS_INCLUDES:-}" ]]; then
+if [[ -n "${BIOM3_WEIGHTS_URI:-}" ]]; then
+    if [[ -z "${BIOM3_WEIGHTS_INCLUDES:-}" ]]; then
+        echo "[entrypoint] ERROR: BIOM3_WEIGHTS_URI set without BIOM3_WEIGHTS_INCLUDES." >&2
+        echo "[entrypoint]   Refusing a full-tree sync. Set globs, or '*' for everything." >&2
+        exit 1
+    fi
     WEIGHTS_FILTER+=(--exclude "*")
+    set -f      # split on spaces without expanding globs against the local fs
     for pat in ${BIOM3_WEIGHTS_INCLUDES}; do
         WEIGHTS_FILTER+=(--include "${pat}")
     done
+    set +f
 fi
 
 # Pulls (each a no-op when its URI is unset).

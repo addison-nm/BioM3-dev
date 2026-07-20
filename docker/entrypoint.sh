@@ -34,12 +34,9 @@
 #=============================================================================
 set -euo pipefail
 
-# environment.sh honors the image's BIOM3_MACHINE=container and sets common
-# vars (TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD, etc.). Required before any training
-# wrapper, which reads BIOM3_MACHINE. Send its banner to stderr so the exec'd
-# command's stdout stays clean (the redirect applies to `source` only).
-# shellcheck disable=SC1091
-source /app/environment.sh 1>&2
+# BIOM3_MACHINE and TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD come from the image's ENV.
+# A device-specific env step (as environment.sh does for XPU) will be needed here
+# for a non-CUDA variant.
 
 SYNC_MODE="${BIOM3_SYNC_MODE:-auto}"
 
@@ -74,21 +71,23 @@ _sync_in() {
     fi
 }
 
-# _sync_out DEST_URI SRC LABEL  (best-effort; never fails the run)
+# _can_push DEST_URI — is a push mechanism available for this destination?
+_can_push() {
+    [[ -n "${BIOM3_SYNC_CMD_OUT:-}" ]] && return 0
+    [[ "$1" == s3://* ]] && _have_aws && return 0
+    return 1
+}
+
+# _sync_out DEST_URI SRC LABEL — returns non-zero if the push failed.
 _sync_out() {
     local dest_uri="$1" src="$2" label="$3"
     [[ -z "${dest_uri}" ]] && return 0
     if [[ -n "${BIOM3_SYNC_CMD_OUT:-}" ]]; then
         echo "[entrypoint] Pushing ${label}: BIOM3_SYNC_CMD_OUT '${src}' -> '${dest_uri}'" >&2
-        BIOM3_SYNC_SRC="${src}" BIOM3_SYNC_URI="${dest_uri}" bash -c "${BIOM3_SYNC_CMD_OUT}" \
-            || echo "[entrypoint] WARN: ${label} push failed." >&2
-    elif [[ "${dest_uri}" == s3://* ]] && _have_aws; then
-        echo "[entrypoint] Pushing ${label}: aws s3 sync '${src}' -> '${dest_uri}'" >&2
-        aws s3 sync "${src}" "${dest_uri}" --no-progress \
-            || echo "[entrypoint] WARN: ${label} push failed." >&2
+        BIOM3_SYNC_SRC="${src}" BIOM3_SYNC_URI="${dest_uri}" bash -c "${BIOM3_SYNC_CMD_OUT}"
     else
-        echo "[entrypoint] WARN: cannot push ${label} to '${dest_uri}'" \
-             "(need BIOM3_SYNC_CMD_OUT, or s3:// + awscli)." >&2
+        echo "[entrypoint] Pushing ${label}: aws s3 sync '${src}' -> '${dest_uri}'" >&2
+        aws s3 sync "${src}" "${dest_uri}" --no-progress
     fi
 }
 
@@ -115,14 +114,28 @@ _sync_in "${BIOM3_DATA_URI:-}"    /app/data    data
 
 # Run the command. With no outputs-push configured, exec for clean signal
 # semantics. Otherwise run as a child so we can push /app/outputs on exit
-# (best-effort; forwards SIGTERM/SIGINT for graceful spot preemption).
+# (forwards SIGTERM/SIGINT for graceful spot preemption).
 if [[ -z "${BIOM3_OUTPUTS_PUSH_URI:-}" ]]; then
     exec "$@"
+fi
+
+# Check before running rather than after: on an ephemeral instance an unpushable
+# destination means the outputs are lost when the node goes away.
+if ! _can_push "${BIOM3_OUTPUTS_PUSH_URI}"; then
+    echo "[entrypoint] ERROR: cannot push outputs to '${BIOM3_OUTPUTS_PUSH_URI}'" \
+         "(need BIOM3_SYNC_CMD_OUT, or an s3:// target with awscli installed)." >&2
+    exit 1
 fi
 
 "$@" &
 child=$!
 trap 'kill -TERM "${child}" 2>/dev/null || true' TERM INT
 wait "${child}"; rc=$?
-_sync_out "${BIOM3_OUTPUTS_PUSH_URI}" /app/outputs outputs
+
+if ! _sync_out "${BIOM3_OUTPUTS_PUSH_URI}" /app/outputs outputs; then
+    echo "[entrypoint] ERROR: outputs push to '${BIOM3_OUTPUTS_PUSH_URI}' failed;" \
+         "outputs remain only on this node." >&2
+    # A job failure's own code is more informative, so only override a success.
+    if [[ "${rc}" -eq 0 ]]; then rc=1; fi
+fi
 exit "${rc}"

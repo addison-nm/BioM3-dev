@@ -221,8 +221,11 @@ no pull. To reuse an image pushed before this flow existed:
 
 ```bash
 REPO=ghcr.io/natural-machine/biom3
-docker buildx imagetools create -t $REPO:cuda-<sha>-amd64 $REPO:cuda-<sha>
+docker buildx imagetools create -t ${REPO}:cuda-<sha>-amd64 ${REPO}:cuda-<sha>
 ```
+
+Brace the variable — zsh reads an unbraced `$REPO:c…` as the `:c` history modifier
+and silently drops the `:c`, producing a garbage image reference.
 
 #### Cross-building on one host (slow fallback)
 

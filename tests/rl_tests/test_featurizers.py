@@ -97,7 +97,7 @@ _ESM_WEIGHTS = "./weights/LLMs/esm2_t33_650M_UR50D.pt"
 
 
 @pytest.mark.slow
-@pytest.mark.use_gpu
+@pytest.mark.requires_gpu
 @pytest.mark.skipif(
     not os.path.exists(_ESM_WEIGHTS),
     reason=f"ESM-2 weights not present at {_ESM_WEIGHTS}",

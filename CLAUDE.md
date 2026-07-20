@@ -91,7 +91,7 @@ pytest tests/ --quick
 pytest tests/
 
 # Include GPU-only tests
-pytest tests/ --use_gpu
+pytest tests/ --include_requires_gpu
 ```
 
 ## Testing conventions
@@ -101,7 +101,7 @@ pytest tests/ --use_gpu
 - CLI arguments for entrypoint tests are stored in `tests/_data/entrypoint_args/*.txt`.
 - Custom pytest markers:
   - `@pytest.mark.benchmark` (needs `--benchmark` to run)
-  - `@pytest.mark.use_gpu` (needs `--use_gpu` to run)
+  - `@pytest.mark.requires_gpu` (needs `--include_requires_gpu` to run)
   - `@pytest.mark.network` (needs `--network` to run)
   - `@pytest.mark.database_files` (needs `--database_files` to run)
   - `@pytest.mark.slow` (skipped under `--quick`; applied module-wide to entrypoint + training + pipeline tests)

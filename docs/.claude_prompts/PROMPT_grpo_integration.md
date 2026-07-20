@@ -319,7 +319,7 @@ Worktree: `git worktree add .claude/worktrees/grpo -b addison-grpo addison-dev`
    section in `pyproject.toml` with `grpo = ["fair-esm==2.0.0"]`.
 6. Add a tiny test under `tests/rl/test_grpo_smoke.py` that constructs the
    trainer with a stub reward, runs 2 steps with K=2 batch=1 on a tiny
-   model, and asserts loss is finite. Mark `@pytest.mark.use_gpu` if
+   model, and asserts loss is finite. Mark `@pytest.mark.requires_gpu` if
    needed (or write a CPU path with a dummy diffusion forward).
 
 ### Phase 2 — Run scaffolding

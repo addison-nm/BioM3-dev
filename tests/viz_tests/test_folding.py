@@ -29,7 +29,7 @@ class TestModelCaching:
         folding_mod._ESMFOLD_MODEL = None  # cleanup
 
 
-@pytest.mark.use_gpu
+@pytest.mark.requires_gpu
 class TestFoldSequenceGPU:
     def test_fold_returns_pdb_string(self):
         # ESMFold pulls in heavy optional deps (omegaconf, openfold, ...). Skip

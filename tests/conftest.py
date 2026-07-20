@@ -71,7 +71,7 @@ def pytest_addoption(parser):
         help="run benchmarking tests"
     )
     parser.addoption(
-        "--use_gpu", action="store_true", default=False,
+        "--include_requires_gpu", action="store_true", default=False,
         help="run GPU specific tests"
     )
     parser.addoption(
@@ -104,7 +104,7 @@ def pytest_addoption(parser):
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "benchmark: mark test as benchmarking")
-    config.addinivalue_line("markers", "use_gpu: mark test as GPU specific")
+    config.addinivalue_line("markers", "requires_gpu: mark test as GPU specific")
     config.addinivalue_line("markers", "database_files: mark test as requiring full database files")
     config.addinivalue_line("markers", "network: mark test as requiring network access")
     config.addinivalue_line("markers", "slow: mark test as slow (skipped under --quick)")
@@ -113,13 +113,13 @@ def pytest_configure(config):
 
 def pytest_collection_modifyitems(config, items):
     benchmark_flag_given = False
-    use_gpu_flag_given = False
+    include_requires_gpu_given = False
     if config.getoption("--benchmark"):
         # --benchmark given in cli: do not skip benchmarking tests
         benchmark_flag_given = True
-    if config.getoption("--use_gpu"):
-        # --use_gpu given in cli: do not skip GPU tests
-        use_gpu_flag_given = True
+    if config.getoption("--include_requires_gpu"):
+        # --include_requires_gpu given in cli: do not skip GPU tests
+        include_requires_gpu_given = True
     database_files_flag_given = False
     if config.getoption("--database_files"):
         database_files_flag_given = True
@@ -144,7 +144,7 @@ def pytest_collection_modifyitems(config, items):
     except Exception:
         actual_world = int(os.environ.get("WORLD_SIZE", 1))
     skip_benchmark = pytest.mark.skip(reason="need --benchmark option to run")
-    skip_use_gpu = pytest.mark.skip(reason="need --use_gpu option to run")
+    skip_requires_gpu = pytest.mark.skip(reason="need --include_requires_gpu option to run")
     skip_database_files = pytest.mark.skip(reason="need --database_files option to run")
     skip_network = pytest.mark.skip(reason="need --network option to run")
     skip_slow = pytest.mark.skip(reason="skipped under --quick; remove flag to run slow tests")
@@ -156,8 +156,8 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if "benchmark" in item.keywords and not benchmark_flag_given:
             item.add_marker(skip_benchmark)
-        if "use_gpu" in item.keywords and not use_gpu_flag_given:
-            item.add_marker(skip_use_gpu)
+        if "requires_gpu" in item.keywords and not include_requires_gpu_given:
+            item.add_marker(skip_requires_gpu)
         if "database_files" in item.keywords and not database_files_flag_given:
             item.add_marker(skip_database_files)
         if "network" in item.keywords and not network_flag_given:

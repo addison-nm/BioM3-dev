@@ -1,0 +1,33 @@
+# Fully-pinned dependency set for the Aurora *container* (docker/Dockerfile.xpu).
+#
+# This is the container counterpart to requirements/aurora.txt. The bare-metal
+# Aurora install (docs/setup/setup_aurora.md) gets torch + the Lightning layer
+# from `module load frameworks`, so requirements/aurora.txt lists only a few
+# extras. A container has no frameworks module, so it must pin everything — but
+# these three are installed separately in the Dockerfile and are therefore NOT
+# listed here:
+#   * torch / torchvision  -> from the +xpu wheel index (native torch.xpu)
+#   * pytorch-lightning     -> the addison-nm/lightning fork (Intel-GPU support)
+#   * nvidia-ml-py          -> CUDA-only; not applicable on Intel GPUs
+#
+# Pins mirror requirements/base.txt so the container matches the CPU/CUDA lines.
+
+numpy==2.2.6
+axial-positional-embedding==0.3.12
+linear-attention-transformer==0.19.1
+biopython==1.85
+wandb==0.24.1
+pytest==9.0
+tables==3.11
+pandas
+matplotlib
+fair-esm
+deepspeed
+h5py
+scikit-learn
+transformers
+imageio
+dask
+pyarrow
+py3Dmol
+omegaconf

@@ -1,0 +1,119 @@
+# BioM3 — Intel XPU image (biom3:xpu) for Aurora (ALCF) via Apptainer.
+# The NVIDIA-CUDA variant is docker/Dockerfile.cuda.
+#
+# One image per device, all uses: training (all stages), finetuning, generation,
+# and the streamlit app. The command is chosen at run time.
+#
+# amd64 ONLY: Intel GPU torch wheels are x86_64-only (no aarch64), and Aurora is
+# x86_64 — so, unlike the CUDA variant, there is no arm64 build here.
+#
+# TARGET = Aurora, run under Apptainer (NOT docker). The usual flow is:
+#   docker/build.sh --variant xpu                                   # x86_64 host
+#   docker/push.sh  --variant xpu                                   # -> :xpu-dev
+#   apptainer build biom3_xpu.sif docker://ghcr.io/.../biom3:xpu-dev  # on Aurora
+#   scripts/aurora/apptainer_run.sh <cmd>    # binds /dev/dri + /flare, runs
+# See docs/setup/setup_aurora_container.md for the full runbook.
+# It can also `docker run` on any local Intel-GPU host (see docker/run.sh, which
+# maps :xpu tags to `--device /dev/dri`).
+#
+# GPU ENABLEMENT — how this actually reaches Aurora's Ponte Vecchio GPUs:
+#   * torch==2.8.0+xpu (below) has native torch.xpu; Intel's IPEX is upstreamed
+#     into mainline torch, so no intel_extension_for_pytorch is installed, and
+#     torch.distributed uses the native `xccl` backend (not the old `ccl`).
+#   * The torch wheel vendors the SYCL/DPC++ *runtime*. What must come from
+#     OUTSIDE the wheel is the Level-Zero loader + the Intel L0 GPU *driver*
+#     (libze_intel_gpu). We install those from Intel's GPU apt repo so the image
+#     is self-contained on any Intel-GPU host. On Aurora, the kernel driver is
+#     reached by binding /dev/dri at run time (apptainer_run.sh does this).
+#     NOTE: if the in-image L0 driver ever mismatches Aurora's kernel driver,
+#     the fallback is to bind the host runtime instead — see
+#     docs/setup/setup_aurora_container.md.
+#
+# Build context is the BioM3-dev repo ROOT. Build with docker/build.sh, or:
+#   docker buildx build -f docker/Dockerfile.xpu -t biom3:xpu --load .
+
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1
+
+# BIOM3_MACHINE is deliberately NOT set here (unlike Dockerfile.cuda, which pins
+# it to `container`). Under Apptainer on Aurora, /flare is bound, so leaving it
+# unset lets environment.sh auto-detect `aurora` and apply the oneCCL/xccl/
+# NUMEXPR settings. On a generic Intel host with no /flare, it falls back to
+# `container`. See the detection block in environment.sh.
+
+# System deps:
+#  - python3.12: matches BioM3-dev's required Python (Ubuntu 24.04 ships 3.12).
+#  - build-essential, python3.12-dev: source builds for deps without wheels.
+#  - libopenmpi-dev, openmpi-bin: kept ONLY so mpi4py builds/imports (parity
+#    with the CUDA image). Multi-node launching is done by the host mpiexec.
+#  - git, ca-certificates, wget, gnupg: pip git+ URLs (lightning fork) and the
+#    Intel GPU apt repo key.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3.12 python3.12-dev python3.12-venv \
+        build-essential git ca-certificates wget gnupg \
+        libopenmpi-dev openmpi-bin \
+    && rm -rf /var/lib/apt/lists/*
+
+# Intel GPU user-space runtime (Level-Zero loader + Intel L0 GPU driver + OpenCL
+# ICD) from Intel's official GPU repo for Ubuntu 24.04 (noble). These package
+# names track Intel's `unified` repo and change occasionally; if a name breaks
+# the build, check https://dgpu-docs.intel.com for the current set.
+RUN wget -qO - https://repositories.intel.com/gpu/intel-graphics.key \
+        | gpg --dearmor -o /usr/share/keyrings/intel-graphics.gpg \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/gpu/ubuntu noble unified" \
+        > /etc/apt/sources.list.d/intel-gpu-noble.list \
+    && apt-get update && apt-get install -y --no-install-recommends \
+        libze1 libze-intel-gpu1 intel-opencl-icd clinfo \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV VIRTUAL_ENV=/opt/venv
+RUN python3.12 -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+RUN pip install --upgrade pip setuptools wheel
+
+# Torch with the +xpu wheel (native torch.xpu; pulls pytorch-triton-xpu). Must
+# come before requirements so the pinned torch isn't replaced by a CPU wheel
+# during dependency resolution. This is the XPU analog of the CUDA image's
+# cu129 index.
+RUN pip install torch==2.8.0 torchvision \
+        --index-url https://download.pytorch.org/whl/xpu
+
+# Custom lightning fork with Intel-GPU support, matching the bare-metal Aurora
+# install in docs/setup/setup_aurora.md. Installed before requirements so it,
+# not stock pytorch-lightning, provides the Lightning layer.
+RUN pip install --no-build-isolation \
+        "git+https://github.com/addison-nm/lightning.git"
+
+# Requirements layer, cached independently of the source. aurora-container.txt
+# is the fully-pinned set for the container (the bare-metal requirements/aurora.txt
+# leans on `module load frameworks` for torch, which a container cannot).
+WORKDIR /app
+COPY requirements/ /app/requirements/
+RUN pip install -r requirements/aurora-container.txt
+
+# BioM3 source. Explicit paths (no `COPY . .`) so we never bake weights/, data/,
+# outputs/, logs/, or jobs/ into the image. configs/ IS baked in (tiny, versioned,
+# matches the code revision). Keep in sync with Dockerfile.cuda.
+COPY pyproject.toml environment.sh README.md /app/
+COPY src/      /app/src/
+COPY scripts/  /app/scripts/
+COPY tests/    /app/tests/
+COPY configs/  /app/configs/
+
+# Editable install with the `app` extra (streamlit). A benign dependency-conflict
+# warning is expected here (the lightning fork vs pyproject's pin) — the same is
+# noted for the bare-metal Aurora install; the install still works.
+RUN pip install -e ".[app]" \
+    && mkdir -p /app/weights /app/data /app/outputs /app/logs
+
+# Shared entrypoint (device-agnostic).
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["bash"]

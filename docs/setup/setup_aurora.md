@@ -1,5 +1,9 @@
 # Installation and setup instructions for Aurora
 
+> **Containerized alternative:** to run BioM3 from an Apptainer `.sif` instead of
+> a bare-metal venv, see [setup_aurora_container.md](./setup_aurora_container.md).
+> The instructions below are the bare-metal `module load frameworks` path.
+
 The Aurora cluster provides access to Intel GPUs, so a different installation is required. Like Polaris, there is a prebuilt environment that we can extend using a virtual environment.
 
 In order to run on Intel GPUs, we have modified a custom `lightning` package, which must be included in the installation. This [lightning source code](https://github.com/addison-nm/lightning) is available on GitHub, if one needs to edit this directly. The commands below install this version of lightning, originally forked from the ALCF lightning repo.

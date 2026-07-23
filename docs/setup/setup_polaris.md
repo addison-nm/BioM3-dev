@@ -1,5 +1,10 @@
 # Installation and setup instructions for Polaris
 
+> **Containerized alternative:** to run BioM3 from an Apptainer `.sif` (the same
+> CUDA image the cloud uses, no Polaris-specific build) instead of a bare-metal
+> venv, see [setup_polaris_container.md](./setup_polaris_container.md). The
+> instructions below are the bare-metal `module load conda` path.
+
 Polaris provides access to NVIDIA GPUs. The prebuilt conda environment on Polaris is theoretically equipped with up to date versions of ML packages optimized to run on the cluster. In order to take advantage of this optimization, while also installing additional requirements, we will create a virtual environment extending the existing environment. Note the use of pip instead of conda.
 
 ```bash

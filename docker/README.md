@@ -9,9 +9,13 @@ to run at `docker run` time. Built per architecture:
 - **x86_64 NVIDIA** — AWS `p3/p4/p5`, `g4/g5/g6`; Mithril H100/H200.
 - **ARM64 NVIDIA** — Grace / GH200.
 
-> **Not for ALCF HPC.** Polaris and Aurora use apptainer and a different software stack —
-> see [`docs/setup/setup_polaris.md`](../docs/setup/setup_polaris.md) and
-> [`setup_aurora.md`](../docs/setup/setup_aurora.md).
+> **ALCF HPC uses Apptainer, not `docker run`.** This CUDA image itself *does* run
+> on **Polaris** (NVIDIA) unchanged — converted to a `.sif` and launched with
+> `--nv`; see [`setup_polaris_container.md`](../docs/setup/setup_polaris_container.md).
+> **Aurora** is Intel/oneAPI, so it uses a separate XPU image (`Dockerfile.xpu`) —
+> see [`setup_aurora_container.md`](../docs/setup/setup_aurora_container.md). For the
+> bare-metal HPC installs see [`setup_polaris.md`](../docs/setup/setup_polaris.md)
+> and [`setup_aurora.md`](../docs/setup/setup_aurora.md).
 
 | File | Purpose |
 | ---- | ------- |

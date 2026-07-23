@@ -75,5 +75,7 @@ ENVS=(--env "ZE_FLAT_DEVICE_HIERARCHY=FLAT")
 # The passed command runs from /app with "$@" preserved.
 set -- bash -lc 'cd /app && source environment.sh >&2 && exec "$@"' _ "$@"
 
-echo "+ apptainer exec --bind ${BIND_ARG} ${SIF} <cmd>" >&2
-exec apptainer exec --bind "${BIND_ARG}" "${ENVS[@]}" "${SIF}" "$@"
+# `--writable-tmpfs`: ephemeral RAM-backed overlay so incidental writes to the
+# read-only image (caches, tests/_tmp) succeed; real outputs go to /app/outputs.
+echo "+ apptainer exec --writable-tmpfs --bind ${BIND_ARG} ${SIF} <cmd>" >&2
+exec apptainer exec --writable-tmpfs --bind "${BIND_ARG}" "${ENVS[@]}" "${SIF}" "$@"

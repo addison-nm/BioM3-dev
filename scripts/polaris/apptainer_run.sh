@@ -66,9 +66,12 @@ BIND_ARG="$(IFS=,; echo "${BINDS[*]}")"
 
 # --- apptainer invocation ------------------------------------------------
 # `--nv` exposes the NVIDIA driver/libs (the CUDA analog of the XPU path's
-# /dev/dri bind). Built as one array so an unset WANDB_API_KEY doesn't leave an
-# empty "${ENVS[@]}" to expand under set -u.
-ARGS=(exec --nv --bind "${BIND_ARG}")
+# /dev/dri bind). `--writable-tmpfs` overlays an ephemeral RAM-backed layer so
+# incidental writes to the read-only image (matplotlib/HF caches, .pytest_cache,
+# tests/_tmp) succeed; real outputs still go to the bind-mounted /app/outputs.
+# Built as one array so an unset WANDB_API_KEY doesn't leave an empty
+# "${ENVS[@]}" to expand under set -u.
+ARGS=(exec --nv --writable-tmpfs --bind "${BIND_ARG}")
 [[ -n "${WANDB_API_KEY:-}" ]] && ARGS+=(--env "WANDB_API_KEY=${WANDB_API_KEY}")
 ARGS+=("${SIF}")
 

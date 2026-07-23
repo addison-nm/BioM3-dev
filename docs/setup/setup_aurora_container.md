@@ -99,3 +99,8 @@ for multi-node jobs.
   `clinfo` inside the container.
 - **Dependency-conflict warning during build.** Expected — the `addison-nm/lightning`
   fork vs pyproject's pin — and harmless, same as the bare-metal Aurora install.
+- **`OSError: [Errno 30] Read-only file system` (e.g. running the test suite).**
+  The `.sif` is read-only, and some code writes into the image tree
+  (`/app/tests/_tmp`, `.pytest_cache`). `apptainer_run.sh` passes
+  `--writable-tmpfs` (an ephemeral RAM-backed overlay) to absorb these; if you
+  invoke `apptainer exec` by hand, add `--writable-tmpfs` yourself.

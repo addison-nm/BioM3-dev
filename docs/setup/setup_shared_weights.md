@@ -2,6 +2,11 @@
 
 Pretrained model weights required by BioM3 are stored in a shared directory on each machine. This avoids duplicating large files across users and project copies. The local `weights/` directory in each clone of BioM3-dev is populated with symlinks that point to these shared files.
 
+> **No cluster access?** The Run 1 base weights are also published to GHCR as a pullable
+> bundle that includes the matching architecture configs. See
+> [weights_bundle.md](weights_bundle.md). It populates `weights/` through the same
+> `link_weights.sh` described below, so the two approaches are interchangeable.
+
 ## Shared weights locations
 
 | Machine | Shared weights path | Permissions |

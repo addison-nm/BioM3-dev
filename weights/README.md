@@ -17,4 +17,13 @@ Weights are synced from a shared directory on each machine using the sync script
 ./scripts/link_weights.sh <shared_weights_path> weights
 ```
 
-See [docs/setup_shared_weights.md](../docs/setup_shared_weights.md) for machine-specific shared paths, the full list of required files, and setup instructions.
+See [docs/setup/setup_shared_weights.md](../docs/setup/setup_shared_weights.md) for machine-specific shared paths, the full list of required files, and setup instructions.
+
+Off-cluster, pull the published Run 1 bundle from GHCR instead — it populates this
+directory through the same linker:
+
+```bash
+./scripts/weights_bundle/fetch_bundle.sh ~/biom3-bundles
+```
+
+See [docs/setup/weights_bundle.md](../docs/setup/weights_bundle.md).

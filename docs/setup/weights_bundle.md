@@ -66,7 +66,7 @@ checkout.
 
 ### Into a checkout
 
-`fetch_bundle.sh` pulls and verifies — it does **not** touch your checkout:
+By default `fetch_bundle.sh` pulls and verifies — it does **not** touch your checkout:
 
 ```bash
 cd /path/to/BioM3-dev
@@ -76,10 +76,13 @@ cd /path/to/BioM3-dev
 1. `oras pull` into `~/biom3-bundles/run1_base/`
 2. verifies every file's sha256 against the bundle's `MANIFEST.json`
 
-Wiring it in is a **separate, explicit step** so a fetch never overwrites or shadows files
-in your working tree (fetch prints these commands on success). From the repo root:
+Wiring it into the checkout is opt-in. Either pass `--link` to have fetch do it after
+verifying, or run the two commands yourself from the repo root (fetch prints them on
+success):
 
 ```bash
+./scripts/weights_bundle/fetch_bundle.sh ~/biom3-bundles --tag run1_base --link
+# equivalently, by hand:
 ./scripts/link_weights.sh ~/biom3-bundles/run1_base/weights weights
 ln -s ~/biom3-bundles/run1_base/configs configs/bundles/run1_base
 ```
@@ -89,9 +92,11 @@ files that are absent and reports `MATCH`/`MISMATCH` for anything already presen
 its output before relying on the result. The bundle's `weights/` subtree mirrors the repo's
 own layout, so once linked, a path like `weights/PenCL/BioM3_PenCL_run1_base.bin` resolves
 through the symlink, and `configs/bundles/run1_base/` is what the consumer configs reference.
+Keep the pulled bundle dir around — the symlinks point into it.
 
 `--tag` is required — it names the bundle to pull; list published tags with `oras repo tags
-ghcr.io/natural-machine/biom3-weights`. `--quick-verify` checks sizes without hashing.
+ghcr.io/natural-machine/biom3-weights`. `--link` wires the bundle into the checkout;
+`--quick-verify` checks sizes without hashing.
 
 ### Verifying an existing bundle
 
@@ -99,7 +104,7 @@ ghcr.io/natural-machine/biom3-weights`. `--quick-verify` checks sizes without ha
 works on a bare machine:
 
 ```bash
-python3 scripts/weights_bundle/verify_bundle.py ~/biom3-bundles/run1_base
+python scripts/weights_bundle/verify_bundle.py ~/biom3-bundles/run1_base
 ```
 
 ## Running with it
@@ -129,15 +134,15 @@ biom3_ProteoScribe_sample \
 Each config lists the bundle partial under `_overwrite_configs`, so bundle values win over
 the repo's defaults but CLI flags still win over everything.
 
-These three configs only resolve **after** a fetch, because `configs/bundles/run1_base/` is
-the symlink that `fetch_bundle.sh` creates. Running them on a checkout that has not pulled
-the bundle raises:
+These three configs only resolve once the bundle is linked, because
+`configs/bundles/run1_base/` is the symlink that `fetch_bundle.sh --link` (or the manual
+`ln -s`) creates. Running them on a checkout that has not linked the bundle raises:
 
 ```
 FileNotFoundError: .../configs/bundles/run1_base/_base_PenCL.json
 ```
 
-That means "fetch the bundle first", not "the config is broken".
+That indicates one should fetch the bundle first, not that the config is itsel broken.
 
 `--input_data_path None` uses Stage 1's built-in 5-protein test set, which makes the whole
 chain runnable with no external data.

@@ -1,0 +1,22 @@
+{
+  "name": "biom3-weights-run1_base",
+
+  "weights": {
+    "LLMs/esm2_t33_650M_UR50D.pt": "weights/LLMs/esm2_t33_650M_UR50D.pt",
+    "LLMs/esm2_t33_650M_UR50D-contact-regression.pt": "weights/LLMs/esm2_t33_650M_UR50D-contact-regression.pt",
+    "LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext/config.json": "weights/LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext/config.json",
+    "LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext/pytorch_model.bin": "weights/LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext/pytorch_model.bin",
+    "LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext/tokenizer_config.json": "weights/LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext/tokenizer_config.json",
+    "LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext/vocab.txt": "weights/LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext/vocab.txt",
+    "LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext/LICENSE.md": "weights/LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext/LICENSE.md",
+    "PenCL/BioM3_PenCL_run1_base.bin": "weights/Run1_frozen_ckpts/Run1_TrackC_step_187000_3b7e39f9.ckpt",
+    "Facilitator/BioM3_Facilitator_run1_base.bin": "weights/Run1_frozen_ckpts/v3_mmd_full49M_final.ckpt",
+    "ProteoScribe/BioM3_ProteoScribe_run1_base.bin": "weights/Run1_frozen_ckpts/ep_mmd_ep353_base.bin"
+  },
+
+  "configs": {
+    "_base_PenCL.json": "scripts/weights_bundle/configs/run1_base_PenCL.json",
+    "_base_Facilitator.json": "scripts/weights_bundle/configs/run1_base_Facilitator.json",
+    "_base_ProteoScribe.json": "scripts/weights_bundle/configs/run1_base_ProteoScribe.json"
+  }
+}

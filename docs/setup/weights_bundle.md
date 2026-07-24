@@ -8,8 +8,8 @@ successfully.
 | | |
 |---|---|
 | Package | `ghcr.io/natural-machine/biom3-weights` |
-| Tag | `run1_base-<sha>` — immutable, sha-pinned (no moving pointer) |
-| Size | ~6.44 GB across 14 files |
+| Tag | `run1_base` (whatever the publisher pushed it as) |
+| Size | ~6.44 GB across 13 files |
 | Prereq | [`oras`](https://oras.land/docs/installation) — a single static binary |
 
 ## Contents
@@ -18,8 +18,7 @@ The published artifact unpacks to a self-contained directory:
 
 ```txt
 biom3-weights-run1_base/
-├── MANIFEST.json        sha256, size, and provenance for every file
-├── README.md            standalone pull + link instructions
+├── MANIFEST.json        sha256 and size for every file
 ├── configs/             one architecture config fragment per stage
 │   ├── _base_PenCL.json
 │   ├── _base_Facilitator.json
@@ -48,7 +47,7 @@ The weights need neither the `BioM3-dev` repo, the software image, nor a login (
 package is public). Pull them, with their configs, straight to a directory:
 
 ```bash
-oras pull ghcr.io/natural-machine/biom3-weights:run1_base-<sha> -o biom3-weights-run1_base
+oras pull ghcr.io/natural-machine/biom3-weights:run1_base -o biom3-weights-run1_base
 ```
 
 `oras pull` checks each blob's digest against the manifest as it downloads, so a clean
@@ -72,25 +71,25 @@ checkout in one step:
 
 ```bash
 cd /path/to/BioM3-dev
-./scripts/weights_bundle/fetch_bundle.sh ~/biom3-bundles --tag run1_base-<sha>
+./scripts/weights_bundle/fetch_bundle.sh ~/biom3-bundles --tag run1_base
 ```
 
 That does three things:
 
-1. `oras pull` into `~/biom3-bundles/biom3-weights-run1_base/`
+1. `oras pull` into `~/biom3-bundles/run1_base/`
 2. verifies every file's sha256 against the bundle's `MANIFEST.json`
 3. symlinks the bundle into this checkout via the existing
    [`scripts/link_weights.sh`](../../scripts/link_weights.sh), and links the bundle's
-   configs to `configs/bundles/run1_base/`
+   configs to `configs/bundles/run1_base/` (the name is read from the bundle's manifest)
 
 Step 3 is why nothing in the codebase needed to change. The bundle's `weights/` subtree
 mirrors the repo's own layout, so after linking, a weights path like
 `weights/PenCL/BioM3_PenCL_run1_base.bin` resolves through a symlink into the bundle, and
 every existing config keeps working.
 
-`--tag run1_base-<sha>` selects which build to pull, and is required — every tag is an
-immutable sha, there is no moving pointer. `--no-link` pulls and verifies only;
-`--quick-verify` checks sizes without hashing.
+`--tag` is required — it names the bundle to pull (e.g. `run1_base`); list what's published
+with `oras repo tags ghcr.io/natural-machine/biom3-weights`. `--no-link` pulls and verifies
+only; `--quick-verify` checks sizes without hashing.
 
 ### Verifying an existing bundle
 
@@ -98,7 +97,7 @@ immutable sha, there is no moving pointer. `--no-link` pulls and verifies only;
 works on a bare machine:
 
 ```bash
-python3 scripts/weights_bundle/verify_bundle.py ~/biom3-bundles/biom3-weights-run1_base
+python3 scripts/weights_bundle/verify_bundle.py ~/biom3-bundles/run1_base
 ```
 
 ## Running with it
@@ -143,7 +142,8 @@ chain runnable with no external data.
 
 ## Publishing (maintainers)
 
-The publish runbook — `oras` login, smoke rehearsal, build, push, and the visibility
-flip — lives alongside the image's runbook in
+The publish runbook — `oras` login, build from a spec, push, and the visibility flip —
+lives alongside the image's runbook in
 [../../cloud/README.md](../../cloud/README.md) under **Publishing the weights bundle
-(GHCR)**, so both GHCR publish flows sit in one place.
+(GHCR)**, so both GHCR publish flows sit in one place. A bundle's contents are declared by a
+spec under `scripts/weights_bundle/bundle_specs/`.

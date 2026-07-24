@@ -1,0 +1,12 @@
+{
+  "seq_model_path": "./weights/LLMs/esm2_t33_650M_UR50D.pt",
+  "pretrained_seq": true,
+  "rep_layer": 33,
+  "protein_encoder_embedding": 1280,
+  "text_model_path": "./weights/LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext",
+  "pretrained_text": true,
+  "text_encoder_embedding": 768,
+  "text_max_length": 512,
+  "proj_embedding_dim": 512,
+  "dropout": 0.1
+}

@@ -64,32 +64,34 @@ docker pull ghcr.io/natural-machine/biom3:cuda-dev
 Each artifact stands on its own — pull either without the other, and neither needs a
 checkout.
 
-### Into a checkout — the convenience path
+### Into a checkout
 
-With `BioM3-dev` cloned, `fetch_bundle.sh` pulls, verifies, and wires the bundle into the
-checkout in one step:
+`fetch_bundle.sh` pulls and verifies — it does **not** touch your checkout:
 
 ```bash
 cd /path/to/BioM3-dev
 ./scripts/weights_bundle/fetch_bundle.sh ~/biom3-bundles --tag run1_base
 ```
 
-That does three things:
-
 1. `oras pull` into `~/biom3-bundles/run1_base/`
 2. verifies every file's sha256 against the bundle's `MANIFEST.json`
-3. symlinks the bundle into this checkout via the existing
-   [`scripts/link_weights.sh`](../../scripts/link_weights.sh), and links the bundle's
-   configs to `configs/bundles/run1_base/` (the name is read from the bundle's manifest)
 
-Step 3 is why nothing in the codebase needed to change. The bundle's `weights/` subtree
-mirrors the repo's own layout, so after linking, a weights path like
-`weights/PenCL/BioM3_PenCL_run1_base.bin` resolves through a symlink into the bundle, and
-every existing config keeps working.
+Wiring it in is a **separate, explicit step** so a fetch never overwrites or shadows files
+in your working tree (fetch prints these commands on success). From the repo root:
 
-`--tag` is required — it names the bundle to pull (e.g. `run1_base`); list what's published
-with `oras repo tags ghcr.io/natural-machine/biom3-weights`. `--no-link` pulls and verifies
-only; `--quick-verify` checks sizes without hashing.
+```bash
+./scripts/link_weights.sh ~/biom3-bundles/run1_base/weights weights
+ln -s ~/biom3-bundles/run1_base/configs configs/bundles/run1_base
+```
+
+[`link_weights.sh`](../../scripts/link_weights.sh) never overwrites: it symlinks only the
+files that are absent and reports `MATCH`/`MISMATCH` for anything already present, so review
+its output before relying on the result. The bundle's `weights/` subtree mirrors the repo's
+own layout, so once linked, a path like `weights/PenCL/BioM3_PenCL_run1_base.bin` resolves
+through the symlink, and `configs/bundles/run1_base/` is what the consumer configs reference.
+
+`--tag` is required — it names the bundle to pull; list published tags with `oras repo tags
+ghcr.io/natural-machine/biom3-weights`. `--quick-verify` checks sizes without hashing.
 
 ### Verifying an existing bundle
 

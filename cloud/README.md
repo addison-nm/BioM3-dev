@@ -270,7 +270,7 @@ no git awareness — no clean-tree or matching-commit requirement.
 
 ```bash
 # 1. Build — copies/flattens the files the spec lists, writes a checksummed MANIFEST.json.
-conda run -n biom3-env python scripts/weights_bundle/build_bundle.py \
+python scripts/weights_bundle/build_bundle.py \
     scripts/weights_bundle/bundle_specs/run1_base.json -o ~/biom3-bundles
 
 # 2. Push under a tag. --dry-run prints the file list without uploading.
@@ -281,9 +281,10 @@ scripts/weights_bundle/push_bundle.sh ~/biom3-bundles/biom3-weights-run1_base ru
 #    https://github.com/orgs/natural-machine/packages → biom3-weights
 #         → Package settings → Change visibility → Public
 
-# 4. Verify an anonymous pull into a scratch dir (pull + checksum, no linking):
+# 4. Verify an anonymous pull into a scratch dir (fetch pulls + checksums; it never
+#    touches your checkout):
 oras logout ghcr.io
-scripts/weights_bundle/fetch_bundle.sh /tmp/biom3-weights-check --tag run1_base --no-link
+scripts/weights_bundle/fetch_bundle.sh /tmp/biom3-weights-check --tag run1_base
 ```
 
 **Upload constraint.** GHCR times out a single blob upload at **10 minutes**, and `oras`

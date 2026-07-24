@@ -155,6 +155,11 @@ def parse_arguments(args):
                         help="fp32 matmul precision. 'high' (config default) enables "
                              "TF32 tensor cores; 'highest' forces full fp32 for bitwise "
                              "reproducibility. Overrides the config value when set.")
+    parser.add_argument('--alpha', type=float, default=0.0,
+                        help="sequence generation from a joint [z_c, z_p] blend: " \
+                            "y = alpha * z_p + (1 - alpha) * z_c. " \
+                            "0.0 = text-only (default, establist behavior) " \
+                            "1.0 = protein-only")
     return parser.parse_args(args)
 
 
@@ -713,6 +718,20 @@ def set_seed(seed):
     random.seed(seed + 2)
     return
 
+def blend_conditioning(embedding_dataset, alpha):
+    """y = alpha * z_p + (1 - alpha) * z_c.
+    """
+    if not 0.0 <= alpha <= 1.0:
+        raise ValueError(f"--alpha must be between [0, 1]")
+    z_c = embedding_dataset['z_c']
+    if alpha == 0.0:
+        return z_c
+    if 'z_p' not in embedding_dataset:
+        raise KeyError(
+            "alpha > 0 requires z_p in the embedding file; regenerate Stage 2 "
+            "(the saved dict should carry z_t/z_p/z_c)")
+    y = alpha * embedding_dataset['z_p'] + (1.0 - alpha) * z_c
+    return y
 
 def main(args, _setup_logging=True):
     # Parse arguments
@@ -829,7 +848,10 @@ def main(args, _setup_logging=True):
     #     logger.info("Model compiled with torch.compile (inductor)")
 
     # Resolve animation targets
-    z_c = embedding_dataset['z_c']
+    alpha = getattr(config_args_parser, 'alpha', 0.0)
+    z_c = blend_conditioning(embedding_dataset, alpha)
+    logger.info("Conditioning blend: alpha=%.3f (0 = z_c, 1 = z_p)", alpha)
+
     num_prompts = z_c.size(0) if isinstance(z_c, torch.Tensor) else len(z_c)
     animate_prompts_set = resolve_animate_prompts(
         parse_animate_prompts(config_args_parser.animate_prompts),

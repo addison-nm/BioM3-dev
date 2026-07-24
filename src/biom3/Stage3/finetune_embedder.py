@@ -144,3 +144,61 @@ def build_text_to_zc_embedder(
     if device is not None:
         embedder.to(device)
     return embedder
+
+class ProteintoZpEmbedder(nn.Module):
+    """Maps tokenized proteins to ProteoScribe's z_p condition.
+
+    Mirrors TexttoZcEmbedder but holds protein_encoder (ESM-2) +
+    protein_projection. PenCL so its checkpoint loads with 
+    ``strict=False`` so the text-branch keys are ignored.
+    """
+
+    def __init__(self, stage1_args):
+        super().__init__()
+        self.protein_encoder = stage1_mod.ProteinEncoder(args=stage1_args)
+        self.protein_projection = stage1_mod.ProjectionHead(
+            embedding_dim=stage1_args.protein_encoder_embedding,
+            args=stage1_args,
+        )
+
+    @torch.no_grad()
+    def embed_protein(self, sequences, device=None, batch_size=64):
+        """get z_p for a list of raw aa sequences (compute once)"""
+        device = device or next(self.parameters()).device
+        convert = self.protein_encoder.alphabet.get_batch_converter()
+        chunks = []
+        for i in range(0, len(sequences), batch_size):
+            batch = [(str(j), s) for j, s in enumerate(sequences[i:i +batch_size])]
+            _, _, tokens = convert(batch)
+            z_p = self.protein_projection(self.protein_encoder(tokens.to(device)))
+            chunks.append(z_p.float().cpu())
+            
+        return torch.cat(chunks, dim=0)
+
+
+def build_protein_to_zp_embedder(
+        stage1_args,
+        pencl_weights: str,
+        device=None,
+    ) -> ProteintoZpEmbedder:
+    """Build the frozen protein - >z_p embedder that mirrors the above 
+    text -> z_c embedder
+    """
+    embedder = ProteintoZpEmbedder(stage1_args)
+
+    logger.info("Loading PenCL protein-branch weights from: %s", pencl_weights)
+    load_and_prepare_model(
+        embedder,
+        pencl_weights,
+        device=None,
+        strict=False,
+        eval_mode=False,
+        attempt_correction=False,
+    )
+
+    for p in embedder.parameters():
+        p.requires_grad = False
+    embedder.eval()
+    if device is not None:
+        embedder.to(device)
+    return embedder

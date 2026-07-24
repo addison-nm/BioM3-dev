@@ -38,7 +38,7 @@ import biom3.Stage3.cond_diff_transformer_layer as mod
 import biom3.Stage3.PL_wrapper as PL_mod
 import biom3.Stage3.run_PL_training as base
 from biom3.Stage3.io import prepare_model_ProteoScribe
-from biom3.Stage3.finetune_embedder import build_text_to_zc_embedder
+from biom3.Stage3.finetune_embedder import build_text_to_zc_embedder, build_protein_to_zp_embedder
 from biom3.core.dataloaders import load_compose_plugins
 from biom3.core.helpers import load_json_config, convert_to_namespace
 from biom3.core.dry_run import run_dry_run
@@ -104,6 +104,12 @@ def get_finetune_args(parser):
                         help='comma-separated module-name substrings to wrap with LoRA')
     parser.add_argument('--lora_unfreeze_y_mlp', default='True', type=str,
                         help='also train the y_mlp z_c-conditioning MLP')
+
+    #alpha related arguments 
+    parser.add_argument('--train_alpha', default='0', type=str,
+                    help="'0' = pure z_c (text), "
+                         "'1' = pure z_p (sequences), " \
+                         "anything else = blend schedule {1:.25, 0:.25, U(0,1):.5}")
     return parser
 
 
@@ -221,6 +227,7 @@ def load_data(args, stage1_args):
         length_field=args.length_field,
         lazy=args.lazy_records,
         split_manifest_path=args.split_manifest_path,
+        needs_unique_sequences=(str(args.train_alpha) != '0'),
     )
     data_module.setup()
     return data_module
@@ -265,11 +272,24 @@ def load_model(args, data_module, stage1_args, stage2_args):
         facilitator_weights=args.facilitator_weights,
         device=None,
     )
+    zp_lookup = None 
+    if str(args.train_alpha) != '0':
+        zp_embedder = build_protein_to_zp_embedder(
+            stage1_args=stage1_args,
+            pencl_weights=args.pencl_weights,
+            device=args.device,
+        )  
+        seqs = data_module.unique_sequences()
+        z_p = zp_embedder.embed_protein([s.replace('-', '') for s in seqs], device=args.device)
+        zp_lookup = dict(zip(seqs, z_p))
+        del zp_embedder
 
     PL_model = PL_mod.PL_ProtARDM_Finetune(
         args=args,
         model=model,
         embedder=embedder,
+        zp_lookup=zp_lookup,
+        train_alpha=args.train_alpha,
     )
     return PL_model
 

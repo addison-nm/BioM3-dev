@@ -1057,25 +1057,45 @@ class PL_ProtARDM_Finetune(PL_ProtARDM):
     runs in fp32 eval mode so its embeddings match Stage 1/2 inference exactly.
     """
 
-    def __init__(self, args, model, embedder):
+    def __init__(self, args, model, embedder, zp_lookup=None, train_alpha='0'):
         super().__init__(args=args, model=model)
         embedder.eval()
         for p in embedder.parameters():
             p.requires_grad = False
         self._embedder_ref = [embedder]
+        self.zp_lookup = zp_lookup
+        self.train_alpha = str(train_alpha)
+
+    def _sample_alpha(self, n, device):
+        """Rama train_blend schedule {1:.25, 0:.25, U(0,1):.5}; weight on z_p."""
+        if self.train_alpha == '0':
+            return torch.zeros(n, 1, device=device)
+        if self.train_alpha == '1':
+            return torch.ones(n, 1, device=device)
+
+        r = torch.rand(n, device=device)
+        a = torch.rand(n, device=device)
+        a = torch.where(r < 0.25, torch.ones_like(a),  a)
+        a = torch.where(r >= 0.75, torch.zeros_like(a), a)
+        return a.view(n, 1)
 
     @property
     def embedder(self):
         return self._embedder_ref[0]
 
     def on_after_batch_transfer(self, batch, dataloader_idx):
-        num_seqs, input_ids = batch
+        num_seqs, input_ids = batch[0], batch[1]
         embedder = self.embedder
         if next(embedder.parameters()).device != input_ids.device:
             embedder.to(input_ids.device)
         with torch.no_grad():
             z_c = embedder(input_ids)
-        return [num_seqs, z_c]
+        if self.zp_lookup is None:
+            return [num_seqs, z_c]
+        z_p = torch.stack([self.zp_lookup[s] for s in batch[2]]).to(z_c)
+        alpha = self._sample_alpha(z_c.size(0), z_c.device)
+        y = alpha * z_p + (1.0 - alpha) * z_c
+        return [num_seqs, y]
 
 
 class _SequenceView:
@@ -1130,6 +1150,7 @@ class GeneralizedDataModule(pl.LightningDataModule):
         length_field="sequence_length",
         lazy=False,
         split_manifest_path=None,
+        needs_unique_sequences=False,
     ):
         super().__init__()
         self.jsonl_path = jsonl_path
@@ -1147,6 +1168,7 @@ class GeneralizedDataModule(pl.LightningDataModule):
         self.length_field = length_field
         self.lazy = lazy
         self.split_manifest_path = split_manifest_path
+        self.needs_unique_sequences = needs_unique_sequences
         self.min_seq_length = diffusion_steps - 2
 
     def setup(self, stage=None):
@@ -1187,9 +1209,24 @@ class GeneralizedDataModule(pl.LightningDataModule):
             "val_indices": val_idx,
             "test_indices": test_idx,
         }]
+        if self.needs_unique_sequences:
+            raw_key = self._raw_sequence_key()
+            used = list(train_idx) + list(val_idx)
+            seqs = ((source[i][raw_key] if raw_key is not None
+             else dataset[i][self.sequence_key]) for i in used)
+            self._unique_sequences = list(dict.fromkeys(seqs))
+        else: 
+            self._unique_sequences = None
         logger.info(
             "Loaded generalized dataset from %s (%d train, %d val, %d held-out test)",
             self.jsonl_path, len(train_idx), len(val_idx), len(test_idx))
+    
+    def unique_sequences(self):
+        if self._unique_sequences is None:
+            raise RuntimeError(
+                "requires needs_unique_sequences=True on the when train_alpha is 'zp' or 'blend'."
+            )
+        return self._unique_sequences
 
     def _manifest_split(self, source):
         """Read train/val/test row indices from a curated split manifest.

@@ -385,7 +385,8 @@ def make_seq_caption_collate_fn(*, text_tokenizer, text_max_length, image_size,
             return_attention_mask=False,
             return_token_type_ids=False,
         )
-        return num_seqs, text_inputs["input_ids"]
+        sequences = [sample[sequence_key] for sample in batch]
+        return num_seqs, text_inputs["input_ids"], sequences
 
     return _collate
 

@@ -1,5 +1,5 @@
 {
-  "_base_configs": ["_base_runtime.json", "models/_base_PenCL.json"],
+  "_base_configs": ["../inference/_base_runtime.json", "../inference/models/_base_PenCL.json"],
   "_overwrite_configs": ["../bundles/run1_base/_base_PenCL.json"],
 
   "model_type": "pfam",

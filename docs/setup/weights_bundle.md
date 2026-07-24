@@ -98,6 +98,25 @@ Keep the pulled bundle dir around — the symlinks point into it.
 ghcr.io/natural-machine/biom3-weights`. `--link` wires the bundle into the checkout;
 `--quick-verify` checks sizes without hashing.
 
+### Into an image
+
+The published image does not bake in the weights. Pull the bundle on the host, then bind it
+into the container at run time so both the weights and the bundle's configs are visible
+inside:
+
+```bash
+oras pull ghcr.io/natural-machine/biom3-weights:run1_base -o ~/biom3-bundles/run1_base
+# then at container run time, bind:
+#   ~/biom3-bundles/run1_base/weights -> /app/weights
+#   ~/biom3-bundles/run1_base/configs -> /app/configs/bundles/run1_base
+#   your own configs/                 -> /app/configs
+```
+
+Binding the bundle's `configs/` to `/app/configs/bundles/run1_base` gives the container the
+same `configs/bundles/run1_base/` path a checkout gets from linking, so a config that
+references `../bundles/run1_base/...` resolves either way. See [APPTAINER.md](../APPTAINER.md)
+for a worked container invocation.
+
 ### Verifying an existing bundle
 
 `verify_bundle.py` is stdlib-only and needs neither torch nor a `biom3` install, so it
@@ -107,45 +126,56 @@ works on a bare machine:
 python scripts/weights_bundle/verify_bundle.py ~/biom3-bundles/run1_base
 ```
 
-## Running with it
+## Referencing fetched weight bundles
 
-Three configs compose the bundle's pinned architecture over the repo defaults:
+Each bundle carries an architecture config fragment per stage (`configs/_base_*.json`). You
+compose it into your own inference config so the settings the weights need travel with the
+weights instead of being copied by hand. `configs/examples/` holds a runnable example per
+stage — an ordinary inference config whose `_overwrite_configs` layers the bundle fragment
+over the repo defaults:
+
+```json
+{
+  "_base_configs": ["../inference/_base_runtime.json", "../inference/models/_base_PenCL.json"],
+  "_overwrite_configs": ["../bundles/run1_base/_base_PenCL.json"],
+  "model_type": "pfam"
+}
+```
+
+The `../bundles/run1_base/...` reference resolves once the bundle's configs sit at
+`configs/bundles/run1_base/`. The two use cases differ only in how they get there.
+
+Checkout: `fetch_bundle.sh --link` (or the manual `ln -s`) creates the
+`configs/bundles/run1_base/` symlink into the pulled bundle. Then run against the bundle's
+weights:
 
 ```bash
 biom3_PenCL_inference \
-    --input_data_path None \
-    --config_path configs/inference/stage1_PenCL_run1_base.json \
+    --config_path configs/examples/stage1_PenCL_run1_base.json \
     --model_path weights/PenCL/BioM3_PenCL_run1_base.bin \
-    --output_path outputs/pencl_embeddings.pt
+    --input_data_path None --output_path outputs/pencl_embeddings.pt
 
 biom3_Facilitator_sample \
-    --input_data_path outputs/pencl_embeddings.pt \
-    --config_path configs/inference/stage2_Facilitator_run1_base.json \
+    --config_path configs/examples/stage2_Facilitator_run1_base.json \
     --model_path weights/Facilitator/BioM3_Facilitator_run1_base.bin \
+    --input_data_path outputs/pencl_embeddings.pt \
     --output_data_path outputs/facilitator_embeddings.pt
 
 biom3_ProteoScribe_sample \
-    --input_path outputs/facilitator_embeddings.pt \
-    --config_path configs/inference/stage3_ProteoScribe_sample_run1_base.json \
+    --config_path configs/examples/stage3_ProteoScribe_sample_run1_base.json \
     --model_path weights/ProteoScribe/BioM3_ProteoScribe_run1_base.bin \
+    --input_path outputs/facilitator_embeddings.pt \
     --output_path outputs/generated_sequences.csv
 ```
 
-Each config lists the bundle partial under `_overwrite_configs`, so bundle values win over
-the repo's defaults but CLI flags still win over everything.
+Image: bind the pulled bundle's `configs/` to `/app/configs/bundles/run1_base` and your own
+`configs/` to `/app/configs` (see [Into an image](#into-an-image)); the same
+`../bundles/run1_base/...` reference then resolves inside the container.
 
-These three configs only resolve once the bundle is linked, because
-`configs/bundles/run1_base/` is the symlink that `fetch_bundle.sh --link` (or the manual
-`ln -s`) creates. Running them on a checkout that has not linked the bundle raises:
-
-```
-FileNotFoundError: .../configs/bundles/run1_base/_base_PenCL.json
-```
-
-That indicates one should fetch the bundle first, not that the config is itsel broken.
-
-`--input_data_path None` uses Stage 1's built-in 5-protein test set, which makes the whole
-chain runnable with no external data.
+Until the bundle is linked or bound, these configs raise
+`FileNotFoundError: .../configs/bundles/run1_base/_base_PenCL.json` — that means fetch the
+bundle first, not that the config is broken. `--input_data_path None` uses Stage 1's
+built-in 5-protein test set, so the whole chain runs with no external data.
 
 ## Publishing (maintainers)
 

@@ -1,0 +1,9 @@
+{
+  "_base_configs": ["_base_runtime.json", "models/_base_PenCL.json"],
+  "_overwrite_configs": ["../bundles/run1_base/_base_PenCL.json"],
+
+  "model_type": "pfam",
+
+  "sequence_keyword": "protein_sequence",
+  "id_keyword": "primary_Accession"
+}

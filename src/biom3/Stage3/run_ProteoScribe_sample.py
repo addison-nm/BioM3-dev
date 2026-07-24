@@ -156,10 +156,11 @@ def parse_arguments(args):
                              "TF32 tensor cores; 'highest' forces full fp32 for bitwise "
                              "reproducibility. Overrides the config value when set.")
     parser.add_argument('--alpha', type=float, default=0.0,
-                        help="sequence generation from a joint [z_c, z_p] blend: " \
-                            "y = alpha * z_p + (1 - alpha) * z_c. " \
-                            "0.0 = text-only (default, establist behavior) " \
-                            "1.0 = protein-only")
+                        help="condition generation on a blend of the text and "
+                             "sequence embeddings: y = alpha * z_p + (1 - alpha) "
+                             "* z_c. 0.0 = text only (default, the established "
+                             "behaviour); 1.0 = sequence only. Requires z_p in "
+                             "the embedding file when > 0.")
     return parser.parse_args(args)
 
 
@@ -719,19 +720,30 @@ def set_seed(seed):
     return
 
 def blend_conditioning(embedding_dataset, alpha):
-    """y = alpha * z_p + (1 - alpha) * z_c.
+    """Blend the text and sequence conditions: y = alpha * z_p + (1-alpha) * z_c.
+
+    z_p comes from Stage 1 (PenCL's protein branch) and z_c from Stage 2, both
+    already in the same joint space, so a plain convex combination is valid.
     """
     if not 0.0 <= alpha <= 1.0:
-        raise ValueError(f"--alpha must be between [0, 1]")
+        raise ValueError(f"--alpha must be in [0, 1], got {alpha}")
     z_c = embedding_dataset['z_c']
     if alpha == 0.0:
         return z_c
     if 'z_p' not in embedding_dataset:
         raise KeyError(
-            "alpha > 0 requires z_p in the embedding file; regenerate Stage 2 "
-            "(the saved dict should carry z_t/z_p/z_c)")
-    y = alpha * embedding_dataset['z_p'] + (1.0 - alpha) * z_c
-    return y
+            f"--alpha={alpha} needs z_p, which is missing from the embedding "
+            f"file (keys: {sorted(embedding_dataset)}). Stage 1 emits z_p and "
+            f"Stage 2 preserves it, so this file was most likely built by "
+            f"something that dropped it."
+        )
+    z_p = embedding_dataset['z_p']
+    if z_p.shape != z_c.shape:
+        raise ValueError(
+            f"z_p shape {tuple(z_p.shape)} != z_c shape {tuple(z_c.shape)}; "
+            f"they must be row-aligned to blend."
+        )
+    return alpha * z_p + (1.0 - alpha) * z_c
 
 def main(args, _setup_logging=True):
     # Parse arguments

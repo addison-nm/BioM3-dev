@@ -23,6 +23,7 @@ logger = setup_logger(__name__)
 
 
 TEXT_BRANCH_PREFIXES = ("text_encoder.", "text_projection.")
+PROTEIN_BRANCH_PREFIXES = ("protein_encoder.", "protein_projection.")
 
 
 class TextToZcEmbedder(nn.Module):
@@ -145,12 +146,14 @@ def build_text_to_zc_embedder(
         embedder.to(device)
     return embedder
 
-class ProteintoZpEmbedder(nn.Module):
-    """Maps tokenized proteins to ProteoScribe's z_p condition.
+class ProteinToZpEmbedder(nn.Module):
+    """Maps a protein sequence to PenCL's z_p, the joint-space protein embedding.
 
-    Mirrors TexttoZcEmbedder but holds protein_encoder (ESM-2) +
-    protein_projection. PenCL so its checkpoint loads with 
-    ``strict=False`` so the text-branch keys are ignored.
+    The mirror of :class:`TextToZcEmbedder`: holds only PenCL's protein branch
+    (``protein_encoder`` = ESM-2, plus ``protein_projection``). Attribute names
+    match PenCL so its checkpoint loads directly; the text-branch keys are
+    ignored. No Facilitator is involved — z_p is already in the joint space that
+    the Facilitator maps text *into*.
     """
 
     def __init__(self, stage1_args):
@@ -161,18 +164,25 @@ class ProteintoZpEmbedder(nn.Module):
             args=stage1_args,
         )
 
+    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
+        return self.protein_projection(self.protein_encoder(tokens))
+
     @torch.no_grad()
-    def embed_protein(self, sequences, device=None, batch_size=64):
-        """get z_p for a list of raw aa sequences (compute once)"""
+    def embed_sequences(self, sequences, device=None, batch_size=64):
+        """Embed raw amino-acid strings to z_p, in input order.
+
+        Gaps are stripped here so the returned rows align with ``sequences`` as
+        given — callers can zip the original (possibly gapped) strings against
+        the result to build a lookup.
+        """
         device = device or next(self.parameters()).device
         convert = self.protein_encoder.alphabet.get_batch_converter()
         chunks = []
         for i in range(0, len(sequences), batch_size):
-            batch = [(str(j), s) for j, s in enumerate(sequences[i:i +batch_size])]
+            window = sequences[i:i + batch_size]
+            batch = [(str(j), s.replace("-", "")) for j, s in enumerate(window)]
             _, _, tokens = convert(batch)
-            z_p = self.protein_projection(self.protein_encoder(tokens.to(device)))
-            chunks.append(z_p.float().cpu())
-            
+            chunks.append(self(tokens.to(device)).float().cpu())
         return torch.cat(chunks, dim=0)
 
 
@@ -180,20 +190,28 @@ def build_protein_to_zp_embedder(
         stage1_args,
         pencl_weights: str,
         device=None,
-    ) -> ProteintoZpEmbedder:
-    """Build the frozen protein - >z_p embedder that mirrors the above 
-    text -> z_c embedder
+    ) -> ProteinToZpEmbedder:
+    """Build the frozen protein->z_p embedder mirroring the text->z_c one.
+
+    Ignores PenCL's text-branch keys but requires every protein-branch
+    parameter to be populated, so a checkpoint that matches nothing fails
+    loudly instead of yielding a random projection of stock ESM-2.
     """
-    embedder = ProteintoZpEmbedder(stage1_args)
+    if not pencl_weights:
+        raise ValueError(
+            "--pencl_weights is required when train_alpha puts any weight on "
+            "z_p: without it the protein branch is a randomly initialised "
+            "projection of stock ESM-2, which does not share a space with z_c."
+        )
+
+    embedder = ProteinToZpEmbedder(stage1_args)
 
     logger.info("Loading PenCL protein-branch weights from: %s", pencl_weights)
-    load_and_prepare_model(
-        embedder,
-        pencl_weights,
-        device=None,
-        strict=False,
-        eval_mode=False,
-        attempt_correction=False,
+    _load_frozen_weights(
+        embedder, pencl_weights,
+        required_prefixes=PROTEIN_BRANCH_PREFIXES,
+        label="PenCL protein branch",
+        device=device,
     )
 
     for p in embedder.parameters():

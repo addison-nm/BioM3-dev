@@ -105,11 +105,24 @@ def get_finetune_args(parser):
     parser.add_argument('--lora_unfreeze_y_mlp', default='True', type=str,
                         help='also train the y_mlp z_c-conditioning MLP')
 
-    #alpha related arguments 
-    parser.add_argument('--train_alpha', default='0', type=str,
-                    help="'0' = pure z_c (text), "
-                         "'1' = pure z_p (sequences), " \
-                         "anything else = blend schedule {1:.25, 0:.25, U(0,1):.5}")
+    # Conditioning blend: y = alpha * z_p + (1 - alpha) * z_c, alpha = weight on z_p
+    parser.add_argument('--train_alpha', default='zc', type=str,
+                        help="conditioning blend during training. 'zc' (default) "
+                             "= text only, 'zp' = sequence only, 'blend' = the "
+                             "per-example schedule {alpha=1: .25, alpha=0: .25, "
+                             "U(0,1): .5}, or a constant in [0, 1]. Anything "
+                             "putting weight on z_p precomputes z_p for every "
+                             "unique train/val sequence via PenCL's protein branch.")
+    parser.add_argument('--eval_alpha', default='spread', type=str,
+                        help="blend used for validation batches. 'spread' (default) "
+                             "gives each val example its own deterministic alpha "
+                             "covering [0, 1], so best-checkpoint selection reflects "
+                             "the whole operating range rather than one point. A "
+                             "constant ('zc', 'zp', or a number in [0, 1]) evaluates "
+                             "at a single alpha. Either way it is fixed across epochs; "
+                             "the 'blend' training schedule is not allowed here.")
+    parser.add_argument('--zp_batch_size', default=64, type=int,
+                        help='batch size for the one-off z_p precompute pass')
     return parser
 
 
@@ -184,6 +197,9 @@ def _apply_finetune_arg_conversions(args):
     if args.finetune_last_n_layers == -2:
         args.finetune_last_n_layers = -1
 
+    args.train_alpha = PL_mod.normalize_alpha_spec(args.train_alpha)
+    args.eval_alpha = PL_mod.resolve_eval_alpha(args.eval_alpha)
+
     # LoRA options
     args.use_lora = base.str_to_bool(args.use_lora)
     args.lora_unfreeze_y_mlp = base.str_to_bool(args.lora_unfreeze_y_mlp)
@@ -227,7 +243,7 @@ def load_data(args, stage1_args):
         length_field=args.length_field,
         lazy=args.lazy_records,
         split_manifest_path=args.split_manifest_path,
-        needs_unique_sequences=(str(args.train_alpha) != '0'),
+        needs_unique_sequences=PL_mod.alpha_spec_uses_zp(args.train_alpha),
     )
     data_module.setup()
     return data_module
@@ -272,17 +288,9 @@ def load_model(args, data_module, stage1_args, stage2_args):
         facilitator_weights=args.facilitator_weights,
         device=None,
     )
-    zp_lookup = None 
-    if str(args.train_alpha) != '0':
-        zp_embedder = build_protein_to_zp_embedder(
-            stage1_args=stage1_args,
-            pencl_weights=args.pencl_weights,
-            device=args.device,
-        )  
-        seqs = data_module.unique_sequences()
-        z_p = zp_embedder.embed_protein([s.replace('-', '') for s in seqs], device=args.device)
-        zp_lookup = dict(zip(seqs, z_p))
-        del zp_embedder
+    zp_lookup = None
+    if PL_mod.alpha_spec_uses_zp(args.train_alpha):
+        zp_lookup = _precompute_zp_lookup(args, stage1_args, data_module)
 
     PL_model = PL_mod.PL_ProtARDM_Finetune(
         args=args,
@@ -290,8 +298,35 @@ def load_model(args, data_module, stage1_args, stage2_args):
         embedder=embedder,
         zp_lookup=zp_lookup,
         train_alpha=args.train_alpha,
+        eval_alpha=args.eval_alpha,
     )
     return PL_model
+
+
+def _precompute_zp_lookup(args, stage1_args, data_module):
+    """Map every unique train/val sequence to its z_p, once.
+
+    Valid because PenCL's protein branch is frozen for the whole run, so z_p
+    never changes. ESM-2 is released afterwards — it is only needed for this
+    pass and is far larger than the resulting embeddings.
+    """
+    zp_embedder = build_protein_to_zp_embedder(
+        stage1_args=stage1_args,
+        pencl_weights=args.pencl_weights,
+        device=args.device,
+    )
+    try:
+        seqs = data_module.unique_sequences()
+        logger.info('Precomputing z_p for %d unique sequences (batch size %d)',
+                    len(seqs), args.zp_batch_size)
+        z_p = zp_embedder.embed_sequences(
+            seqs, device=args.device, batch_size=args.zp_batch_size,
+        )
+    finally:
+        del zp_embedder
+        base.clear_gpu_cache()
+    logger.info('z_p lookup built: %d entries, dim %d', z_p.size(0), z_p.size(1))
+    return dict(zip(seqs, z_p))
 
 
 def _finetune_dataset_probe(args):

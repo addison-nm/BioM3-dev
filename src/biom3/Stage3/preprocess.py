@@ -354,7 +354,8 @@ def encode_protein_sequence(sequence: str, image_size: int) -> list:
 
 
 def make_seq_caption_collate_fn(*, text_tokenizer, text_max_length, image_size,
-                                sequence_key="sequence", caption_key="caption"):
+                                sequence_key="sequence", caption_key="caption",
+                                include_sequences=False):
     """Build a collate fn mapping composed records to model-ready tensors.
 
     The returned callable takes a batch of ``{sequence_key: str, caption_key: str}``
@@ -366,6 +367,10 @@ def make_seq_caption_collate_fn(*, text_tokenizer, text_max_length, image_size,
 
     Returns ``(num_seqs [B, image_size**2] float32, input_ids [B, text_max_length])``,
     the batch contract expected by :class:`PL_ProtARDM_Finetune`.
+
+    With ``include_sequences=True`` a third element is appended: the raw
+    sequence strings, verbatim from the record. z_p-blended finetuning uses
+    them to key its precomputed z_p lookup.
     """
     image_size = int(image_size)
 
@@ -385,8 +390,10 @@ def make_seq_caption_collate_fn(*, text_tokenizer, text_max_length, image_size,
             return_attention_mask=False,
             return_token_type_ids=False,
         )
-        sequences = [sample[sequence_key] for sample in batch]
-        return num_seqs, text_inputs["input_ids"], sequences
+        if include_sequences:
+            return (num_seqs, text_inputs["input_ids"],
+                    [sample[sequence_key] for sample in batch])
+        return num_seqs, text_inputs["input_ids"]
 
     return _collate
 

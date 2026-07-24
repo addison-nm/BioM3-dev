@@ -43,6 +43,7 @@ from transformers import AutoTokenizer  # BioBERT tokenizer for finetuning
 
 # ----- Standard Libraries & Utilities -----
 import functools
+import hashlib
 import math
 import copy
 
@@ -1042,6 +1043,78 @@ class HDF5DataModule(pl.LightningDataModule):
 HDF5_PFamDataModule = HDF5DataModule
 
 
+ALPHA_BLEND = "blend"
+EVAL_SPREAD = "spread"
+_ALPHA_ALIASES = {"zc": 0.0, "zp": 1.0}
+
+
+def normalize_alpha_spec(value):
+    """Normalize an alpha spec to a float in [0, 1] or the string ``"blend"``.
+
+    alpha is the weight on z_p in ``y = alpha * z_p + (1 - alpha) * z_c``.
+    Accepts the names ``zc`` / ``zp`` / ``blend``, or any numeric literal in
+    [0, 1] for a constant blend.
+    """
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if text == ALPHA_BLEND:
+            return ALPHA_BLEND
+        if text in _ALPHA_ALIASES:
+            return _ALPHA_ALIASES[text]
+        try:
+            value = float(text)
+        except ValueError:
+            raise ValueError(
+                f"train_alpha must be 'zc', 'zp', 'blend', or a number in "
+                f"[0, 1] (the weight on z_p); got {value!r}"
+            ) from None
+    value = float(value)
+    if not 0.0 <= value <= 1.0:
+        raise ValueError(
+            f"a constant train_alpha must be in [0, 1]; got {value}"
+        )
+    return value
+
+
+def resolve_eval_alpha(value):
+    """Normalize a validation-alpha spec to a float in [0, 1] or ``"spread"``.
+
+    ``"spread"`` assigns each validation example its own alpha, deterministically
+    (see :func:`deterministic_alpha`), so the metric covers the whole [0, 1]
+    operating range instead of a single point. A constant is still allowed for
+    targeted evaluation at one alpha. The ``"blend"`` *training* schedule is
+    rejected: it resamples per batch, which would make val loss — and therefore
+    best-checkpoint selection — jitter epoch to epoch.
+    """
+    if isinstance(value, str) and value.strip().lower() == EVAL_SPREAD:
+        return EVAL_SPREAD
+    spec = normalize_alpha_spec(value)
+    if spec == ALPHA_BLEND:
+        raise ValueError(
+            "eval_alpha must be 'spread', 'zc', 'zp', or a constant in [0, 1]; "
+            "not the 'blend' training schedule (a resampled validation alpha "
+            "makes val loss incomparable across epochs)."
+        )
+    return float(spec)
+
+
+def deterministic_alpha(key: str) -> float:
+    """A stable pseudo-random alpha in [0, 1) for a string key.
+
+    Keyed on the sequence so the same example always draws the same alpha —
+    across epochs, processes, and DDP ranks — which is what keeps the spread
+    validation metric comparable epoch to epoch. ``hash()`` is unsuitable here:
+    it is salted per interpreter run.
+    """
+    digest = hashlib.sha1(key.encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big") / float(1 << 64)
+
+
+def alpha_spec_uses_zp(spec) -> bool:
+    """Whether a normalized alpha spec ever puts weight on z_p."""
+    return spec == ALPHA_BLEND or float(spec) > 0.0
+
+
 class PL_ProtARDM_Finetune(PL_ProtARDM):
     """ProteoScribe finetuning module that embeds text prompts to z_c on-device.
 
@@ -1057,31 +1130,50 @@ class PL_ProtARDM_Finetune(PL_ProtARDM):
     runs in fp32 eval mode so its embeddings match Stage 1/2 inference exactly.
     """
 
-    def __init__(self, args, model, embedder, zp_lookup=None, train_alpha='0'):
+    def __init__(self, args, model, embedder, zp_lookup=None, train_alpha=0.0,
+                 eval_alpha=EVAL_SPREAD):
         super().__init__(args=args, model=model)
         embedder.eval()
         for p in embedder.parameters():
             p.requires_grad = False
         self._embedder_ref = [embedder]
         self.zp_lookup = zp_lookup
-        self.train_alpha = str(train_alpha)
+        self.train_alpha = normalize_alpha_spec(train_alpha)
+        self.eval_alpha = resolve_eval_alpha(eval_alpha)
 
-    def _sample_alpha(self, n, device):
-        """Rama train_blend schedule {1:.25, 0:.25, U(0,1):.5}; weight on z_p."""
-        if self.train_alpha == '0':
-            return torch.zeros(n, 1, device=device)
-        if self.train_alpha == '1':
-            return torch.ones(n, 1, device=device)
+    def _train_alpha(self, n, device):
+        """Per-example weight on z_p for a *training* batch, shaped ``[n, 1]``."""
+        if self.train_alpha != ALPHA_BLEND:
+            return torch.full((n, 1), float(self.train_alpha), device=device)
 
+        # Rama's train_blend schedule: {alpha=1: .25, alpha=0: .25, U(0,1): .5}
         r = torch.rand(n, device=device)
         a = torch.rand(n, device=device)
-        a = torch.where(r < 0.25, torch.ones_like(a),  a)
+        a = torch.where(r < 0.25, torch.ones_like(a), a)
         a = torch.where(r >= 0.75, torch.zeros_like(a), a)
         return a.view(n, 1)
+
+    def _eval_alpha(self, sequences, device):
+        """Per-example weight on z_p for a *validation* batch, shaped ``[n, 1]``.
+
+        A constant applies one alpha to every example; ``"spread"`` gives each
+        its own deterministic alpha keyed on the sequence, so the metric spans
+        the operating range yet stays identical across epochs. Best-checkpoint
+        selection then reflects the whole range, not a single point.
+        """
+        if self.eval_alpha == EVAL_SPREAD:
+            vals = [deterministic_alpha(s) for s in sequences]
+            return torch.tensor(vals, dtype=torch.float32, device=device).view(-1, 1)
+        return torch.full((len(sequences), 1), self.eval_alpha, device=device)
 
     @property
     def embedder(self):
         return self._embedder_ref[0]
+
+    def _is_training_batch(self):
+        # self.trainer raises when unattached, so read the backing attribute.
+        trainer = getattr(self, "_trainer", None)
+        return self.training if trainer is None else trainer.training
 
     def on_after_batch_transfer(self, batch, dataloader_idx):
         num_seqs, input_ids = batch[0], batch[1]
@@ -1092,8 +1184,18 @@ class PL_ProtARDM_Finetune(PL_ProtARDM):
             z_c = embedder(input_ids)
         if self.zp_lookup is None:
             return [num_seqs, z_c]
-        z_p = torch.stack([self.zp_lookup[s] for s in batch[2]]).to(z_c)
-        alpha = self._sample_alpha(z_c.size(0), z_c.device)
+        if len(batch) < 3:
+            raise RuntimeError(
+                "z_p blending needs the raw sequences in the batch; build the "
+                "data module with needs_unique_sequences=True so the collate "
+                "emits them."
+            )
+        sequences = batch[2]
+        z_p = torch.stack([self.zp_lookup[s] for s in sequences]).to(z_c)
+        if self._is_training_batch():
+            alpha = self._train_alpha(z_c.size(0), z_c.device)
+        else:
+            alpha = self._eval_alpha(sequences, z_c.device).to(z_c)
         y = alpha * z_p + (1.0 - alpha) * z_c
         return [num_seqs, y]
 
@@ -1191,6 +1293,7 @@ class GeneralizedDataModule(pl.LightningDataModule):
             image_size=self.image_size,
             sequence_key=self.sequence_key,
             caption_key=self.caption_key,
+            include_sequences=self.needs_unique_sequences,
         )
 
         lengths = self._resolve_lengths(source, dataset, lengths)
@@ -1210,21 +1313,29 @@ class GeneralizedDataModule(pl.LightningDataModule):
             "test_indices": test_idx,
         }]
         if self.needs_unique_sequences:
+            # Keys must match what the collate emits, so read the sequence the
+            # same way it does: the raw record value for a passthrough spec,
+            # otherwise through the composed dataset.
             raw_key = self._raw_sequence_key()
-            used = list(train_idx) + list(val_idx)
-            seqs = ((source[i][raw_key] if raw_key is not None
-             else dataset[i][self.sequence_key]) for i in used)
+            seqs = (
+                (source[i][raw_key] if raw_key is not None
+                 else dataset[i][self.sequence_key])
+                for i in list(train_idx) + list(val_idx)
+            )
             self._unique_sequences = list(dict.fromkeys(seqs))
-        else: 
+        else:
             self._unique_sequences = None
         logger.info(
             "Loaded generalized dataset from %s (%d train, %d val, %d held-out test)",
             self.jsonl_path, len(train_idx), len(val_idx), len(test_idx))
-    
+
     def unique_sequences(self):
+        """Deduplicated train+val sequences, for the one-off z_p precompute."""
         if self._unique_sequences is None:
             raise RuntimeError(
-                "requires needs_unique_sequences=True on the when train_alpha is 'zp' or 'blend'."
+                "unique_sequences() requires the data module to be built with "
+                "needs_unique_sequences=True, which run_ProteoScribe_finetuning "
+                "sets whenever train_alpha puts weight on z_p."
             )
         return self._unique_sequences
 

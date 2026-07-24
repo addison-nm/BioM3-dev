@@ -243,6 +243,63 @@ docker/build.sh --variant cuda --awscli --platform linux/amd64,linux/arm64 \
 *image registry*. The entrypoint still syncs from S3, so launches pass the `AWS_*` trio
 and that egress still bills to AWS. Narrow it with `BIOM3_WEIGHTS_INCLUDES`.
 
+## Publishing the weights bundle (GHCR)
+
+Model **weights** ship separately from the image, as an OCI **artifact** (not a runnable
+image) at **`ghcr.io/natural-machine/biom3-weights`**, tagged `run1_base-<sha>` — immutable,
+pinned to the commit that built it. Unlike the image's moving `cuda-dev`, there is **no
+moving `run1_base` pointer**: weights are a versioned artifact, so a consumer pins an exact
+sha and never has the ground shift under a rerun. It pairs the Run 1 frozen weights
+(Stages 1–3 plus the ESM-2 and BiomedBERT backbones) with the architecture-only configs
+that describe them — ~6.44 GB over 14 blobs. Consumers pull it with **`oras`**, not
+`docker`. The pull / link / run side and the full contents are in
+[../docs/setup/weights_bundle.md](../docs/setup/weights_bundle.md); the publish side is here.
+
+Same PAT as the image (`write:packages`, from the one-time step above), but log in with
+`oras`:
+
+```bash
+# oras is a single static binary — https://oras.land/docs/installation
+echo "$GHCR_TOKEN" | oras login ghcr.io -u addison-nm --password-stdin
+```
+
+Build and push from a **clean checkout on a machine that has the Run 1 weights** (e.g. DGX
+Spark, where `weights/` is linked from the share). `push_bundle.sh` refuses a dirty tree or
+a bundle whose recorded build commit ≠ `HEAD`, so the `run1_base-<sha>` tag always matches
+the code that produced it.
+
+```bash
+# 1. Rehearse — a ~350 MB subset (configs + Stage 2/3, no LLMs). Validates auth, artifact
+#    type, and the pull path without committing to the 6.4 GB upload.
+python scripts/weights_bundle/build_bundle.py -o ~/smoke --skip_llms
+scripts/weights_bundle/push_bundle.sh ~/smoke/biom3-weights-run1_base --smoke
+
+# 2. Full build — verifies every source sha256 against weights/Run1_frozen_ckpts/
+#    FROZEN_MANIFEST.md, flattens the Lightning checkpoints, writes a checksummed
+#    MANIFEST.json.
+python scripts/weights_bundle/build_bundle.py -o ~/biom3-bundles
+
+# 3. Push the immutable run1_base-<sha> tag. --dry-run prints the oras command first.
+scripts/weights_bundle/push_bundle.sh ~/biom3-bundles/biom3-weights-run1_base --dry-run
+scripts/weights_bundle/push_bundle.sh ~/biom3-bundles/biom3-weights-run1_base
+
+# 4. Make the package PUBLIC — the first push creates it private, same as the image:
+#    https://github.com/orgs/natural-machine/packages → biom3-weights
+#         → Package settings → Change visibility → Public
+
+# 5. Verify an anonymous pull into a scratch dir (pull + checksum, no linking).
+#    Use the run1_base-<sha> tag that step 3 printed.
+oras logout ghcr.io
+scripts/weights_bundle/fetch_bundle.sh /tmp/biom3-weights-check --tag run1_base-<sha> --no-link
+```
+
+**Upload constraint.** GHCR times out a single blob upload at **10 minutes**, and `oras`
+has no resumable upload. The largest blob (PenCL, ~3.05 GB) needs a sustained **~41 Mbps**
+upstream or it fails at the very end — rehearse with `--smoke` first. Blobs are
+content-addressed, so a later bundle that reuses the same ESM-2 file re-uploads only what
+changed. Weights are architecture-independent, so there is **no** multi-arch merge step
+(unlike the image).
+
 ---
 
 ## Launching from a separate machine

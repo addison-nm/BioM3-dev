@@ -19,13 +19,13 @@
 #   echo "$GHCR_TOKEN" | oras login ghcr.io -u <github-user> --password-stdin
 #
 # USAGE:
-#   scripts/weights_bundle/fetch_bundle.sh <dest> [--repo R] [--tag T]
-#                                          [--no-link] [--quick-verify]
+#   scripts/weights_bundle/fetch_bundle.sh <dest> --tag run1_base-<sha>
+#                                          [--repo R] [--no-link] [--quick-verify]
 #
 #   <dest>          directory to pull into (created if absent)
+#   --tag T         immutable tag to pull, e.g. run1_base-<sha>  (REQUIRED)
 #   --repo R        registry repo WITHOUT the tag
 #                   (default: ghcr.io/natural-machine/biom3-weights)
-#   --tag T         tag to pull (default: run1_base)
 #   --no-link       pull and verify only; skip the symlink step
 #   --quick-verify  check size only, skipping sha256 (fast, less thorough)
 #
@@ -36,7 +36,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 REPO="ghcr.io/natural-machine/biom3-weights"
-TAG="run1_base"
+TAG=""                        # required: the immutable run1_base-<sha> tag
+LINK_NAME="run1_base"         # stable local name; configs reference ../bundles/run1_base/
 BUNDLE_NAME="biom3-weights-run1_base"
 DEST=""
 NO_LINK=0
@@ -55,6 +56,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "${DEST}" ]] || { echo "ERROR: destination directory required." >&2; exit 1; }
+[[ -n "${TAG}" ]] || {
+    echo "ERROR: --tag is required (e.g. --tag run1_base-<sha>). Weights are pinned by" >&2
+    echo "       sha; there is no moving tag. Find the published tag in cloud/README.md," >&2
+    echo "       or list them: oras repo tags ${REPO}" >&2
+    exit 1
+}
 
 command -v oras >/dev/null 2>&1 || {
     echo "ERROR: oras not found. Install from https://oras.land/docs/installation" >&2
@@ -89,9 +96,10 @@ BUNDLE_WEIGHTS="${BUNDLE_DIR}/weights"
 echo "+ scripts/link_weights.sh ${BUNDLE_WEIGHTS} weights" >&2
 "${REPO_ROOT}/scripts/link_weights.sh" "${BUNDLE_WEIGHTS}" "${REPO_ROOT}/weights"
 
-# Expose the bundle's partial configs at a stable path so configs can reference
-# them relatively (../bundles/run1_base/...) instead of by absolute path.
-BUNDLE_CONFIG_LINK="${REPO_ROOT}/configs/bundles/${TAG}"
+# Expose the bundle's partial configs at a stable path so the committed consumer
+# configs can reference them relatively (../bundles/run1_base/...). The link name
+# is fixed regardless of which sha tag was pulled.
+BUNDLE_CONFIG_LINK="${REPO_ROOT}/configs/bundles/${LINK_NAME}"
 mkdir -p "$(dirname "${BUNDLE_CONFIG_LINK}")"
 if [[ -L "${BUNDLE_CONFIG_LINK}" ]]; then
     rm "${BUNDLE_CONFIG_LINK}"
@@ -100,7 +108,7 @@ elif [[ -e "${BUNDLE_CONFIG_LINK}" ]]; then
     exit 1
 fi
 ln -s "${BUNDLE_DIR}/configs" "${BUNDLE_CONFIG_LINK}"
-echo "+ configs/bundles/${TAG} -> ${BUNDLE_DIR}/configs" >&2
+echo "+ configs/bundles/${LINK_NAME} -> ${BUNDLE_DIR}/configs" >&2
 
 cat >&2 <<EOF
 
@@ -108,7 +116,7 @@ Done. Run a stage with the bundle's pinned architecture:
 
   biom3_PenCL_inference \\
       --input_data_path None \\
-      --config_path configs/inference/stage1_PenCL_${TAG}.json \\
-      --model_path weights/PenCL/BioM3_PenCL_${TAG}.bin \\
+      --config_path configs/inference/stage1_PenCL_${LINK_NAME}.json \\
+      --model_path weights/PenCL/BioM3_PenCL_${LINK_NAME}.bin \\
       --output_path outputs/pencl_embeddings.pt
 EOF

@@ -5,12 +5,13 @@
 #
 # Push a built weights bundle to GHCR as an OCI artifact, so consumers pull a
 # consistent weights + config set instead of hunting for matched files. Mirrors
-# docker/push.sh: same git-sha derivation, same dirty-tree guard, same two-tag
-# scheme.
+# docker/push.sh's git-sha derivation and dirty-tree guard.
 #
-# Pushes TWO tags per call:
-#   <bundle>-<shortsha>   immutable, tied to the exact commit that built it
-#   <bundle>              moving pointer for the current published bundle
+# Pushes ONE immutable, sha-pinned tag:
+#   <tag>-<shortsha>   tied to the exact commit that built the bundle
+#
+# There is no moving pointer: weights are a versioned artifact, so consumers pin
+# an exact sha rather than tracking a tag that shifts under them.
 #
 # Each file becomes its own content-addressed blob, so republishing a bundle
 # that only changes one stage re-uploads only that stage. Weights are
@@ -133,21 +134,18 @@ done < <(find . -type f -printf '%P\n' | sort)
 
 if [[ "${SMOKE}" -eq 1 ]]; then
     VERSION_TAG="${REPO}:${TAG}-smoke-${SHA}"
-    MOVING_TAG="${REPO}:${TAG}-smoke"
     echo "SMOKE: omitting LLMs/ and PenCL/ — this artifact is NOT usable for Stage 1." >&2
 else
     VERSION_TAG="${REPO}:${TAG}-${SHA}"
-    MOVING_TAG="${REPO}:${TAG}"
 fi
 
 TOTAL_BYTES="$(du -sb "${BUNDLE_DIR}" | cut -f1)"
 echo "Bundle:  ${BUNDLE_DIR}" >&2
 echo "Files:   ${#FILES[@]} ($(numfmt --to=iec "${TOTAL_BYTES}"))" >&2
-echo "Tags:    ${VERSION_TAG}" >&2
-echo "         ${MOVING_TAG}" >&2
+echo "Tag:     ${VERSION_TAG}" >&2
 
 if [[ "${DRY_RUN}" -eq 1 ]]; then
-    echo "+ oras push --artifact-type ${ARTIFACT_TYPE} ${VERSION_TAG} ${MOVING_TAG} <${#FILES[@]} files>" >&2
+    echo "+ oras push --artifact-type ${ARTIFACT_TYPE} ${VERSION_TAG} <${#FILES[@]} files>" >&2
     printf '    %s\n' "${FILES[@]}" >&2
     exit 0
 fi
@@ -160,10 +158,6 @@ oras push \
     "${VERSION_TAG}" \
     "${FILES[@]}"
 
-echo "+ oras tag ${VERSION_TAG} -> ${MOVING_TAG}" >&2
-oras tag "${VERSION_TAG}" "${MOVING_TAG##*:}"
-
-echo "Pushed:" >&2
-echo "  ${VERSION_TAG}   (immutable)" >&2
-echo "  ${MOVING_TAG}    (moving pointer — what fetch_bundle.sh tracks)" >&2
-echo "Verify: oras manifest fetch --pretty ${MOVING_TAG}" >&2
+echo "Pushed: ${VERSION_TAG}   (immutable)" >&2
+echo "Verify: oras manifest fetch --pretty ${VERSION_TAG}" >&2
+echo "Fetch:  scripts/weights_bundle/fetch_bundle.sh <dest> --tag ${VERSION_TAG##*:}" >&2

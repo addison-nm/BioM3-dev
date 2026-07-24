@@ -3,6 +3,7 @@
 /outputs/*
 /logs/
 /weights/*/*
+/configs/bundles/
 _my*/
 /tests/_tmp/
 /_tmp/

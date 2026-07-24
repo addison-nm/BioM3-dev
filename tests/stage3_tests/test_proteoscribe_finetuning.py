@@ -16,6 +16,7 @@ these run under `pytest --quick`.
 """
 
 import json
+import logging
 from argparse import Namespace
 
 import numpy as np
@@ -24,6 +25,7 @@ import torch
 from torch import nn
 
 import biom3.Stage3.preprocess as prep
+import biom3.Stage3.run_ProteoScribe_finetuning as run_ft
 from biom3.Stage3.preprocess import encode_protein_sequence, make_seq_caption_collate_fn
 from biom3.split.manifest import write_manifest
 from biom3.split.run_stratified_split import build_stratified_split_manifest
@@ -334,3 +336,63 @@ class TestFinetuneWrapper:
         assert ret_seqs is num_seqs
         assert z_c.shape == (3, 8)
         assert not z_c.requires_grad  # computed under no_grad with a frozen front-end
+
+
+# --------------------------- runtime arg wiring -----------------------------
+
+class _StopAfterRuntimeSetup(Exception):
+    """Aborts main() once the runtime settings have been applied."""
+
+
+@pytest.fixture
+def isolated_matmul_precision():
+    """Pin the global to torch's default, then restore it (and any log handlers)."""
+    original = torch.get_float32_matmul_precision()
+    biom3_logger = logging.getLogger("biom3")
+    original_handlers = list(biom3_logger.handlers)
+    torch.set_float32_matmul_precision("highest")
+    yield
+    torch.set_float32_matmul_precision(original)
+    for handler in list(biom3_logger.handlers):
+        if handler not in original_handlers:
+            biom3_logger.removeHandler(handler)
+            handler.close()
+
+
+class TestFloat32MatmulPrecision:
+    """--float32_matmul_precision was inherited from run_PL_training but dead:
+    it is applied inside that module's main(), which the finetune main() does
+    not call, so finetune runs stayed at torch's "highest" default."""
+
+    @staticmethod
+    def _args(tmp_path, precision):
+        return run_ft.parse_arguments([
+            "--record_schema", json.dumps({"sequence": {"from": "sequence"}}),
+            "--output_root", str(tmp_path),
+            "--run_id", "matmul_precision",
+            "--checkpoints_folder", "checkpoints",
+            "--float32_matmul_precision", precision,
+        ])
+
+    @pytest.mark.parametrize("precision", ["high", "medium"])
+    def test_applied_by_main(self, tmp_path, monkeypatch,
+                             isolated_matmul_precision, precision):
+        args = self._args(tmp_path, precision)
+
+        def _stop(*a, **kw):
+            raise _StopAfterRuntimeSetup
+
+        monkeypatch.setattr(run_ft, "load_embedder_configs", _stop)
+
+        with pytest.raises(_StopAfterRuntimeSetup):
+            run_ft.main(args)
+
+        assert torch.get_float32_matmul_precision() == precision
+
+    def test_invalid_value_rejected(self, tmp_path, isolated_matmul_precision):
+        """argparse `choices` guards the CLI, but JSON configs reach the
+        namespace via set_defaults() and are not validated there."""
+        args = self._args(tmp_path, "high")
+        args.float32_matmul_precision = "turbo"
+        with pytest.raises(ValueError, match="float32_matmul_precision"):
+            run_ft.main(args)

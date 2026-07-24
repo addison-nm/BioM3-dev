@@ -44,7 +44,9 @@ from biom3.core.helpers import load_json_config, convert_to_namespace
 from biom3.core.dry_run import run_dry_run
 from biom3.core.run_utils import setup_file_logging, teardown_file_logging
 from biom3.core.distributed import get_global_rank
-from biom3.backend.device import print_gpu_initialization, setup_logger
+from biom3.backend.device import (
+    print_gpu_initialization, setup_logger, set_float32_matmul_precision,
+)
 
 logger = setup_logger(__name__)
 
@@ -333,6 +335,7 @@ def main(args, ds_config=None):
         os.makedirs(checkpoint_dir, exist_ok=True)
     log_path, file_handler = setup_file_logging(artifacts_dir)
 
+    set_float32_matmul_precision(args.float32_matmul_precision)
     base.clear_gpu_cache()
 
     seed = args.seed

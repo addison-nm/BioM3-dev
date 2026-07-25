@@ -91,8 +91,7 @@ ln -s ~/biom3-bundles/run1_base/configs configs/bundles/run1_base
 files that are absent and reports `MATCH`/`MISMATCH` for anything already present, so review
 its output before relying on the result. The bundle's `weights/` subtree mirrors the repo's
 own layout, so once linked, a path like `weights/PenCL/BioM3_PenCL_run1_base.bin` resolves
-through the symlink, and `configs/bundles/run1_base/` is what the consumer configs reference.
-Keep the pulled bundle dir around — the symlinks point into it.
+through the symlink. Keep the pulled bundle dir around — the symlinks point into it.
 
 `--tag` is required — it names the bundle to pull; list published tags with `oras repo tags
 ghcr.io/natural-machine/biom3-weights`. `--link` wires the bundle into the checkout;
@@ -100,22 +99,19 @@ ghcr.io/natural-machine/biom3-weights`. `--link` wires the bundle into the check
 
 ### Into an image
 
-The published image does not bake in the weights. Pull the bundle on the host, then bind it
-into the container at run time so both the weights and the bundle's configs are visible
-inside:
+The published image does not bake in the weights. Pull the bundle on the host and bind its
+`weights/` into the container at run time:
 
 ```bash
 oras pull ghcr.io/natural-machine/biom3-weights:run1_base -o ~/biom3-bundles/run1_base
 # then at container run time, bind:
 #   ~/biom3-bundles/run1_base/weights -> /app/weights
-#   ~/biom3-bundles/run1_base/configs -> /app/configs/bundles/run1_base
-#   your own configs/                 -> /app/configs
 ```
 
-Binding the bundle's `configs/` to `/app/configs/bundles/run1_base` gives the container the
-same `configs/bundles/run1_base/` path a checkout gets from linking, so a config that
-references `../bundles/run1_base/...` resolves either way. See [APPTAINER.md](../APPTAINER.md)
-for a worked container invocation.
+You bind only the weights: run1_base's architecture is already the default baked into the
+image's `configs/inference/` configs, so you point `--config_path` at those and don't need
+to bind the bundle's configs at run time. See [APPTAINER.md](../APPTAINER.md) for a worked
+container invocation.
 
 ### Verifying an existing bundle
 
@@ -126,47 +122,41 @@ works on a bare machine:
 python scripts/weights_bundle/verify_bundle.py ~/biom3-bundles/run1_base
 ```
 
-## Referencing fetched weight bundles
+## Running against the bundle's weights
 
-Each bundle carries an architecture config fragment per stage (`configs/_base_*.json`). You
-compose it into your own inference config so the settings the weights need travel with the
-weights instead of being copied by hand. `configs/examples/` holds a runnable example per
-stage — an ordinary inference config whose `_overwrite_configs` layers the bundle fragment
-over the repo defaults:
+Each bundle ships a per-stage architecture fragment (`configs/_base_*.json`) alongside its
+weights, so the settings the weights were built with are published *with* them — you can
+always see exactly what a bundle expects.
 
-```json
-{
-  "_base_configs": ["../inference/_base_runtime.json", "../inference/models/_base_PenCL.json"],
-  "_overwrite_configs": ["../bundles/run1_base/_base_PenCL.json"],
-  "model_type": "pfam"
-}
-```
-
-The `../bundles/run1_base/...` reference resolves once the bundle's configs sit at
-`configs/bundles/run1_base/`. The two use cases differ only in how they get there.
-
-Checkout: `fetch_bundle.sh --link` (or the manual `ln -s`) creates the
-`configs/bundles/run1_base/` symlink into the pulled bundle. Then run against the bundle's
-weights:
+For **run1_base**, that architecture is already the default the repo's `configs/inference/`
+configs encode, so there is nothing to compose: point `--config_path` straight at the stock
+inference config and pass the bundle's weight file. (Weight paths are relative to the run
+dir, so run from the repo root — or `/app` in the container — with the bundle's `weights/`
+linked or bound there.)
 
 ```bash
 biom3_PenCL_inference \
-    --config_path configs/examples/stage1_PenCL_run1_base.json \
+    --config_path configs/inference/stage1_PenCL.json \
     --model_path weights/PenCL/BioM3_PenCL_run1_base.bin \
     --input_data_path None --output_path outputs/pencl_embeddings.pt
 
 biom3_Facilitator_sample \
-    --config_path configs/examples/stage2_Facilitator_run1_base.json \
+    --config_path configs/inference/stage2_Facilitator.json \
     --model_path weights/Facilitator/BioM3_Facilitator_run1_base.bin \
     --input_data_path outputs/pencl_embeddings.pt \
     --output_data_path outputs/facilitator_embeddings.pt
 
 biom3_ProteoScribe_sample \
-    --config_path configs/examples/stage3_ProteoScribe_sample_run1_base.json \
+    --config_path configs/inference/stage3_ProteoScribe_sample.json \
     --model_path weights/ProteoScribe/BioM3_ProteoScribe_run1_base.bin \
     --input_path outputs/facilitator_embeddings.pt \
     --output_path outputs/generated_sequences.csv
 ```
+
+A future weight set whose architecture differs from these defaults would ship a fragment that
+no longer matches `configs/inference/`; that's when you compose the shipped fragment into a
+config via `_overwrite_configs` (or the planned bundle-config integration tool). run1_base
+does not need it.
 
 Image: bind the pulled bundle's `configs/` to `/app/configs/bundles/run1_base` and your own
 `configs/` to `/app/configs` (see [Into an image](#into-an-image)); the same

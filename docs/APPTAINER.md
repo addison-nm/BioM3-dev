@@ -84,41 +84,41 @@ bundle=$PWD/biom3-weights-run1_base
 mkdir -p $PWD/outputs
 ```
 
-Bind the bundle's `weights/` over the image's empty `/app/weights`, and its
-`configs/` into `/app/configs/bundles/run1_base` (where the run1_base configs'
-`_overwrite_configs` look for them). A small helper keeps the three stages tidy —
-with `--pwd /app`, no shell wrapper is needed:
+Bind the bundle's `weights/` over the image's empty `/app/weights` — that's the
+only bundle bind you need. run1_base's architecture is already the default baked
+into the image's `configs/inference/` configs, so you point `--config_path` at
+those and never bind the bundle's configs. A small helper keeps the three stages
+tidy — with `--pwd /app`, no shell wrapper is needed:
 
 ```bash
 run() {
     apptainer exec --nv --writable-tmpfs --pwd /app \
         --bind "$PWD/outputs:/app/outputs" \
         --bind "$bundle/weights:/app/weights:ro" \
-        --bind "$bundle/configs:/app/configs/bundles/run1_base:ro" \
         ${biom3_image} "$@"
 }
 
 # Stage 1 -> 2 -> 3. `--input_data_path None` uses Stage 1's built-in 5-protein
 # test set, so the whole chain runs with no external data.
 run biom3_PenCL_inference --input_data_path None \
-    --config_path configs/examples/stage1_PenCL_run1_base.json \
+    --config_path configs/inference/stage1_PenCL.json \
     --model_path weights/PenCL/BioM3_PenCL_run1_base.bin \
     --output_path outputs/pencl_embeddings.pt
 
 run biom3_Facilitator_sample --input_data_path outputs/pencl_embeddings.pt \
-    --config_path configs/examples/stage2_Facilitator_run1_base.json \
+    --config_path configs/inference/stage2_Facilitator.json \
     --model_path weights/Facilitator/BioM3_Facilitator_run1_base.bin \
     --output_data_path outputs/facilitator_embeddings.pt
 
 run biom3_ProteoScribe_sample --input_path outputs/facilitator_embeddings.pt \
-    --config_path configs/examples/stage3_ProteoScribe_sample_run1_base.json \
+    --config_path configs/inference/stage3_ProteoScribe_sample.json \
     --model_path weights/ProteoScribe/BioM3_ProteoScribe_run1_base.bin \
     --output_path outputs/generated_sequences.csv
 ```
 
 Paths like `configs/...`, `weights/...`, `outputs/...` are relative to `/app`
-(`--pwd /app`), resolving against the baked-in configs and the bundle you bound
-in. Generated sequences land in `$PWD/outputs/generated_sequences.csv`.
+(`--pwd /app`): the config comes from the baked-in image, the weights from the
+bundle you bound. Generated sequences land in `$PWD/outputs/generated_sequences.csv`.
 
 > **Multi-GPU training is different.** The single-node training launcher spawns
 > ranks with Cray PALS `mpiexec`, which must run *outside* the container (the

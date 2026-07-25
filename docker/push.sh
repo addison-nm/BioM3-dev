@@ -3,21 +3,21 @@
 #
 # FILE: docker/push.sh
 #
-# Tag + push a locally-built BioM3 image to GHCR with git-derived version tags, so
-# cloud instances pull it instead of rebuilding (~10-40 min build -> seconds). The
-# image is published PUBLIC, so cloud/*.yaml pull it anonymously (no registry token).
+# Tag + push an ALREADY-BUILT local BioM3 image to GHCR with git-derived version
+# tags, so cloud instances pull it instead of rebuilding. The image is published
+# PUBLIC, so cloud/*.yaml pull it anonymously (no registry token).
 #
 # Pushes TWO tags per call:
 #   <variant>-<shortsha>   immutable, tied to the exact commit (reproducible)
 #   <variant>-dev          moving pointer for the dev line (what cloud/*.yaml track)
 #
-# MULTI-ARCH (amd64 for cloud instances + arm64 for DGX Spark) is built natively on
-# each architecture and merged, because emulating the other arch costs hours on an
-# image this size. Run --arch on a host of each architecture, then --join once:
-#   host A:  docker/build.sh --variant cuda --awscli && docker/push.sh --arch
-#   host B:  docker/build.sh --variant cuda --awscli && docker/push.sh --arch
-#   either:  docker/push.sh --join
-# --join needs both <variant>-<sha>-amd64 and <variant>-<sha>-arm64 to exist.
+# SINGLE-ARCH ONLY: a local image holds one architecture, so this publishes the
+# architecture you built on. That suits the amd64-only xpu variant. For the cuda
+# variant, which ships as a multi-arch manifest list, publish with
+#   docker/build.sh --variant cuda --awscli --release
+# which builds every architecture in one pass and pushes both tags itself. This
+# script REFUSES to overwrite a multi-arch <variant>-dev (see --force-dev), since
+# doing so would strip an architecture off the tag cloud jobs pull.
 #
 # Prereqs: docker; a local biom3:<variant> image (docker/build.sh --variant ...); and a
 # GHCR login on the PUSH side (pulling a public image needs no login):
@@ -27,15 +27,14 @@
 #
 # USAGE:
 #   docker/push.sh [--variant cuda|xpu] [--repo R] [--local-tag T] [--allow-dirty]
-#                  [--arch | --join]
+#                  [--force-dev]
 #
 #   --variant V    cuda | xpu (default cuda) -> pushes biom3:<V> as <V>-<sha> + <V>-dev
 #   --repo R       registry repo WITHOUT the tag
 #                  (default: ghcr.io/natural-machine/biom3)
 #   --local-tag T  local image to push (default: biom3:<variant>)
 #   --allow-dirty  push from a dirty tree; the sha tag gets a -dirty suffix
-#   --arch         push only <variant>-<sha>-<arch>, taking <arch> from the image
-#   --join         merge the per-arch tags into <variant>-<sha> + <variant>-dev
+#   --force-dev    replace a multi-arch <variant>-dev with this single-arch image
 #
 #=============================================================================
 set -euo pipefail
@@ -47,7 +46,7 @@ VARIANT="cuda"
 REPO="ghcr.io/natural-machine/biom3"
 LOCAL_TAG=""
 ALLOW_DIRTY=0
-MODE="single"
+FORCE_DEV=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -55,9 +54,8 @@ while [[ $# -gt 0 ]]; do
         --repo)        REPO="$2"; shift 2 ;;
         --local-tag)   LOCAL_TAG="$2"; shift 2 ;;
         --allow-dirty) ALLOW_DIRTY=1; shift ;;
-        --arch)        MODE="arch"; shift ;;
-        --join)        MODE="join"; shift ;;
-        -h|--help)     sed -n '3,38p' "$0"; exit 0 ;;
+        --force-dev)   FORCE_DEV=1; shift ;;
+        -h|--help)     sed -n '3,36p' "$0"; exit 0 ;;
         *)             echo "Unknown arg: $1" >&2; exit 1 ;;
     esac
 done
@@ -83,59 +81,29 @@ fi
 VERSION_TAG="${REPO}:${VARIANT}-${SHA}"
 MOVING_TAG="${REPO}:${VARIANT}-dev"
 
-case "${MODE}" in
+# A local image is single-arch. If the remote moving tag is a manifest list,
+# pushing over it drops every architecture but this one from the tag cloud jobs
+# pull. Attestation entries count as platforms too, so >1 means "manifest list".
+REMOTE_PLATFORMS="$(docker buildx imagetools inspect "${MOVING_TAG}" 2>/dev/null \
+    | grep -c '^ *Platform:' || true)"
+if [[ "${REMOTE_PLATFORMS}" -gt 1 && "${FORCE_DEV}" -eq 0 ]]; then
+    echo "ERROR: ${MOVING_TAG} is a multi-arch manifest list; pushing this" >&2
+    echo "       single-arch image over it would strip the other architecture(s)." >&2
+    echo "       Publish multi-arch instead:" >&2
+    echo "         docker/build.sh --variant ${VARIANT} --awscli --release" >&2
+    echo "       Or pass --force-dev to replace it deliberately." >&2
+    exit 1
+fi
 
-single)
-    echo "+ docker tag ${LOCAL_TAG} -> ${VERSION_TAG} , ${MOVING_TAG}" >&2
-    docker tag "${LOCAL_TAG}" "${VERSION_TAG}"
-    docker tag "${LOCAL_TAG}" "${MOVING_TAG}"
+echo "+ docker tag ${LOCAL_TAG} -> ${VERSION_TAG} , ${MOVING_TAG}" >&2
+docker tag "${LOCAL_TAG}" "${VERSION_TAG}"
+docker tag "${LOCAL_TAG}" "${MOVING_TAG}"
 
-    echo "+ docker push ${VERSION_TAG}" >&2
-    docker push "${VERSION_TAG}"
-    echo "+ docker push ${MOVING_TAG}" >&2
-    docker push "${MOVING_TAG}"
+echo "+ docker push ${VERSION_TAG}" >&2
+docker push "${VERSION_TAG}"
+echo "+ docker push ${MOVING_TAG}" >&2
+docker push "${MOVING_TAG}"
 
-    echo "Pushed:" >&2
-    echo "  ${VERSION_TAG}   (immutable, single-arch)" >&2
-    echo "  ${MOVING_TAG}    (moving dev pointer — what cloud/*.yaml reference)" >&2
-    ;;
-
-arch)
-    # Read the arch off the image rather than the host, so a cross-built image is
-    # still tagged truthfully.
-    ARCH="$(docker image inspect --format '{{.Architecture}}' "${LOCAL_TAG}")"
-    [[ -n "${ARCH}" ]] || { echo "ERROR: could not read arch of ${LOCAL_TAG}." >&2; exit 1; }
-    ARCH_TAG="${VERSION_TAG}-${ARCH}"
-
-    echo "+ docker tag ${LOCAL_TAG} -> ${ARCH_TAG}" >&2
-    docker tag "${LOCAL_TAG}" "${ARCH_TAG}"
-    echo "+ docker push ${ARCH_TAG}" >&2
-    docker push "${ARCH_TAG}"
-
-    echo "Pushed ${ARCH_TAG}. Run --join once every arch is pushed." >&2
-    ;;
-
-join)
-    MISSING=()
-    for a in amd64 arm64; do
-        docker buildx imagetools inspect "${VERSION_TAG}-${a}" >/dev/null 2>&1 \
-            || MISSING+=("${VERSION_TAG}-${a}")
-    done
-    if [[ ${#MISSING[@]} -gt 0 ]]; then
-        echo "ERROR: missing per-arch tag(s): ${MISSING[*]}" >&2
-        echo "       Build on that architecture and push with --arch first." >&2
-        exit 1
-    fi
-
-    echo "+ docker buildx imagetools create -t ${VERSION_TAG} -t ${MOVING_TAG}" >&2
-    docker buildx imagetools create \
-        -t "${VERSION_TAG}" -t "${MOVING_TAG}" \
-        "${VERSION_TAG}-amd64" "${VERSION_TAG}-arm64"
-
-    echo "Published multi-arch:" >&2
-    echo "  ${VERSION_TAG}   (immutable, amd64+arm64)" >&2
-    echo "  ${MOVING_TAG}    (moving dev pointer — what cloud/*.yaml reference)" >&2
-    echo "Verify: docker manifest inspect ${MOVING_TAG}" >&2
-    ;;
-
-esac
+echo "Pushed:" >&2
+echo "  ${VERSION_TAG}   (immutable, single-arch)" >&2
+echo "  ${MOVING_TAG}    (moving dev pointer — what cloud/*.yaml reference)" >&2

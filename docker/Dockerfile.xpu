@@ -8,8 +8,7 @@
 # x86_64 — so, unlike the CUDA variant, there is no arm64 build here.
 #
 # TARGET = Aurora, run under Apptainer (NOT docker). The usual flow is:
-#   docker/build.sh --variant xpu                                   # x86_64 host
-#   docker/push.sh  --variant xpu                                   # -> :xpu-dev
+#   docker/build.sh --variant xpu --release                         # -> :xpu-dev + :xpu-<sha>
 #   apptainer build biom3_xpu.sif docker://ghcr.io/.../biom3:xpu-dev  # on Aurora
 #   scripts/aurora/apptainer_run.sh <cmd>    # binds /dev/dri + /flare, runs
 # See docs/setup/setup_aurora_container.md for the full runbook.

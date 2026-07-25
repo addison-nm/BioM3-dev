@@ -19,10 +19,12 @@ to run at `docker run` time. Built per architecture:
 
 | File | Purpose |
 | ---- | ------- |
-| `Dockerfile` | The image: `nvidia/cuda:12.9` → py3.12 → torch 2.8 (cu129) → BioM3 (`pip install -e .[app]`). |
-| `Dockerfile.dockerignore` | Trims the build context (BuildKit picks it up for `-f docker/Dockerfile`). |
+| `Dockerfile.cuda` | The NVIDIA image: `nvidia/cuda:12.9` → py3.12 → torch 2.8 (cu129) → BioM3 (`pip install -e .[app]`). |
+| `Dockerfile.xpu` | The Intel/oneAPI variant, for Aurora. **amd64 only** — there are no arm64 Intel GPU wheels. |
+| `Dockerfile.<variant>.dockerignore` | Trims the build context (BuildKit picks it up per-Dockerfile). |
 | `entrypoint.sh` | Sources `environment.sh`, runs the optional object-store sync, then exec's your command. |
-| `build.sh` | `docker buildx` wrapper (platform, tag, awscli, push). |
+| `build.sh` | `docker buildx` wrapper (variant, platform, tag, awscli, push) and the GHCR publish path (`--release`). |
+| `push.sh` | Publishes an already-built **single-arch** image under the GHCR tags. For the xpu variant; see [Publishing](#publishing-to-ghcr). |
 | `run.sh` | `docker run` wrapper for GPU hosts: standard mounts + env passthrough. |
 | `docker-compose.yml` | Optional services for the streamlit `app` (port 8501) and a `shell`. |
 
@@ -30,8 +32,9 @@ to run at `docker run` time. Built per architecture:
 
 ## Build
 
-Requires Docker with BuildKit/buildx. The image is ~12–15 GB; the first build downloads
-the ~3 GB torch cu129 wheel (10–40 min). Subsequent builds reuse the buildx layer cache.
+Requires Docker with BuildKit/buildx. The image is ~18–21 GB on disk (~10–12 GB
+compressed in the registry); the first build downloads the ~3 GB torch cu129 wheel.
+Subsequent builds reuse the buildx layer cache.
 
 ```bash
 # Native architecture (Apple Silicon → arm64; x86 Linux/Mac → amd64):
@@ -44,16 +47,56 @@ docker/build.sh --platform linux/arm64
 # Bake in awscli for the S3 sync hook (off by default):
 docker/build.sh --awscli
 
-# Multi-arch (requires --push; buildx --load is single-platform only):
-docker/build.sh --platform linux/amd64,linux/arm64 --tag <registry>/biom3:cuda --push
+# The Intel/oneAPI variant (amd64 only):
+docker/build.sh --variant xpu
 ```
 
-Cross-arch builds (building arm64 on an x86 host or vice-versa) need QEMU/binfmt
-registered in the buildx builder. Building natively on each arch is simplest.
+`--load` is single-platform only, so a multi-platform build must push — see
+[Publishing](#publishing-to-ghcr).
 
 **Network note:** the torch wheel comes from `download.pytorch.org`. On a VPN with
 upstream DNS filtering (e.g. Tailscale MagicDNS) the download can stall on `Failed to
 resolve download.pytorch.org` — disconnect the VPN for the build.
+
+---
+
+## Publishing to GHCR
+
+The public image at `ghcr.io/natural-machine/biom3` is a **multi-arch manifest list**
+covering `linux/amd64` (cloud instances) and `linux/arm64` (DGX Spark), so both pull
+the same tag. Build every architecture in one pass, from **one** host of either
+architecture:
+
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u <github-user> --password-stdin
+docker/build.sh --variant cuda --awscli --release
+docker buildx imagetools inspect ghcr.io/natural-machine/biom3:cuda-dev
+```
+
+`--release` pushes `cuda-<sha>` (immutable) and `cuda-dev` (moving; what `cloud/*.yaml`
+pull), defaults `--platform` to every architecture the variant supports, and refuses a
+dirty tree so the sha tag matches the commit.
+
+The build host needs a **`docker-container`** buildx builder (the stock `default` driver
+cannot build multi-platform) and **binfmt/QEMU** for the non-native architecture:
+
+```bash
+docker buildx create --name multiarch --driver docker-container --use
+docker run --privileged --rm tonistiigi/binfmt --install all
+docker buildx inspect            # Platforms: must list both architectures
+```
+
+`Dockerfile.cuda` has no architecture conditionals — the `nvidia/cuda` base is a
+manifest list and the cu129 index serves aarch64 wheels — so multi-arch is purely a
+build-orchestration concern.
+
+[`push.sh`](push.sh) publishes an already-built image under the same tags, but a local
+image is **single-arch**. It is the path for the amd64-only `xpu` variant; for cuda it
+refuses to overwrite a multi-arch `-dev` tag (`--force-dev` overrides).
+
+**Publishing makes the baked `src/`, `scripts/`, `tests/`, and `configs/` world-readable.**
+The full runbook — token creation, package visibility, anonymous-pull verification — is in
+[`../cloud/README.md`](../cloud/README.md#publishing-the-image-ghcr--runbook).
 
 ---
 

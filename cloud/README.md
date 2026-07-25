@@ -152,9 +152,10 @@ tracks). Both are **multi-arch manifest lists** covering `linux/amd64` (cloud
 instances) and `linux/arm64` (DGX Spark), so the same tag runs on either.
 
 Why GHCR + public:
-- **Cost**: Mithril instances are ephemeral, so *every launch pulls the whole ~11.6 GB
-  image*. From ECR that is internet egress (~$0.09/GB ≈ **$1/launch**, billed under the
-  AWS EC2/"EC2-Other" line). GitHub Packages is **free for public packages**.
+- **Cost**: Mithril instances are ephemeral, so *every launch pulls the whole image*
+  (~11.6 GB compressed for amd64, ~10.3 GB for arm64). From ECR that is internet egress
+  (~$0.09/GB ≈ **$1/launch**, billed under the AWS EC2/"EC2-Other" line). GitHub
+  Packages is **free for public packages**.
 - **Simplicity**: a public image needs **no pull authentication**, so the launch path
   carries no registry token at all.
 
@@ -174,7 +175,8 @@ export GHCR_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
 # 2. Log in to GHCR (needed to PUSH; pulling a public image needs no login).
 echo "$GHCR_TOKEN" | docker login ghcr.io -u addison-nm --password-stdin
 
-# 3. Build and publish (see the multi-arch section below).
+# 3. Build and publish both architectures (see the next section for host requirements).
+docker/build.sh --variant cuda --awscli --release
 
 # 4. Make the package PUBLIC — the first push creates it PRIVATE by default.
 #    Web: https://github.com/orgs/natural-machine/packages → biom3
@@ -185,57 +187,51 @@ docker logout ghcr.io
 docker pull ghcr.io/natural-machine/biom3:cuda-dev
 ```
 
-### On every image change — build each arch natively, then merge
+### On every image change — one cross-build from any host
 
 The image bakes `src/ scripts/ tests/ configs/`, so any change to them — or to
 `docker/entrypoint.sh` — needs a rebuild and repush before it reaches a cloud run.
 
-Each architecture is built on matching hardware and the results merged. Emulating the
-other architecture costs hours on this image (~1 GB torch wheel, DeepSpeed compiles
-from source), so cross-building is a fallback, not the default.
-
-On an **arm64** host (DGX Spark) *and* an **amd64** host (x86 box, cloud instance, or
-CI runner), from the same clean commit:
+Both architectures are built in a single pass, from **one** host of either
+architecture, and pushed as a manifest list:
 
 ```bash
 echo "$GHCR_TOKEN" | docker login ghcr.io -u addison-nm --password-stdin
-docker/build.sh --variant cuda --awscli          # builder's native platform
-docker/push.sh  --variant cuda --arch            # -> cuda-<sha>-amd64 / -arm64
+docker/build.sh --variant cuda --awscli --release
+docker buildx imagetools inspect ghcr.io/natural-machine/biom3:cuda-dev
 ```
 
-Then once, from either host:
+`--release` defaults `--platform` to every architecture the variant supports
+(`linux/amd64,linux/arm64` for cuda; amd64 only for xpu), derives the tags from
+`--repo` and the git sha, and implies `--push`:
 
-```bash
-docker/push.sh --variant cuda --join             # -> cuda-<sha> + cuda-dev
-docker manifest inspect ghcr.io/natural-machine/biom3:cuda-dev
-```
+- `cuda-<sha>` — immutable, per commit
+- `cuda-dev` — moving; what `run.mithril.yaml` pulls
 
-The `inspect` should list both `linux/amd64` and `linux/arm64`. `--arch` reads the
-architecture from the image itself, and `--join` refuses unless both per-arch tags
-exist. The dirty-tree guard applies to both, so `cuda-<sha>` still matches the commit.
+It refuses a dirty tree so `cuda-<sha>` matches the commit; `--allow-dirty` overrides
+and suffixes the sha with `-dirty`. `--tag` is not valid alongside it.
 
-#### Adopting an existing single-arch image
+The `inspect` should list `linux/amd64` and `linux/arm64`. Two extra `unknown/unknown`
+entries are buildx provenance attestations — expected, and ignored by `docker pull`.
 
-`imagetools` composes manifest lists from images already in the registry — no rebuild,
-no pull. To reuse an image pushed before this flow existed:
+**Requirements on the build host:**
 
-```bash
-REPO=ghcr.io/natural-machine/biom3
-docker buildx imagetools create -t ${REPO}:cuda-<sha>-amd64 ${REPO}:cuda-<sha>
-```
+- A **`docker-container`** buildx builder. The stock `default` (docker driver) cannot
+  build multi-platform: `docker buildx create --name <n> --driver docker-container --use`.
+- **binfmt/QEMU** registered for the non-native architecture:
+  `docker run --privileged --rm tonistiigi/binfmt --install all`. Check with
+  `docker buildx inspect` — the `Platforms:` line must list both.
 
-Brace the variable — zsh reads an unbraced `$REPO:c…` as the `:c` history modifier
-and silently drops the `:c`, producing a garbage image reference.
+Emulating the non-native architecture is slower than a native build, but not
+prohibitively so for this image, and buildx caches layers across runs.
 
-#### Cross-building on one host (slow fallback)
+#### Single-arch publishing (`push.sh`)
 
-Emulates the non-native architecture. `buildx` cannot `--load` a multi-platform build,
-so it must push directly and `push.sh` is not involved:
-
-```bash
-docker/build.sh --variant cuda --awscli --platform linux/amd64,linux/arm64 \
-    --tag ghcr.io/natural-machine/biom3:cuda-<sha> --push
-```
+[`docker/push.sh`](../docker/push.sh) pushes a locally-built image under the same two
+tags, but a local image holds only one architecture. It exists for the **amd64-only
+xpu variant**. For cuda it refuses to overwrite a multi-arch `cuda-dev` — doing so
+would silently strip an architecture off the tag cloud jobs pull. `--force-dev`
+overrides that if you mean it.
 
 ### What this does NOT remove
 

@@ -30,9 +30,13 @@ Intel's IPEX is upstreamed into mainline torch, and `torch.distributed` uses the
 ### 1. Build + push the XPU image (off Aurora)
 
 ```bash
-docker/build.sh --variant xpu                 # -> biom3:xpu (amd64)
-docker/push.sh  --variant xpu                 # -> ghcr.io/natural-machine/biom3:xpu-dev (+ :xpu-<sha>)
+docker/build.sh --variant xpu --release       # -> ghcr.io/natural-machine/biom3:xpu-dev (+ :xpu-<sha>)
 ```
+
+`--release` builds and pushes in one pass. Unlike the cuda variant it stays
+**amd64-only**, so there is no manifest list to assemble. To publish an image you have
+already built locally, `docker/push.sh --variant xpu` pushes the same two tags without
+rebuilding.
 
 ### 2. Convert to a .sif (Aurora login node)
 

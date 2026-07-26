@@ -30,6 +30,7 @@ runtime env:
 
 | Var | Direction |
 | --- | --- |
+| `BIOM3_WEIGHTS_BUNDLE` (+ `_REPO`) | GHCR bundle → `/app/weights`, via the baked-in `oras` |
 | `BIOM3_WEIGHTS_URI` + `BIOM3_WEIGHTS_INCLUDES` | → `/app/weights` |
 | `BIOM3_DATA_URI` | → `/app/data` |
 | `BIOM3_OUTPUTS_PUSH_URI` | `/app/outputs` → (rank-0 node only) |
@@ -40,6 +41,12 @@ runtime env:
 below only set `INCLUDES`. A URI with no `INCLUDES` is refused rather than pulling the
 whole tree — pass `INCLUDES="*"` to opt into everything, or `BIOM3_WEIGHTS_URI=""` to
 skip the weight sync.
+
+**No S3 at all:** for a published weight set, `BIOM3_WEIGHTS_BUNDLE=run1_base` pulls the
+GHCR bundle straight into `/app/weights` — no bucket, no `AWS_*` credentials, no egress
+bill. The bundle's filenames match `configs/weights/run1_base.json`, so the job command
+just passes `--weight_set configs/weights/run1_base.json`. See
+[weights_bundle.md](../docs/setup/weights_bundle.md).
 
 Not on S3: set `BIOM3_SYNC_CMD` to any pull command. It runs with `BIOM3_SYNC_URI` and
 `BIOM3_SYNC_DEST` exported, so rclone/gsutil/curl work without changing the image.
@@ -115,10 +122,14 @@ Starting from a CSV instead of a precompiled HDF5, chain the embedding pipeline 
 
 ### generate — Stage 1 → 2 → 3
 
+Weights come from the published GHCR bundle, so this needs no bucket and no `AWS_*`
+credentials — the bundle's filenames are exactly what `configs/weights/run1_base.json`
+names:
+
 ```bash
 scripts/cloud/mithril_launch.sh cloud/run.mithril.yaml biom3-gen \
   --config mithril.limit_price=6.00 \
-  --env BIOM3_WEIGHTS_INCLUDES="LLMs/esm2_t33_650M_UR50D* LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext/* PenCL/run1_base_pencl.ckpt* Facilitator/run1_base_facilitator.ckpt* ProteoScribe/run1_base_proteoscribe.ckpt*" \
+  --env BIOM3_WEIGHTS_BUNDLE=run1_base --env BIOM3_WEIGHTS_URI="" \
   --env CMD="biom3_embedding_pipeline --generate \
       -i tests/_data/stage1_inputs/sample_text_seqs1.csv \
       -o /app/outputs/gen1 --prefix gen1 \

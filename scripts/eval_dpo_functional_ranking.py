@@ -30,7 +30,7 @@ from biom3.backend.device import get_device, setup_logger
 logger = setup_logger("eval_ranking")
 
 MODELS = {
-    "BASE":     "weights/ProteoScribe/run1_base_proteoscribe.ckpt",
+    "BASE":     "weights/ProteoScribe/run1_base_proteoscribe.bin",
     "FT":       "weights/ProteoScribe/sh3_ft_prod.pth",
     "DPO_run1": "outputs/dpo/dpo_sh3_paired_v2/final.pt",
     "DPO_ft":   "outputs/dpo/dpo_sh3_ftbase_d70/final.pt",
@@ -55,8 +55,8 @@ def main():
     # Frozen z_c front-end (same run1_base encoders every run used).
     cfg1 = convert_to_namespace(load_json_config("configs/inference/stage1_PenCL.json"))
     cfg2 = convert_to_namespace(load_json_config("configs/inference/stage2_Facilitator.json"))
-    s1 = load_pencl_frozen(cfg1, "weights/PenCL/run1_base_pencl.ckpt", device=str(device))
-    s2 = load_facilitator_frozen(cfg2, "weights/Facilitator/run1_base_facilitator.ckpt", device=str(device))
+    s1 = load_pencl_frozen(cfg1, "weights/PenCL/run1_base_pencl.bin", device=str(device))
+    s2 = load_facilitator_frozen(cfg2, "weights/Facilitator/run1_base_facilitator.bin", device=str(device))
     encode = _PromptEncoder(s1, s2, cfg1, device)
 
     df = pd.read_csv("data/rl/processed/biom3_designs.csv")

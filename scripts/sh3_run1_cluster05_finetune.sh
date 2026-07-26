@@ -20,7 +20,7 @@ HDF5=${EMB_DIR}/${PREFIX}.compiled_emb.hdf5
 MANIFEST=${EMB_DIR}/${PREFIX}.split_manifest.json
 
 WEIGHT_SET=configs/weights/run1_base.json
-PROTEOSCRIBE_INIT=weights/ProteoScribe/run1_base_proteoscribe.ckpt
+PROTEOSCRIBE_INIT=weights/ProteoScribe/run1_base_proteoscribe.bin
 FINETUNE_CONFIG=configs/stage3_training/finetune_v1.json
 RUN_ID=sh3_run1_clust05_v1
 

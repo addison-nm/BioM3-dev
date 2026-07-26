@@ -102,17 +102,17 @@ run() {
 # test set, so the whole chain runs with no external data.
 run biom3_PenCL_inference --input_data_path None \
     --config_path configs/inference/stage1_PenCL.json \
-    --model_path weights/PenCL/BioM3_PenCL_run1_base.bin \
+    --model_path weights/PenCL/run1_base_pencl.bin \
     --output_path outputs/pencl_embeddings.pt
 
 run biom3_Facilitator_sample --input_data_path outputs/pencl_embeddings.pt \
     --config_path configs/inference/stage2_Facilitator.json \
-    --model_path weights/Facilitator/BioM3_Facilitator_run1_base.bin \
+    --model_path weights/Facilitator/run1_base_facilitator.bin \
     --output_data_path outputs/facilitator_embeddings.pt
 
 run biom3_ProteoScribe_sample --input_path outputs/facilitator_embeddings.pt \
     --config_path configs/inference/stage3_ProteoScribe_sample.json \
-    --model_path weights/ProteoScribe/BioM3_ProteoScribe_run1_base.bin \
+    --model_path weights/ProteoScribe/run1_base_proteoscribe.bin \
     --output_path outputs/generated_sequences.csv
 ```
 

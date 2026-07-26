@@ -57,6 +57,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libopenmpi-dev openmpi-bin \
     && rm -rf /var/lib/apt/lists/*
 
+# oras — pulls the GHCR weights bundle (see scripts/weights_bundle/ and the
+# BIOM3_WEIGHTS_BUNDLE hook in docker/entrypoint.sh). This variant is amd64-only,
+# but TARGETARCH is used anyway so the line stays correct if that ever changes.
+ARG ORAS_VERSION=1.3.3
+ARG TARGETARCH
+RUN wget -qO /tmp/oras.tar.gz \
+        "https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_${TARGETARCH}.tar.gz" \
+    && tar -xzf /tmp/oras.tar.gz -C /usr/local/bin oras \
+    && rm /tmp/oras.tar.gz \
+    && oras version
+
 # Intel GPU user-space runtime (Level-Zero loader + Intel L0 GPU driver + OpenCL
 # ICD) from Intel's official GPU repo for Ubuntu 24.04 (noble). These package
 # names track Intel's `unified` repo and change occasionally; if a name breaks

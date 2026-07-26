@@ -90,7 +90,7 @@ ln -s ~/biom3-bundles/run1_base/configs configs/bundles/run1_base
 [`link_weights.sh`](../../scripts/link_weights.sh) never overwrites: it symlinks only the
 files that are absent and reports `MATCH`/`MISMATCH` for anything already present, so review
 its output before relying on the result. The bundle's `weights/` subtree mirrors the repo's
-own layout, so once linked, a path like `weights/PenCL/BioM3_PenCL_run1_base.bin` resolves
+own layout, so once linked, a path like `weights/PenCL/run1_base_pencl.bin` resolves
 through the symlink. Keep the pulled bundle dir around — the symlinks point into it.
 
 `--tag` is required — it names the bundle to pull; list published tags with `oras repo tags
@@ -112,6 +112,30 @@ You bind only the weights: run1_base's architecture is already the default baked
 image's `configs/inference/` configs, so you point `--config_path` at those and don't need
 to bind the bundle's configs at run time. See [APPTAINER.md](../APPTAINER.md) for a worked
 container invocation.
+
+The bundle's `weights/` tree uses the **same filenames as `configs/weights/<name>.json`**,
+so once it is bound (or pulled) into `/app/weights`, `--weight_set configs/weights/run1_base.json`
+resolves against it — no per-stage `--model_path` needed for the tools that accept a weight
+set (`biom3_embedding_pipeline`, Stage 3 finetuning). The individual `biom3_*_inference` /
+`biom3_*_sample` entry points do not read `--weight_set`; pass `--model_path` explicitly there.
+
+### Pulled by the container itself
+
+The image ships `oras`, so a container can fetch its own weights with no object store and no
+credentials. Set `BIOM3_WEIGHTS_BUNDLE` and the entrypoint pulls into `/app/weights` before
+running your command:
+
+```bash
+docker run --rm --gpus all \
+    -e BIOM3_WEIGHTS_BUNDLE=run1_base \
+    ghcr.io/natural-machine/biom3:cuda-dev \
+    biom3_embedding_pipeline --generate -i my.csv -o /app/outputs/gen --prefix gen \
+        --weight_set configs/weights/run1_base.json
+```
+
+`BIOM3_WEIGHTS_BUNDLE_REPO` overrides the repo. The pull honours `BIOM3_SYNC_MODE`, so under
+the default `auto` it is skipped when `/app/weights` is already populated (e.g. bind-mounted).
+A private bundle additionally needs `GHCR_TOKEN` (and `GHCR_USER`).
 
 ### Verifying an existing bundle
 
@@ -137,18 +161,18 @@ linked or bound there.)
 ```bash
 biom3_PenCL_inference \
     --config_path configs/inference/stage1_PenCL.json \
-    --model_path weights/PenCL/BioM3_PenCL_run1_base.bin \
+    --model_path weights/PenCL/run1_base_pencl.bin \
     --input_data_path None --output_path outputs/pencl_embeddings.pt
 
 biom3_Facilitator_sample \
     --config_path configs/inference/stage2_Facilitator.json \
-    --model_path weights/Facilitator/BioM3_Facilitator_run1_base.bin \
+    --model_path weights/Facilitator/run1_base_facilitator.bin \
     --input_data_path outputs/pencl_embeddings.pt \
     --output_data_path outputs/facilitator_embeddings.pt
 
 biom3_ProteoScribe_sample \
     --config_path configs/inference/stage3_ProteoScribe_sample.json \
-    --model_path weights/ProteoScribe/BioM3_ProteoScribe_run1_base.bin \
+    --model_path weights/ProteoScribe/run1_base_proteoscribe.bin \
     --input_path outputs/facilitator_embeddings.pt \
     --output_path outputs/generated_sequences.csv
 ```

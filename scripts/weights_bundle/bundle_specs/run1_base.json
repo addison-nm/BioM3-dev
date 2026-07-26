@@ -9,9 +9,9 @@
     "LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext/tokenizer_config.json": "weights/LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext/tokenizer_config.json",
     "LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext/vocab.txt": "weights/LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext/vocab.txt",
     "LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext/LICENSE.md": "weights/LLMs/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext/LICENSE.md",
-    "PenCL/BioM3_PenCL_run1_base.bin": "weights/Run1_frozen_ckpts/Run1_TrackC_step_187000_3b7e39f9.ckpt",
-    "Facilitator/BioM3_Facilitator_run1_base.bin": "weights/Run1_frozen_ckpts/v3_mmd_full49M_final.ckpt",
-    "ProteoScribe/BioM3_ProteoScribe_run1_base.bin": "weights/Run1_frozen_ckpts/ep_mmd_ep353_base.bin"
+    "PenCL/run1_base_pencl.bin": "weights/PenCL/run1_base_pencl.bin",
+    "Facilitator/run1_base_facilitator.bin": "weights/Facilitator/run1_base_facilitator.bin",
+    "ProteoScribe/run1_base_proteoscribe.bin": "weights/ProteoScribe/run1_base_proteoscribe.bin"
   },
 
   "configs": {

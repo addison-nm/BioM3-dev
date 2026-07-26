@@ -32,11 +32,24 @@ ENV DEBIAN_FRONTEND=noninteractive \
 #  - libopenmpi-dev, openmpi-bin: kept ONLY so mpi4py (in requirements) builds
 #    and imports. Multi-GPU launching uses torchrun, not mpiexec.
 #  - git, ca-certificates: pip may resolve git+https URLs from dependencies.
+#  - curl: fetches the oras binary below; also generally useful at run time.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         python3.12 python3.12-dev python3.12-venv \
-        build-essential git ca-certificates \
+        build-essential git ca-certificates curl \
         libopenmpi-dev openmpi-bin \
     && rm -rf /var/lib/apt/lists/*
+
+# oras — pulls the GHCR weights bundle (see scripts/weights_bundle/ and the
+# BIOM3_WEIGHTS_BUNDLE hook in docker/entrypoint.sh). TARGETARCH is set by
+# buildx per platform, and oras publishes matching linux_amd64 / linux_arm64
+# release tarballs, so this stays correct in the multi-arch build.
+ARG ORAS_VERSION=1.3.3
+ARG TARGETARCH
+RUN curl -fsSL -o /tmp/oras.tar.gz \
+        "https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_${TARGETARCH}.tar.gz" \
+    && tar -xzf /tmp/oras.tar.gz -C /usr/local/bin oras \
+    && rm /tmp/oras.tar.gz \
+    && oras version
 
 ENV VIRTUAL_ENV=/opt/venv
 RUN python3.12 -m venv $VIRTUAL_ENV

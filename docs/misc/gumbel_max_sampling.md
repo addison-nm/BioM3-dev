@@ -3,7 +3,7 @@
 ## Where it's used
 
 `batch_generate_denoised_sampled` in
-[src/biom3/Stage3/sampling_analysis.py](../src/biom3/Stage3/sampling_analysis.py)
+[src/biom3/Stage3/sampling_analysis.py](../../src/biom3/Stage3/sampling_analysis.py)
 samples one token per sequence position at each diffusion step. This happens
 inside a tight loop that runs `diffusion_steps` (typically 1024) iterations, so
 sampling efficiency directly affects wall-clock time.

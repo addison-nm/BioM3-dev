@@ -10,4 +10,4 @@ The `databases/` subdirectory is set up via the sync script, which creates symli
 ./scripts/sync_databases.sh <shared_databases_path> data/databases
 ```
 
-See [docs/setup_databases.md](../docs/setup_databases.md) for machine-specific shared paths, the full list of database files, and configuration details.
+See [docs/setup/setup_databases.md](../docs/setup/setup_databases.md) for machine-specific shared paths, the full list of database files, and configuration details.

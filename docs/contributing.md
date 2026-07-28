@@ -2,7 +2,7 @@
 
 Thanks for your interest in contributing! This guide walks through the workflow we use for both internal collaborators and external contributors: cloning the repo, branching off `dev`, committing your changes, and opening a pull request.
 
-For background on the project's layout and how the package is built, see the [README](../README.md) and [docs/biom3_ecosystem.md](./biom3_ecosystem.md).
+For background on the project's layout and how the package is built, see the [README](../README.md) and [docs/misc/biom3_ecosystem.md](./misc/biom3_ecosystem.md).
 
 ## Branch model
 
@@ -10,7 +10,7 @@ BioM3-dev uses three tiers of branches:
 
 | Branch | Purpose |
 |--------|---------|
-| `main` | Release branch. Advances by fast-forward only at version bumps — see [versioning.md](./versioning.md). Never commit here directly. |
+| `main` | Release branch. Advances by fast-forward only at version bumps — see [versioning.md](./misc/versioning.md). Never commit here directly. |
 | `dev` | Integration branch. All new work is branched from `dev` and merged back into `dev` via pull request. |
 | `<your-name>-<topic>` | Your personal feature branch. Short-lived, branched off `dev`, merged back into `dev`. |
 
@@ -140,7 +140,7 @@ After opening the PR:
 ## Things to keep in mind
 
 - **Don't commit large binaries.** Model weights, datasets, and reference databases live in [BioM3-data-share](https://github.com/natural-machine/BioM3-data-share), not in this repo. The `weights/` and `data/databases/` directories are gitignored for this reason.
-- **Don't bump the version yourself.** Version bumps happen on release boundaries and are coordinated by maintainers — see [versioning.md](./versioning.md).
+- **Don't bump the version yourself.** Version bumps happen on release boundaries and are coordinated by maintainers — see [versioning.md](./misc/versioning.md).
 - **Match the existing code style.** PascalCase classes, snake_case functions, light type hints on public APIs, no docstrings or inline comments on code you didn't change. Full conventions are in [CLAUDE.md](../CLAUDE.md#code-style).
 - **Keep PRs focused.** A reviewer should be able to hold the whole change in their head. If a PR grows beyond that, split it.
 

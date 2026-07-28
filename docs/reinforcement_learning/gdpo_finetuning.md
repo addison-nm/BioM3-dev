@@ -236,5 +236,5 @@ module all use 0 (MASK) correctly. Fix is one line; tracked separately.
 - Liu et al. 2025b — unnormalized advantage estimate (paper Eq. 6
   citation).
 - Companion docs:
-  [docs/grpo_finetuning.md](grpo_finetuning.md),
-  [docs/.claude_sessions/2026-04-29_gdpo_implementation.md](.claude_sessions/2026-04-29_gdpo_implementation.md).
+  [docs/reinforcement_learning/grpo_finetuning.md](grpo_finetuning.md),
+  [docs/.claude_sessions/2026-04-29_gdpo_implementation.md](../.claude_sessions/2026-04-29_gdpo_implementation.md).

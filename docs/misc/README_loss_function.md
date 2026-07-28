@@ -9,7 +9,7 @@ documents the full ELBO objective so the answer can be put in context.
 **masked (unsampled) positions only** in each sequence, then weighted by
 `1 / (L − t + 1)`, then mean-reduced across the batch.
 The summation is done in
-[`log_prob_of_unsampled_locations`](../src/biom3/Stage3/transformer_training_helper.py#L298-L323)
+[`log_prob_of_unsampled_locations`](../../src/biom3/Stage3/transformer_training_helper.py#L298-L323)
 (`return log_prob_unsampled.sum(1)`), and revealed positions are excluded by the
 mask `(real_token_masked == 0)`. We do **not** divide by the number of masked
 tokens — the `1 / (L − t + 1)` factor is the ARDM ELBO weight, not a normaliser.

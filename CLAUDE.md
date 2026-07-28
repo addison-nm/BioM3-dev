@@ -33,7 +33,7 @@ Input (CSV: sequences + text)
 
 ## Ecosystem context
 
-BioM3-dev is the core library in a multi-repo ecosystem. See [docs/biom3_ecosystem.md](docs/biom3_ecosystem.md) for full details.
+BioM3-dev is the core library in a multi-repo ecosystem. See [docs/misc/biom3_ecosystem.md](docs/misc/biom3_ecosystem.md) for full details.
 
 Related repositories:
 - **BioM3-data-share** — shared model weights, datasets, and reference databases
@@ -47,33 +47,66 @@ Machine-specific repo paths are in `.claude/repo_paths.json` (gitignored, not ve
 ```
 src/biom3/
   backend/          # Device abstraction (CPU / CUDA / XPU)
-  core/             # Shared utilities: model I/O (io.py), state-dict helpers (helpers.py)
+  core/             # Shared utilities: model I/O (io.py), state-dict helpers (helpers.py), dataloaders
   dbio/             # Database I/O: readers for SwissProt/Pfam/NCBI taxonomy, enrichment, dataset building
   Stage1/           # PenCL: model.py (encoders + projection), preprocess.py, PL_wrapper.py
   Stage2/           # Facilitator: run_Facilitator_sample.py
-  Stage3/           # ProteoScribe: diffusion model, PL training, sampling
-configs/            # JSON configs for each stage's inference, training, and dbio
-  inference/        #   Inference configs with models/ base configs (uses _base_configs composition)
-  training/         #   Training configs with models/ and machines/ base configs
-scripts/            # Bash wrappers (embedding_pipeline, training, generation, sync)
+  Stage3/           # ProteoScribe: diffusion model, PL training, finetuning, sampling
+  rl/               # RL post-training: GRPO, GDPO, DPO; rewards/ package, rollout, preference data
+  pipeline/         # End-to-end embedding pipeline (Stage 1 → Stage 2 in one entrypoint)
+  split/            # Cluster-aware and stratified dataset splitting
+  data_prep/        # HDF5 compilation from embeddings
+  benchmarks/       # Stage 3 training/generation benchmarks + plotting
+  viz/              # 3D structure rendering, sequence analysis, unmasking-order plots
+  app/              # Streamlit web app (installed via the `app` extra)
+configs/            # JSON configs for inference, per-stage training, RL, splits, and jobs
+  inference/        #   Inference configs; models/ holds shared bases (uses _base_configs composition)
+  stage1_training/  #   Stage 1 training; models/ + machines/ bases
+  stage2_training/  #   Stage 2 training; models/ + machines/ bases
+  stage3_training/  #   Stage 3 training + finetuning; models/ + machines/ bases
+  grpo/ dpo/        #   RL post-training configs
+  split/ weights/   #   Split specs and named weight sets
+  benchmark/ jobs/  #   Benchmark and job-template configs
+scripts/            # Bash wrappers (embedding, training, generation, RL, cloud, sync)
 demos/              # End-to-end demos (dbio dataset building, SH3 embedding pipeline)
 data/databases/     # Symlinked reference databases (gitignored, see docs/setup/setup_databases.md)
 tests/              # pytest suite (conftest.py, per-stage tests, test data in tests/_data/)
 weights/            # Pre-trained model weights (gitignored, see weights/README.md)
-docs/               # Per-machine setup guides (Polaris, Aurora, DGX Spark)
+docs/               # Setup guides (setup/), CLI reference, dbio/, reinforcement_learning/, misc/
 jobs/               # HPC job submission scripts
 ```
 
 ## Entry points
 
-Defined in `pyproject.toml`:
+Defined in `pyproject.toml`. See [docs/CLI_reference.md](docs/CLI_reference.md) for argument tables.
+
+Inference:
 - `biom3_PenCL_inference` → `biom3.Stage1.__main__:run_PenCL_inference`
 - `biom3_Facilitator_sample` → `biom3.Stage2.__main__:run_Facilitator_sample`
-- `biom3_train_stage3` → `biom3.Stage3.__main__:run_stage3_training`
 - `biom3_ProteoScribe_sample` → `biom3.Stage3.__main__:run_ProteoScribe_sample`
+- `biom3_embedding_pipeline` → `biom3.pipeline.__main__:run_embedding_pipeline`
+
+Training:
+- `biom3_train_stage1` → `biom3.Stage1.__main__:run_stage1_training`
+- `biom3_train_stage2` → `biom3.Stage2.__main__:run_stage2_training`
+- `biom3_train_stage3` → `biom3.Stage3.__main__:run_stage3_training` (HDF5 z_c; `--finetune True` for finetuning)
+- `biom3_finetune_stage3` → `biom3.Stage3.__main__:run_stage3_finetuning` (JSONL records, on-device z_c)
+
+RL post-training:
+- `biom3_grpo_train` / `biom3_gdpo_train` / `biom3_dpo_train` → `biom3.rl.__main__:run_{grpo,gdpo,dpo}_train`
+
+Data preparation:
 - `biom3_build_dataset` → `biom3.dbio.__main__:run_build_dataset`
 - `biom3_build_taxid_index` → `biom3.dbio.__main__:run_build_taxid_index`
 - `biom3_csv_to_parquet` → `biom3.dbio.__main__:run_csv_to_parquet`
+- `biom3_build_source_{swissprot,pfam,trembl,expasy,smart,brenda}` → `biom3.dbio.__main__:run_build_source_*`
+- `biom3_build_pfam_subsets` / `biom3_build_annotation_cache` → `biom3.dbio.__main__:*`
+- `biom3_compile_hdf5` → `biom3.data_prep.__main__:run_compile_hdf5`
+- `biom3_cluster_split` / `biom3_stratified_cluster_split` → `biom3.split.__main__:*`
+
+Benchmarks and app:
+- `biom3_benchmark_stage3_generation` / `biom3_benchmark_stage3_training` / `biom3_plot_benchmark` → `biom3.benchmarks.__main__:*`
+- `biom3_app` → `biom3.app:main`
 
 ## Building and running
 
@@ -165,13 +198,13 @@ When loading models, use `core.io.load_and_prepare_model` for raw weights. For L
 
 ### Configuration
 - **Inference**: JSON files in `configs/inference/` → loaded via `--config_path` with `load_json_config()` → converted to `argparse.Namespace`. Old flat configs in `configs/` still work for backward compatibility.
-- **Training**: JSON files in `configs/stage3_training/` → loaded via `--config_path` into argparse defaults. CLI args override JSON values; JSON overrides argparse defaults.
+- **Training**: JSON files in `configs/stage{1,2,3}_training/` → loaded via `--config_path` into argparse defaults. CLI args override JSON values; JSON overrides argparse defaults.
 - **Config composition**: All stages (inference and training) use `core.helpers.load_json_config()`, which supports two special keys:
   - `_base_configs`: list of paths loaded *before* the current file (current file overrides them)
   - `_overwrite_configs`: list of paths loaded *after* the current file (they override it)
   - Priority (low → high): `_base_configs` < current file < `_overwrite_configs` < CLI
   - Paths resolve relative to the JSON file's directory. Both keys are stripped from the result.
-- **Base configs**: `configs/inference/models/` has shared encoder/model configs (`_base_PenCL.json`, `_base_Facilitator.json`). `configs/stage3_training/models/` has shared model architecture configs (`_base_ProteoScribe_1block.json`, `_base_ProteoScribe_16blocks.json`). `configs/stage3_training/machines/` has per-machine device configs (`_aurora.json`, `_polaris.json`, `_spark.json`). Stage 3 inference reuses the training model base configs via `_base_configs`.
+- **Base configs**: `configs/inference/models/` has shared encoder/model configs (`_base_PenCL.json`, `_base_Facilitator.json`). Each `configs/stage{1,2,3}_training/` directory carries its own `models/` (shared architecture configs, e.g. `_base_ProteoScribe_1block.json`, `_base_ProteoScribe_16blocks.json`) and `machines/` (per-machine device configs: `_aurora.json`, `_polaris.json`, `_spark.json`). Stage 3 inference reuses the training model base configs via `_base_configs`.
 
 ### Training output structure
 Stage 3 training (`biom3_train_stage3`) organizes outputs under `--output_root` with three key CLI args: `--checkpoints_folder` (default `checkpoints`), `--runs_folder` (default `runs`), and `--run_id` (unique per run, constructed automatically by HPC job templates).

@@ -3,7 +3,7 @@
 GRPO (Group Relative Policy Optimization) RL fine-tuning of the Stage 3
 ProteoScribe diffusion model. Single-GPU only in this revision; multi-GPU
 is deferred (Phase 4 in
-[docs/.claude_prompts/PROMPT_grpo_integration.md](.claude_prompts/PROMPT_grpo_integration.md)).
+[docs/.claude_prompts/PROMPT_grpo_integration.md](../.claude_prompts/PROMPT_grpo_integration.md)).
 
 ## What it does
 
@@ -13,7 +13,7 @@ policy with PPO-clip + Schulman $k_3$ KL against a frozen reference
 snapshot, using group-normalized advantages.
 
 The math is laid out in
-[PROMPT_grpo_integration.md](.claude_prompts/PROMPT_grpo_integration.md);
+[PROMPT_grpo_integration.md](../.claude_prompts/PROMPT_grpo_integration.md);
 see "Equations".
 
 ## Layout
@@ -23,8 +23,14 @@ src/biom3/rl/
   __init__.py
   __main__.py            # biom3_grpo_train entry-point wrapper
   grpo.py                # GRPOConfig, grpo_train, sampling + log-prob helpers
-  rewards.py             # ESMFoldReward, StubReward, build_reward
+  rewards/               # reward package (see below)
+    __init__.py          #   re-exports Reward, build_reward, and all reward classes
+    base.py              #   Reward Protocol, VALID_AA
+    registry.py          #   build_reward
+    stub.py esmfold.py aa_fraction.py surrogate.py tsv_lookup.py
+    composite.py diversity.py
   io.py                  # frozen Stage 1/2 loaders + trainable Stage 3
+  rollout.py             # sequence rollout helpers
   run_grpo_train.py      # argparse + load_json_config composition
 
 configs/grpo/
@@ -95,7 +101,7 @@ GRPO hyperparameters (defaults shown):
 
 A reward is any callable taking `List[str]` of decoded amino-acid
 sequences and returning `List[float]` scalars (one per sequence). The
-``Reward`` ``Protocol`` lives in [src/biom3/rl/rewards.py](../../src/biom3/rl/rewards.py).
+``Reward`` ``Protocol`` lives in [src/biom3/rl/rewards/base.py](../../src/biom3/rl/rewards/base.py).
 
 | Name | Class | What |
 |---|---|---|
@@ -211,7 +217,7 @@ The pieces you need are already in the repo:
 - [`scripts/make_grpo_synthetic_eval.py`](../../scripts/make_grpo_synthetic_eval.py) — for development, builds a synthetic 2k-row TSV from `data/datasets/SH3/FINAL_SH3_all_dataset_with_prompts.csv` with `functional_score = AAFractionReward + small noise`.
 - [`scripts/train_grpo_surrogate.py`](../../scripts/train_grpo_surrogate.py) — fits an sklearn regressor (Ridge or MLP) on a TSV of (sequence, scalar) using a chosen featurizer (one-hot or ESM-2 mean-pool). Writes a joblib + a small JSON sidecar describing the featurizer config.
 - [`scripts/eval_grpo_checkpoint.py`](../../scripts/eval_grpo_checkpoint.py) — samples N sequences per prompt from a Stage 3 checkpoint and scores with a configurable reward (always also computes the `aa_fraction` ground truth, so a fair before/after comparison is always available).
-- [`SurrogateReward(predictor, featurizer)`](../../src/biom3/rl/rewards.py) — wraps a fitted regressor + featurizer as a per-sequence reward. Constructed in code; reload via:
+- [`SurrogateReward(predictor, featurizer)`](../../src/biom3/rl/rewards/surrogate.py) — wraps a fitted regressor + featurizer as a per-sequence reward. Constructed in code; reload via:
 
   ```python
   import joblib, json

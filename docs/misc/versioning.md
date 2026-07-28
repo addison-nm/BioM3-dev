@@ -1,6 +1,6 @@
 # BioM3-dev — Versioning Maintenance
 
-How and when to bump the `biom3` package version. For the ecosystem-wide picture (all four repos and the cross-repo sync contract), see [BioM3-ecosystem/docs/version_tracking.md](../../docs/version_tracking.md).
+How and when to bump the `biom3` package version. For the ecosystem-wide picture (all four repos and the cross-repo sync contract), see [BioM3-ecosystem/docs/version_tracking.md](../../../docs/version_tracking.md).
 
 ## Source of truth
 
@@ -80,7 +80,7 @@ Run through this list every time you bump:
    ```
 7. **Refresh dependent repos' SYNC_LOG files.** BioM3-dev itself does not have a SYNC_LOG, but every dependent repo does. After the new tag is pushed:
    - In `BioM3-workflow-demo`, `BioM3-workspace-template`, and `BioM3-data-share`, pull the latest BioM3-dev, run a smoke test, then add a new row to that repo's `SYNC_LOG.md` pairing the new BioM3-dev hash with the dependent repo's commit hash.
-   - See [BioM3-ecosystem/docs/version_tracking.md §How to keep things in sync](../../docs/version_tracking.md#how-to-keep-things-in-sync) for the full ritual.
+   - See [BioM3-ecosystem/docs/version_tracking.md §How to keep things in sync](../../../docs/version_tracking.md#how-to-keep-things-in-sync) for the full ritual.
 8. **Verify with `/version-check`** (from the ecosystem root). All rows should report `OK` after the dust settles.
 
 ## Recovering from drift
@@ -106,6 +106,6 @@ The general rule: **never delete a tag that has been pushed**. Pushed tags are p
 
 ## See also
 
-- [BioM3-ecosystem/docs/version_tracking.md](../../docs/version_tracking.md) — ecosystem-wide versioning conventions.
+- [BioM3-ecosystem/docs/version_tracking.md](../../../docs/version_tracking.md) — ecosystem-wide versioning conventions.
 - `pyproject.toml` — where the dynamic version is declared.
 - `src/biom3/__init__.py` — the single source of truth.

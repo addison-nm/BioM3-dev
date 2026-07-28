@@ -155,7 +155,7 @@ all ranks land on 71 batches → no deadlock. This is why round 6 trial 1
 Two changes, both in our code, no Lightning fork modifications.
 
 **1. Construct `DistributedSampler(drop_last=True)` explicitly in our
-DataLoader** ([PL_wrapper.py](../../src/biom3/Stage3/PL_wrapper.py) — `_make_distributed_sampler` helper, used in all four train/val DataLoaders):
+DataLoader** ([PL_wrapper.py](../../../src/biom3/Stage3/PL_wrapper.py) — `_make_distributed_sampler` helper, used in all four train/val DataLoaders):
 
 ```python
 def _make_distributed_sampler(dataset, *, shuffle: bool, seed: int):
@@ -177,7 +177,7 @@ floor(N / world_size)` *before* sharding, so every rank gets exactly the same
 number of samples. The leftover 0–11 samples are dropped (as opposed to
 duplicated via padding).
 
-**2. `Trainer(use_distributed_sampler=False)`** ([run_PL_training.py](../../src/biom3/Stage3/run_PL_training.py)):
+**2. `Trainer(use_distributed_sampler=False)`** ([run_PL_training.py](../../../src/biom3/Stage3/run_PL_training.py)):
 
 ```python
 trainer_params = {

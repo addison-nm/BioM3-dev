@@ -6,8 +6,8 @@ ExPASy, SMART, BRENDA), enrichment joins, per-Pfam output,
 `<stem>.stats.md` reports, and the structured `annot_ec_numbers`
 column.
 
-See [docs/database_linkage.md](database_linkage.md) for the canonical
-cross-reference spec and [docs/building_datasets_with_dbio.md](building_datasets_with_dbio.md)
+See [docs/dbio/database_linkage.md](database_linkage.md) for the canonical
+cross-reference spec and [docs/dbio/building_datasets_with_dbio.md](building_datasets_with_dbio.md)
 for the original Pfam-centric workflow.
 
 ## Prerequisites

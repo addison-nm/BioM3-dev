@@ -110,8 +110,9 @@ oras pull ghcr.io/natural-machine/biom3-weights:run1_base -o ~/biom3-bundles/run
 
 You bind only the weights: run1_base's architecture is already the default baked into the
 image's `configs/inference/` configs, so you point `--config_path` at those and don't need
-to bind the bundle's configs at run time. See [APPTAINER.md](../APPTAINER.md) for a worked
-container invocation.
+to bind the bundle's configs at run time. See [setup_polaris_container.md](./setup_polaris_container.md)
+or [setup_aurora_container.md](./setup_aurora_container.md) for a worked container invocation,
+including the `--bind` flags and Apptainer environment setup.
 
 The bundle's `weights/` tree uses the **same filenames as `configs/weights/<name>.json`**,
 so once it is bound (or pulled) into `/app/weights`, `--weight_set configs/weights/run1_base.json`

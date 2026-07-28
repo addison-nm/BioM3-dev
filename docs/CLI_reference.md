@@ -1,12 +1,18 @@
 # BioM3 CLI Reference
 
-Reference for the seven user-facing entrypoints declared in [pyproject.toml](../pyproject.toml). Each section gives the synopsis, required and optional arguments, the canonical config file (where applicable), and a representative example. For per-stage prose context (output layouts, metrics, per-machine job submission), see the deeper docs linked from each section.
+Reference for the eight core inference and training entrypoints declared in [pyproject.toml](../pyproject.toml). Each section gives the synopsis, required and optional arguments, the canonical config file (where applicable), and a representative example. For per-stage prose context (output layouts, metrics, per-machine job submission), see the deeper docs linked from each section.
 
-dbio entrypoints (`biom3_build_dataset`, `biom3_build_taxid_index`, `biom3_csv_to_parquet`, `biom3_build_source_*`, `biom3_build_annotation_cache`, `biom3_build_pfam_subsets`) are documented separately in [dbio_examples.md](dbio/dbio_examples.md). Benchmark and Streamlit-app entrypoints (`biom3_benchmark_*`, `biom3_app`, `biom3_plot_benchmark`, `biom3_compile_hdf5`) are not covered here — invoke them with `--help` for current options.
+Entrypoints covered elsewhere:
+
+| Entrypoints | Where |
+| ----------- | ----- |
+| `biom3_build_dataset`, `biom3_build_taxid_index`, `biom3_csv_to_parquet`, `biom3_build_source_*`, `biom3_build_annotation_cache`, `biom3_build_pfam_subsets` | [dbio_examples.md](dbio/dbio_examples.md) |
+| `biom3_grpo_train`, `biom3_gdpo_train`, `biom3_dpo_train` | [reinforcement_learning/](reinforcement_learning/) |
+| `biom3_benchmark_*`, `biom3_plot_benchmark`, `biom3_compile_hdf5`, `biom3_cluster_split`, `biom3_stratified_cluster_split`, `biom3_app` | not documented — invoke with `--help` for current options |
 
 > All entrypoints accept `--help`. The tables below mirror the source-of-truth `add_argument` declarations; if behavior diverges, the source wins.
 
-> **Config composition**: every entrypoint that accepts `--config_path` loads JSON via `core.helpers.load_json_config`, which honors two special keys: `_base_configs` (loaded before the current file — current file overrides) and `_overwrite_configs` (loaded after — they override). CLI args override everything. See [stage3_training.md#config-composition](stage3_training.md#config-composition).
+> **Config composition**: every entrypoint that accepts `--config_path` loads JSON via `core.helpers.load_json_config`, which honors two special keys: `_base_configs` (loaded before the current file — current file overrides) and `_overwrite_configs` (loaded after — they override). CLI args override everything. See [stage3_training.md#config-composition](misc/stage3_training.md#config-composition).
 
 ---
 
@@ -95,7 +101,7 @@ Generates protein sequences from facilitated embeddings via diffusion sampling. 
 
 **Source:** [src/biom3/Stage3/run_ProteoScribe_sample.py](../src/biom3/Stage3/run_ProteoScribe_sample.py)
 **Config:** `configs/inference/stage3_ProteoScribe_sample.json`
-**Deeper docs:** [sequence_generation_animation.md](sequence_generation_animation.md) for `--animate_*` and `--animation_*` flags.
+**Deeper docs:** [sequence_generation_animation.md](misc/sequence_generation_animation.md) for `--animate_*` and `--animation_*` flags.
 
 #### Required arguments
 
@@ -128,7 +134,7 @@ Generates protein sequences from facilitated embeddings via diffusion sampling. 
 
 #### Optional arguments — animation
 
-See [sequence_generation_animation.md](sequence_generation_animation.md) for full details.
+See [sequence_generation_animation.md](misc/sequence_generation_animation.md) for full details.
 
 | Arg | Type | Default | Description |
 |---|---|---|---|
@@ -158,7 +164,7 @@ Runs `biom3_PenCL_inference` → `biom3_Facilitator_sample` → HDF5 compilation
 
 **Source:** [src/biom3/pipeline/embedding_pipeline.py](../src/biom3/pipeline/embedding_pipeline.py)
 **Config:** delegates to two configs (one per stage).
-**Deeper doc:** [embedding_pipeline.md](embedding_pipeline.md).
+**Deeper doc:** [embedding_pipeline.md](misc/embedding_pipeline.md).
 
 #### Required arguments
 
@@ -194,7 +200,7 @@ Trains the joint protein/text encoder (PenCL) from a CSV dataset.
 
 **Source:** [src/biom3/Stage1/run_PL_training.py](../src/biom3/Stage1/run_PL_training.py)
 **Config dir:** `configs/stage1_training/`
-**Deeper doc:** none yet — see [stage3_training.md](stage3_training.md) for the analogous training conventions (output layout, checkpoint formats, metric history).
+**Deeper doc:** none yet — see [stage3_training.md](misc/stage3_training.md) for the analogous training conventions (output layout, checkpoint formats, metric history).
 
 #### Required arguments
 
@@ -217,7 +223,7 @@ The argparser declares ~50 flags. Highlights below; run `biom3_train_stage1 --he
 | `--batch_size` | int | 8 | Per-device mini-batch size. |
 | `--epochs` | int | 20 | Training epochs. |
 | `--valid_size` | float | 0.1 | Train/val split fraction (0.1 = 90/10). |
-| `--limit_val_batches` | float | 1.0 | See [Choosing limit_val_batches](stage3_training.md#choosing-limit_val_batches-and-limit_train_batches). |
+| `--limit_val_batches` | float | 1.0 | See [Choosing limit_val_batches](misc/stage3_training.md#choosing-limit_val_batches-and-limit_train_batches). |
 | `--limit_train_batches` | float | None | Same convention as above. |
 | `--head_lr` / `--protein_encoder_lr` / `--text_encoder_lr` | float | varies | Per-component learning rates. |
 | `--scale_learning_rate` | str | `'False'` | `'True'`/`'False'`. Scale LR by world size. |
@@ -266,7 +272,7 @@ None positional.
 | `--batch_size` | int | 32 | Per-device batch size. |
 | `--epochs` | int | 20 | Training epochs. |
 | `--valid_size` | float | 0.2 | Train/val split (0.2 = 80/20). |
-| `--limit_val_batches` | float | 1.0 | See [Choosing limit_val_batches](stage3_training.md#choosing-limit_val_batches-and-limit_train_batches). |
+| `--limit_val_batches` | float | 1.0 | See [Choosing limit_val_batches](misc/stage3_training.md#choosing-limit_val_batches-and-limit_train_batches). |
 | `--lr` | float | 1e-3 | Base learning rate. |
 | `--loss_type` | str | `MSE` | One of `MSE` (point-wise) or `MMD` (distribution-matching). |
 | `--emb_dim` / `--hid_dim` | int | 512 / 1024 | Facilitator I/O and hidden dims. |
@@ -282,7 +288,7 @@ Trains the conditional diffusion transformer that generates protein sequences. S
 
 **Source:** [src/biom3/Stage3/run_PL_training.py](../src/biom3/Stage3/run_PL_training.py)
 **Config dir:** `configs/stage3_training/`
-**Deeper doc:** [stage3_training.md](stage3_training.md) — output layout, metric definitions, checkpointing details, finetuning recipes, per-machine job templates.
+**Deeper doc:** [stage3_training.md](misc/stage3_training.md) — output layout, metric definitions, checkpointing details, finetuning recipes, per-machine job templates.
 
 #### Key arguments
 
@@ -299,7 +305,7 @@ The argparser is the largest in the project (70+ flags across `get_args`, `get_m
 | `--epochs` | int | 1 | Used in `primary_only` mode. |
 | `--max_steps` | int | 100000 | Used in `combine` mode. |
 | `--val_check_interval` | int | 10000 | Steps between validations (step-based mode). |
-| `--limit_val_batches` | float | 200 | Cap val batches per check. See [Choosing limit_val_batches](stage3_training.md#choosing-limit_val_batches-and-limit_train_batches). |
+| `--limit_val_batches` | float | 200 | Cap val batches per check. See [Choosing limit_val_batches](misc/stage3_training.md#choosing-limit_val_batches-and-limit_train_batches). |
 | `--limit_train_batches` | float | None | Same convention as above. |
 | `--batch_size` | int | 16 | Per-device batch size. |
 | `--lr` | float | 3e-4 | Base learning rate. |
@@ -346,7 +352,70 @@ biom3_train_stage3 \
     --finetune_output_layers True
 ```
 
-See [stage3_training.md](stage3_training.md) for resumption, secondary-data continuation, and per-machine submission examples.
+See [stage3_training.md](misc/stage3_training.md) for resumption, secondary-data continuation, and per-machine submission examples.
+
+---
+
+### `biom3_finetune_stage3` — Stage 3 finetuning on cleaned records
+
+`biom3.Stage3.__main__:run_stage3_finetuning` → `src/biom3/Stage3/run_ProteoScribe_finetuning.py`
+
+Finetunes ProteoScribe on a **JSONL dataset of cleaned records** rather than on precomputed `z_c` in HDF5 (which is what `biom3_train_stage3` consumes). For each record, a `--record_schema` composes a caption from the record's fields, which is embedded to `z_c` on-device through a frozen text→`z_c` front-end (PenCL text branch + Facilitator). The caption is re-composed every epoch, so `z_c` cannot be precomputed — hence the separate entrypoint.
+
+This entrypoint is always finetuning: it loads pretrained ProteoScribe weights or resumes from a Lightning checkpoint, and freezes all but a chosen subset of the transformer. Trainer setup, callbacks, checkpointing, freezing, and arg coercion are reused from `run_PL_training`, so the shared arguments in [`biom3_train_stage3`](#biom3_train_stage3--stage-3-proteoscribe-training-and-finetuning) apply here too — including `--dry_run` and the wandb handling described below.
+
+#### Key arguments — data and captions
+
+| Argument | Default | Description |
+| -------- | ------- | ----------- |
+| `--finetune_data_path` | `None` | JSONL dataset of `{sequence, fields, sequence_length}` records |
+| `--record_schema` | `None` | Schema composing a caption from record fields (per-key dropout, label-adding, shuffle, concatenate) |
+| `--compose_plugins` | `None` | Extra caption-composition plugins (see `biom3.core.dataloaders`) |
+| `--length_field` | `sequence_length` | Record key holding the sequence length |
+| `--caption_key` | `caption` | Output key for the composed caption |
+| `--sequence_output_key` | `sequence` | Record key holding the sequence |
+| `--lazy_records` | `False` | Stream records instead of loading the dataset into memory |
+
+#### Key arguments — frozen text→z_c front-end
+
+| Argument | Default | Description |
+| -------- | ------- | ----------- |
+| `--stage1_config_path` | `None` | PenCL config for the frozen text encoder |
+| `--stage2_config_path` | `None` | Facilitator config |
+| `--pencl_weights` | `None` | PenCL weights |
+| `--facilitator_weights` | `None` | Facilitator weights |
+| `--zp_batch_size` | `64` | Batch size for `z_p` precomputation |
+
+#### Key arguments — LoRA and conditioning
+
+| Argument | Default | Description |
+| -------- | ------- | ----------- |
+| `--use_lora` | `False` | Enable LoRA instead of block/layer unfreezing |
+| `--lora_r` | `16` | LoRA rank |
+| `--lora_alpha` | `32` | LoRA alpha |
+| `--lora_dropout` | `0.05` | LoRA dropout |
+| `--lora_target_patterns` | `.fn.to_q,.fn.to_v` | Module-name patterns to wrap with LoRA |
+| `--lora_unfreeze_y_mlp` | `True` | Also unfreeze the conditioning MLP |
+| `--train_alpha` | `zc` | Conditioning blend at train time (`zc`, `zp`, or a blend) |
+| `--eval_alpha` | `spread` | Conditioning blend at eval time |
+
+#### Example
+
+```bash
+biom3_finetune_stage3 \
+    --config_path configs/stage3_training/finetune_generalized_v1.json \
+    --run_id my_finetune_run
+```
+
+With LoRA, using the prepared config:
+
+```bash
+biom3_finetune_stage3 \
+    --config_path configs/stage3_training/finetune_generalized_lora_v1.json \
+    --run_id my_lora_run \
+    --use_lora True \
+    --lora_r 16
+```
 
 ---
 
@@ -408,6 +477,7 @@ biom3_embedding_pipeline --help
 biom3_train_stage1 --help
 biom3_train_stage2 --help
 biom3_train_stage3 --help
+biom3_finetune_stage3 --help
 ```
 
 If any table in this document drifts from `--help` output, the argparser is the source of truth.

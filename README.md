@@ -13,7 +13,7 @@ BioM3 development is organized across several repositories:
 | [BioM3-workflow-demo](https://github.com/natural-machine/BioM3-workflow-demo) | Demo workflows | End-to-end finetuning and generation demonstration pipeline |
 | BioM3-workspace-template | Workspace setup | *(Planned)* Standardized workspace template for new research projects |
 
-See [docs/biom3_ecosystem.md](./docs/biom3_ecosystem.md) for cross-repo workflows, version compatibility, and shared data architecture.
+See [docs/misc/biom3_ecosystem.md](./docs/misc/biom3_ecosystem.md) for cross-repo workflows, version compatibility, and shared data architecture.
 
 ## Installation and setup
 
@@ -65,7 +65,7 @@ source environment.sh
 **Note:** *Some tests require pretrained weights that are too large to commit to git. These tests
 are skipped automatically when the weights are absent. To run the full test suite, populate the
 `weights/` directory using the shared weights sync script — see
-[docs/setup_shared_weights.md](./docs/setup/setup_shared_weights.md) for machine-specific paths, the
+[docs/setup/setup_shared_weights.md](./docs/setup/setup_shared_weights.md) for machine-specific paths, the
 list of required files, and setup instructions.*
 
 For installation and setup instructions on the following machines, refer to the setup instructions located in the `docs/` folder.
@@ -115,11 +115,11 @@ biom3_build_dataset -p PF00018 --enrich_pfam -o outputs/SH3_dataset
 biom3_build_dataset -p PF00018 --enrich_pfam --add_taxonomy --taxonomy_filter "superkingdom=Bacteria" -o outputs/SH3_bacteria
 ```
 
-See [docs/setup_databases.md](./docs/setup/setup_databases.md) for machine-specific shared paths, the full list of databases, and configuration details.
+See [docs/setup/setup_databases.md](./docs/setup/setup_databases.md) for machine-specific shared paths, the full list of databases, and configuration details.
 
 ## Usage
 
-After the pip installation, a number of entrypoints should be available from the command line. These include scripts to run Stages 1, 2, and 3 in inference mode, as well as a general Stage 3 training script for both pretraining and finetuning ProteoScribe.
+After the pip installation, a number of entrypoints should be available from the command line. These include scripts to run Stages 1, 2, and 3 in inference mode (plus `biom3_embedding_pipeline`, which chains Stages 1 and 2), training entrypoints for all three stages, two Stage 3 finetuning paths, RL post-training (GRPO / GDPO / DPO), dataset construction via `biom3.dbio`, and the Streamlit app.
 
 > **CLI reference:** see [docs/CLI_reference.md](./docs/CLI_reference.md) for the full per-entrypoint argument tables. The walkthroughs below show common invocations; the reference covers the complete argument surface.
 
@@ -142,8 +142,8 @@ biom3_ProteoScribe_sample     → outputs/generated_sequences.pt
 
 ### Configuration files
 
-Each inference entrypoint takes a JSON config file from `configs/` (e.g. `configs/inference/stage1_PenCL.json`) that controls model hyperparameters and paths to backbone LLM weights.
-Training uses a separate set of shell-based config files in `arglists/` (e.g. `arglists/config_pretrain_scratch_v1.sh`), which are sourced by the wrapper scripts in `scripts/`.
+Each inference entrypoint takes a JSON config file from `configs/inference/` (e.g. `configs/inference/stage1_PenCL.json`) that controls model hyperparameters and paths to backbone LLM weights.
+Training uses JSON configs too, one directory per stage: `configs/stage1_training/`, `configs/stage2_training/`, and `configs/stage3_training/`. Each directory carries `models/` (shared architecture bases) and `machines/` (per-machine device settings), composed via the `_base_configs` / `_overwrite_configs` keys. The wrapper scripts in `scripts/` pass these configs through to the entrypoints; CLI arguments override JSON values, which override argparse defaults.
 
 ### Stage 1 (inference)
 
@@ -232,7 +232,7 @@ Training configuration is specified via a JSON config file passed with `--config
 CLI arguments override JSON values, which override argparse defaults.
 
 Example JSON configs are in `configs/stage3_training/`.
-Configs support layered composition: `_base_configs` for shared model architectures (`configs/stage3_training/models/`) and `_overwrite_configs` for per-machine settings (`configs/stage3_training/machines/`). See [docs/stage3_training.md](./docs/stage3_training.md) for details.
+Configs support layered composition: `_base_configs` for shared model architectures (`configs/stage3_training/models/`) and `_overwrite_configs` for per-machine settings (`configs/stage3_training/machines/`). See [docs/misc/stage3_training.md](./docs/misc/stage3_training.md) for details.
 Wrapper scripts `scripts/stage3_train_multinode.sh` (multi-node via `mpiexec`) and `scripts/stage3_train_singlenode.sh` (single-node) handle environment setup and launch the entrypoint.
 HPC job templates in `jobs/{polaris,aurora,spark}/` demonstrate how to use these wrappers.
 
@@ -254,9 +254,10 @@ biom3_train_stage3 \
 
 #### Finetuning
 
-Finetuning uses the same entrypoint with `--finetune True` and additional flags for specifying pretrained weights and which transformer blocks/layers to unfreeze.
-The key difference is that we must specify a pretrained model and the number of transformer blocks or layers that we wish to freeze/finetune.
-Example finetuning configs are in `configs/stage3_training/finetune_*.json`.
+There are two finetuning paths, differing in what the model is finetuned *on*.
+
+**On precomputed `z_c` embeddings (HDF5)** — use `biom3_train_stage3` with `--finetune True`, plus flags for the pretrained weights and which transformer blocks/layers to unfreeze.
+Example configs: `configs/stage3_training/finetune_v1.json`, `finetune_v2.json`.
 
 ```bash
 biom3_train_stage3 \
@@ -266,6 +267,17 @@ biom3_train_stage3 \
     --pretrained_weights ./weights/ProteoScribe/BioM3_ProteoScribe_pfam_epoch20_v1.bin \
     --finetune_last_n_blocks 1 \
     --finetune_last_n_layers -1
+```
+
+**On cleaned records (JSONL)** — use `biom3_finetune_stage3` (script `src/biom3/Stage3/run_ProteoScribe_finetuning.py`).
+This finetunes directly on a JSONL dataset of `{sequence, fields, sequence_length}` records. A `--record_schema` composes the caption from the record's fields each epoch (per-key dropout, shuffling, label-adding), which is then embedded to `z_c` on-device through a frozen text→`z_c` front-end (PenCL text branch + Facilitator). Because the caption is re-composed every epoch, `z_c` cannot be precomputed — that is the reason for the separate entrypoint.
+It always loads pretrained ProteoScribe weights (or resumes from a Lightning checkpoint) and supports LoRA via `--use_lora True`.
+Example configs: `configs/stage3_training/finetune_generalized_v1.json`, `finetune_generalized_lora_v1.json`.
+
+```bash
+biom3_finetune_stage3 \
+    --config_path configs/stage3_training/finetune_generalized_v1.json \
+    --run_id my_finetune_run
 ```
 
 #### Inference (Generation)
@@ -310,7 +322,7 @@ biom3_ProteoScribe_sample \
     --animate_replicas 2
 ```
 
-GIFs are written to `outputs/animations/prompt_<P>_replica_<R>.gif`. See [docs/sequence_generation_animation.md](./docs/sequence_generation_animation.md) for details.
+GIFs are written to `outputs/animations/prompt_<P>_replica_<R>.gif`. See [docs/misc/sequence_generation_animation.md](./docs/misc/sequence_generation_animation.md) for details.
 
 ### Dataset construction
 
@@ -391,7 +403,7 @@ Launch the web app:
 biom3_app
 ```
 
-See [docs/web_app.md](./docs/web_app.md) for app pages, configuration, and architecture. See [docs/structure_visualization.md](./docs/structure_visualization.md) for the `biom3.viz` Python API (3D rendering, structural alignment, BLAST, unmasking-order visualization).
+See [docs/misc/web_app.md](./docs/misc/web_app.md) for app pages, configuration, and architecture. See [docs/misc/structure_visualization.md](./docs/misc/structure_visualization.md) for the `biom3.viz` Python API (3D rendering, structural alignment, BLAST, unmasking-order visualization).
 
 ## Contributing
 

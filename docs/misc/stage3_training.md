@@ -8,7 +8,7 @@ Training uses PyTorch Lightning with DeepSpeed Stage 2 as the distributed strate
 biom3_train_stage3 --config_path <path_to_json>
 ```
 
-> **CLI argument reference:** see [CLI_reference.md#biom3_train_stage3--stage-3-proteoscribe-training-and-finetuning](CLI_reference.md#biom3_train_stage3--stage-3-proteoscribe-training-and-finetuning) for the full argument table. This document focuses on workflows, output layout, and per-machine submission.
+> **CLI argument reference:** see [CLI_reference.md#biom3_train_stage3--stage-3-proteoscribe-training-and-finetuning](../CLI_reference.md#biom3_train_stage3--stage-3-proteoscribe-training-and-finetuning) for the full argument table. This document focuses on workflows, output layout, and per-machine submission.
 
 ---
 
@@ -232,7 +232,7 @@ Key constants: `num_devices=4` (A100s per node), `device=cuda`.
 
 Uses `scripts/stage3_train_multinode.sh` which launches via `mpiexec`.
 
-See [setup_polaris.md](setup/setup_polaris.md) for environment setup.
+See [setup_polaris.md](../setup/setup_polaris.md) for environment setup.
 
 ### Aurora (Intel GPUs)
 
@@ -249,7 +249,7 @@ Same editing pattern as Polaris. Key differences:
 qsub jobs/aurora/_template_stage3_pretrain_from_scratch.pbs
 ```
 
-See [setup_aurora.md](setup/setup_aurora.md) for environment setup (including the custom `lightning` fork).
+See [setup_aurora.md](../setup/setup_aurora.md) for environment setup (including the custom `lightning` fork).
 
 ### DGX Spark (single NVIDIA GPU)
 
@@ -266,7 +266,7 @@ bash jobs/spark/_template_stage3_pretrain_from_scratch.sh
 
 Key constants: `num_nodes=1`, `num_devices=1`, `device=cuda`.
 
-See [setup_spark.md](setup/setup_spark.md) for environment setup.
+See [setup_spark.md](../setup/setup_spark.md) for environment setup.
 
 ---
 

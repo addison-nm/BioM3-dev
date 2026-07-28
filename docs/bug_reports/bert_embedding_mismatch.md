@@ -12,7 +12,7 @@ that interacts with a missing `attention_mask` in the BERT forward pass.
 
 ### 1. `attention_mask` is never passed to BERT
 
-In `TextEncoder.forward()` ([src/biom3/Stage1/model.py](../src/biom3/Stage1/model.py)):
+In `TextEncoder.forward()` ([src/biom3/Stage1/model.py](../../src/biom3/Stage1/model.py)):
 
 ```python
 outputs = self.model(inputs, output_hidden_states=True)  # attention_mask absent
@@ -24,7 +24,7 @@ input and attends to them. This is true in both repos and was consistent during 
 ### 2. Padding strategy differs between the two repos
 
 The tokenizer call in `collate_fn`
-([src/biom3/Stage1/preprocess.py](../src/biom3/Stage1/preprocess.py)):
+([src/biom3/Stage1/preprocess.py](../../src/biom3/Stage1/preprocess.py)):
 
 | Repo | `padding=` argument | Effect |
 |---|---|---|

@@ -18,7 +18,12 @@ from biom3.Stage3.multidomain.audit import (
     enforce_audit,
     expert_delta_norms,
 )
+# Imported for its @register_compose side effect: a record_schema naming
+# "map_domains" resolves through the registry, which is only populated once this
+# module has been imported.
+from biom3.Stage3.multidomain.compose import map_domains
 from biom3.Stage3.multidomain.coupling import AllPairsCoupling
+from biom3.Stage3.multidomain.data import MultiDomainDataModule
 from biom3.Stage3.multidomain.io import (
     MultiDomainSpec,
     build_from_spec,
@@ -31,10 +36,12 @@ from biom3.Stage3.multidomain.model import (
     MultiDomainProteoScribe,
     build_multidomain_model,
 )
+from biom3.Stage3.multidomain.preprocess import make_multidomain_collate_fn
 
 __all__ = [
     "AllPairsCoupling",
     "AuditFailure",
+    "MultiDomainDataModule",
     "MultiDomainProteoScribe",
     "MultiDomainSpec",
     "assert_additive_null",
@@ -46,5 +53,7 @@ __all__ = [
     "expert_delta_norms",
     "load_composed_state_dict",
     "load_experts",
+    "make_multidomain_collate_fn",
+    "map_domains",
     "state_dict_fingerprint",
 ]

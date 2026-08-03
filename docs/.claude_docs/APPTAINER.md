@@ -142,6 +142,6 @@ module load apptainer
 Build the image (one time).
 
 ```bash
-apptainer build --fakeroot biom3.sif docker://ghcr.io/natural-machine/biom3:cuda-dev
+apptainer build --fakeroot biom3.sif docker://ghcr.io/natural-machine/biom3:xpu-dev
 ```
 

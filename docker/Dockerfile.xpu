@@ -16,7 +16,7 @@
 # maps :xpu tags to `--device /dev/dri`).
 #
 # GPU ENABLEMENT — how this actually reaches Aurora's Ponte Vecchio GPUs:
-#   * torch==2.8.0+xpu (below) has native torch.xpu; Intel's IPEX is upstreamed
+#   * torch==2.10.0+xpu (below) has native torch.xpu; Intel's IPEX is upstreamed
 #     into mainline torch, so no intel_extension_for_pytorch is installed, and
 #     torch.distributed uses the native `xccl` backend (not the old `ccl`).
 #   * The torch wheel vendors the SYCL/DPC++ *runtime*. What must come from
@@ -90,13 +90,18 @@ RUN pip install --upgrade pip setuptools wheel
 # come before requirements so the pinned torch isn't replaced by a CPU wheel
 # during dependency resolution. This is the XPU analog of the CUDA image's
 # cu129 index.
-RUN pip install torch==2.8.0 torchvision \
+RUN pip install torch==2.10.0 torchvision \
         --index-url https://download.pytorch.org/whl/xpu
 
 # Custom lightning fork with Intel-GPU support, matching the bare-metal Aurora
 # install in docs/setup/setup_aurora.md. Installed before requirements so it,
 # not stock pytorch-lightning, provides the Lightning layer.
-RUN pip install --no-build-isolation \
+#
+# setuptools<82 is required: the fork's setup.py imports pkg_resources, which
+# setuptools removed in 82.0.0, and --no-build-isolation makes it use the
+# setuptools installed here.
+RUN pip install "setuptools<82" \
+    && pip install --no-build-isolation \
         "git+https://github.com/addison-nm/lightning.git"
 
 # Requirements layer, cached independently of the source. aurora-container.txt

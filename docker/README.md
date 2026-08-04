@@ -20,7 +20,8 @@ to run at `docker run` time. Built per architecture:
 | File | Purpose |
 | ---- | ------- |
 | `Dockerfile.cuda` | The NVIDIA image: `nvidia/cuda:12.9` → py3.12 → torch 2.8 (cu129) → BioM3 (`pip install -e .[app]`). |
-| `Dockerfile.xpu` | The Intel/oneAPI variant, for Aurora. **amd64 only** — there are no arm64 Intel GPU wheels. |
+| `Dockerfile.xpu` | The Intel XPU variant, for Aurora single-node. Ubuntu + pip wheels. **amd64 only** — there are no arm64 Intel GPU wheels. |
+| `Dockerfile.xpu-oneapi` | Second Aurora variant, built on `intel/oneapi-hpckit` so the container's Intel MPI matches the host launcher's. Exists because multi-node collectives never complete in the `xpu` image. **amd64 only.** |
 | `Dockerfile.<variant>.dockerignore` | Trims the build context (BuildKit picks it up per-Dockerfile). |
 | `entrypoint.sh` | Sources `environment.sh`, runs the optional object-store sync, then exec's your command. |
 | `build.sh` | `docker buildx` wrapper (variant, platform, tag, awscli, push) and the GHCR publish path (`--release`). |
@@ -47,8 +48,9 @@ docker/build.sh --platform linux/arm64
 # Bake in awscli for the S3 sync hook (off by default):
 docker/build.sh --awscli
 
-# The Intel/oneAPI variant (amd64 only):
-docker/build.sh --variant xpu
+# The Intel XPU variants (amd64 only):
+docker/build.sh --variant xpu           # single-node, validated
+docker/build.sh --variant xpu-oneapi    # oneAPI base, for multi-node
 ```
 
 `--load` is single-platform only, so a multi-platform build must push — see

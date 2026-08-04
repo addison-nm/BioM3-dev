@@ -76,8 +76,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 case "${VARIANT}" in
-    cuda|xpu) ;;
-    *) echo "ERROR: --variant must be cuda or xpu (got '${VARIANT}')." >&2; exit 1 ;;
+    cuda|xpu|xpu-oneapi) ;;
+    *) echo "ERROR: --variant must be cuda, xpu or xpu-oneapi (got '${VARIANT}')." >&2; exit 1 ;;
 esac
 
 DOCKERFILE="${SCRIPT_DIR}/Dockerfile.${VARIANT}"
@@ -85,14 +85,14 @@ DOCKERFILE="${SCRIPT_DIR}/Dockerfile.${VARIANT}"
 
 # Every architecture the variant is buildable for. Intel GPU wheels are
 # amd64-only, so xpu never gets arm64.
-if [[ "${VARIANT}" == "xpu" ]]; then
+if [[ "${VARIANT}" == xpu* ]]; then
     ALL_PLATFORMS="linux/amd64"
 else
     ALL_PLATFORMS="linux/amd64,linux/arm64"
 fi
 
-if [[ "${VARIANT}" == "xpu" && "${PLATFORM}" == *arm64* ]]; then
-    echo "ERROR: the xpu variant is amd64-only (no arm64 Intel GPU wheels)." >&2
+if [[ "${VARIANT}" == xpu* && "${PLATFORM}" == *arm64* ]]; then
+    echo "ERROR: the ${VARIANT} variant is amd64-only (no arm64 Intel GPU wheels)." >&2
     exit 1
 fi
 

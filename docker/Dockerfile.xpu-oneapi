@@ -1,0 +1,121 @@
+# BioM3 — Intel XPU image built on oneAPI (biom3:xpu-oneapi), for Aurora.
+#
+# This is a SECOND xpu image, not a replacement for docker/Dockerfile.xpu. That
+# one works for single-node runs; this one exists to fix multi-node.
+#
+# WHY A SEPARATE BASE
+#   Under host mpiexec, ranks in the Dockerfile.xpu image start and get correct
+#   rank ids, but never complete a collective: all 12 spin at ~90% CPU with the
+#   GPUs idle. That image carries OpenMPI + pip-installed oneCCL, while Aurora's
+#   launcher is Intel MPI, and Lightning's MPIEnvironment asks mpi4py for the
+#   rank -- which requires an mpi4py built against an ABI-compatible MPI.
+#   intel/oneapi-hpckit supplies Intel MPI and oneCCL, which is why ALCF's own
+#   container recipe uses it (_misc/sample_script.sh, mirrored from
+#   https://docs.alcf.anl.gov/aurora/containers/containers/).
+#
+# DELIBERATELY UNCHANGED FROM Dockerfile.xpu
+#   torch 2.8.0+xpu and IPEX 2.8.10+xpu, not the recipe's torch 2.10. Moving
+#   torch at the same time would confound whether multi-node works because of
+#   Intel MPI or because of the torch version, and 2.10 has no public IPEX,
+#   which the addison-nm/lightning fork's XPUAccelerator requires. Bumping torch
+#   belongs in its own change, together with removing that gate.
+#
+# amd64 ONLY, same as Dockerfile.xpu: Intel GPU torch wheels are x86_64-only.
+#
+# Build:  docker/build.sh --variant xpu-oneapi --platform linux/amd64
+# Run:    scripts/aurora/apptainer_mpi_run.sh (host mpiexec, one container/rank)
+
+FROM intel/oneapi-hpckit
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1
+
+# BIOM3_MACHINE is deliberately unset, as in Dockerfile.xpu: under Apptainer on
+# Aurora /flare is bound, so environment.sh auto-detects `aurora`.
+
+# The base ships python3 + pip + venv. ALCF's recipe warns against apt-get in
+# this image (it can fail under fakeroot), so only the pieces that are certain
+# to be missing are installed, and the build fails loudly if python is absent.
+RUN python3 -V && python3 -m pip --version && python3 -m venv -h >/dev/null
+
+# Intel GPU user-space runtime. oneapi-hpckit provides the oneAPI runtimes but
+# not the Level-Zero GPU *driver*, which must match the host kernel driver.
+# libze_loader.so (unversioned) is required because oneCCL dlopen()s that exact
+# name; without it Level-Zero never initializes and every collective fails with
+# "ze_data was not initialized".
+RUN wget -qO - https://repositories.intel.com/gpu/intel-graphics.key \
+        | gpg --dearmor -o /usr/share/keyrings/intel-graphics.gpg \
+    && . /etc/os-release \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/gpu/ubuntu ${UBUNTU_CODENAME} unified" \
+        > /etc/apt/sources.list.d/intel-gpu.list \
+    && apt-get update && apt-get install -y --no-install-recommends \
+        libze1 libze-intel-gpu1 intel-opencl-icd clinfo \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf libze_loader.so.1 /usr/lib/x86_64-linux-gnu/libze_loader.so
+
+# oras — pulls the GHCR weights bundle (see the BIOM3_WEIGHTS_BUNDLE hook in
+# docker/entrypoint.sh).
+ARG ORAS_VERSION=1.3.3
+ARG TARGETARCH
+RUN wget -qO /tmp/oras.tar.gz \
+        "https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_${TARGETARCH}.tar.gz" \
+    && tar -xzf /tmp/oras.tar.gz -C /usr/local/bin oras \
+    && rm /tmp/oras.tar.gz \
+    && oras version
+
+# --system-site-packages so the venv can see anything oneAPI installed into the
+# system interpreter; pip-installed packages still take precedence.
+ENV VIRTUAL_ENV=/opt/venv
+RUN python3 -m venv --system-site-packages $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# setuptools<82 ships pkg_resources, which the lightning fork's setup.py imports.
+RUN pip install --upgrade pip "setuptools<82" wheel
+
+# mpi4py compiled against the image's Intel MPI. This is the whole point of the
+# oneapi base: Lightning's MPIEnvironment asks mpi4py for the rank, and that
+# only works when its MPI matches the launcher's. --no-binary is required --
+# a wheel would carry someone else's MPI.
+RUN . /opt/intel/oneapi/setvars.sh --force \
+    && MPICC=mpiicx pip install --no-binary=mpi4py --no-build-isolation mpi4py \
+    && python -c "from mpi4py import MPI; print('mpi4py', MPI.Get_library_version())"
+
+# Torch + IPEX, pinned exactly as in Dockerfile.xpu. The explicit +xpu local
+# versions stop pip satisfying a transitive `torch` requirement from PyPI, which
+# serves CPU-only wheels.
+RUN pip install torch==2.8.0 torchvision \
+        --index-url https://download.pytorch.org/whl/xpu
+RUN pip install intel-extension-for-pytorch==2.8.10+xpu \
+        torch==2.8.0+xpu torchvision==0.23.0+xpu \
+        --extra-index-url https://download.pytorch.org/whl/xpu \
+        --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
+
+# Custom lightning fork with Intel-GPU support.
+RUN pip install --no-build-isolation \
+        "git+https://github.com/addison-nm/lightning.git"
+
+WORKDIR /app
+COPY requirements/ /app/requirements/
+RUN pip install -c requirements/constraints-xpu.txt \
+        -r requirements/aurora-container.txt \
+        --extra-index-url https://download.pytorch.org/whl/xpu \
+        --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
+
+COPY pyproject.toml environment.sh README.md /app/
+COPY src/      /app/src/
+COPY scripts/  /app/scripts/
+COPY tests/    /app/tests/
+COPY configs/  /app/configs/
+
+RUN pip install -c requirements/constraints-xpu.txt -e ".[app]" \
+        --extra-index-url https://download.pytorch.org/whl/xpu \
+        --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/ \
+    && mkdir -p /app/weights /app/data /app/outputs /app/logs
+
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["bash"]

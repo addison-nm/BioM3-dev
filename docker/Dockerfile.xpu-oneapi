@@ -32,6 +32,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1
 
+# oneAPI's setvars.sh is unreliable under dash, which is /bin/sh on Ubuntu.
+SHELL ["/bin/bash", "-c"]
+
 # BIOM3_MACHINE is deliberately unset, as in Dockerfile.xpu: under Apptainer on
 # Aurora /flare is bound, so environment.sh auto-detects `aurora`.
 
@@ -42,9 +45,9 @@ RUN python3 -V && python3 -m pip --version && python3 -m venv -h >/dev/null
 
 # Intel GPU user-space runtime. oneapi-hpckit provides the oneAPI runtimes but
 # not the Level-Zero GPU *driver*, which must match the host kernel driver.
-# libze_loader.so (unversioned) is required because oneCCL dlopen()s that exact
-# name; without it Level-Zero never initializes and every collective fails with
-# "ze_data was not initialized".
+# The unversioned libze_loader.so, which oneCCL dlopen()s, already exists in this
+# base (unlike the Ubuntu base of Dockerfile.xpu); the symlink below is a no-op
+# kept so the requirement stays visible if the base changes.
 RUN wget -qO - https://repositories.intel.com/gpu/intel-graphics.key \
         | gpg --dearmor -o /usr/share/keyrings/intel-graphics.gpg \
     && . /etc/os-release \

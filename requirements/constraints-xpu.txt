@@ -1,0 +1,13 @@
+# Pip constraints for the Aurora XPU container (docker/Dockerfile.xpu).
+#
+# Applied to every pip resolution after torch is installed. Without these, a
+# transitive `torch` requirement is satisfiable from PyPI, which serves CPU-only
+# wheels — pip then replaces torch 2.8.0+xpu with a plain build and leaves
+# torchvision compiled against a torch that is no longer installed.
+#
+# Constraints only bound versions; they never install anything on their own.
+# Keep in sync with the torch/IPEX layer in docker/Dockerfile.xpu.
+
+torch==2.8.0+xpu
+torchvision==0.23.0+xpu
+intel-extension-for-pytorch==2.8.10+xpu

@@ -101,7 +101,14 @@ RUN pip install torch==2.8.0 torchvision \
 # ModuleNotFoundError unless intel_extension_for_pytorch>=1.13 is installed, and
 # its is_available() imports the module. BioM3's own code never imports it.
 # Only Intel's index carries the +xpu builds (PyPI ships CPU-only wheels).
+#
+# torch and torchvision are repeated here with explicit +xpu local versions.
+# Without them pip satisfies IPEX's `torch` requirement from PyPI, which serves
+# a CPU-only wheel — that silently replaces torch 2.8.0+xpu above and leaves
+# torchvision built against a torch that is no longer installed.
 RUN pip install intel-extension-for-pytorch==2.8.10+xpu \
+        torch==2.8.0+xpu torchvision==0.23.0+xpu \
+        --extra-index-url https://download.pytorch.org/whl/xpu \
         --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
 
 # Custom lightning fork with Intel-GPU support, matching the bare-metal Aurora
@@ -120,7 +127,10 @@ RUN pip install "setuptools<82" \
 # leans on `module load frameworks` for torch, which a container cannot).
 WORKDIR /app
 COPY requirements/ /app/requirements/
-RUN pip install -r requirements/aurora-container.txt
+RUN pip install -c requirements/constraints-xpu.txt \
+        -r requirements/aurora-container.txt \
+        --extra-index-url https://download.pytorch.org/whl/xpu \
+        --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
 
 # BioM3 source. Explicit paths (no `COPY . .`) so we never bake weights/, data/,
 # outputs/, logs/, or jobs/ into the image. configs/ IS baked in (tiny, versioned,
@@ -134,7 +144,9 @@ COPY configs/  /app/configs/
 # Editable install with the `app` extra (streamlit). A benign dependency-conflict
 # warning is expected here (the lightning fork vs pyproject's pin) — the same is
 # noted for the bare-metal Aurora install; the install still works.
-RUN pip install -e ".[app]" \
+RUN pip install -c requirements/constraints-xpu.txt -e ".[app]" \
+        --extra-index-url https://download.pytorch.org/whl/xpu \
+        --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/ \
     && mkdir -p /app/weights /app/data /app/outputs /app/logs
 
 # Shared entrypoint (device-agnostic).

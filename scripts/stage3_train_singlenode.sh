@@ -45,7 +45,13 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # Resolve wandb (sets `wandb_resolved`; errors if --wandb True without API key)
 source "${SCRIPT_DIR}/_wandb_resolve.sh" "$@"
 MACHINE="${BIOM3_MACHINE:?BIOM3_MACHINE not set; source environment.sh first}"
-LAUNCHER="${SCRIPT_DIR}/launchers/${MACHINE}_singlenode.sh"
+
+# BIOM3_LAUNCHER decouples "how ranks are spawned" from "whose settings apply".
+# Under Apptainer on Aurora, BIOM3_MACHINE is `aurora` (so the oneCCL/xccl vars
+# get applied) but ranks must be spawned by torchrun, not the host's mpiexec:
+# the container cannot read PBS's hostfile. apptainer_run.sh sets this to
+# `container`.
+LAUNCHER="${SCRIPT_DIR}/launchers/${BIOM3_LAUNCHER:-${MACHINE}}_singlenode.sh"
 
 if [ ! -x "${LAUNCHER}" ]; then
     echo "ERROR: no launcher for ${MACHINE} singlenode at ${LAUNCHER}"

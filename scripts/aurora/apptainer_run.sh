@@ -91,6 +91,12 @@ ENVS=(--env "ZE_FLAT_DEVICE_HIERARCHY=FLAT")
 ENVS+=(--env "FI_PROVIDER=${BIOM3_FI_PROVIDER:-tcp}")
 ENVS+=(--env "CCL_PROCESS_LAUNCHER=${BIOM3_CCL_LAUNCHER:-torchrun}")
 
+# Spawn ranks with torchrun (launchers/container_singlenode.sh), not the host's
+# mpiexec: the container has no access to PBS's hostfile, so Hydra fails with
+# "unable to find an RMK and the node list". BIOM3_MACHINE stays `aurora`, so
+# the Aurora oneCCL/NUMEXPR settings still apply.
+ENVS+=(--env "BIOM3_LAUNCHER=${BIOM3_LAUNCHER:-container}")
+
 [[ -n "${WANDB_API_KEY:-}" ]] && ENVS+=(--env "WANDB_API_KEY=${WANDB_API_KEY}")
 
 # `exec` (not `run`) so we bypass the S3-sync entrypoint and instead source

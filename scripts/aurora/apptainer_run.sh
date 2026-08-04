@@ -88,8 +88,13 @@ ENVS=(--env "ZE_FLAT_DEVICE_HIERARCHY=FLAT")
 #     reachable in the container, so oneCCL cannot resolve local rank/size.
 #     `torchrun` reads LOCAL_RANK/LOCAL_WORLD_SIZE, which covers both a single
 #     process and a multi-rank launch.
+#   CCL_ROOT — the host points at /opt/aurora/<ver>/oneapi/ccl/latest, which
+#     does not exist in the container, so oneCCL cannot find its SPIR-V kernels
+#     ("failed to load file containing oneCCL SPIR-V kernels"). The pip-installed
+#     oneCCL keeps them under /opt/venv/lib/ccl/kernels.
 ENVS+=(--env "FI_PROVIDER=${BIOM3_FI_PROVIDER:-tcp}")
 ENVS+=(--env "CCL_PROCESS_LAUNCHER=${BIOM3_CCL_LAUNCHER:-torchrun}")
+ENVS+=(--env "CCL_ROOT=/opt/venv")
 
 # Spawn ranks with torchrun (launchers/container_singlenode.sh), not the host's
 # mpiexec: the container has no access to PBS's hostfile, so Hydra fails with

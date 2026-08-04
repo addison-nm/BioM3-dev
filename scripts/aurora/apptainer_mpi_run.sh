@@ -108,7 +108,18 @@ if [[ "${NGPU_PER_NODE}" != "12" ]]; then
          "CPU_BIND list assumes 12 tiles per node. Adjust the list if needed." >&2
 fi
 
-MPI_ARGS=(--envall -n "${NGPU_TOTAL}" --ppn "${NGPU_PER_NODE}" "${CPU_BIND_SCHEME}")
+# -genv values configure the HOST launcher (Intel MPI), per the ALCF container
+# recipe in _misc/sample_script.sh. Distinct from the --env values below, which
+# configure oneCCL/libfabric *inside* each rank's container.
+#
+# NOTE: the recipe also sets ZE_AFFINITY_MASK=0..11. Do NOT copy that here:
+# backend/xpu.py resolves to xpu:0 whenever ZE_AFFINITY_MASK is set, so every
+# rank would land on tile 0.
+MPI_ARGS=(--envall -n "${NGPU_TOTAL}" --ppn "${NGPU_PER_NODE}" "${CPU_BIND_SCHEME}"
+          -genv I_MPI_HYDRA_BOOTSTRAP pmi
+          -genv I_MPI_FABRICS ofi
+          -genv I_MPI_OFI_PROVIDER "${BIOM3_FI_PROVIDER:-tcp}"
+          -genv FI_PROVIDER "${BIOM3_FI_PROVIDER:-tcp}")
 if [[ "${NGPU_TOTAL}" -gt "${NGPU_PER_NODE}" ]]; then
     : "${PBS_NODEFILE:?PBS_NODEFILE required for multi-node (set by PBS)}"
     MPI_ARGS+=(--hostfile "${PBS_NODEFILE}")

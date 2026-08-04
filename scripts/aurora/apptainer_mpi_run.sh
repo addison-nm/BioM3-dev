@@ -152,13 +152,24 @@ ENVS+=(--env "BIOM3_WORLD_SIZE=${NGPU_TOTAL}")
 # detect via mpi4py, which is the native path and only works in an image whose
 # MPI matches the launcher's (Dockerfile.xpu-oneapi). Note TorchElasticEnvironment
 # is checked BEFORE MPIEnvironment, so the variables below suppress it.
+# BIOM3_SETVARS=1 sources the image's oneAPI setvars.sh first. Required for
+# Dockerfile.xpu-oneapi: it has two Intel MPIs -- the base's (which mpi4py was
+# compiled against) and pip's impi-rt, pulled in as a dependency. Without
+# setvars the loader mixes them and mpi4py fails with
+#   libmpifort.so.12: undefined symbol: MPIR_F_MPI_BUFFER_AUTOMATIC
+# Leave unset for Dockerfile.xpu, which has no oneAPI installation.
+SETVARS=""
+[[ "${BIOM3_SETVARS:-0}" == "1" ]] && \
+    SETVARS='source /opt/intel/oneapi/setvars.sh --force >/dev/null 2>&1
+'
+
 if [[ "${BIOM3_RANK_SOURCE:-pals}" == "mpi" ]]; then
-PRELUDE='cd /app
-source environment.sh >&2
+PRELUDE="cd /app
+${SETVARS}"'source environment.sh >&2
 exec "$@"'
 else
-PRELUDE='cd /app
-export RANK="${PALS_RANKID:?PALS_RANKID not set; was this launched by mpiexec?}"
+PRELUDE="cd /app
+${SETVARS}"'export RANK="${PALS_RANKID:?PALS_RANKID not set; was this launched by mpiexec?}"
 export LOCAL_RANK="${PALS_LOCAL_RANKID:?PALS_LOCAL_RANKID not set}"
 export LOCAL_WORLD_SIZE="${PALS_LOCAL_SIZE:?PALS_LOCAL_SIZE not set}"
 export WORLD_SIZE="${BIOM3_WORLD_SIZE:?BIOM3_WORLD_SIZE not set}"

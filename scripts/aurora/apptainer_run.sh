@@ -33,6 +33,8 @@
 #   BIOM3_OUTPUTS_DIR  host outputs dir bound to /app/outputs (rw; default ./outputs)
 #   BIOM3_CONFIGS_DIR  host configs dir bound to /app/configs (ro; overrides baked-in)
 #   BIOM3_BIND_EXTRA   extra colon/comma paths to --bind (e.g. a checkpoints root)
+#   BIOM3_FI_PROVIDER  libfabric provider (default tcp; cxi needs host binds)
+#   BIOM3_CCL_LAUNCHER CCL_PROCESS_LAUNCHER (default torchrun; hydra|pmix|none)
 #   WANDB_API_KEY      forwarded into the container if set
 #
 #=============================================================================
@@ -71,6 +73,24 @@ BIND_ARG="$(IFS=,; echo "${BINDS[*]}")"
 # device (matches num_devices=12 in the PBS templates). On bare metal the
 # frameworks module sets this; the container must set it itself.
 ENVS=(--env "ZE_FLAT_DEVICE_HIERARCHY=FLAT")
+
+# oneCCL settings that MUST differ from bare metal, because a shell with
+# `module load frameworks` exports values that are wrong inside the container
+# and apptainer forwards them:
+#
+#   FI_PROVIDER — the host asks for `cxi,tcp;ofi_rxm`, but the container's
+#     libfabric has no cxi provider, so libfabric matches nothing and oneCCL
+#     fails with "fi_getinfo error: ret -61, providers 0". tcp is correct for
+#     single node (GPU transfers go over Level-Zero IPC, not the fabric).
+#     Multi-node over CXI needs the host libfabric bound in; see the runbook.
+#
+#   CCL_PROCESS_LAUNCHER — the host sets `pmix`, but no PMIx server is
+#     reachable in the container, so oneCCL cannot resolve local rank/size.
+#     `torchrun` reads LOCAL_RANK/LOCAL_WORLD_SIZE, which covers both a single
+#     process and a multi-rank launch.
+ENVS+=(--env "FI_PROVIDER=${BIOM3_FI_PROVIDER:-tcp}")
+ENVS+=(--env "CCL_PROCESS_LAUNCHER=${BIOM3_CCL_LAUNCHER:-torchrun}")
+
 [[ -n "${WANDB_API_KEY:-}" ]] && ENVS+=(--env "WANDB_API_KEY=${WANDB_API_KEY}")
 
 # `exec` (not `run`) so we bypass the S3-sync entrypoint and instead source

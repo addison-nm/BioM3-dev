@@ -89,14 +89,31 @@ scripts/aurora/apptainer_run.sh scripts/stage3_train_singlenode.sh \
 Host dirs bind onto `/app/{weights,data,outputs}`; `outputs/` is writable, weights
 and data are read-only. See the script header for all `BIOM3_*` knobs.
 
-## Multi-node (not yet supported)
+## Collectives: what works and what doesn't
 
-A self-contained image's bundled oneCCL cannot drive Aurora's CXI fabric on its
-own. Enabling multi-node means binding the host libfabric/CXI + MPICH into the
-container and launching `apptainer exec` under the host `mpiexec` with an
-ABI-compatible MPICH — see [oneCCL on Aurora](https://docs.alcf.anl.gov/aurora/data-science/frameworks/oneCCL/).
-Until that is added, use the bare-metal path ([setup_aurora.md](./setup_aurora.md))
-for multi-node jobs.
+oneCCL inside the container needs three things that bare metal gets for free.
+All three are handled by [apptainer_run.sh](../../scripts/aurora/apptainer_run.sh);
+they are recorded here because the failure modes are opaque.
+
+| Need | Why | Failure if missing |
+| --- | --- | --- |
+| `libze_loader.so` symlink | oneCCL `dlopen`s the unversioned name, which only the `-dev` package ships. torch is unaffected — it links `.so.1` directly. | `could not open the library: libze_loader.so`, then `ze_data was not initialized` on every collective |
+| `FI_PROVIDER=tcp` | A shell with `module load frameworks` exports `cxi,tcp;ofi_rxm`; apptainer forwards it, and the container's libfabric has no cxi provider. | `fi_getinfo error: ret -61, providers 0` → `failed to initialize ATL` |
+| `CCL_PROCESS_LAUNCHER=torchrun` | The host sets `pmix`, but no PMIx server is reachable in the container. `torchrun` reads `LOCAL_RANK`/`LOCAL_WORLD_SIZE`. | `PMIx_Init failed: PMIX_ERR_UNREACH` → `local_idx >= 0 && local_idx < local_count failed` |
+
+**Single node** works with the above. GPU-to-GPU transfers use Level-Zero IPC
+rather than the fabric, so the tcp provider carries only out-of-band traffic.
+
+**Multi-node is not supported yet.** It needs Aurora's CXI provider, which lives
+in the host libfabric, not in the image. That means binding the host
+libfabric/CXI + MPICH into the container, launching `apptainer exec` under the
+host `mpiexec` with an ABI-compatible MPICH, and then setting `FI_PROVIDER=cxi`,
+`CCL_PROCESS_LAUNCHER=pmix`, and `CCL_ATL_TRANSPORT=mpi` (via `BIOM3_FI_PROVIDER`
+and `BIOM3_CCL_LAUNCHER`) — i.e. the values the host already exports become
+correct once the libraries backing them are present. See
+[oneCCL on Aurora](https://docs.alcf.anl.gov/aurora/data-science/frameworks/oneCCL/).
+Until then, use the bare-metal path ([setup_aurora.md](./setup_aurora.md)) for
+multi-node jobs.
 
 ## Troubleshooting
 

@@ -79,7 +79,14 @@ RUN wget -qO - https://repositories.intel.com/gpu/intel-graphics.key \
         > /etc/apt/sources.list.d/intel-gpu-noble.list \
     && apt-get update && apt-get install -y --no-install-recommends \
         libze1 libze-intel-gpu1 intel-opencl-icd clinfo \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf libze_loader.so.1 /usr/lib/x86_64-linux-gnu/libze_loader.so
+
+# oneCCL dlopen()s the unversioned `libze_loader.so`, which only the -dev package
+# provides; libze1 ships just the .so.1 soname. Without the symlink above, oneCCL
+# logs "could not open the library: libze_loader.so", never initializes ze_data,
+# and every collective fails with "ze_data was not initialized" — while torch
+# itself works, since it links .so.1 directly.
 
 ENV VIRTUAL_ENV=/opt/venv
 RUN python3.12 -m venv $VIRTUAL_ENV

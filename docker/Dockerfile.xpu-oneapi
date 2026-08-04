@@ -13,12 +13,19 @@
 #   container recipe uses it (_misc/sample_script.sh, mirrored from
 #   https://docs.alcf.anl.gov/aurora/containers/containers/).
 #
-# DELIBERATELY UNCHANGED FROM Dockerfile.xpu
-#   torch 2.8.0+xpu and IPEX 2.8.10+xpu, not the recipe's torch 2.10. Moving
-#   torch at the same time would confound whether multi-node works because of
-#   Intel MPI or because of the torch version, and 2.10 has no public IPEX,
-#   which the addison-nm/lightning fork's XPUAccelerator requires. Bumping torch
-#   belongs in its own change, together with removing that gate.
+# VERSIONS ARE ALIGNED ON ONEAPI 2025.3
+#   Everything here is pinned to the base's oneAPI version, which is also what
+#   Aurora's frameworks/2025.3.1 runs. This image first tried torch 2.8.0+xpu
+#   (as Dockerfile.xpu pins) and that does not work: 2.8's runtime deps are
+#   oneAPI 2025.1.1, so with the 2025.3 base present the loader resolves
+#   per-library and one side always breaks -- torch failing on
+#   LIBUR_LOADER_0.11, or mpi4py on MPIR_F_MPI_BUFFER_AUTOMATIC, depending on
+#   LD_LIBRARY_PATH order. No ordering satisfies both.
+#
+#   torch 2.10.0+xpu depends on 2025.3, dpctl 0.21.1 requires >=2025.3 (and is
+#   Aurora's version), and pip's duplicate Intel MPI / oneCCL are removed so the
+#   base's are the only ones present. IPEX is dropped: there is no public 2.10
+#   build, and the fork's gate on it is patched out below.
 #
 # amd64 ONLY, same as Dockerfile.xpu: Intel GPU torch wheels are x86_64-only.
 #
@@ -94,26 +101,41 @@ RUN . /opt/intel/oneapi/setvars.sh --force \
     && MPICC=mpiicx pip install --no-binary=mpi4py --no-build-isolation mpi4py \
     && python -c "from mpi4py import MPI; print('mpi4py', MPI.Get_library_version())"
 
-# Torch + IPEX, pinned exactly as in Dockerfile.xpu. The explicit +xpu local
-# versions stop pip satisfying a transitive `torch` requirement from PyPI, which
-# serves CPU-only wheels.
-RUN pip install torch==2.8.0 torchvision \
+# torch 2.10.0+xpu, NOT the 2.8.0 that Dockerfile.xpu pins. 2.8's runtime deps
+# are oneAPI 2025.1.1 while this base is 2025.3; with both present the loader
+# picks per-library and one side always breaks:
+#   torch  -> libur_loader.so.0: version `LIBUR_LOADER_0.11' not found
+#   mpi4py -> libmpifort.so.12: undefined symbol: MPIR_F_MPI_BUFFER_AUTOMATIC
+# 2.10.0+xpu depends on 2025.3, matching the base and Aurora's frameworks.
+RUN pip install torch==2.10.0+xpu torchvision==0.25.0+xpu \
         --index-url https://download.pytorch.org/whl/xpu
-RUN pip install intel-extension-for-pytorch==2.8.10+xpu \
-        torch==2.8.0+xpu torchvision==0.23.0+xpu \
-        --extra-index-url https://download.pytorch.org/whl/xpu \
-        --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
 
 # Custom lightning fork with Intel-GPU support.
 RUN pip install --no-build-isolation \
         "git+https://github.com/addison-nm/lightning.git"
 
+# The fork's XPUAccelerator gates on intel_extension_for_pytorch, which has no
+# public 2.10 build (Aurora's 2.10.10 is an ALCF source build). The gate is
+# vestigial: all three uses of _IPEX_AVAILABLE guard code that then calls
+# torch.xpu.is_available() / torch.xpu.device_count() anyway, and the imported
+# `ipex` name is never used. Forcing the flag true and dropping the imports
+# leaves every branch returning the same native answer.
+RUN XPU_PY="$(python -c 'import lightning.pytorch.accelerators.xpu as m; print(m.__file__)')" \
+    && sed -i 's/^_IPEX_AVAILABLE = RequirementCache.*/_IPEX_AVAILABLE = True  # patched: native torch.xpu covers every use below/' "$XPU_PY" \
+    && sed -i '/^ *import intel_extension_for_pytorch as ipex$/d' "$XPU_PY" \
+    && python -c "from lightning.pytorch.accelerators.xpu import XPUAccelerator, num_xpu_devices; XPUAccelerator(); print('XPUAccelerator constructs; devices:', num_xpu_devices())"
+
+# Drop pip's Intel MPI and oneCCL: the base already provides 2021.17 of both,
+# and two copies means the dynamic loader can mix versions across a single
+# library's dependencies. --no-deps on the reinstall keeps pip from pulling them
+# straight back in as transitive requirements.
+RUN pip uninstall -y impi-rt oneccl oneccl-devel 2>/dev/null || true
+
 WORKDIR /app
 COPY requirements/ /app/requirements/
-RUN pip install -c requirements/constraints-xpu.txt \
-        -r requirements/aurora-container.txt \
-        --extra-index-url https://download.pytorch.org/whl/xpu \
-        --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
+RUN pip install -c requirements/constraints-oneapi.txt \
+        -r requirements/aurora-oneapi.txt \
+        --extra-index-url https://download.pytorch.org/whl/xpu
 
 COPY pyproject.toml environment.sh README.md /app/
 COPY src/      /app/src/
@@ -121,9 +143,8 @@ COPY scripts/  /app/scripts/
 COPY tests/    /app/tests/
 COPY configs/  /app/configs/
 
-RUN pip install -c requirements/constraints-xpu.txt -e ".[app]" \
+RUN pip install -c requirements/constraints-oneapi.txt -e ".[app]" \
         --extra-index-url https://download.pytorch.org/whl/xpu \
-        --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/ \
     && mkdir -p /app/weights /app/data /app/outputs /app/logs
 
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh

@@ -147,6 +147,16 @@ ENVS+=(--env "BIOM3_WORLD_SIZE=${NGPU_TOTAL}")
 # into the standard torch variables. TorchElasticEnvironment reads exactly
 # these and reports creates_processes_externally=True, which is accurate here:
 # mpiexec already created the processes.
+#
+# BIOM3_RANK_SOURCE=mpi skips the translation entirely and lets MPIEnvironment
+# detect via mpi4py, which is the native path and only works in an image whose
+# MPI matches the launcher's (Dockerfile.xpu-oneapi). Note TorchElasticEnvironment
+# is checked BEFORE MPIEnvironment, so the variables below suppress it.
+if [[ "${BIOM3_RANK_SOURCE:-pals}" == "mpi" ]]; then
+PRELUDE='cd /app
+source environment.sh >&2
+exec "$@"'
+else
 PRELUDE='cd /app
 export RANK="${PALS_RANKID:?PALS_RANKID not set; was this launched by mpiexec?}"
 export LOCAL_RANK="${PALS_LOCAL_RANKID:?PALS_LOCAL_RANKID not set}"
@@ -157,6 +167,7 @@ export NODE_RANK="${GROUP_RANK}"
 export TORCHELASTIC_RUN_ID="${TORCHELASTIC_RUN_ID:-biom3-mpi}"
 source environment.sh >&2
 exec "$@"'
+fi
 
 # environment.sh runs inside each rank so BIOM3_MACHINE and the Aurora oneCCL
 # settings apply; the --env values above win over anything it sets.

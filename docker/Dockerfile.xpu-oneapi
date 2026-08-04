@@ -38,10 +38,19 @@ SHELL ["/bin/bash", "-c"]
 # BIOM3_MACHINE is deliberately unset, as in Dockerfile.xpu: under Apptainer on
 # Aurora /flare is bound, so environment.sh auto-detects `aurora`.
 
-# The base ships python3 + pip + venv. ALCF's recipe warns against apt-get in
-# this image (it can fail under fakeroot), so only the pieces that are certain
-# to be missing are installed, and the build fails loudly if python is absent.
-RUN python3 -V && python3 -m pip --version && python3 -m venv -h >/dev/null
+# The base ships python3.12 but no pip and no venv module. (ALCF's recipe warns
+# against apt-get here, but that applies to their --fakeroot sandbox build on
+# Aurora; this image is built with Docker as root.)
+#
+#  - git, ca-certificates, wget, gnupg: pip git+ URLs (lightning fork) and the
+#    Intel GPU apt repo key.
+#  - build-essential: source builds for deps without wheels. mpi4py uses the
+#    base's mpiicx, but others (e.g. antlr4-python3-runtime) need a plain cc.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3-pip python3-venv python3-dev \
+        build-essential git ca-certificates wget gnupg \
+    && rm -rf /var/lib/apt/lists/* \
+    && python3 -V && python3 -m pip --version && python3 -m venv -h >/dev/null
 
 # Intel GPU user-space runtime. oneapi-hpckit provides the oneAPI runtimes but
 # not the Level-Zero GPU *driver*, which must match the host kernel driver.

@@ -3,10 +3,10 @@
 #
 # FILE: scripts/aurora/apptainer_run.sh
 #
-# Run a command inside the BioM3 Intel-XPU .sif on Aurora, single node. Binds the
-# Intel GPU device nodes and /flare, sources environment.sh inside the container
-# (so it auto-detects `aurora` and applies the oneCCL/xccl/NUMEXPR settings), then
-# runs whatever command you pass.
+# Run a command inside the BioM3 Intel-XPU .sif on Aurora, single node. Binds
+# /flare, sources environment.sh inside the container (so it auto-detects
+# `aurora` and applies the oneCCL/xccl/NUMEXPR settings), then runs whatever
+# command you pass.
 #
 # This is the container replacement for the bare-metal `module load frameworks +
 # source venv + source environment.sh` prelude. SINGLE NODE only — multi-node
@@ -52,9 +52,12 @@ O="${BIOM3_OUTPUTS_DIR:-$PWD/outputs}"
 mkdir -p "${O}"
 
 # --- Binds ---------------------------------------------------------------
-# /dev/dri : Intel GPU render/card nodes (the Intel analog of docker's --nv).
 # /flare   : ALCF Lustre; also what environment.sh fingerprints to pick `aurora`.
-BINDS=("/dev/dri" "${O}:/app/outputs")
+#
+# Do NOT bind /dev/dri. Apptainer mounts /dev by default; adding /dev/dri as a
+# user bind remounts it `nodev`, so the GPU character devices become unusable
+# and torch.xpu.device_count() returns 0 (clinfo -l also comes back empty).
+BINDS=("${O}:/app/outputs")
 [[ -d /flare ]] && BINDS+=("/flare")
 [[ -n "${BIOM3_WEIGHTS_DIR:-}" ]] && BINDS+=("${BIOM3_WEIGHTS_DIR}:/app/weights:ro")
 [[ -n "${BIOM3_DATA_DIR:-}"    ]] && BINDS+=("${BIOM3_DATA_DIR}:/app/data:ro")

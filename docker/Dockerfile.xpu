@@ -10,7 +10,7 @@
 # TARGET = Aurora, run under Apptainer (NOT docker). The usual flow is:
 #   docker/build.sh --variant xpu --release                         # -> :xpu-dev + :xpu-<sha>
 #   apptainer build biom3_xpu.sif docker://ghcr.io/.../biom3:xpu-dev  # on Aurora
-#   scripts/aurora/apptainer_run.sh <cmd>    # binds /dev/dri + /flare, runs
+#   scripts/aurora/apptainer_run.sh <cmd>    # binds /flare, runs
 # See docs/setup/setup_aurora_container.md for the full runbook.
 # It can also `docker run` on any local Intel-GPU host (see docker/run.sh, which
 # maps :xpu tags to `--device /dev/dri`).
@@ -22,8 +22,9 @@
 #   * The torch wheel vendors the SYCL/DPC++ *runtime*. What must come from
 #     OUTSIDE the wheel is the Level-Zero loader + the Intel L0 GPU *driver*
 #     (libze_intel_gpu). We install those from Intel's GPU apt repo so the image
-#     is self-contained on any Intel-GPU host. On Aurora, the kernel driver is
-#     reached by binding /dev/dri at run time (apptainer_run.sh does this).
+#     is self-contained on any Intel-GPU host. On Aurora, Apptainer's default
+#     /dev mount reaches the kernel driver — do NOT bind /dev/dri explicitly,
+#     which remounts it `nodev` and hides the GPUs.
 #     NOTE: if the in-image L0 driver ever mismatches Aurora's kernel driver,
 #     the fallback is to bind the host runtime instead — see
 #     docs/setup/setup_aurora_container.md.

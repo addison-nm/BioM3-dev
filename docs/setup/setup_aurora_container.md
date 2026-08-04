@@ -71,7 +71,7 @@ scripts/aurora/apptainer_run.sh python -c \
 # expect: xpu True 12
 ```
 
-`apptainer_run.sh` binds `/dev/dri` (the Intel analog of docker's `--nv`) and
+`apptainer_run.sh` binds
 `/flare`, sets `ZE_FLAT_DEVICE_HIERARCHY=FLAT` (so each tile is its own device,
 matching `num_devices=12` in the PBS templates), and sources `environment.sh`
 inside the container — which fingerprints `/flare` to select the `aurora` profile

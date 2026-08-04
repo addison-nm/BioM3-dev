@@ -82,7 +82,9 @@ RUN python3 -m venv --system-site-packages $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # setuptools<82 ships pkg_resources, which the lightning fork's setup.py imports.
-RUN pip install --upgrade pip "setuptools<82" wheel
+# cython is a build requirement of mpi4py, which is installed below with
+# --no-build-isolation and so cannot fetch its own build deps.
+RUN pip install --upgrade pip "setuptools<82" wheel cython
 
 # mpi4py compiled against the image's Intel MPI. This is the whole point of the
 # oneapi base: Lightning's MPIEnvironment asks mpi4py for the rank, and that

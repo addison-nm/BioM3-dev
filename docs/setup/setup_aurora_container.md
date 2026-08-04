@@ -12,8 +12,12 @@ not wired up here yet — see [Multi-node](#multi-node-not-yet-supported).
 
 Aurora's GPUs are Intel Data Center GPU Max (Ponte Vecchio), driven by oneAPI /
 Level-Zero — there is no CUDA. The `biom3:cuda` image would run on Aurora only on
-CPU. The XPU image instead installs `torch==2.10.0+xpu` (matching the minor
-version of Aurora's `module load frameworks` torch; native `torch.xpu`;
+CPU. The XPU image instead installs `torch==2.8.0+xpu` with the matching
+`intel-extension-for-pytorch==2.8.10+xpu` — the newest public XPU pair, and one
+the `addison-nm/lightning` fork requires, since its `XPUAccelerator` raises
+without IPEX. Aurora's `module load frameworks` runs torch `2.10.0a0` with a
+non-public IPEX `2.10.10`, which the container cannot reproduce (native
+`torch.xpu`;
 Intel's IPEX is upstreamed into mainline torch, and `torch.distributed` uses the
 `xccl` backend). This mirrors how the CUDA image swaps in the cu129 wheel — see
 [PyTorch on Aurora](https://docs.alcf.anl.gov/aurora/data-science/frameworks/pytorch/).

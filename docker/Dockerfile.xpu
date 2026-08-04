@@ -16,9 +16,9 @@
 # maps :xpu tags to `--device /dev/dri`).
 #
 # GPU ENABLEMENT — how this actually reaches Aurora's Ponte Vecchio GPUs:
-#   * torch==2.10.0+xpu (below) has native torch.xpu; Intel's IPEX is upstreamed
-#     into mainline torch, so no intel_extension_for_pytorch is installed, and
-#     torch.distributed uses the native `xccl` backend (not the old `ccl`).
+#   * torch==2.8.0+xpu (below) has native torch.xpu, and torch.distributed uses
+#     the native `xccl` backend (not the old `ccl`). IPEX is installed anyway:
+#     the lightning fork's XPUAccelerator gates on it (see that layer below).
 #   * The torch wheel vendors the SYCL/DPC++ *runtime*. What must come from
 #     OUTSIDE the wheel is the Level-Zero loader + the Intel L0 GPU *driver*
 #     (libze_intel_gpu). We install those from Intel's GPU apt repo so the image
@@ -90,8 +90,19 @@ RUN pip install --upgrade pip setuptools wheel
 # come before requirements so the pinned torch isn't replaced by a CPU wheel
 # during dependency resolution. This is the XPU analog of the CUDA image's
 # cu129 index.
-RUN pip install torch==2.10.0 torchvision \
+#
+# Pinned to 2.8.0 to pair with IPEX 2.8.10+xpu below, which is the newest
+# public XPU build. Aurora's `module load frameworks` runs torch 2.10.0a0 with a
+# matching non-public IPEX 2.10.10; the container cannot reproduce that pair.
+RUN pip install torch==2.8.0 torchvision \
         --index-url https://download.pytorch.org/whl/xpu
+
+# IPEX is required by the addison-nm/lightning fork: its XPUAccelerator raises
+# ModuleNotFoundError unless intel_extension_for_pytorch>=1.13 is installed, and
+# its is_available() imports the module. BioM3's own code never imports it.
+# Only Intel's index carries the +xpu builds (PyPI ships CPU-only wheels).
+RUN pip install intel-extension-for-pytorch==2.8.10+xpu \
+        --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
 
 # Custom lightning fork with Intel-GPU support, matching the bare-metal Aurora
 # install in docs/setup/setup_aurora.md. Installed before requirements so it,

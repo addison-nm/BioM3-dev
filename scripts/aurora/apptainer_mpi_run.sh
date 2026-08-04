@@ -130,9 +130,35 @@ export MASTER_ADDR="${MASTER_ADDR:-$(hostname -s).hsn.cm.aurora.alcf.anl.gov}"
 export MASTER_PORT="${MASTER_PORT:-29500}"
 ENVS+=(--env "MASTER_ADDR=${MASTER_ADDR}" --env "MASTER_PORT=${MASTER_PORT}")
 
+ENVS+=(--env "BIOM3_WORLD_SIZE=${NGPU_TOTAL}")
+
+# Rank translation, done INSIDE the container because PALS_RANKID differs per
+# rank and --env would apply one value to all of them.
+#
+# Lightning auto-detects its ClusterEnvironment. On bare metal MPIEnvironment
+# wins, because it asks mpi4py, which is built against Aurora's Intel MPI. The
+# container's mpi4py is OpenMPI and cannot bootstrap under PALS, so detection
+# falls through to LightningEnvironment, whose global_rank() is 0 for every
+# process -- each rank then tries to spawn its own children and the run dies.
+#
+# PALS exports per-rank ids into the container regardless, so translate them
+# into the standard torch variables. TorchElasticEnvironment reads exactly
+# these and reports creates_processes_externally=True, which is accurate here:
+# mpiexec already created the processes.
+PRELUDE='cd /app
+export RANK="${PALS_RANKID:?PALS_RANKID not set; was this launched by mpiexec?}"
+export LOCAL_RANK="${PALS_LOCAL_RANKID:?PALS_LOCAL_RANKID not set}"
+export LOCAL_WORLD_SIZE="${PALS_LOCAL_SIZE:?PALS_LOCAL_SIZE not set}"
+export WORLD_SIZE="${BIOM3_WORLD_SIZE:?BIOM3_WORLD_SIZE not set}"
+export GROUP_RANK=$(( RANK / LOCAL_WORLD_SIZE ))
+export NODE_RANK="${GROUP_RANK}"
+export TORCHELASTIC_RUN_ID="${TORCHELASTIC_RUN_ID:-biom3-mpi}"
+source environment.sh >&2
+exec "$@"'
+
 # environment.sh runs inside each rank so BIOM3_MACHINE and the Aurora oneCCL
 # settings apply; the --env values above win over anything it sets.
-set -- bash -lc 'cd /app && source environment.sh >&2 && exec "$@"' _ "$@"
+set -- bash -lc "${PRELUDE}" _ "$@"
 
 echo "+ mpiexec ${MPI_ARGS[*]} apptainer exec --writable-tmpfs --bind ${BIND_ARG} ${SIF} <cmd>" >&2
 exec mpiexec "${MPI_ARGS[@]}" \

@@ -90,12 +90,14 @@ BINDS=("/flare" "${O}:/app/outputs" "${PMIX}:/hostlib/libpmix.so.2" "/usr/lib64:
 BIND_ARG="$(IFS=,; echo "${BINDS[*]}")"
 
 # --- Env into each rank's container ---------------------------------------
-# CCL_PROCESS_LAUNCHER=pmix here, NOT torchrun: under host mpiexec a PMIx server
-# IS reachable, so the value the frameworks module exports is the correct one.
-# CCL_ROOT still has to be overridden — the host path does not exist in the image.
+# CCL_PROCESS_LAUNCHER=torchrun, not pmix. mpiexec spawns the ranks, but rank
+# identity reaches the workload through the env vars the prelude derives from
+# PALS, not through MPI -- so oneCCL should read those same variables rather
+# than try to join a PMIx namespace. With pmix it blocks during init instead of
+# failing. CCL_ROOT is overridden because the host path does not exist here.
 ENVS=(--env "ZE_FLAT_DEVICE_HIERARCHY=FLAT"
       --env "CCL_ROOT=/opt/venv"
-      --env "CCL_PROCESS_LAUNCHER=pmix"
+      --env "CCL_PROCESS_LAUNCHER=${BIOM3_CCL_LAUNCHER:-torchrun}"
       --env "FI_PROVIDER=${BIOM3_FI_PROVIDER:-tcp}"
       --env "I_MPI_PMI_LIBRARY=/hostlib/libpmix.so.2"
       --env "LD_LIBRARY_PATH=/hostevent:${LD_LIBRARY_PATH:-}")

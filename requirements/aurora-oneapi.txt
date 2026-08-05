@@ -11,8 +11,9 @@
 #   * torch / torchvision  -> from the +xpu wheel index (native torch.xpu)
 #   * pytorch-lightning    -> the addison-nm/lightning fork (Intel-GPU support)
 #   * nvidia-ml-py         -> CUDA-only; not applicable on Intel GPUs
-#   * intel-extension-for-pytorch -> no public 2.10 build; the fork's gate on it
-#                                    is patched out in the Dockerfile
+#   * intel-extension-for-pytorch -> no public 2.10 build, and not needed: the
+#                                    lightning fork's gate on it was removed in
+#                                    addison-nm/lightning#1
 
 numpy==2.2.6
 dpctl==0.21.1

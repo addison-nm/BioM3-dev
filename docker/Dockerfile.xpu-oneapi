@@ -25,7 +25,7 @@
 #   torch 2.10.0+xpu depends on 2025.3, dpctl 0.21.1 requires >=2025.3 (and is
 #   Aurora's version), and pip's duplicate Intel MPI / oneCCL are removed so the
 #   base's are the only ones present. IPEX is dropped: there is no public 2.10
-#   build, and the fork's gate on it is patched out below.
+#   build, and the fork's gate on it was removed in addison-nm/lightning#1.
 #
 # amd64 ONLY, same as Dockerfile.xpu: Intel GPU torch wheels are x86_64-only.
 #
@@ -114,30 +114,17 @@ RUN pip install torch==2.10.0+xpu torchvision==0.25.0+xpu \
 RUN pip install --no-build-isolation \
         "git+https://github.com/addison-nm/lightning.git"
 
-# The fork's XPUAccelerator gates on intel_extension_for_pytorch, which has no
-# public 2.10 build (Aurora's 2.10.10 is an ALCF source build). The gate is
-# vestigial: all three uses of _IPEX_AVAILABLE guard code that then calls
-# torch.xpu.is_available() / torch.xpu.device_count() anyway, and the imported
-# `ipex` name is never used. Forcing the flag true and dropping the imports
-# leaves every branch returning the same native answer.
-# BOTH copies must be patched. lightning/pytorch/accelerators/xpu.py gates the
-# accelerator; lightning/fabric/accelerators/xpu.py holds the num_xpu_devices()
-# that fabric's device_parser._sanitize_gpu_ids consults. Patching only the
-# former leaves Lightning rejecting every device with
-#   MisconfigurationException: You requested gpu: [0..11] But your machine only has: []
-# even though torch.xpu.device_count() reports them.
-RUN LDIR="$(python -c 'import lightning, os; print(os.path.dirname(lightning.__file__))')" \
-    && for f in "$LDIR/pytorch/accelerators/xpu.py" "$LDIR/fabric/accelerators/xpu.py"; do \
-         test -f "$f" || { echo "ERROR: expected $f" >&2; exit 1; }; \
-         sed -i 's/^_IPEX_AVAILABLE = RequirementCache.*/_IPEX_AVAILABLE = True  # patched: native torch.xpu covers every use below/' "$f"; \
-         sed -i '/^ *import intel_extension_for_pytorch as ipex$/d' "$f"; \
-       done \
-    && python -c "\
-from lightning.fabric.accelerators.xpu import _IPEX_AVAILABLE as F, num_xpu_devices; \
-from lightning.pytorch.accelerators.xpu import _IPEX_AVAILABLE as P, XPUAccelerator; \
-assert F is True and P is True, ('unpatched', F, P); \
+# The fork's XPUAccelerator used to refuse to construct without
+# intel_extension_for_pytorch, which has no public 2.10 build (Aurora's 2.10.10
+# is an ALCF source build), and this image patched that gate out. Since
+# addison-nm/lightning#1 the gate is gone upstream and no patch is needed --
+# assert it stays that way, because a silent return of it would strand the
+# accelerator on any torch without a matching IPEX.
+RUN python -c "\
+from lightning.pytorch.accelerators.xpu import XPUAccelerator; \
+from lightning.fabric.accelerators.xpu import num_xpu_devices; \
 XPUAccelerator(); \
-print('both xpu accelerators patched; fabric devices:', num_xpu_devices())"
+print('XPUAccelerator constructs without IPEX; fabric devices:', num_xpu_devices())"
 
 # pip installs its own impi-rt and oneCCL alongside the base's, as transitive
 # dependencies of torch. That is fine here and deliberately left alone: with

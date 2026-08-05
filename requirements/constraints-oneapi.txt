@@ -12,7 +12,7 @@
 #
 # No intel-extension-for-pytorch: there is no public 2.10 build, and the only
 # thing that required it was a gate in the lightning fork's XPUAccelerator,
-# patched out in the Dockerfile.
+# removed upstream in addison-nm/lightning#1.
 #
 # Constraints only bound versions; they never install anything on their own.
 

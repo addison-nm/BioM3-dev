@@ -197,8 +197,6 @@ no usable MPI; that constraint does not apply to this image.)
 
 See [oneCCL on Aurora](https://docs.alcf.anl.gov/aurora/data-science/frameworks/oneCCL/)
 and the container recipe in `_misc/sample_script.sh`.
-Until then, use the bare-metal path ([setup_aurora.md](./setup_aurora.md)) for
-multi-node jobs.
 
 ## Troubleshooting
 

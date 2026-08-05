@@ -52,9 +52,9 @@
 #
 # CXI: the default provider is tcp, which works across nodes but does not use
 # Aurora's Slingshot fabric — two nodes end up slower in aggregate than one.
-# Driving CXI needs the host libfabric bound in, from the SAME Intel MPI version
-# the image carries (2021.17):
-#   BIOM3_FABRIC_DIR=/opt/aurora/26.26.0/oneapi/mpi/2021.17/opt/mpi/libfabric \
+# Driving CXI needs HPE's Cray libfabric bound in. Intel MPI's own bundled
+# libfabric has no cxi provider, in the image or under /opt/aurora:
+#   BIOM3_FABRIC_DIR=/opt/cray/libfabric/1.22.0/lib64 \
 #   BIOM3_FI_PROVIDER=cxi \
 #   scripts/aurora/apptainer_mpi_run.sh ...
 # See setup_aurora_container.md.
@@ -91,13 +91,24 @@ mkdir -p "${O}"
 BINDS=("/flare" "${O}:/app/outputs" "${PMIX}:/hostlib/libpmix.so.2" "/usr/lib64:/hostevent")
 
 # BIOM3_FABRIC_DIR binds a host libfabric over the container's, so cross-node
-# collectives can use Aurora's CXI provider instead of tcp. The container's
-# libfabric has no cxi provider, which caps multi-node throughput below a single
-# node's. Point it at the libfabric belonging to the SAME Intel MPI version the
-# image carries, e.g. for Intel MPI 2021.17:
-#   BIOM3_FABRIC_DIR=/opt/aurora/26.26.0/oneapi/mpi/2021.17/opt/mpi/libfabric \
-#   BIOM3_FI_PROVIDER=cxi
-[[ -n "${BIOM3_FABRIC_DIR:-}" ]] && BINDS+=("${BIOM3_FABRIC_DIR}:/hostfabric:ro")
+# collectives can use Aurora's CXI provider instead of tcp, which otherwise caps
+# multi-node throughput below a single node's.
+#
+# It must be the directory *containing* libfabric.so.1, and it must be HPE's
+# Cray build -- Intel MPI's own bundled libfabric ships efa/psm3/rxm/tcp/verbs
+# and no cxi, on Aurora as elsewhere:
+#   BIOM3_FABRIC_DIR=/opt/cray/libfabric/1.22.0/lib64 BIOM3_FI_PROVIDER=cxi
+# In that build cxi is compiled in rather than a loadable plugin, which is why
+# FI_PROVIDER_PATH is empty on bare metal and only set below when a prov/
+# directory actually exists.
+if [[ -n "${BIOM3_FABRIC_DIR:-}" ]]; then
+    [[ -e "${BIOM3_FABRIC_DIR}/libfabric.so.1" ]] || {
+        echo "ERROR: no libfabric.so.1 in BIOM3_FABRIC_DIR='${BIOM3_FABRIC_DIR}'." >&2
+        echo "       Point it at the directory containing it, e.g." >&2
+        echo "       /opt/cray/libfabric/<ver>/lib64 (the build with the cxi provider)." >&2
+        exit 1; }
+    BINDS+=("${BIOM3_FABRIC_DIR}:/hostfabric:ro")
+fi
 [[ -n "${BIOM3_WEIGHTS_DIR:-}" ]] && BINDS+=("${BIOM3_WEIGHTS_DIR}:/app/weights:ro")
 [[ -n "${BIOM3_DATA_DIR:-}"    ]] && BINDS+=("${BIOM3_DATA_DIR}:/app/data:ro")
 [[ -n "${BIOM3_CONFIGS_DIR:-}" ]] && BINDS+=("${BIOM3_CONFIGS_DIR}:/app/configs:ro")
@@ -136,6 +147,10 @@ ENVS=(--env "ZE_FLAT_DEVICE_HIERARCHY=FLAT"
 #   MPI_Init_thread ... MPIDI_OFI_mpi_init_hook: Other MPI error
 # The prelude appends /hostevent instead, inside the container, where the image's
 # value is already in place.
+# Intel MPI prefers its own bundled libfabric unless told otherwise, which would
+# defeat the bind above.
+[[ -n "${BIOM3_FABRIC_DIR:-}" ]] && ENVS+=(--env "I_MPI_OFI_LIBRARY_INTERNAL=0")
+
 [[ -n "${WANDB_API_KEY:-}" ]] && ENVS+=(--env "WANDB_API_KEY=${WANDB_API_KEY}")
 
 # ALCF-canonical 12-tile binding, matching launchers/aurora_multinode.sh.
@@ -213,10 +228,15 @@ HOSTEVENT='export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/hostevent"
 # over the container's, which has no cxi provider. FI_PROVIDER_PATH points
 # libfabric at the host's provider plugins rather than the image's.
 HOSTFABRIC=""
-[[ -n "${BIOM3_FABRIC_DIR:-}" ]] && \
-    HOSTFABRIC='export LD_LIBRARY_PATH="/hostfabric/lib:${LD_LIBRARY_PATH}"
-export FI_PROVIDER_PATH="/hostfabric/lib/prov"
+if [[ -n "${BIOM3_FABRIC_DIR:-}" ]]; then
+    HOSTFABRIC='export LD_LIBRARY_PATH="/hostfabric:${LD_LIBRARY_PATH}"
 '
+    # Only when the build uses loadable providers. The Cray build compiles cxi
+    # in, and setting this to a directory without plugins hides the built-ins.
+    [[ -d "${BIOM3_FABRIC_DIR}/prov" ]] && \
+        HOSTFABRIC+='export FI_PROVIDER_PATH="/hostfabric/prov"
+'
+fi
 
 if [[ "${BIOM3_RANK_SOURCE:-pals}" == "mpi" ]]; then
 PRELUDE="cd /app

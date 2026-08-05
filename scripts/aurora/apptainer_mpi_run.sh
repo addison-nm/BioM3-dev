@@ -130,7 +130,7 @@ BIND_ARG="$(IFS=,; echo "${BINDS[*]}")"
 # than try to join a PMIx namespace. With pmix it blocks during init instead of
 # failing. CCL_ROOT is overridden because the host path does not exist here.
 ENVS=(--env "ZE_FLAT_DEVICE_HIERARCHY=FLAT"
-      --env "CCL_ROOT=/opt/venv"
+      --env "CCL_ROOT=${BIOM3_CCL_ROOT:-/opt/venv}"
       --env "CCL_PROCESS_LAUNCHER=${BIOM3_CCL_LAUNCHER:-torchrun}"
       --env "FI_PROVIDER=${BIOM3_FI_PROVIDER:-tcp}"
       --env "I_MPI_PMI_LIBRARY=/hostlib/libpmix.so.2"

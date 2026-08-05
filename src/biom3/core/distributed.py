@@ -105,6 +105,8 @@ def init_distributed_if_launched(device: str) -> tuple[int, int, int, str]:
         os.environ["WORLD_SIZE"] = str(world_size)
         _set_master_addr_port()
 
+        _preinit_mpi_for_oneccl()
+
         dist.init_process_group(
             backend=DIST_BACKEND,
             init_method="env://",
@@ -114,6 +116,33 @@ def init_distributed_if_launched(device: str) -> tuple[int, int, int, str]:
         atexit.register(_destroy_if_initialized)
 
     return rank, local_rank, world_size, resolved_device
+
+
+def _preinit_mpi_for_oneccl():
+    """Initialise MPI before oneCCL does, which inside a container it cannot.
+
+    oneCCL's ``mpi`` transport -- its default, and what carries CXI at full
+    speed -- bootstraps Intel MPI itself when nothing else has. Under Apptainer
+    on Aurora that segfaults on the FIRST collective, whatever it is: barrier,
+    all_reduce and object collectives all die, at 2 ranks on one node as
+    readily as 24 across two, with or without the fabric bound. When MPI is
+    already up, oneCCL attaches to it ("MPI was initialized externally") and
+    every collective works.
+
+    Importing ``mpi4py.MPI`` performs ``MPI_Init``. Stage 3 training never hit
+    the crash because Lightning's MPIEnvironment imports mpi4py to read the
+    rank, doing this incidentally.
+
+    Best-effort: without mpi4py, or outside an MPI launcher, this is a no-op.
+    """
+    if DIST_BACKEND != "xccl":
+        return
+    if not (os.environ.get("PALS_RANKID") or os.environ.get("PMI_RANK")):
+        return
+    try:
+        from mpi4py import MPI  # noqa: F401  -- the import is the initialisation
+    except Exception:
+        pass
 
 
 def is_main_process() -> bool:
@@ -132,12 +161,8 @@ def gather_object_to_main(obj, dst: int = 0):
 
     No-op (returns ``[obj]``) when not running under a distributed launcher.
 
-    Implemented with ``all_gather_object`` rather than ``gather_object``:
-    ``gather`` is not a portable collective. NCCL rejects it outright, and the
-    XCCL in the pip torch 2.10 XPU wheels segfaults on it (every rank completes
-    its work, then dies at the gather). ``all_gather`` is supported everywhere.
-    The cost is that every rank holds the full list instead of just ``dst``;
-    payloads here are per-rank result shards, not tensors.
+    Uses ``all_gather_object`` rather than ``gather_object`` because NCCL has
+    no ``gather`` at all; every backend supports ``all_gather``.
     """
     if not (dist.is_available() and dist.is_initialized()):
         return [obj]

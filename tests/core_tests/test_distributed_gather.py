@@ -1,14 +1,12 @@
 """Tests for biom3.core.distributed.gather_object_to_main.
 
 Runs over gloo, which is available everywhere, so the collective's contract is
-checked without a GPU or a launcher. The backend-portability requirement this
-guards is real: ``gather`` is rejected by NCCL and segfaults under the XCCL in
-the pip torch 2.10 XPU wheels, so the helper must stay on ``all_gather``.
+checked without a GPU or a launcher. The portability requirement this guards is
+real: NCCL has no ``gather`` at all, so the helper must stay on ``all_gather``.
 """
 
 import os
 
-import pytest
 import torch.distributed as dist
 import torch.multiprocessing as mp
 

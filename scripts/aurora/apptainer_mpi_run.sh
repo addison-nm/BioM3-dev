@@ -46,12 +46,18 @@
 #   BIOM3_CONFIGS_DIR  host configs dir bound to /app/configs (ro)
 #   BIOM3_BIND_EXTRA   extra colon/comma paths to --bind
 #   BIOM3_FI_PROVIDER  libfabric provider (default tcp; see the CXI note below)
+#   BIOM3_FABRIC_DIR   host libfabric to bind over the container's (CXI; below)
 #   BIOM3_PMIX         host PMIx library (default /usr/lib64/libpmix.so.2)
 #   WANDB_API_KEY      forwarded into the container if set
 #
 # CXI: the default provider is tcp, which works across nodes but does not use
-# Aurora's Slingshot fabric. Driving CXI needs the host libfabric + its cxi
-# provider bound in and BIOM3_FI_PROVIDER=cxi; see setup_aurora_container.md.
+# Aurora's Slingshot fabric — two nodes end up slower in aggregate than one.
+# Driving CXI needs the host libfabric bound in, from the SAME Intel MPI version
+# the image carries (2021.17):
+#   BIOM3_FABRIC_DIR=/opt/aurora/26.26.0/oneapi/mpi/2021.17/opt/mpi/libfabric \
+#   BIOM3_FI_PROVIDER=cxi \
+#   scripts/aurora/apptainer_mpi_run.sh ...
+# See setup_aurora_container.md.
 #
 #=============================================================================
 set -euo pipefail
@@ -83,6 +89,15 @@ mkdir -p "${O}"
 #             PMIx links against. Prepending the whole directory is why this is
 #             scoped to a subdirectory rather than binding over /usr/lib64.
 BINDS=("/flare" "${O}:/app/outputs" "${PMIX}:/hostlib/libpmix.so.2" "/usr/lib64:/hostevent")
+
+# BIOM3_FABRIC_DIR binds a host libfabric over the container's, so cross-node
+# collectives can use Aurora's CXI provider instead of tcp. The container's
+# libfabric has no cxi provider, which caps multi-node throughput below a single
+# node's. Point it at the libfabric belonging to the SAME Intel MPI version the
+# image carries, e.g. for Intel MPI 2021.17:
+#   BIOM3_FABRIC_DIR=/opt/aurora/26.26.0/oneapi/mpi/2021.17/opt/mpi/libfabric \
+#   BIOM3_FI_PROVIDER=cxi
+[[ -n "${BIOM3_FABRIC_DIR:-}" ]] && BINDS+=("${BIOM3_FABRIC_DIR}:/hostfabric:ro")
 [[ -n "${BIOM3_WEIGHTS_DIR:-}" ]] && BINDS+=("${BIOM3_WEIGHTS_DIR}:/app/weights:ro")
 [[ -n "${BIOM3_DATA_DIR:-}"    ]] && BINDS+=("${BIOM3_DATA_DIR}:/app/data:ro")
 [[ -n "${BIOM3_CONFIGS_DIR:-}" ]] && BINDS+=("${BIOM3_CONFIGS_DIR}:/app/configs:ro")
@@ -194,13 +209,22 @@ SETVARS=""
 HOSTEVENT='export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/hostevent"
 '
 
+# Prepended, unlike /hostevent: the whole point is for the host libfabric to win
+# over the container's, which has no cxi provider. FI_PROVIDER_PATH points
+# libfabric at the host's provider plugins rather than the image's.
+HOSTFABRIC=""
+[[ -n "${BIOM3_FABRIC_DIR:-}" ]] && \
+    HOSTFABRIC='export LD_LIBRARY_PATH="/hostfabric/lib:${LD_LIBRARY_PATH}"
+export FI_PROVIDER_PATH="/hostfabric/lib/prov"
+'
+
 if [[ "${BIOM3_RANK_SOURCE:-pals}" == "mpi" ]]; then
 PRELUDE="cd /app
-${HOSTEVENT}${SETVARS}"'source environment.sh >&2
+${HOSTEVENT}${HOSTFABRIC}${SETVARS}"'source environment.sh >&2
 exec "$@"'
 else
 PRELUDE="cd /app
-${HOSTEVENT}${SETVARS}"'export RANK="${PALS_RANKID:?PALS_RANKID not set; was this launched by mpiexec?}"
+${HOSTEVENT}${HOSTFABRIC}${SETVARS}"'export RANK="${PALS_RANKID:?PALS_RANKID not set; was this launched by mpiexec?}"
 export LOCAL_RANK="${PALS_LOCAL_RANKID:?PALS_LOCAL_RANKID not set}"
 export LOCAL_WORLD_SIZE="${PALS_LOCAL_SIZE:?PALS_LOCAL_SIZE not set}"
 export WORLD_SIZE="${BIOM3_WORLD_SIZE:?BIOM3_WORLD_SIZE not set}"

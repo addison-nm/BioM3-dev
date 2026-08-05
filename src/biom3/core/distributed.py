@@ -131,14 +131,20 @@ def gather_object_to_main(obj, dst: int = 0):
     """Gather ``obj`` from every rank to ``dst``. Returns a list on dst, ``None`` elsewhere.
 
     No-op (returns ``[obj]``) when not running under a distributed launcher.
+
+    Implemented with ``all_gather_object`` rather than ``gather_object``:
+    ``gather`` is not a portable collective. NCCL rejects it outright, and the
+    XCCL in the pip torch 2.10 XPU wheels segfaults on it (every rank completes
+    its work, then dies at the gather). ``all_gather`` is supported everywhere.
+    The cost is that every rank holds the full list instead of just ``dst``;
+    payloads here are per-rank result shards, not tensors.
     """
     if not (dist.is_available() and dist.is_initialized()):
         return [obj]
     world_size = dist.get_world_size()
-    rank = dist.get_rank()
-    gathered = [None] * world_size if rank == dst else None
-    dist.gather_object(obj, gathered, dst=dst)
-    return gathered
+    gathered = [None] * world_size
+    dist.all_gather_object(gathered, obj)
+    return gathered if dist.get_rank() == dst else None
 
 
 def broadcast_int(value: int, src: int = 0) -> int:

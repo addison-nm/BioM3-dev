@@ -120,10 +120,24 @@ RUN pip install --no-build-isolation \
 # torch.xpu.is_available() / torch.xpu.device_count() anyway, and the imported
 # `ipex` name is never used. Forcing the flag true and dropping the imports
 # leaves every branch returning the same native answer.
-RUN XPU_PY="$(python -c 'import lightning.pytorch.accelerators.xpu as m; print(m.__file__)')" \
-    && sed -i 's/^_IPEX_AVAILABLE = RequirementCache.*/_IPEX_AVAILABLE = True  # patched: native torch.xpu covers every use below/' "$XPU_PY" \
-    && sed -i '/^ *import intel_extension_for_pytorch as ipex$/d' "$XPU_PY" \
-    && python -c "from lightning.pytorch.accelerators.xpu import XPUAccelerator, num_xpu_devices; XPUAccelerator(); print('XPUAccelerator constructs; devices:', num_xpu_devices())"
+# BOTH copies must be patched. lightning/pytorch/accelerators/xpu.py gates the
+# accelerator; lightning/fabric/accelerators/xpu.py holds the num_xpu_devices()
+# that fabric's device_parser._sanitize_gpu_ids consults. Patching only the
+# former leaves Lightning rejecting every device with
+#   MisconfigurationException: You requested gpu: [0..11] But your machine only has: []
+# even though torch.xpu.device_count() reports them.
+RUN LDIR="$(python -c 'import lightning, os; print(os.path.dirname(lightning.__file__))')" \
+    && for f in "$LDIR/pytorch/accelerators/xpu.py" "$LDIR/fabric/accelerators/xpu.py"; do \
+         test -f "$f" || { echo "ERROR: expected $f" >&2; exit 1; }; \
+         sed -i 's/^_IPEX_AVAILABLE = RequirementCache.*/_IPEX_AVAILABLE = True  # patched: native torch.xpu covers every use below/' "$f"; \
+         sed -i '/^ *import intel_extension_for_pytorch as ipex$/d' "$f"; \
+       done \
+    && python -c "\
+from lightning.fabric.accelerators.xpu import _IPEX_AVAILABLE as F, num_xpu_devices; \
+from lightning.pytorch.accelerators.xpu import _IPEX_AVAILABLE as P, XPUAccelerator; \
+assert F is True and P is True, ('unpatched', F, P); \
+XPUAccelerator(); \
+print('both xpu accelerators patched; fabric devices:', num_xpu_devices())"
 
 # Drop pip's Intel MPI and oneCCL: the base already provides 2021.17 of both,
 # and two copies means the dynamic loader can mix versions across a single

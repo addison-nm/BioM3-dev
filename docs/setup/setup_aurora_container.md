@@ -11,8 +11,9 @@ There are **two** Aurora images, and which one you want depends on node count:
   Most of this document describes this path.
 - **Multi-node** — [docker/Dockerfile.xpu-oneapi](../../docker/Dockerfile.xpu-oneapi),
   run with [apptainer_mpi_run.sh](../../scripts/aurora/apptainer_mpi_run.sh).
-  Runs across nodes, but over tcp rather than Slingshot, so it is currently
-  slower in aggregate than a single node. See [Multi-node](#multi-node).
+  Runs across nodes over Slingshot/CXI and scales — two nodes at roughly twice a
+  single node's throughput — provided the host's Cray libfabric is bound in.
+  See [Multi-node](#multi-node).
 
 ## Why a separate image from the CUDA one
 
@@ -112,10 +113,10 @@ rather than the fabric, so the tcp provider carries only out-of-band traffic.
 
 ## Multi-node
 
-Multi-node runs, but over `tcp` rather than Slingshot, which currently makes it
-slower in aggregate than a single node. Use it to validate that a job works
-across nodes; use bare metal ([setup_aurora.md](./setup_aurora.md)) for real
-multi-node training until CXI is wired up.
+Multi-node works, over Slingshot/CXI, and scales: two nodes run roughly twice a
+single node's throughput. It needs the host's Cray libfabric bound in — see
+[CXI](#cxi) — without which it falls back to `tcp` and ends up *slower* than one
+node.
 
 It needs a different image and a different launcher from the single-node path:
 
@@ -131,8 +132,12 @@ Lightning falls back to a local environment, and every rank reports global rank
 0. `intel/oneapi-hpckit` supplies an Intel MPI that matches the host launcher.
 
 ```bash
-# 2 nodes, 24 tiles
+# 2 nodes, 24 tiles. Do not `module load frameworks` — the container carries its
+# own stack, and the module only exports host values the wrapper must override.
+module load apptainer
+
 NGPU_PER_NODE=12 NGPU_TOTAL=24 BIOM3_RANK_SOURCE=mpi \
+BIOM3_FABRIC_DIR=/opt/cray/libfabric/1.22.0/lib64 BIOM3_FI_PROVIDER=cxi \
 BIOM3_SIF=/flare/.../biom3_xpu-oneapi-<sha>.sif \
 BIOM3_WEIGHTS_DIR=./weights BIOM3_DATA_DIR=./data \
 scripts/aurora/apptainer_mpi_run.sh \
@@ -150,22 +155,46 @@ every rank is a torchrun child of one container, so it never arises.
 
 Stage 3 pretraining, `pretrain_scratch_v1.json`, 86.2M params, batch 32/rank:
 
-| Config | it/s | samples/s |
-| --- | --- | --- |
-| bare metal, 12 ranks, 1 node | 0.62 | ~238 |
-| container, 12 ranks, 1 node | 0.57 | ~219 |
-| container, 24 ranks, 2 nodes | 0.17 | ~131 |
+| Config | it/s | samples/s | read at step |
+| --- | --- | --- | --- |
+| bare metal, 12 ranks, 1 node | 0.62 | ~238 | 16 |
+| container, 12 ranks, 1 node | 0.57 | ~219 | 7 |
+| container, 24 ranks, 2 nodes, tcp | 0.17 | ~131 | 334 |
+| container, 24 ranks, 2 nodes, **cxi** | **0.64** | **~492** | 499 |
 
-Single-node containers cost roughly 8% against bare metal. Two nodes is *slower
-in aggregate than one*, because cross-node collectives go over tcp.
+Single-node containers cost roughly 8% against bare metal. Two nodes over CXI is
+3.8x the tcp figure and about twice a single node; the single-node container
+number was read very early, so treat the scaling ratio as approximate until both
+are measured at the same step.
 
-### Remaining work: CXI
+### CXI
 
-Aurora's CXI provider lives in the host libfabric, not the image. Enabling it
-means binding the host libfabric and its provider into the container and setting
-`BIOM3_FI_PROVIDER=cxi` (the wrapper already takes that variable). Until then the
-two-node numbers above are what to expect. See
-[oneCCL on Aurora](https://docs.alcf.anl.gov/aurora/data-science/frameworks/oneCCL/)
+Aurora's CXI provider is in **HPE's Cray libfabric**, not the image and not
+Intel MPI's bundled libfabric — that one ships efa/psm3/rxm/shm/tcp/verbs and no
+cxi, under `/opt/aurora` as well as in the image. Point `BIOM3_FABRIC_DIR` at
+the directory holding Cray's `libfabric.so.1`:
+
+```
+BIOM3_FABRIC_DIR=/opt/cray/libfabric/1.22.0/lib64 BIOM3_FI_PROVIDER=cxi
+```
+
+The wrapper then binds it at `/hostfabric`, prepends it to `LD_LIBRARY_PATH`,
+`LD_PRELOAD`s it, and sets `I_MPI_OFI_LIBRARY_INTERNAL=0`. All four are needed:
+`LD_PRELOAD` because pip's oneCCL ships its own libfabric at
+`/opt/venv/lib/libfabric.so.1` and finds it through RPATH, which
+`LD_LIBRARY_PATH` cannot override; `I_MPI_OFI_LIBRARY_INTERNAL=0` because Intel
+MPI otherwise prefers its own. Cray's libfabric needs `libcxi.so.1`, which is in
+`/usr/lib64` and so arrives via the existing `/hostevent` bind.
+
+`CCL_ATL_TRANSPORT` must be `mpi` here, which is the wrapper's default. On `ofi`
+oneCCL opens libfabric providers itself and fails on cxi with
+`fi_getinfo error: ret -61, providers 0`, even with Cray's library loaded and
+`fi_info -p cxi` listing every domain from inside the container — it requests
+capabilities the provider will not grant. Riding the Intel MPI that already works
+over cxi avoids the question. (ALCF's recipe sets `ofi` because its container has
+no usable MPI; that constraint does not apply to this image.)
+
+See [oneCCL on Aurora](https://docs.alcf.anl.gov/aurora/data-science/frameworks/oneCCL/)
 and the container recipe in `_misc/sample_script.sh`.
 Until then, use the bare-metal path ([setup_aurora.md](./setup_aurora.md)) for
 multi-node jobs.

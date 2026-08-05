@@ -52,6 +52,7 @@
 #
 # CXI: the default provider is tcp, which works across nodes but does not use
 # Aurora's Slingshot fabric — two nodes end up slower in aggregate than one.
+# With the bind below, two nodes instead run ~3.8x the tcp throughput.
 # Driving CXI needs HPE's Cray libfabric bound in. Intel MPI's own bundled
 # libfabric has no cxi provider, in the image or under /opt/aurora:
 #   BIOM3_FABRIC_DIR=/opt/cray/libfabric/1.22.0/lib64 \

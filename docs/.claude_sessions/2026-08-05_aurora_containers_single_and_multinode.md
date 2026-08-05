@@ -125,7 +125,10 @@ all 12 tiles.
 
 ## Open items
 
-- `xpu-oneapi` has never been through the test suite; `xpu` has (1134 passed / 162 skipped).
+- ~~`xpu-oneapi` has never been through the test suite~~ — both images pass
+  (1134 passed / 162 skipped), `xpu-oneapi` confirmed at `6d1497e`. Notably it passes with
+  torch 2.10, dpctl 0.21.1 and no IPEX, which is evidence that removing the fork's IPEX gate
+  has no observable effect beyond letting the accelerator construct.
 - Re-measure single-node container throughput at ~step 500 for an exact scaling ratio.
 - `xpu-oneapi` image not rebuilt since `a8fe97f`; published `xpu-oneapi-6ed0e87` is
   functionally current (that commit removed a no-op layer and edited comments).

@@ -123,6 +123,7 @@ It needs a different image and a different launcher from the single-node path:
 | | Single node | Multi-node |
 | --- | --- | --- |
 | Image | [Dockerfile.xpu](../../docker/Dockerfile.xpu) | [Dockerfile.xpu-oneapi](../../docker/Dockerfile.xpu-oneapi) |
+| Test suite | 1134 passed / 162 skipped | 1134 passed / 162 skipped |
 | Launcher | [apptainer_run.sh](../../scripts/aurora/apptainer_run.sh) — one container, torchrun spawns ranks | [apptainer_mpi_run.sh](../../scripts/aurora/apptainer_mpi_run.sh) — host mpiexec spawns one container per rank |
 | Rank source | PALS env vars translated to `RANK`/`LOCAL_RANK` | `MPIEnvironment` via mpi4py (`BIOM3_RANK_SOURCE=mpi`) |
 

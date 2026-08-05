@@ -53,16 +53,28 @@ rebuilding.
 ### 2. Convert to a .sif (Aurora login node)
 
 Apptainer ([Containers on Aurora](https://docs.alcf.anl.gov/aurora/containers/containers/))
-converts the Docker image to a `.sif`. Point the cache/tmp at a roomy filesystem
-if `$HOME` is tight — the unpack is several GB.
+converts the Docker image to a `.sif`. The two scratch locations want opposite
+things, so set them separately:
+
+- `APPTAINER_CACHEDIR` on `/flare`, where it persists across login nodes. It
+  holds the downloaded layer blobs, so a warm cache makes a rebuild of a new tag
+  pull nothing.
+- `APPTAINER_TMPDIR` on node-local disk. Unpacking layers is millions of small
+  file creates, chowns and `setxattr`s — the access pattern Lustre is worst at.
+  Only the finished `.sif` needs to land on `/flare`.
 
 ```bash
 export APPTAINER_CACHEDIR=/flare/NLDesignProtein/$USER/.apptainer/cache
-export APPTAINER_TMPDIR=/flare/NLDesignProtein/$USER/.apptainer/tmp
+export APPTAINER_TMPDIR=/tmp/$USER/apptainer-tmp     # check `df -h /tmp` for room
 mkdir -p "$APPTAINER_CACHEDIR" "$APPTAINER_TMPDIR"
 
-apptainer build biom3_xpu.sif docker://ghcr.io/natural-machine/biom3:xpu-dev
+apptainer build /flare/NLDesignProtein/$USER/biom3_xpu.sif \
+    docker://ghcr.io/natural-machine/biom3:xpu-dev
 ```
+
+Prefer the immutable `<variant>-<sha>` tag over `-dev` when validating a specific
+build: it pins what you tested, and it cannot collide with a cached pull of an
+older image under a moving tag.
 
 Offline alternative (no registry): `docker save biom3:xpu -o biom3_xpu.tar` on the
 build host, `scp` it over, then
@@ -87,11 +99,15 @@ and apply the oneCCL/`xccl`/NUMEXPR settings.
 ### 4. Run a stage (single node)
 
 ```bash
-BIOM3_WEIGHTS_DIR=/flare/NLDesignProtein/sharepoint/BioM3-data-share/weights \
-BIOM3_DATA_DIR=/flare/NLDesignProtein/sharepoint/BioM3-data-share/data \
+BIOM3_WEIGHTS_DIR=./weights BIOM3_DATA_DIR=./data \
 scripts/aurora/apptainer_run.sh scripts/stage3_train_singlenode.sh \
     configs/stage3_training/pretrain_scratch_v1.json 12 xpu run001 --epochs 1
 ```
+
+`BIOM3_WEIGHTS_DIR` / `BIOM3_DATA_DIR` are bind sources, so they must exist on the
+node. The repo's own `weights/` and `data/` are the working default; pointing them
+at a share path that is not populated fails every rank at container creation with
+`mount source ... doesn't exist`, before any Python runs.
 
 Host dirs bind onto `/app/{weights,data,outputs}`; `outputs/` is writable, weights
 and data are read-only. See the script header for all `BIOM3_*` knobs.

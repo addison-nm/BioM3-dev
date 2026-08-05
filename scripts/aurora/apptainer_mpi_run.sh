@@ -99,8 +99,17 @@ ENVS=(--env "ZE_FLAT_DEVICE_HIERARCHY=FLAT"
       --env "CCL_ROOT=/opt/venv"
       --env "CCL_PROCESS_LAUNCHER=${BIOM3_CCL_LAUNCHER:-torchrun}"
       --env "FI_PROVIDER=${BIOM3_FI_PROVIDER:-tcp}"
-      --env "I_MPI_PMI_LIBRARY=/hostlib/libpmix.so.2"
-      --env "LD_LIBRARY_PATH=/hostevent:${LD_LIBRARY_PATH:-}")
+      --env "I_MPI_PMI_LIBRARY=/hostlib/libpmix.so.2")
+
+# LD_LIBRARY_PATH is deliberately NOT set with --env: that replaces the image's
+# own value rather than extending it, and on an oneAPI base that value carries
+# every /opt/intel/oneapi/*/lib directory. Dropping it makes anything built with
+# the Intel compiler unloadable --
+#   ImportError: libsvml.so: cannot open shared object file
+# and hides Intel MPI's bundled libfabric providers, which surfaces later as
+#   MPI_Init_thread ... MPIDI_OFI_mpi_init_hook: Other MPI error
+# The prelude appends /hostevent instead, inside the container, where the image's
+# value is already in place.
 [[ -n "${WANDB_API_KEY:-}" ]] && ENVS+=(--env "WANDB_API_KEY=${WANDB_API_KEY}")
 
 # ALCF-canonical 12-tile binding, matching launchers/aurora_multinode.sh.
@@ -168,13 +177,19 @@ SETVARS=""
     SETVARS='export LD_LIBRARY_PATH="/opt/intel/oneapi/mpi/latest/lib:/opt/intel/oneapi/mpi/latest/lib/release:${LD_LIBRARY_PATH}"
 '
 
+# Appended, never prepended, and inside the container so the image's own
+# LD_LIBRARY_PATH survives. /hostevent exists only so PMIx can find the host's
+# libevent; nothing else should resolve there in preference to the image.
+HOSTEVENT='export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/hostevent"
+'
+
 if [[ "${BIOM3_RANK_SOURCE:-pals}" == "mpi" ]]; then
 PRELUDE="cd /app
-${SETVARS}"'source environment.sh >&2
+${HOSTEVENT}${SETVARS}"'source environment.sh >&2
 exec "$@"'
 else
 PRELUDE="cd /app
-${SETVARS}"'export RANK="${PALS_RANKID:?PALS_RANKID not set; was this launched by mpiexec?}"
+${HOSTEVENT}${SETVARS}"'export RANK="${PALS_RANKID:?PALS_RANKID not set; was this launched by mpiexec?}"
 export LOCAL_RANK="${PALS_LOCAL_RANKID:?PALS_LOCAL_RANKID not set}"
 export LOCAL_WORLD_SIZE="${PALS_LOCAL_SIZE:?PALS_LOCAL_SIZE not set}"
 export WORLD_SIZE="${BIOM3_WORLD_SIZE:?BIOM3_WORLD_SIZE not set}"

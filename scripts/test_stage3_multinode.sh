@@ -8,7 +8,7 @@
 # DESCRIPTION: Multi-node multi-GPU launcher for the Stage 3 sampling smoke
 #   test suite (tests/stage3_tests/test_multinode_sample.py). Dispatches to
 #   the machine-specific launcher under
-#   scripts/launchers/${BIOM3_MACHINE}_multinode.sh, which wraps the call
+#   scripts/launchers/${BIOM3_LAUNCHER:-${BIOM3_MACHINE}}_multinode.sh, which wraps the call
 #   in mpiexec with the appropriate per-tile CPU binding.
 #
 #   The smoke suite verifies that, under the requested topology:
@@ -40,7 +40,7 @@ export NGPU_PER_NODE NGPU_TOTAL
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MACHINE="${BIOM3_MACHINE:?BIOM3_MACHINE not set; source environment.sh first}"
-LAUNCHER="${SCRIPT_DIR}/launchers/${MACHINE}_multinode.sh"
+LAUNCHER="${SCRIPT_DIR}/launchers/${BIOM3_LAUNCHER:-${MACHINE}}_multinode.sh"
 
 if [ ! -x "${LAUNCHER}" ]; then
     echo "ERROR: no launcher for ${MACHINE} multinode at ${LAUNCHER}"

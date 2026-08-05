@@ -8,7 +8,7 @@
 #
 # DESCRIPTION: Single-node wrapper for Stage 3 training (pretraining and
 #   finetuning). Dispatches to the machine-specific launcher under
-#   scripts/launchers/${BIOM3_MACHINE}_singlenode.sh, which knows how to
+#   scripts/launchers/${BIOM3_LAUNCHER:-${BIOM3_MACHINE}}_singlenode.sh, which knows how to
 #   spawn ranks (mpiexec on Aurora/Polaris, bare exec on Spark).
 #
 #   The JSON config provides model/training hyperparameters; per-job

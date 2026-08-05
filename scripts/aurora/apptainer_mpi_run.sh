@@ -35,9 +35,16 @@
 #   # two nodes, 24 tiles
 #   NGPU_PER_NODE=12 NGPU_TOTAL=24 ... (same, --num_nodes 2 --run_id mpi002)
 #
+#   # GDPO on two nodes: ONE rank per node, each owning all 12 local tiles
+#   NGPU_PER_NODE=1 NGPU_TOTAL=2 BIOM3_RANK_LAYOUT=node \
+#   BIOM3_SIF=/flare/.../biom3_xpu-oneapi-<sha>.sif \
+#   scripts/aurora/apptainer_mpi_run.sh biom3_gdpo_train --config_path configs/grpo/...
+#
 # ENV:
-#   NGPU_PER_NODE      ranks per node (required; 12 for full Aurora nodes)
+#   NGPU_PER_NODE      ranks per node (required; 12 for tile layout, 1 for node)
 #   NGPU_TOTAL         total ranks across all nodes (required)
+#   BIOM3_RANK_LAYOUT  tile (default) = 1 rank/tile, Stage 3 train + generate;
+#                      node = 1 rank/node with all 12 tiles, GDPO/GRPO
 #   PBS_NODEFILE       set by PBS; required for >1 node
 #   BIOM3_SIF          path to the .sif (default: ./biom3_xpu.sif)
 #   BIOM3_WEIGHTS_DIR  host weights dir bound to /app/weights (ro)
@@ -163,11 +170,37 @@ ENVS=(--env "ZE_FLAT_DEVICE_HIERARCHY=FLAT"
 
 [[ -n "${WANDB_API_KEY:-}" ]] && ENVS+=(--env "WANDB_API_KEY=${WANDB_API_KEY}")
 
-# ALCF-canonical 12-tile binding, matching launchers/aurora_multinode.sh.
-CPU_BIND_SCHEME="--cpu-bind=list:1-8:9-16:17-24:25-32:33-40:41-48:53-60:61-68:69-76:77-84:85-92:93-100"
-if [[ "${NGPU_PER_NODE}" != "12" ]]; then
-    echo "WARNING (apptainer_mpi_run.sh): NGPU_PER_NODE=${NGPU_PER_NODE} but the" \
-         "CPU_BIND list assumes 12 tiles per node. Adjust the list if needed." >&2
+# --- Rank layout ----------------------------------------------------------
+# Which of the two shapes on Aurora this run uses. The container equivalent of
+# the aurora_multinode.sh / aurora_multinode_rl.sh split.
+#
+#   tile (default)  one rank per tile, 12 per node, ALCF-canonical cpu-bind.
+#                   Stage 3 training, Stage 3 generation.
+#   node            one rank per NODE, no cpu-bind, all 12 tiles visible to that
+#                   rank. GDPO/GRPO: the trainer holds an in-process RolloutPool
+#                   that fans across local tiles via torch.xpu.device_count(),
+#                   so splitting the node into 12 ranks would give each of them
+#                   a pool of one.
+LAYOUT="${BIOM3_RANK_LAYOUT:-tile}"
+case "${LAYOUT}" in
+    tile|node) ;;
+    *) echo "ERROR: BIOM3_RANK_LAYOUT must be 'tile' or 'node' (got '${LAYOUT}')." >&2; exit 1 ;;
+esac
+
+CPU_BIND_SCHEME=()
+if [[ "${LAYOUT}" == "tile" ]]; then
+    # ALCF-canonical 12-tile binding, matching launchers/aurora_multinode.sh.
+    CPU_BIND_SCHEME=("--cpu-bind=list:1-8:9-16:17-24:25-32:33-40:41-48:53-60:61-68:69-76:77-84:85-92:93-100")
+    if [[ "${NGPU_PER_NODE}" != "12" ]]; then
+        echo "WARNING (apptainer_mpi_run.sh): NGPU_PER_NODE=${NGPU_PER_NODE} but the" \
+             "CPU_BIND list assumes 12 tiles per node. Adjust the list if needed." >&2
+    fi
+elif [[ "${NGPU_PER_NODE}" != "1" ]]; then
+    # Not a warning: >1 rank per node under this layout means several ranks each
+    # believe they own all 12 tiles, and they would collide on every one.
+    echo "ERROR: BIOM3_RANK_LAYOUT=node requires NGPU_PER_NODE=1" \
+         "(got ${NGPU_PER_NODE}); NGPU_TOTAL is then the node count." >&2
+    exit 1
 fi
 
 # -genv values configure the HOST launcher (Intel MPI), per the ALCF container
@@ -177,7 +210,8 @@ fi
 # NOTE: the recipe also sets ZE_AFFINITY_MASK=0..11. Do NOT copy that here:
 # backend/xpu.py resolves to xpu:0 whenever ZE_AFFINITY_MASK is set, so every
 # rank would land on tile 0.
-MPI_ARGS=(--envall -n "${NGPU_TOTAL}" --ppn "${NGPU_PER_NODE}" "${CPU_BIND_SCHEME}"
+MPI_ARGS=(--envall -n "${NGPU_TOTAL}" --ppn "${NGPU_PER_NODE}"
+          ${CPU_BIND_SCHEME[@]+"${CPU_BIND_SCHEME[@]}"}
           -genv I_MPI_HYDRA_BOOTSTRAP pmi
           -genv I_MPI_FABRICS ofi
           -genv I_MPI_OFI_PROVIDER "${BIOM3_FI_PROVIDER:-tcp}"
@@ -258,21 +292,37 @@ export LD_LIBRARY_PATH="/hostfabric:${LD_LIBRARY_PATH}"
 fi
 
 if [[ "${BIOM3_RANK_SOURCE:-pals}" == "mpi" ]]; then
-PRELUDE="cd /app
-${HOSTEVENT}${HOSTFABRIC}${SETVARS}"'source environment.sh >&2
-exec "$@"'
+    RANK_XLATE=""
 else
-PRELUDE="cd /app
-${HOSTEVENT}${HOSTFABRIC}${SETVARS}"'export RANK="${PALS_RANKID:?PALS_RANKID not set; was this launched by mpiexec?}"
+    RANK_XLATE='export RANK="${PALS_RANKID:?PALS_RANKID not set; was this launched by mpiexec?}"
 export LOCAL_RANK="${PALS_LOCAL_RANKID:?PALS_LOCAL_RANKID not set}"
 export LOCAL_WORLD_SIZE="${PALS_LOCAL_SIZE:?PALS_LOCAL_SIZE not set}"
 export WORLD_SIZE="${BIOM3_WORLD_SIZE:?BIOM3_WORLD_SIZE not set}"
 export GROUP_RANK=$(( RANK / LOCAL_WORLD_SIZE ))
 export NODE_RANK="${GROUP_RANK}"
 export TORCHELASTIC_RUN_ID="${TORCHELASTIC_RUN_ID:-biom3-mpi}"
-source environment.sh >&2
-exec "$@"'
+'
 fi
+
+# BIOM3_RANK_LAYOUT=node: the rank must see every local tile, and must not
+# inherit a 12-rank affinity mask. Mirrors launchers/aurora_multinode_rl.sh.
+LAYOUT_PRE=""
+LAYOUT_POST=""
+if [[ "${LAYOUT}" == "node" ]]; then
+    # backend/xpu.py resolves to xpu:0 whenever ZE_AFFINITY_MASK is set, so an
+    # inherited mask would pin the whole rollout pool to one tile.
+    LAYOUT_PRE='unset ZE_AFFINITY_MASK || true
+'
+    # After environment.sh, not before: that is what sets CCL_WORKER_AFFINITY,
+    # to a 12-slot mask built for 12 ranks x 8 cores. One rank inheriting all 12
+    # slots gets 12 oneCCL worker threads contending inside a single process.
+    LAYOUT_POST='unset CCL_WORKER_AFFINITY || true
+'
+fi
+
+PRELUDE="cd /app
+${HOSTEVENT}${HOSTFABRIC}${SETVARS}${LAYOUT_PRE}${RANK_XLATE}source environment.sh >&2
+${LAYOUT_POST}"'exec "$@"'
 
 # environment.sh runs inside each rank so BIOM3_MACHINE and the Aurora oneCCL
 # settings apply; the --env values above win over anything it sets.

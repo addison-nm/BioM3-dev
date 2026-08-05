@@ -8,7 +8,7 @@
 #
 # DESCRIPTION: Single-node wrapper for Stage 1 PenCL training. Dispatches
 #   to the machine-specific launcher under
-#   scripts/launchers/${BIOM3_MACHINE}_singlenode.sh.
+#   scripts/launchers/${BIOM3_LAUNCHER:-${BIOM3_MACHINE}}_singlenode.sh.
 #
 #   The JSON config provides model/training hyperparameters; per-job
 #   overrides (epochs, dataset_type, pfam_data_path, etc.) are passed via
@@ -44,7 +44,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # Resolve wandb (sets `wandb_resolved`; errors if --wandb True without API key)
 source "${SCRIPT_DIR}/_wandb_resolve.sh" "$@"
 MACHINE="${BIOM3_MACHINE:?BIOM3_MACHINE not set; source environment.sh first}"
-LAUNCHER="${SCRIPT_DIR}/launchers/${MACHINE}_singlenode.sh"
+LAUNCHER="${SCRIPT_DIR}/launchers/${BIOM3_LAUNCHER:-${MACHINE}}_singlenode.sh"
 
 if [ ! -x "${LAUNCHER}" ]; then
     echo "ERROR: no launcher for ${MACHINE} singlenode at ${LAUNCHER}"

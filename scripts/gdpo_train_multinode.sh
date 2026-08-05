@@ -16,7 +16,7 @@
 #   --rollout_devices auto is injected unless the caller overrides it,
 #   so each rank's RolloutPool spans all visible local tiles.
 #
-#   Dispatches to scripts/launchers/${BIOM3_MACHINE}_multinode_rl.sh.
+#   Dispatches to scripts/launchers/${BIOM3_LAUNCHER:-${BIOM3_MACHINE}}_multinode_rl.sh.
 #
 #   Requires: source environment.sh first so BIOM3_MACHINE is set.
 #   PBS_NODEFILE must be set by PBS at submission time.
@@ -50,7 +50,7 @@ export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=true
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 MACHINE="${BIOM3_MACHINE:?BIOM3_MACHINE not set; source environment.sh first}"
-LAUNCHER="${SCRIPT_DIR}/launchers/${MACHINE}_multinode_rl.sh"
+LAUNCHER="${SCRIPT_DIR}/launchers/${BIOM3_LAUNCHER:-${MACHINE}}_multinode_rl.sh"
 
 if [ ! -x "${LAUNCHER}" ]; then
     echo "ERROR: no RL multinode launcher for ${MACHINE} at ${LAUNCHER}"

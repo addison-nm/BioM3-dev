@@ -8,7 +8,7 @@
 #
 # DESCRIPTION: Multi-node wrapper for Stage 2 Facilitator training.
 #   Dispatches to the machine-specific launcher under
-#   scripts/launchers/${BIOM3_MACHINE}_multinode.sh. Mirrors
+#   scripts/launchers/${BIOM3_LAUNCHER:-${BIOM3_MACHINE}}_multinode.sh. Mirrors
 #   scripts/stage{1,3}_train_multinode.sh.
 #
 #   Requires: source environment.sh first so BIOM3_MACHINE is set.
@@ -41,7 +41,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # Resolve wandb (sets `wandb_resolved`; errors if --wandb True without API key)
 source "${SCRIPT_DIR}/_wandb_resolve.sh" "$@"
 MACHINE="${BIOM3_MACHINE:?BIOM3_MACHINE not set; source environment.sh first}"
-LAUNCHER="${SCRIPT_DIR}/launchers/${MACHINE}_multinode.sh"
+LAUNCHER="${SCRIPT_DIR}/launchers/${BIOM3_LAUNCHER:-${MACHINE}}_multinode.sh"
 
 if [ ! -x "${LAUNCHER}" ]; then
     echo "ERROR: no launcher for ${MACHINE} multinode at ${LAUNCHER}"

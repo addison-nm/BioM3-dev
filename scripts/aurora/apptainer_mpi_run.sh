@@ -127,7 +127,16 @@ ENVS=(--env "ZE_FLAT_DEVICE_HIERARCHY=FLAT"
       --env "FI_PROVIDER=${BIOM3_FI_PROVIDER:-tcp}"
       --env "I_MPI_PMI_LIBRARY=/hostlib/libpmix.so.2"
       --env "CCL_ZE_IPC_EXCHANGE=${BIOM3_CCL_ZE_IPC_EXCHANGE:-sockets}"
-      --env "CCL_ATL_TRANSPORT=${BIOM3_CCL_ATL_TRANSPORT:-ofi}")
+      --env "CCL_ATL_TRANSPORT=${BIOM3_CCL_ATL_TRANSPORT:-mpi}")
+
+# CCL_ATL_TRANSPORT=mpi (oneCCL's own default) rather than the ofi that ALCF's
+# recipe sets. Their recipe has no usable MPI inside the container, so oneCCL
+# must open libfabric providers itself; this image does have one, working over
+# cxi. Left on ofi, oneCCL opens its own providers and fails on cxi with
+#   fi_getinfo error: ret -61, providers 0 / can't create providers for name cxi
+# even with Cray's libfabric preloaded and fi_info -p cxi listing every domain --
+# it asks for capabilities the provider will not grant it. Riding the MPI that
+# already works sidesteps that entirely.
 
 # CCL_ZE_IPC_EXCHANGE=sockets is required on this path, not merely advisable.
 # oneCCL's default (pidfd) exchanges Level-Zero IPC handles with pidfd_getfd,

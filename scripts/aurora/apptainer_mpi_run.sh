@@ -229,7 +229,16 @@ HOSTEVENT='export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/hostevent"
 # libfabric at the host's provider plugins rather than the image's.
 HOSTFABRIC=""
 if [[ -n "${BIOM3_FABRIC_DIR:-}" ]]; then
-    HOSTFABRIC='export LD_LIBRARY_PATH="/hostfabric:${LD_LIBRARY_PATH}"
+    # LD_PRELOAD, not just LD_LIBRARY_PATH. pip's oneccl ships its own
+    # libfabric at /opt/venv/lib/libfabric.so.1 and finds it through RPATH,
+    # which LD_LIBRARY_PATH does not override -- so oneCCL kept loading a
+    # libfabric with no cxi provider and failed with
+    #   fi_getinfo error: ret -61, providers 0 / can't create providers for name cxi
+    # while Intel MPI, which honours I_MPI_OFI_LIBRARY_INTERNAL=0, was already
+    # using Cray's. Cray's libfabric needs libcxi.so.1, which lives in
+    # /usr/lib64 and so resolves through the /hostevent bind.
+    HOSTFABRIC='export LD_PRELOAD="/hostfabric/libfabric.so.1${LD_PRELOAD:+:${LD_PRELOAD}}"
+export LD_LIBRARY_PATH="/hostfabric:${LD_LIBRARY_PATH}"
 '
     # Only when the build uses loadable providers. The Cray build compiles cxi
     # in, and setting this to a directory without plugins hides the built-ins.

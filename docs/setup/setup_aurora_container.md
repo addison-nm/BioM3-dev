@@ -105,9 +105,16 @@ scripts/aurora/apptainer_run.sh scripts/stage3_train_singlenode.sh \
 ```
 
 `BIOM3_WEIGHTS_DIR` / `BIOM3_DATA_DIR` are bind sources, so they must exist on the
-node. The repo's own `weights/` and `data/` are the working default; pointing them
-at a share path that is not populated fails every rank at container creation with
-`mount source ... doesn't exist`, before any Python runs.
+node. Use the repo's own `weights/` and `data/`. Binding the shared copy directly
+needs its real layout — `BioM3-data-share/data/weights`, not
+`BioM3-data-share/weights` — and a path that does not exist fails every rank at
+container creation with `mount source ... doesn't exist`, before any Python runs.
+
+The repo's `weights/` and `data/` entries are absolute symlinks into
+`/lus/flare/projects/...`. Apptainer binds `/flare`, so if `/lus` is not visible
+inside the container those links dangle. Check with
+`apptainer_run.sh ls -lL /app/weights/<a file>`; if it fails, add
+`BIOM3_BIND_EXTRA=/lus`.
 
 Host dirs bind onto `/app/{weights,data,outputs}`; `outputs/` is writable, weights
 and data are read-only. See the script header for all `BIOM3_*` knobs.

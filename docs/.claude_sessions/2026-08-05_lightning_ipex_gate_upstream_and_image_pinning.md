@@ -126,9 +126,11 @@ the ecosystem `CLAUDE.md` machine table. That path is not populated. Because the
 `data/` are what work, which is what the multi-node example three sections lower already
 said. Fixed, with a note that these are bind sources.
 
-*Still open:* whether `/flare/NLDesignProtein/sharepoint/BioM3-data-share` exists at all
-decides whether the ecosystem `CLAUDE.md` Aurora row is wrong, or whether it is a real
-share this repo simply doesn't use.
+*Resolved:* the share exists and the ecosystem `CLAUDE.md` row is correct. The repo's
+`weights/`/`data/` entries are symlinks into it, and their targets show the real layout is
+`BioM3-data-share/**data**/weights/...`. The bad path was one level wrong, not fictional.
+Follow-on to verify: those symlinks are absolute into `/lus/flare/projects/...` while the
+wrapper binds `/flare`, so `/lus` may need `BIOM3_BIND_EXTRA`.
 
 **Apptainer scratch dirs.** The doc told you to put `APPTAINER_CACHEDIR` *and*
 `APPTAINER_TMPDIR` on `/flare`. They want opposite things: the cache benefits from Lustre's

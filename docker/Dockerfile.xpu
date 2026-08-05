@@ -105,9 +105,11 @@ RUN pip install --upgrade pip setuptools wheel
 RUN pip install torch==2.8.0 torchvision \
         --index-url https://download.pytorch.org/whl/xpu
 
-# IPEX is required by the addison-nm/lightning fork: its XPUAccelerator raises
-# ModuleNotFoundError unless intel_extension_for_pytorch>=1.13 is installed, and
-# its is_available() imports the module. BioM3's own code never imports it.
+# IPEX is not required by anything here — the lightning fork's XPUAccelerator
+# gate on intel_extension_for_pytorch was removed in addison-nm/lightning#1, and
+# BioM3's own code never imports it. It is retained because it is part of the
+# torch 2.8 stack this image was validated against; dropping it belongs with the
+# move to torch 2.10, not before it.
 # Only Intel's index carries the +xpu builds (PyPI ships CPU-only wheels).
 #
 # torch and torchvision are repeated here with explicit +xpu local versions.
@@ -126,9 +128,14 @@ RUN pip install intel-extension-for-pytorch==2.8.10+xpu \
 # setuptools<82 is required: the fork's setup.py imports pkg_resources, which
 # setuptools removed in 82.0.0, and --no-build-isolation makes it use the
 # setuptools installed here.
+#
+# Pinned to a commit: an unpinned branch makes the image unreproducible, and
+# Docker cannot tell that the branch moved, so it serves a stale cached layer
+# until something else invalidates it.
+ARG LIGHTNING_REF=5116b36e81d6be8d4c466179f3a47dd528d95c0f
 RUN pip install "setuptools<82" \
     && pip install --no-build-isolation \
-        "git+https://github.com/addison-nm/lightning.git"
+        "git+https://github.com/addison-nm/lightning.git@${LIGHTNING_REF}"
 
 # Requirements layer, cached independently of the source. aurora-container.txt
 # is the fully-pinned set for the container (the bare-metal requirements/aurora.txt

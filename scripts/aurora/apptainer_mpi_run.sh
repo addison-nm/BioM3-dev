@@ -99,7 +99,18 @@ ENVS=(--env "ZE_FLAT_DEVICE_HIERARCHY=FLAT"
       --env "CCL_ROOT=/opt/venv"
       --env "CCL_PROCESS_LAUNCHER=${BIOM3_CCL_LAUNCHER:-torchrun}"
       --env "FI_PROVIDER=${BIOM3_FI_PROVIDER:-tcp}"
-      --env "I_MPI_PMI_LIBRARY=/hostlib/libpmix.so.2")
+      --env "I_MPI_PMI_LIBRARY=/hostlib/libpmix.so.2"
+      --env "CCL_ZE_IPC_EXCHANGE=${BIOM3_CCL_ZE_IPC_EXCHANGE:-sockets}"
+      --env "CCL_ATL_TRANSPORT=${BIOM3_CCL_ATL_TRANSPORT:-ofi}")
+
+# CCL_ZE_IPC_EXCHANGE=sockets is required on this path, not merely advisable.
+# oneCCL's default (pidfd) exchanges Level-Zero IPC handles with pidfd_getfd,
+# which needs ptrace-level access to the peer process. Under apptainer_run.sh
+# every rank is a torchrun child inside ONE container, so that succeeds. Here
+# each rank is its own container with its own PID namespace and it is denied:
+#   pidfd_getfd failed: ... errno: Operation not permitted
+#   ze_fd_manager.cpp:390 convert_fd_pidfd
+# Sockets are the exchange ALCF's container recipe uses for the same reason.
 
 # LD_LIBRARY_PATH is deliberately NOT set with --env: that replaces the image's
 # own value rather than extending it, and on an oneAPI base that value carries

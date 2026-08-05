@@ -139,11 +139,13 @@ assert F is True and P is True, ('unpatched', F, P); \
 XPUAccelerator(); \
 print('both xpu accelerators patched; fabric devices:', num_xpu_devices())"
 
-# Drop pip's Intel MPI and oneCCL: the base already provides 2021.17 of both,
-# and two copies means the dynamic loader can mix versions across a single
-# library's dependencies. --no-deps on the reinstall keeps pip from pulling them
-# straight back in as transitive requirements.
-RUN pip uninstall -y impi-rt oneccl oneccl-devel 2>/dev/null || true
+# pip installs its own impi-rt and oneCCL alongside the base's, as transitive
+# dependencies of torch. That is fine here and deliberately left alone: with
+# torch 2.10 both resolve to 2021.17, matching the base, so the loader cannot mix
+# incompatible versions across one library's dependencies. It is only a problem
+# when the versions differ -- with torch 2.8 pip brought 2021.15 and mpi4py then
+# failed on MPIR_F_MPI_BUFFER_AUTOMATIC, which is part of why this image pins
+# 2.10. Uninstalling them does not stick; pip restores them on the next install.
 
 WORKDIR /app
 COPY requirements/ /app/requirements/

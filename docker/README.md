@@ -12,8 +12,12 @@ to run at `docker run` time. Built per architecture:
 > **ALCF HPC uses Apptainer, not `docker run`.** This CUDA image itself *does* run
 > on **Polaris** (NVIDIA) unchanged — converted to a `.sif` and launched with
 > `--nv`; see [`setup_polaris_container.md`](../docs/setup/setup_polaris_container.md).
-> **Aurora** is Intel/oneAPI, so it uses a separate XPU image (`Dockerfile.xpu`) —
-> see [`setup_aurora_container.md`](../docs/setup/setup_aurora_container.md). For the
+> **Aurora** is Intel/oneAPI and needs its own images — `Dockerfile.xpu` for
+> single node (run with `scripts/aurora/apptainer_run.sh`) and
+> `Dockerfile.xpu-oneapi` for multi-node (run with
+> `scripts/aurora/apptainer_mpi_run.sh`, which launches one container per rank
+> under the host `mpiexec`). See
+> [`setup_aurora_container.md`](../docs/setup/setup_aurora_container.md). For the
 > bare-metal HPC installs see [`setup_polaris.md`](../docs/setup/setup_polaris.md)
 > and [`setup_aurora.md`](../docs/setup/setup_aurora.md).
 

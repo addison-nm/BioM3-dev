@@ -96,7 +96,13 @@ mkdir -p "${O}"
 # /hostevent: host /usr/lib64, prepended to LD_LIBRARY_PATH for libevent, which
 #             PMIx links against. Prepending the whole directory is why this is
 #             scoped to a subdirectory rather than binding over /usr/lib64.
+# /lus alongside /flare: on Aurora /flare IS /lus/flare/projects, and the
+# weights/ and data/ trees are symlinks whose targets are spelled /lus/...
+# Binding only /flare leaves every one of them dangling inside the container --
+# which surfaces far from the cause, e.g. transformers reporting a local model
+# directory as a malformed Hub repo id.
 BINDS=("/flare" "${O}:/app/outputs" "${PMIX}:/hostlib/libpmix.so.2" "/usr/lib64:/hostevent")
+[[ -d /lus ]] && BINDS+=("/lus")
 
 # BIOM3_FABRIC_DIR binds a host libfabric over the container's, so cross-node
 # collectives can use Aurora's CXI provider instead of tcp, which otherwise caps

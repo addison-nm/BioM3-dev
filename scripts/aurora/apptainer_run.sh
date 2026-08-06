@@ -60,7 +60,13 @@ mkdir -p "${O}"
 # user bind remounts it `nodev`, so the GPU character devices become unusable
 # and torch.xpu.device_count() returns 0 (clinfo -l also comes back empty).
 BINDS=("${O}:/app/outputs")
+# /lus alongside /flare: on Aurora /flare IS /lus/flare/projects, and the
+# weights/ and data/ trees are symlinks whose targets are spelled /lus/...
+# Binding only /flare leaves every one of them dangling inside the container --
+# which surfaces far from the cause, e.g. transformers reporting a local model
+# directory as a malformed Hub repo id.
 [[ -d /flare ]] && BINDS+=("/flare")
+[[ -d /lus ]] && BINDS+=("/lus")
 [[ -n "${BIOM3_WEIGHTS_DIR:-}" ]] && BINDS+=("${BIOM3_WEIGHTS_DIR}:/app/weights:ro")
 [[ -n "${BIOM3_DATA_DIR:-}"    ]] && BINDS+=("${BIOM3_DATA_DIR}:/app/data:ro")
 [[ -n "${BIOM3_CONFIGS_DIR:-}" ]] && BINDS+=("${BIOM3_CONFIGS_DIR}:/app/configs:ro")

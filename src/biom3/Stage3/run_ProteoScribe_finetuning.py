@@ -105,22 +105,7 @@ def get_finetune_args(parser):
     parser.add_argument('--lora_unfreeze_y_mlp', default='True', type=str,
                         help='also train the y_mlp z_c-conditioning MLP')
 
-    # Conditioning blend: y = alpha * z_p + (1 - alpha) * z_c, alpha = weight on z_p
-    parser.add_argument('--train_alpha', default='zc', type=str,
-                        help="conditioning blend during training. 'zc' (default) "
-                             "= text only, 'zp' = sequence only, 'blend' = the "
-                             "per-example schedule {alpha=1: .25, alpha=0: .25, "
-                             "U(0,1): .5}, or a constant in [0, 1]. Anything "
-                             "putting weight on z_p precomputes z_p for every "
-                             "unique train/val sequence via PenCL's protein branch.")
-    parser.add_argument('--eval_alpha', default='spread', type=str,
-                        help="blend used for validation batches. 'spread' (default) "
-                             "gives each val example its own deterministic alpha "
-                             "covering [0, 1], so best-checkpoint selection reflects "
-                             "the whole operating range rather than one point. A "
-                             "constant ('zc', 'zp', or a number in [0, 1]) evaluates "
-                             "at a single alpha. Either way it is fixed across epochs; "
-                             "the 'blend' training schedule is not allowed here.")
+    # --train_alpha / --eval_alpha / --zp_path are defined in run_PL_training.get_args.
     parser.add_argument('--zp_batch_size', default=64, type=int,
                         help='batch size for the one-off z_p precompute pass')
     return parser
@@ -196,9 +181,6 @@ def _apply_finetune_arg_conversions(args):
         args.finetune_last_n_blocks = -1
     if args.finetune_last_n_layers == -2:
         args.finetune_last_n_layers = -1
-
-    args.train_alpha = PL_mod.normalize_alpha_spec(args.train_alpha)
-    args.eval_alpha = PL_mod.resolve_eval_alpha(args.eval_alpha)
 
     # LoRA options
     args.use_lora = base.str_to_bool(args.use_lora)

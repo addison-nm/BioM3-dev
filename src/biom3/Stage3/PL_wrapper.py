@@ -741,6 +741,91 @@ class PFamDataModule(pl.LightningDataModule):
             shuffle=False,
         )
 
+ALPHA_BLEND = "blend"
+EVAL_SPREAD = "spread"
+_ALPHA_ALIASES = {"zc": 0.0, "zp": 1.0}
+
+
+def normalize_alpha_spec(value):
+    """Normalize an alpha spec to a float in [0, 1] or the string ``"blend"``.
+
+    alpha is the weight on z_p in ``y = alpha * z_p + (1 - alpha) * z_c``.
+    Accepts the names ``zc`` / ``zp`` / ``blend``, or any numeric literal in
+    [0, 1] for a constant blend.
+    """
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if text == ALPHA_BLEND:
+            return ALPHA_BLEND
+        if text in _ALPHA_ALIASES:
+            return _ALPHA_ALIASES[text]
+        try:
+            value = float(text)
+        except ValueError:
+            raise ValueError(
+                f"train_alpha must be 'zc', 'zp', 'blend', or a number in "
+                f"[0, 1] (the weight on z_p); got {value!r}"
+            ) from None
+    value = float(value)
+    if not 0.0 <= value <= 1.0:
+        raise ValueError(
+            f"a constant train_alpha must be in [0, 1]; got {value}"
+        )
+    return value
+
+
+def resolve_eval_alpha(value):
+    """Normalize a validation-alpha spec to a float in [0, 1] or ``"spread"``.
+
+    ``"spread"`` assigns each validation example its own alpha, deterministically
+    (see :func:`deterministic_alpha`), so the metric covers the whole [0, 1]
+    operating range instead of a single point. A constant is still allowed for
+    targeted evaluation at one alpha. The ``"blend"`` *training* schedule is
+    rejected: it resamples per batch, which would make val loss — and therefore
+    best-checkpoint selection — jitter epoch to epoch.
+    """
+    if isinstance(value, str) and value.strip().lower() == EVAL_SPREAD:
+        return EVAL_SPREAD
+    spec = normalize_alpha_spec(value)
+    if spec == ALPHA_BLEND:
+        raise ValueError(
+            "eval_alpha must be 'spread', 'zc', 'zp', or a constant in [0, 1]; "
+            "not the 'blend' training schedule (a resampled validation alpha "
+            "makes val loss incomparable across epochs)."
+        )
+    return float(spec)
+
+
+def deterministic_alpha(key: str) -> float:
+    """A stable pseudo-random alpha in [0, 1) for a string key.
+
+    Keyed on the sequence so the same example always draws the same alpha —
+    across epochs, processes, and DDP ranks — which is what keeps the spread
+    validation metric comparable epoch to epoch. ``hash()`` is unsuitable here:
+    it is salted per interpreter run.
+    """
+    digest = hashlib.sha1(key.encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big") / float(1 << 64)
+
+
+def alpha_spec_uses_zp(spec) -> bool:
+    """Whether a normalized alpha spec ever puts weight on z_p."""
+    return spec == ALPHA_BLEND or float(spec) > 0.0
+
+
+def sample_blend_alpha(n, device=None):
+    """Rama's train_blend schedule {alpha=1: .25, alpha=0: .25, U(0,1): .5}.
+
+    Returns weights on z_p shaped ``[n, 1]``. Shared by both training paths so
+    the HDF5 and generalized finetuning runs draw from the same distribution.
+    """
+    r = torch.rand(n, device=device)
+    a = torch.rand(n, device=device)
+    a = torch.where(r < 0.25, torch.ones_like(a), a)
+    a = torch.where(r >= 0.75, torch.zeros_like(a), a)
+    return a.view(n, 1)
+
+
 class HDF5Dataset(torch.utils.data.Dataset):
     """
     PyTorch Dataset for protein sequences stored in HDF5 format.
@@ -758,15 +843,23 @@ class HDF5Dataset(torch.utils.data.Dataset):
     Note: This dataset keeps the HDF5 file open during its lifetime, so it's
     important to call the close() method when done to release resources.
     """
-    def __init__(self, args, file_path, group_name):
+    def __init__(self, args, file_path, group_name, zp_path=None,
+                 train_alpha=0.0, eval_alpha=EVAL_SPREAD):
         """
         Initialize the HDF5 protein dataset.
-        
+
         Args:
             args: Configuration object containing preprocessing parameters
             file_path: Path to the HDF5 file containing protein data
             group_name: Name of the group within the HDF5 file to access
                        (e.g., 'MMD_data' or 'MSE_data')
+            zp_path: Stage 2 Facilitator output (.pt) holding the z_p rows this
+                       HDF5 was compiled from. Required when train_alpha puts
+                       any weight on z_p.
+            train_alpha: Weight on z_p for training rows — 'zc', 'zp', 'blend',
+                       or a constant in [0, 1]
+            eval_alpha: Weight on z_p for rows registered by set_eval_indices —
+                       'spread' or a constant in [0, 1]
         """
         self.file_path = file_path
         self.f = h5py.File(file_path, 'r')
@@ -776,7 +869,82 @@ class HDF5Dataset(torch.utils.data.Dataset):
         # Store data as attributes for easier access
         self.tensor_data = self.group["text_to_protein_embedding"]
         self.sequences = self.group["sequence"]
-        
+        self.train_alpha = normalize_alpha_spec(train_alpha)
+        self.eval_alpha = resolve_eval_alpha(eval_alpha)
+        self._eval_indices = frozenset()
+        self.z_p = None
+        if alpha_spec_uses_zp(self.train_alpha):
+            if zp_path is None:
+                raise ValueError(
+                    "train_alpha puts weight on z_p, so zp_path is required: "
+                    "pass the Stage 2 Facilitator .pt this HDF5 was compiled "
+                    "from"
+                )
+            self.z_p = self._load_zp(zp_path)
+
+    def _load_zp(self, zp_path):
+        """Load z_p and check it is row-aligned with this HDF5.
+
+        biom3_compile_hdf5 copies the Facilitator .pt through row for row, so
+        row i of z_p pairs with row i here — but only for the .pt this file was
+        actually compiled from. A different run has the same shape and would
+        pair z_p and z_c from unrelated proteins with nothing to signal it.
+        """
+        from biom3.split import manifest as split_manifest
+
+        payload = torch.load(zp_path, weights_only=False)
+        if 'z_p' not in payload:
+            raise KeyError(
+                f"{zp_path} has no 'z_p' key (keys: {sorted(payload)}); it "
+                f"should be the .pt written by biom3_Facilitator_sample"
+            )
+        z_p = payload['z_p'].cpu().float()
+        if z_p.shape[0] != len(self):
+            raise ValueError(
+                f"z_p has {z_p.shape[0]} rows but {self.file_path} has "
+                f"{len(self)}; they must be row-aligned to blend"
+            )
+        if 'sequence' in payload:
+            theirs = split_manifest.compute_fingerprint(payload['sequence'])
+            ours = split_manifest.compute_fingerprint(self.sequences)
+            if theirs != ours:
+                raise ValueError(
+                    f"{zp_path} does not match {self.file_path} (sequence "
+                    f"fingerprint {theirs} vs {ours}); z_p must come from the "
+                    f"Facilitator run this HDF5 was compiled from"
+                )
+        else:
+            logger.warning(
+                "%s carries no 'sequence' key, so z_p alignment was checked on "
+                "row count alone", zp_path)
+        logger.info("Loaded z_p from %s: %d rows, dim %d",
+                    zp_path, z_p.shape[0], z_p.shape[1])
+        return z_p
+
+    def set_eval_indices(self, indices):
+        """Mark the rows served to validation.
+
+        Train and val are Subsets over one shared dataset instance, so the row
+        itself has to know which split it belongs to: without this every val
+        access would redraw a random alpha and val loss would stop being
+        comparable across epochs.
+        """
+        self._eval_indices = frozenset(int(i) for i in indices)
+
+    def _sequence_str(self, idx):
+        seq = self.sequences[idx]
+        return seq.decode() if isinstance(seq, bytes) else str(seq)
+
+    def _alpha_for(self, idx):
+        """Weight on z_p for one row."""
+        if idx in self._eval_indices:
+            if self.eval_alpha == EVAL_SPREAD:
+                return deterministic_alpha(self._sequence_str(idx))
+            return float(self.eval_alpha)
+        if self.train_alpha == ALPHA_BLEND:
+            return float(sample_blend_alpha(1).item())
+        return float(self.train_alpha)
+
     def get_sequence_lengths(self):
         """
         Retrieve the lengths of all sequences in the dataset.
@@ -821,6 +989,9 @@ class HDF5Dataset(torch.utils.data.Dataset):
                 sequences=self.sequences[idx]
             )[0]
         )
+        if self.z_p is not None:
+            a = self._alpha_for(idx)
+            z_c = a * self.z_p[idx] + (1.0 - a) * z_c
         # Return a dictionary containing your data
         return (
             x_p, # sequence
@@ -864,6 +1035,9 @@ class HDF5DataModule(pl.LightningDataModule):
         secondary_paths=None,
         group_name='data',
         split_manifest_path=None,
+        zp_path=None,
+        train_alpha=0.0,
+        eval_alpha=EVAL_SPREAD,
         # Deprecated aliases
         swissprot_path=None,
         pfam_path=None,
@@ -887,6 +1061,9 @@ class HDF5DataModule(pl.LightningDataModule):
         self.secondary_paths = secondary_paths or []
         self.group_name = group_name
         self.split_manifest_path = split_manifest_path
+        self.zp_path = zp_path
+        self.train_alpha = normalize_alpha_spec(train_alpha)
+        self.eval_alpha = resolve_eval_alpha(eval_alpha)
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.valid_size = valid_size
@@ -901,6 +1078,14 @@ class HDF5DataModule(pl.LightningDataModule):
         if self.primary_path is not None:
             all_paths.append(self.primary_path)
         all_paths.extend(self.secondary_paths)
+
+        if alpha_spec_uses_zp(self.train_alpha) and len(all_paths) > 1:
+            raise ValueError(
+                f"z_p blending supports a single HDF5 (primary_path); got "
+                f"{len(all_paths)} paths. The secondary sources have no z_p of "
+                f"their own, so they would train on pure z_c while the primary "
+                f"blends."
+            )
 
         manifest = None
         if self.split_manifest_path is not None:
@@ -920,6 +1105,9 @@ class HDF5DataModule(pl.LightningDataModule):
                 args=self.args,
                 file_path=path,
                 group_name=self.group_name,
+                zp_path=self.zp_path if file_index == 0 else None,
+                train_alpha=self.train_alpha if file_index == 0 else 0.0,
+                eval_alpha=self.eval_alpha,
             )
             test_idx = []
             if manifest is not None:
@@ -935,6 +1123,7 @@ class HDF5DataModule(pl.LightningDataModule):
                 train_idx, val_idx = self.split_indices(dataset)
             train_idx = self.filter_by_sequence_length(dataset, train_idx)
             val_idx = self.filter_by_sequence_length(dataset, val_idx)
+            dataset.set_eval_indices(val_idx)
             train_datasets.append(Subset(dataset, train_idx))
             val_datasets.append(Subset(dataset, val_idx))
             self.split_info.append({
@@ -1043,78 +1232,6 @@ class HDF5DataModule(pl.LightningDataModule):
 HDF5_PFamDataModule = HDF5DataModule
 
 
-ALPHA_BLEND = "blend"
-EVAL_SPREAD = "spread"
-_ALPHA_ALIASES = {"zc": 0.0, "zp": 1.0}
-
-
-def normalize_alpha_spec(value):
-    """Normalize an alpha spec to a float in [0, 1] or the string ``"blend"``.
-
-    alpha is the weight on z_p in ``y = alpha * z_p + (1 - alpha) * z_c``.
-    Accepts the names ``zc`` / ``zp`` / ``blend``, or any numeric literal in
-    [0, 1] for a constant blend.
-    """
-    if isinstance(value, str):
-        text = value.strip().lower()
-        if text == ALPHA_BLEND:
-            return ALPHA_BLEND
-        if text in _ALPHA_ALIASES:
-            return _ALPHA_ALIASES[text]
-        try:
-            value = float(text)
-        except ValueError:
-            raise ValueError(
-                f"train_alpha must be 'zc', 'zp', 'blend', or a number in "
-                f"[0, 1] (the weight on z_p); got {value!r}"
-            ) from None
-    value = float(value)
-    if not 0.0 <= value <= 1.0:
-        raise ValueError(
-            f"a constant train_alpha must be in [0, 1]; got {value}"
-        )
-    return value
-
-
-def resolve_eval_alpha(value):
-    """Normalize a validation-alpha spec to a float in [0, 1] or ``"spread"``.
-
-    ``"spread"`` assigns each validation example its own alpha, deterministically
-    (see :func:`deterministic_alpha`), so the metric covers the whole [0, 1]
-    operating range instead of a single point. A constant is still allowed for
-    targeted evaluation at one alpha. The ``"blend"`` *training* schedule is
-    rejected: it resamples per batch, which would make val loss — and therefore
-    best-checkpoint selection — jitter epoch to epoch.
-    """
-    if isinstance(value, str) and value.strip().lower() == EVAL_SPREAD:
-        return EVAL_SPREAD
-    spec = normalize_alpha_spec(value)
-    if spec == ALPHA_BLEND:
-        raise ValueError(
-            "eval_alpha must be 'spread', 'zc', 'zp', or a constant in [0, 1]; "
-            "not the 'blend' training schedule (a resampled validation alpha "
-            "makes val loss incomparable across epochs)."
-        )
-    return float(spec)
-
-
-def deterministic_alpha(key: str) -> float:
-    """A stable pseudo-random alpha in [0, 1) for a string key.
-
-    Keyed on the sequence so the same example always draws the same alpha —
-    across epochs, processes, and DDP ranks — which is what keeps the spread
-    validation metric comparable epoch to epoch. ``hash()`` is unsuitable here:
-    it is salted per interpreter run.
-    """
-    digest = hashlib.sha1(key.encode("utf-8")).digest()
-    return int.from_bytes(digest[:8], "big") / float(1 << 64)
-
-
-def alpha_spec_uses_zp(spec) -> bool:
-    """Whether a normalized alpha spec ever puts weight on z_p."""
-    return spec == ALPHA_BLEND or float(spec) > 0.0
-
-
 class PL_ProtARDM_Finetune(PL_ProtARDM):
     """ProteoScribe finetuning module that embeds text prompts to z_c on-device.
 
@@ -1145,13 +1262,7 @@ class PL_ProtARDM_Finetune(PL_ProtARDM):
         """Per-example weight on z_p for a *training* batch, shaped ``[n, 1]``."""
         if self.train_alpha != ALPHA_BLEND:
             return torch.full((n, 1), float(self.train_alpha), device=device)
-
-        # Rama's train_blend schedule: {alpha=1: .25, alpha=0: .25, U(0,1): .5}
-        r = torch.rand(n, device=device)
-        a = torch.rand(n, device=device)
-        a = torch.where(r < 0.25, torch.ones_like(a), a)
-        a = torch.where(r >= 0.75, torch.zeros_like(a), a)
-        return a.view(n, 1)
+        return sample_blend_alpha(n, device=device)
 
     def _eval_alpha(self, sequences, device):
         """Per-example weight on z_p for a *validation* batch, shaped ``[n, 1]``.

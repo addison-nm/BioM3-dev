@@ -122,6 +122,7 @@ Generates protein sequences from facilitated embeddings via diffusion sampling. 
 | `--token_strategy` | str | None | One of `sample` (Gumbel-max, default) or `argmax` (deterministic). |
 | `--pre_unmask` | flag | False | Start diffusion from a partially-unmasked state. Requires `--pre_unmask_config`. |
 | `--pre_unmask_config` | str | None | Path to JSON describing the pre-unmask strategy. |
+| `--alpha` | float | 0.0 | Weight on `z_p` when conditioning: `y = alpha * z_p + (1 - alpha) * z_c`. `0` (default) is text-only. Anything above 0 requires `z_p` in `--input_path`, which Stage 1 emits and Stage 2 preserves. Only meaningful for a model trained with a matching blend — see [Conditioning blend](#conditioning-blend-alpha). |
 
 #### Optional arguments — output
 
@@ -302,6 +303,9 @@ The argparser is the largest in the project (70+ flags across `get_args`, `get_m
 | `--secondary_data_paths` | str (n+) | None | One or more secondary HDF5 dataset paths. |
 | `--training_strategy` | str | `auto` | One of `auto`, `primary_only`, `combine`. |
 | `--start_secondary` | str | `'False'` | `'True'`/`'False'`. Phase transition: load primary weights, then train on combined data. |
+| `--train_alpha` | str | `zc` | Conditioning blend during training. See [Conditioning blend](#conditioning-blend-alpha). |
+| `--eval_alpha` | str | `spread` | Conditioning blend for validation batches. |
+| `--zp_path` | str | None | Facilitator `.pt` holding `z_p` row-aligned with `--primary_data_path`. Required when `--train_alpha` puts weight on `z_p`. |
 | `--epochs` | int | 1 | Used in `primary_only` mode. |
 | `--max_steps` | int | 100000 | Used in `combine` mode. |
 | `--val_check_interval` | int | 10000 | Steps between validations (step-based mode). |
@@ -329,6 +333,32 @@ The argparser is the largest in the project (70+ flags across `get_args`, `get_m
 | `--output_root` | str | None | Base output directory. |
 
 Run `biom3_train_stage3 --help` for the full list, including model-architecture flags (`--diffusion_steps`, `--transformer_blocks`, etc.) and benchmark flags (`--save_benchmark`, `--benchmark_per_step`).
+
+#### Conditioning blend (alpha)
+
+ProteoScribe is conditioned on `z_c`, the text embedding from Stage 2. The blend instead conditions on
+
+```
+y = alpha * z_p + (1 - alpha) * z_c
+```
+
+where `z_p` is PenCL's protein-branch embedding of the sequence itself. Both live in the same joint space, so the convex combination is meaningful. `alpha` is always the weight on `z_p`: `alpha=0` is the default text-only behaviour, `alpha=1` conditions on the sequence alone. Training across a range of alpha teaches the model to accept either kind of conditioning at generation time, which `biom3_ProteoScribe_sample --alpha` then selects.
+
+`--train_alpha` accepts:
+
+| Value | Meaning |
+|---|---|
+| `zc` (default) | Text only — no `z_p` is loaded and nothing changes from a run without the flag. |
+| `zp` | Sequence only. |
+| `blend` | Per-example schedule: `alpha=1` w.p. .25, `alpha=0` w.p. .25, `U(0,1)` otherwise. |
+| a number in `[0, 1]` | A constant blend. `0.5` means exactly 0.5, not the schedule. |
+
+`--eval_alpha` takes the same values except `blend`, plus `spread` (the default): each validation example draws its own alpha deterministically from a hash of its sequence, so the metric covers the whole operating range while staying identical across epochs, DDP ranks, and batchings. Best-checkpoint selection then reflects the range rather than a single point. The `blend` schedule is rejected here because a resampled validation alpha makes val loss incomparable epoch to epoch.
+
+The two entrypoints obtain `z_p` differently:
+
+- `biom3_train_stage3` reads it from `--zp_path`, the Stage 2 Facilitator `.pt` that `biom3_compile_hdf5` built `--primary_data_path` from. Rows must correspond one-to-one; the row count and a sequence fingerprint are both checked at setup, so a `.pt` from a different Facilitator run fails loudly instead of pairing unrelated proteins. Blending requires a single HDF5 — secondary sources have no `z_p` of their own.
+- `biom3_finetune_stage3` needs no `--zp_path`: it precomputes `z_p` for every unique train/val sequence through PenCL's frozen protein branch (`--pencl_weights`, batched by `--zp_batch_size`) and releases ESM-2 afterwards.
 
 #### Example: pretrain from scratch
 
@@ -396,8 +426,9 @@ This entrypoint is always finetuning: it loads pretrained ProteoScribe weights o
 | `--lora_dropout` | `0.05` | LoRA dropout |
 | `--lora_target_patterns` | `.fn.to_q,.fn.to_v` | Module-name patterns to wrap with LoRA |
 | `--lora_unfreeze_y_mlp` | `True` | Also unfreeze the conditioning MLP |
-| `--train_alpha` | `zc` | Conditioning blend at train time (`zc`, `zp`, or a blend) |
-| `--eval_alpha` | `spread` | Conditioning blend at eval time |
+| `--train_alpha` | `zc` | Conditioning blend at train time. Shared with `biom3_train_stage3` — see [Conditioning blend](#conditioning-blend-alpha). |
+| `--eval_alpha` | `spread` | Conditioning blend for validation batches. |
+| `--zp_batch_size` | `64` | Batch size for the one-off `z_p` precompute (needs `--pencl_weights`). |
 
 #### Example
 

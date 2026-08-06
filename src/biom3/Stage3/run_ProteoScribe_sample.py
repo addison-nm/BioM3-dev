@@ -730,7 +730,7 @@ def blend_conditioning(embedding_dataset, alpha):
         raise KeyError(
             "alpha > 0 requires z_p in the embedding file; regenerate Stage 2 "
             "(the saved dict should carry z_t/z_p/z_c)")
-    y = alpha * embedding_dataset['z_p'] + (1.0 - alpha) * z_c
+    y = alpha * embedding_dataset['z_p'].to(z_c.device) + (1.0 - alpha) * z_c
     return y
 
 def main(args, _setup_logging=True):

@@ -261,7 +261,16 @@ def get_args(parser):
                              'layers).')
     parser.add_argument('--finetune_output_layers', default="True", type=str,
                         help='Whether to finetune the transformer output layers (norm and out)')
-
+    # alpha parameters 
+    parser.add_argument('--train_alpha', default='0', type=str,
+                        help="'0' = pure z_c (text, default), "
+                             "'1' = pure z_p (sequence), "
+                             "anything else = blend schedule {1:.25, 0:.25, U(0,1):.5}")
+    parser.add_argument('--zp_path', default=None, type=str,
+                        help='Stage 2 Facilitator output (*.Facilitator_emb.pt) holding '
+                             'z_p row-aligned with --primary_data_path. Required when '
+                             '--train_alpha is not 0. Ignored by the generalized '
+                             'finetuning entrypoint, which derives z_p from sequences.')
     # diffusion param
     parser.add_argument('--diffusion_steps', default=256, type=int,
                         help='number of timesteps, should be as long as the sequence')
@@ -1078,6 +1087,8 @@ def apply_arg_type_conversions(args):
     # New generalized dataset args
     args.primary_data_path = nonestr_to_none(args.primary_data_path)
     args.split_manifest_path = nonestr_to_none(getattr(args, 'split_manifest_path', None))
+    args.zp_path = nonestr_to_none(getattr(args, 'zp_path', None))
+    args.train_alpha = str(getattr(args, 'train_alpha', '0'))
     args.start_secondary = str_to_bool(args.start_secondary)
 
     # Map deprecated aliases to new names
@@ -1169,6 +1180,8 @@ def load_data(
         secondary_paths=secondary_data_paths,
         group_name=facilitator + '_data',
         split_manifest_path=getattr(args, 'split_manifest_path', None),
+        zp_path=getattr(args, 'zp_path', None),
+        train_alpha=getattr(args, 'train_alpha', '0')
     )
     data_module.setup()
     return data_module
@@ -1791,6 +1804,9 @@ def _write_build_manifest(args, artifacts_dir, checkpoint_dir, PL_model,
         "acc_grad_batches": args.acc_grad_batches,
         "distributed_strategy": args.distributed_strategy,
     }
+
+    outputs["train_alpha"] = args.train_alpha
+
     if args.distributed_strategy == "deepspeed_zero2":
         outputs["deepspeed_stage"] = "2"
     outputs["training_strategy"] = args.training_strategy

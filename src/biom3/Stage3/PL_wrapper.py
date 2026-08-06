@@ -88,6 +88,22 @@ def _make_distributed_sampler(dataset, *, shuffle: bool, seed: int):
         )
     return None
 
+def sample_alpha(n, device, mode):
+    """rama train_blend schedule {1:.25, 0:.25, U(0,1):.5}
+    0 = pure z_c, 1 = pure z_p, else the blend
+    """
+    mode = str(mode)
+    if mode == '0':
+        return torch.zeros(n, 1, device=device)
+    if mode == '1':
+        return torch.ones(n, 1, device=device)
+
+    r = torch.rand(n, device=device)
+    a = torch.rand(n, device=device)
+    a = torch.where(r < 0.25, torch.ones_like(a),  a)
+    a = torch.where(r >= 0.75, torch.zeros_like(a), a)
+    return a.view(n, 1)
+
 
 class PL_ProtARDM(pl.LightningModule):
     """
@@ -757,7 +773,7 @@ class HDF5Dataset(torch.utils.data.Dataset):
     Note: This dataset keeps the HDF5 file open during its lifetime, so it's
     important to call the close() method when done to release resources.
     """
-    def __init__(self, args, file_path, group_name):
+    def __init__(self, args, file_path, group_name, zp_path=None, train_alpha='0'):
         """
         Initialize the HDF5 protein dataset.
         
@@ -775,6 +791,10 @@ class HDF5Dataset(torch.utils.data.Dataset):
         # Store data as attributes for easier access
         self.tensor_data = self.group["text_to_protein_embedding"]
         self.sequences = self.group["sequence"]
+        self.train_alpha = str(train_alpha)
+        self.z_p = None 
+        if self.train_alpha != '0':
+            self.z_p = torch.load(zp_path, weights_only=False)['z_p'].cpu().float()
         
     def get_sequence_lengths(self):
         """
@@ -820,6 +840,9 @@ class HDF5Dataset(torch.utils.data.Dataset):
                 sequences=self.sequences[idx]
             )[0]
         )
+        if self.z_p is not None:
+            a = sample_alpha(1, 'cpu', self.train_alpha).item()
+            z_c = a * self.z_p[idx] + (1.0 - a) * z_c
         # Return a dictionary containing your data
         return (
             x_p, # sequence
@@ -863,6 +886,8 @@ class HDF5DataModule(pl.LightningDataModule):
         secondary_paths=None,
         group_name='data',
         split_manifest_path=None,
+        zp_path = None,
+        train_alpha='0',
         # Deprecated aliases
         swissprot_path=None,
         pfam_path=None,
@@ -886,6 +911,8 @@ class HDF5DataModule(pl.LightningDataModule):
         self.secondary_paths = secondary_paths or []
         self.group_name = group_name
         self.split_manifest_path = split_manifest_path
+        self.zp_path = zp_path
+        self.train_alpha = str(train_alpha)
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.valid_size = valid_size
@@ -901,6 +928,12 @@ class HDF5DataModule(pl.LightningDataModule):
             all_paths.append(self.primary_path)
         all_paths.extend(self.secondary_paths)
 
+        if self.train_alpha != '0' and len(all_paths) > 1:
+            raise ValueError(
+                "train_alpha != '0' supports a single HDF5 (primary_data_path); "
+                f"got {len(all_paths)} paths. Secondary data would silently train "
+                "on pure z_c while the primary blends."
+            )
         manifest = None
         if self.split_manifest_path is not None:
             from biom3.split import manifest as split_manifest
@@ -919,6 +952,8 @@ class HDF5DataModule(pl.LightningDataModule):
                 args=self.args,
                 file_path=path,
                 group_name=self.group_name,
+                zp_path=self.zp_path if file_index == 0 else None,
+                train_alpha=self.train_alpha if file_index == 0 else '0'
             )
             test_idx = []
             if manifest is not None:
@@ -1065,19 +1100,6 @@ class PL_ProtARDM_Finetune(PL_ProtARDM):
         self._embedder_ref = [embedder]
         self.zp_lookup = zp_lookup
         self.train_alpha = str(train_alpha)
-
-    def _sample_alpha(self, n, device):
-        """Rama train_blend schedule {1:.25, 0:.25, U(0,1):.5}; weight on z_p."""
-        if self.train_alpha == '0':
-            return torch.zeros(n, 1, device=device)
-        if self.train_alpha == '1':
-            return torch.ones(n, 1, device=device)
-
-        r = torch.rand(n, device=device)
-        a = torch.rand(n, device=device)
-        a = torch.where(r < 0.25, torch.ones_like(a),  a)
-        a = torch.where(r >= 0.75, torch.zeros_like(a), a)
-        return a.view(n, 1)
 
     @property
     def embedder(self):

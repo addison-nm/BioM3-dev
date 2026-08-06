@@ -278,7 +278,7 @@ def load_model(args, data_module, stage1_args, stage2_args):
             device=args.device,
         )  
         seqs = data_module.unique_sequences()
-        z_p = zp_embedder.embed_protein([s.replace('-', '') for s in seqs], device=args.device)
+        z_p = zp_embedder.embed_protein(seqs, device=args.device)
         zp_lookup = dict(zip(seqs, z_p))
         del zp_embedder
 

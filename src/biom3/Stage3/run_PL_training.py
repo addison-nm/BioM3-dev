@@ -883,6 +883,21 @@ def save_model(
             expected_dtype=PL_model.dtype,
         )
 
+        # No checkpoint at all: the monitored metric never fired, so
+        # ModelCheckpoint saved nothing. The best-artifact sync above already
+        # skips in that case; without the same guard here a run that trained to
+        # completion dies in post-processing on a last.ckpt that was never
+        # written, losing the whole run over a missing side artifact.
+        if not os.path.exists(last_ckpt_fpath):
+            logger.warning(
+                "Skipping last-artifact sync: no checkpoint at %s. Nothing was "
+                "saved this run -- the monitored metric never produced a value "
+                "(e.g. validation did not run). Enable a periodic checkpoint "
+                "(--checkpoint_every_n_epochs) or ensure validation runs.",
+                last_ckpt_fpath,
+            )
+            return
+
         # Check whether last and best point to the same checkpoint
         # (last.ckpt is a symlink when save_last="link")
         last_real = os.path.realpath(last_ckpt_fpath)

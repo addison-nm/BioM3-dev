@@ -225,6 +225,26 @@ def get_args(parser):
                         help='path to a curated train/val/test split manifest '
                              '(from biom3_cluster_split). When set, the random '
                              '80/20 split is bypassed and the test split is held out.')
+    # Conditioning blend: y = alpha * z_p + (1 - alpha) * z_c, alpha = weight on z_p
+    parser.add_argument('--train_alpha', default='zc', type=str,
+                        help="conditioning blend during training. 'zc' (default) "
+                             "= text only, 'zp' = sequence only, 'blend' = the "
+                             "per-example schedule {alpha=1: .25, alpha=0: .25, "
+                             "U(0,1): .5}, or a constant in [0, 1].")
+    parser.add_argument('--eval_alpha', default='spread', type=str,
+                        help="blend used for validation batches. 'spread' (default) "
+                             "gives each val example its own deterministic alpha "
+                             "covering [0, 1], so best-checkpoint selection reflects "
+                             "the whole operating range rather than one point. A "
+                             "constant ('zc', 'zp', or a number in [0, 1]) evaluates "
+                             "at a single alpha. Either way it is fixed across epochs; "
+                             "the 'blend' training schedule is not allowed here.")
+    parser.add_argument('--zp_path', default=None, type=str,
+                        help='Stage 2 Facilitator output (.pt) holding z_p row-aligned '
+                             'with --primary_data_path. Required by biom3_train_stage3 '
+                             'when --train_alpha puts weight on z_p. Ignored by '
+                             'biom3_finetune_stage3, which precomputes z_p for every '
+                             "unique train/val sequence via PenCL's protein branch.")
     # Deprecated aliases (mapped to primary/secondary in retrieve_all_args)
     parser.add_argument('--swissprot_data_root', default='None', type=str,
                         help='(deprecated, use --primary_data_path) path to SwissProt data')
@@ -883,6 +903,21 @@ def save_model(
             expected_dtype=PL_model.dtype,
         )
 
+        # No checkpoint at all: the monitored metric never fired, so
+        # ModelCheckpoint saved nothing. The best-artifact sync above already
+        # skips in that case; without the same guard here a run that trained to
+        # completion dies in post-processing on a last.ckpt that was never
+        # written, losing the whole run over a missing side artifact.
+        if not os.path.exists(last_ckpt_fpath):
+            logger.warning(
+                "Skipping last-artifact sync: no checkpoint at %s. Nothing was "
+                "saved this run -- the monitored metric never produced a value "
+                "(e.g. validation did not run). Enable a periodic checkpoint "
+                "(--checkpoint_every_n_epochs) or ensure validation runs.",
+                last_ckpt_fpath,
+            )
+            return
+
         # Check whether last and best point to the same checkpoint
         # (last.ckpt is a symlink when save_last="link")
         last_real = os.path.realpath(last_ckpt_fpath)
@@ -1080,6 +1115,11 @@ def apply_arg_type_conversions(args):
     args.split_manifest_path = nonestr_to_none(getattr(args, 'split_manifest_path', None))
     args.start_secondary = str_to_bool(args.start_secondary)
 
+    # Conditioning blend (idempotent, so entrypoints may re-normalize)
+    args.zp_path = nonestr_to_none(getattr(args, 'zp_path', None))
+    args.train_alpha = PL_mod.normalize_alpha_spec(getattr(args, 'train_alpha', 'zc'))
+    args.eval_alpha = PL_mod.resolve_eval_alpha(getattr(args, 'eval_alpha', 'spread'))
+
     # Map deprecated aliases to new names
     args.swissprot_data_root = nonestr_to_none(args.swissprot_data_root)
     args.pfam_data_root = nonestr_to_none(args.pfam_data_root)
@@ -1169,6 +1209,9 @@ def load_data(
         secondary_paths=secondary_data_paths,
         group_name=facilitator + '_data',
         split_manifest_path=getattr(args, 'split_manifest_path', None),
+        zp_path=getattr(args, 'zp_path', None),
+        train_alpha=getattr(args, 'train_alpha', 0.0),
+        eval_alpha=getattr(args, 'eval_alpha', PL_mod.EVAL_SPREAD),
     )
     data_module.setup()
     return data_module
@@ -1790,7 +1833,11 @@ def _write_build_manifest(args, artifacts_dir, checkpoint_dir, PL_model,
         "num_nodes": args.num_nodes,
         "acc_grad_batches": args.acc_grad_batches,
         "distributed_strategy": args.distributed_strategy,
+        "train_alpha": args.train_alpha,
+        "eval_alpha": args.eval_alpha,
     }
+    if PL_mod.alpha_spec_uses_zp(args.train_alpha):
+        outputs["zp_path"] = getattr(args, 'zp_path', None)
     if args.distributed_strategy == "deepspeed_zero2":
         outputs["deepspeed_stage"] = "2"
     outputs["training_strategy"] = args.training_strategy

@@ -13,6 +13,7 @@ A stub ESM-2 keeps these runnable under `pytest --quick`.
 
 from argparse import Namespace
 
+import numpy as np
 import pytest
 import torch
 from torch import nn
@@ -602,3 +603,281 @@ class TestProteinToZpEmbedder:
         emb = build_protein_to_zp_embedder(stage1_args, str(ckpt))
         assert torch.allclose(emb.embed_sequences(["AC-DE-F"]),
                               emb.embed_sequences(["ACDEF"]), atol=1e-6)
+
+
+# ------------------------------ blend on the HDF5 path -----------------------
+
+def _write_hdf5_and_zp(tmp_path, n=8, dim=PROJ_DIM, group="MMD_data",
+                       shift_zp_rows=False, drop_sequence_key=False):
+    """A tiny compiled-HDF5 / Facilitator-.pt pair, row-aligned by construction.
+
+    ``shift_zp_rows`` rolls the .pt rows to imitate pointing at a different
+    Facilitator run of the same shape.
+    """
+    import h5py
+
+    seqs = [f"AC{'D' * (i + 1)}EF" for i in range(n)]
+    z_c = torch.arange(n * dim, dtype=torch.float32).reshape(n, dim)
+    z_p = z_c + 1000.0
+
+    h5_path = tmp_path / "data.hdf5"
+    with h5py.File(h5_path, "w") as fh:
+        grp = fh.create_group(group)
+        grp.create_dataset("sequence", data=[s.encode() for s in seqs])
+        grp.create_dataset("acc_id",
+                           data=[f"P{i:05d}".encode() for i in range(n)])
+        grp.create_dataset("sequence_length",
+                           data=np.array([len(s) for s in seqs], dtype=int))
+        grp.create_dataset("text_to_protein_embedding", data=z_c.numpy())
+
+    payload = {"z_p": torch.roll(z_p, 1, dims=0) if shift_zp_rows else z_p,
+               "z_c": z_c}
+    if not drop_sequence_key:
+        payload["sequence"] = seqs[1:] + seqs[:1] if shift_zp_rows else seqs
+    pt_path = tmp_path / "facilitator.pt"
+    torch.save(payload, pt_path)
+    return str(h5_path), str(pt_path), seqs, z_c, z_p
+
+
+DS_ARGS = {"diffusion_steps": 1024, "image_size": 32}
+
+
+def _dataset(h5_path, **kwargs):
+    return plw.HDF5Dataset(args=DS_ARGS, file_path=h5_path,
+                           group_name="MMD_data", **kwargs)
+
+
+class TestHDF5DatasetBlend:
+    def test_pure_zc_needs_no_zp(self, tmp_path):
+        h5_path, _, _, z_c, _ = _write_hdf5_and_zp(tmp_path)
+        ds = _dataset(h5_path, train_alpha="zc")
+        assert ds.z_p is None
+        assert torch.allclose(ds[0][1], z_c[0])
+        ds.close()
+
+    def test_zp_required_when_alpha_uses_it(self, tmp_path):
+        h5_path, _, _, _, _ = _write_hdf5_and_zp(tmp_path)
+        with pytest.raises(ValueError, match="zp_path is required"):
+            _dataset(h5_path, train_alpha="blend")
+
+    def test_constant_alpha_blends_arithmetically(self, tmp_path):
+        h5_path, pt_path, _, z_c, z_p = _write_hdf5_and_zp(tmp_path)
+        ds = _dataset(h5_path, zp_path=pt_path, train_alpha=0.25)
+        assert torch.allclose(ds[3][1], 0.25 * z_p[3] + 0.75 * z_c[3])
+        ds.close()
+
+    def test_alpha_zp_returns_pure_zp(self, tmp_path):
+        h5_path, pt_path, _, _, z_p = _write_hdf5_and_zp(tmp_path)
+        ds = _dataset(h5_path, zp_path=pt_path, train_alpha="zp")
+        assert torch.allclose(ds[2][1], z_p[2])
+        ds.close()
+
+    def test_numeric_string_is_a_constant_not_the_schedule(self, tmp_path):
+        """The sentinel footgun: '0.5' must not select the blend schedule."""
+        h5_path, pt_path, _, z_c, z_p = _write_hdf5_and_zp(tmp_path)
+        ds = _dataset(h5_path, zp_path=pt_path, train_alpha="0.5")
+        expected = 0.5 * z_p[1] + 0.5 * z_c[1]
+        assert all(torch.allclose(ds[1][1], expected) for _ in range(20))
+        ds.close()
+
+    def test_train_rows_resample_under_blend(self, tmp_path):
+        h5_path, pt_path, _, _, _ = _write_hdf5_and_zp(tmp_path)
+        ds = _dataset(h5_path, zp_path=pt_path, train_alpha="blend")
+        torch.manual_seed(0)
+        draws = {float(ds[0][1][0]) for _ in range(50)}
+        assert len(draws) > 1
+        ds.close()
+
+
+class TestHDF5DatasetEvalIndices:
+    def test_eval_rows_are_stable_across_accesses(self, tmp_path):
+        h5_path, pt_path, _, _, _ = _write_hdf5_and_zp(tmp_path)
+        ds = _dataset(h5_path, zp_path=pt_path, train_alpha="blend")
+        ds.set_eval_indices([0, 1])
+        torch.manual_seed(0)
+        first = ds[0][1].clone()
+        assert all(torch.allclose(ds[0][1], first) for _ in range(50))
+        ds.close()
+
+    def test_eval_alpha_is_deterministic_across_instances(self, tmp_path):
+        """Two ranks building the dataset independently must agree on val."""
+        h5_path, pt_path, _, _, _ = _write_hdf5_and_zp(tmp_path)
+        a = _dataset(h5_path, zp_path=pt_path, train_alpha="blend")
+        b = _dataset(h5_path, zp_path=pt_path, train_alpha="blend")
+        a.set_eval_indices([2])
+        b.set_eval_indices([2])
+        torch.manual_seed(0)
+        left = a[2][1].clone()
+        torch.manual_seed(999)
+        assert torch.allclose(b[2][1], left)
+        a.close()
+        b.close()
+
+    def test_spread_covers_a_range_of_alphas(self, tmp_path):
+        h5_path, pt_path, seqs, _, _ = _write_hdf5_and_zp(tmp_path, n=32)
+        ds = _dataset(h5_path, zp_path=pt_path, train_alpha="blend")
+        ds.set_eval_indices(range(32))
+        alphas = [ds._alpha_for(i) for i in range(32)]
+        assert min(alphas) < 0.25 and max(alphas) > 0.75
+        ds.close()
+
+    def test_constant_eval_alpha_applies_to_eval_rows_only(self, tmp_path):
+        h5_path, pt_path, _, z_c, z_p = _write_hdf5_and_zp(tmp_path)
+        ds = _dataset(h5_path, zp_path=pt_path, train_alpha="zp",
+                      eval_alpha="zc")
+        ds.set_eval_indices([5])
+        assert torch.allclose(ds[5][1], z_c[5])
+        assert torch.allclose(ds[4][1], z_p[4])
+        ds.close()
+
+    def test_rejects_blend_as_eval_alpha(self, tmp_path):
+        h5_path, pt_path, _, _, _ = _write_hdf5_and_zp(tmp_path)
+        with pytest.raises(ValueError, match="eval_alpha must be"):
+            _dataset(h5_path, zp_path=pt_path, train_alpha="blend",
+                     eval_alpha="blend")
+
+
+class TestHDF5ZpAlignment:
+    def test_rejects_row_count_mismatch(self, tmp_path):
+        h5_path, pt_path, _, _, _ = _write_hdf5_and_zp(tmp_path, n=8)
+        payload = torch.load(pt_path, weights_only=False)
+        payload["z_p"] = payload["z_p"][:6]
+        payload["sequence"] = payload["sequence"][:6]
+        torch.save(payload, pt_path)
+        with pytest.raises(ValueError, match="row-aligned"):
+            _dataset(h5_path, zp_path=pt_path, train_alpha="blend")
+
+    def test_rejects_mismatched_facilitator_run(self, tmp_path):
+        h5_path, pt_path, _, _, _ = _write_hdf5_and_zp(
+            tmp_path, n=16, shift_zp_rows=True)
+        with pytest.raises(ValueError, match="does not match"):
+            _dataset(h5_path, zp_path=pt_path, train_alpha="blend")
+
+    def test_rejects_pt_without_zp(self, tmp_path):
+        h5_path, pt_path, _, z_c, _ = _write_hdf5_and_zp(tmp_path)
+        torch.save({"z_c": z_c}, pt_path)
+        with pytest.raises(KeyError, match="no 'z_p' key"):
+            _dataset(h5_path, zp_path=pt_path, train_alpha="blend")
+
+    def test_accepts_pt_without_sequences(self, tmp_path):
+        """Row count is the only check available; it must still load."""
+        h5_path, pt_path, _, _, z_p = _write_hdf5_and_zp(
+            tmp_path, drop_sequence_key=True)
+        ds = _dataset(h5_path, zp_path=pt_path, train_alpha="zp")
+        assert torch.allclose(ds[0][1], z_p[0])
+        ds.close()
+
+
+class TestHDF5DataModuleBlend:
+    def _dm(self, h5_path, **kwargs):
+        return plw.HDF5DataModule(
+            batch_size=4, num_workers=0, valid_size=0.25, seed=0,
+            diffusion_steps=1024, image_size=32,
+            primary_path=h5_path, group_name="MMD_data", **kwargs)
+
+    def test_setup_marks_val_rows_as_eval(self, tmp_path):
+        h5_path, pt_path, _, _, _ = _write_hdf5_and_zp(tmp_path, n=16)
+        dm = self._dm(h5_path, zp_path=pt_path, train_alpha="blend")
+        dm.setup()
+        dataset = dm.val_dataset.datasets[0].dataset
+        assert dataset._eval_indices == frozenset(dm.split_info[0]["val_indices"])
+        dm.teardown(stage="fit")
+
+    def test_val_batches_are_identical_across_epochs(self, tmp_path):
+        h5_path, pt_path, _, _, _ = _write_hdf5_and_zp(tmp_path, n=16)
+        dm = self._dm(h5_path, zp_path=pt_path, train_alpha="blend")
+        dm.setup()
+        torch.manual_seed(0)
+        first = torch.cat([b[1] for b in dm.val_dataloader()])
+        torch.manual_seed(1)
+        second = torch.cat([b[1] for b in dm.val_dataloader()])
+        assert torch.allclose(first, second)
+        dm.teardown(stage="fit")
+
+    def test_rejects_secondary_paths_when_blending(self, tmp_path):
+        h5_path, pt_path, _, _, _ = _write_hdf5_and_zp(tmp_path)
+        dm = self._dm(h5_path, zp_path=pt_path, train_alpha="blend",
+                      secondary_paths=[h5_path])
+        with pytest.raises(ValueError, match="single HDF5"):
+            dm.setup()
+
+    def test_secondary_paths_allowed_without_blending(self, tmp_path):
+        h5_path, _, _, _, _ = _write_hdf5_and_zp(tmp_path, n=16)
+        dm = self._dm(h5_path, secondary_paths=[h5_path])
+        dm.setup()
+        assert len(dm.split_info) == 2
+        dm.teardown(stage="fit")
+
+
+class TestTrainingArgConversions:
+    """train_alpha / eval_alpha / zp_path through the biom3_train_stage3 parser."""
+
+    @staticmethod
+    def _args(**overrides):
+        import biom3.Stage3.run_PL_training as base
+        argv = []
+        for k, v in overrides.items():
+            argv += [f"--{k}", str(v)]
+        return base.retrieve_all_args(argv)
+
+    def test_defaults_are_text_only(self):
+        args = self._args()
+        assert args.train_alpha == 0.0
+        assert args.eval_alpha == "spread"
+        assert args.zp_path is None
+        assert alpha_spec_uses_zp(args.train_alpha) is False
+
+    @pytest.mark.parametrize("value,expected", [
+        ("zp", 1.0), ("blend", ALPHA_BLEND), ("0.3", 0.3), ("zc", 0.0),
+    ])
+    def test_train_alpha_normalized(self, value, expected):
+        assert self._args(train_alpha=value).train_alpha == expected
+
+    def test_eval_alpha_rejects_a_schedule(self):
+        with pytest.raises(ValueError, match="eval_alpha must be"):
+            self._args(eval_alpha="blend")
+
+    def test_invalid_train_alpha_rejected(self):
+        with pytest.raises(ValueError, match="train_alpha must be"):
+            self._args(train_alpha="sequence")
+
+    def test_zp_path_none_sentinel(self):
+        assert self._args(zp_path="None").zp_path is None
+        assert self._args(zp_path="/tmp/f.pt").zp_path == "/tmp/f.pt"
+
+
+class TestLoadDataWiring:
+    """load_data must hand the blend settings to the data module."""
+
+    def _capture(self, monkeypatch, **overrides):
+        import biom3.Stage3.run_PL_training as base
+        seen = {}
+
+        class _Recorder:
+            def __init__(self, **kwargs):
+                seen.update(kwargs)
+
+            def setup(self):
+                pass
+
+        monkeypatch.setattr(base.PL_mod, "HDF5DataModule", _Recorder)
+        args = TestTrainingArgConversions._args(**overrides)
+        args.batch_size, args.num_workers = 4, 0
+        args.valid_size, args.seed = 0.2, 0
+        args.diffusion_steps, args.image_size = 1024, 32
+        base.load_data(args, primary_data_path="x.hdf5",
+                       secondary_data_paths=None, facilitator="MMD")
+        return seen
+
+    def test_defaults_reach_the_data_module(self, monkeypatch):
+        seen = self._capture(monkeypatch)
+        assert seen["train_alpha"] == 0.0
+        assert seen["eval_alpha"] == "spread"
+        assert seen["zp_path"] is None
+
+    def test_blend_settings_reach_the_data_module(self, monkeypatch):
+        seen = self._capture(monkeypatch, train_alpha="blend",
+                             eval_alpha="0.5", zp_path="/tmp/f.pt")
+        assert seen["train_alpha"] == ALPHA_BLEND
+        assert seen["eval_alpha"] == 0.5
+        assert seen["zp_path"] == "/tmp/f.pt"

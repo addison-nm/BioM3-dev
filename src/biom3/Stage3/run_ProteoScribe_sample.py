@@ -737,7 +737,7 @@ def blend_conditioning(embedding_dataset, alpha):
             f"Stage 2 preserves it, so this file was most likely built by "
             f"something that dropped it."
         )
-    z_p = embedding_dataset['z_p']
+    z_p = embedding_dataset['z_p'].to(z_c.device)
     if z_p.shape != z_c.shape:
         raise ValueError(
             f"z_p shape {tuple(z_p.shape)} != z_c shape {tuple(z_c.shape)}; "

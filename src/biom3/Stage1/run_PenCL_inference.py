@@ -33,7 +33,7 @@ biom3_PenCL_inference \
     --model_path "./weights/PenCL/BioM3_PenCL_epoch20.ckpt" \
     --output_path "outputs/pencl_embeddings.pt"
 
-Example usage (large dataset, cap cross-comparison metrics to avoid OOM):
+Example usage (enable the O(n^2) cross-comparison metrics on a subset):
 
 biom3_PenCL_inference \
     --input_data_path "data/large_proteins.csv" \
@@ -99,16 +99,27 @@ def parse_arguments(args):
     parser.add_argument("--load_from_checkpoint", action="store_true",
                         help="Flag to load model_path as a checkpoint. By default, " \
                         "this action is inferred from a .ckpt extension of model_path")
-    parser.add_argument("--cross_comparison_sample_limit", type=int, default=-1,
-                        help="Limit on the number of samples used for cross-comparison "
+    parser.add_argument("--cross_comparison_sample_limit", type=int, default=0,
+                        help="Number of samples used for the O(n^2) cross-comparison "
                              "metrics (dot-product probabilities, homology matrix). "
-                             "If -1, use all. Cross-comparison results are print-only; "
+                             "0 (default) skips them entirely; -1 uses all samples; "
+                             "a positive value uses that many. Each metric allocates an "
+                             "n x n fp32 matrix (~25 GB at n=80k), so -1 is only safe on "
+                             "small datasets. Cross-comparison results are print-only; "
                              "saved embeddings are unaffected.")
     parser.add_argument("--float32_matmul_precision", type=str, default=None,
                         choices=["highest", "high", "medium"],
                         help="fp32 matmul precision. 'high' (config default) enables "
                              "TF32 tensor cores; 'highest' forces full fp32 for bitwise "
                              "reproducibility. Overrides the config value when set.")
+    parser.add_argument("--no_amp", action="store_true",
+                        help="Disable autocast and run the forward pass in fp32. "
+                             "Autocast (bf16 on xpu, fp16 on cuda) is on by default and "
+                             "is a large part of the inference speedup. Disable it when "
+                             "comparing runs: bf16 rounding depends on tensor shape, so "
+                             "results vary with batch size. Pair with "
+                             "--float32_matmul_precision highest for a fully "
+                             "deterministic fp32 forward pass.")
 
     return parser.parse_args(args)
 
@@ -342,8 +353,9 @@ def main(args, _setup_logging=True):
     acc_id_list = []
 
     # Determine autocast dtype: use fp16 on CUDA, bf16 on XPU/CPU if available
-    use_amp = device.type in ("cuda", "xpu")
+    use_amp = device.type in ("cuda", "xpu") and not args.no_amp
     amp_dtype = torch.float16 if device.type == "cuda" else torch.bfloat16
+    logger.info("autocast: %s", amp_dtype if use_amp else "disabled (fp32)")
 
     with torch.inference_mode():
         for item in tqdm.tqdm(loader):
@@ -403,29 +415,9 @@ def main(args, _setup_logging=True):
             'acc_id': acc_id_array,
     }
     
-    # Subsample for O(n^2) cross-comparison metrics (print-only; saved
-    # embeddings above are unaffected).
-    cc_limit = args.cross_comparison_sample_limit
-    if cc_limit is None or cc_limit < 0:
-        k = len(z_p_tensor)
-    else:
-        k = min(cc_limit, len(z_p_tensor))
-    z_p_cc = z_p_tensor[:k]
-    z_t_cc = z_t_tensor[:k]
-
-    # Compute Dot Product scores
-    dot_product_scores = torch.matmul(z_p_cc, z_t_cc.T)  # Dot product
-
-    # Normalize scores into probabilities
-    protein_given_text_probs = F.softmax(dot_product_scores, dim=0)  # Normalize across rows (proteins), for each text
-    text_given_protein_probs = F.softmax(dot_product_scores, dim=1)  # Normalize across columns (texts), for each protein
-
     # Compute magnitudes (L2 norms) for z_t and z_p
     z_p_magnitude = torch.norm(z_p_tensor, dim=1)  # L2 norm for each protein latent vector
     z_t_magnitude = torch.norm(z_t_tensor, dim=1)  # L2 norm for each text latent vector
-
-    # Compute homology probabilities
-    homology_matrix = compute_homology_matrix(z_p_cc)
 
     # Print results
     logger.info("\n=== Inference Results ===")
@@ -434,22 +426,50 @@ def main(args, _setup_logging=True):
     logger.info("Magnitudes of z_p vectors: %s", z_p_magnitude)
     logger.info("Magnitudes of z_t vectors: %s", z_t_magnitude)
 
-    logger.info(
-        "\n=== Cross-comparison subset: k=%d of %d samples ===", k, len(z_p_tensor)
-    )
+    # O(n^2) cross-comparison metrics (print-only; the saved embeddings above are
+    # unaffected). Skipped unless explicitly requested: each metric allocates an
+    # n x n fp32 matrix, which is ~25 GB at n=80k.
+    cc_limit = args.cross_comparison_sample_limit or 0
+    if cc_limit == 0:
+        logger.info(
+            "\n=== Cross-comparison metrics skipped "
+            "(--cross_comparison_sample_limit 0) ==="
+        )
+    else:
+        n_cc = (
+            len(z_p_tensor) if cc_limit < 0
+            else min(cc_limit, len(z_p_tensor))
+        )
+        z_p_cc = z_p_tensor[:n_cc]
+        z_t_cc = z_t_tensor[:n_cc]
 
-    logger.info("\n=== Dot Product Scores Matrix ===")
-    logger.info("%s", dot_product_scores)
+        # Compute Dot Product scores
+        dot_product_scores = torch.matmul(z_p_cc, z_t_cc.T)  # Dot product
 
-    logger.info("\n=== Normalized Probabilities ===")
-    logger.info("Protein-Normalized Probabilities (Softmax across Proteins for each Text):")
-    logger.info("%s", protein_given_text_probs)
+        # Normalize scores into probabilities
+        protein_given_text_probs = F.softmax(dot_product_scores, dim=0)  # Normalize across rows (proteins), for each text
+        text_given_protein_probs = F.softmax(dot_product_scores, dim=1)  # Normalize across columns (texts), for each protein
 
-    logger.info("Text-Normalized Probabilities (Softmax across Texts for each Protein):")
-    logger.info("%s", text_given_protein_probs)
+        # Compute homology probabilities
+        homology_matrix = compute_homology_matrix(z_p_cc)
 
-    logger.info("\n=== Homology Matrix (Dot Product of Normalized z_p) ===")
-    logger.info("%s", homology_matrix)
+        logger.info(
+            "\n=== Cross-comparison subset: k=%d of %d samples ===",
+            n_cc, len(z_p_tensor),
+        )
+
+        logger.info("\n=== Dot Product Scores Matrix ===")
+        logger.info("%s", dot_product_scores)
+
+        logger.info("\n=== Normalized Probabilities ===")
+        logger.info("Protein-Normalized Probabilities (Softmax across Proteins for each Text):")
+        logger.info("%s", protein_given_text_probs)
+
+        logger.info("Text-Normalized Probabilities (Softmax across Texts for each Protein):")
+        logger.info("%s", text_given_protein_probs)
+
+        logger.info("\n=== Homology Matrix (Dot Product of Normalized z_p) ===")
+        logger.info("%s", homology_matrix)
 
     logger.info("\n=== Example raw data elements ===")
     for k in range(min(len(acc_id_array), 3)):

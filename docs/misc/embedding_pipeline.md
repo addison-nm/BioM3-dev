@@ -44,6 +44,9 @@ biom3_embedding_pipeline \
 | `--device` | `cuda` | Device for inference (`cpu`, `cuda`, `xpu`) |
 | `--batch_size` | `256` | Batch size for Stage 1 |
 | `--num_workers` | `0` | Dataloader workers for Stage 1 |
+| `--cross_comparison_sample_limit` | `0` | Stage 1 O(n²) cross-comparison metrics: `0` skips them, `-1` uses all, positive uses that many. Print-only; embeddings unaffected |
+| `--no_amp` | off | Run Stage 1 in fp32 instead of autocast (bf16 on xpu) |
+| `--float32_matmul_precision` | config (`high`) | Stage 1 fp32 matmul precision; pair `highest` with `--no_amp` for a deterministic fp32 pass |
 | `--mmd_sample_limit` | `1000` | Sample limit for MMD in Stage 2 |
 | `--dataset_key` | `MMD_data` | HDF5 group name |
 

@@ -86,6 +86,23 @@ def parse_arguments(args):
         help="Number of dataloader workers for Stage 1 (default: 0)"
     )
     parser.add_argument(
+        "--no_amp", action="store_true",
+        help="Disable autocast in Stage 1 and run the forward pass in fp32 "
+             "(default: autocast on, bf16 on xpu / fp16 on cuda)"
+    )
+    parser.add_argument(
+        "--float32_matmul_precision", type=str, default=None,
+        choices=["highest", "high", "medium"],
+        help="Stage 1 fp32 matmul precision. Pair 'highest' with --no_amp for a "
+             "deterministic fp32 forward pass (default: the config value, 'high')"
+    )
+    parser.add_argument(
+        "--cross_comparison_sample_limit", type=int, default=0,
+        help="Samples used for Stage 1's O(n^2) cross-comparison metrics. "
+             "0 (default) skips them, -1 uses all, a positive value uses that "
+             "many. Print-only; the compiled embeddings are unaffected"
+    )
+    parser.add_argument(
         "--mmd_sample_limit", type=int, default=1000,
         help="Sample limit for MMD computation in Stage 2 (default: 1000)"
     )
@@ -194,7 +211,10 @@ def main(args):
         "--device", args.device,
         "--batch_size", str(args.batch_size),
         "--num_workers", str(args.num_workers),
-    ])
+        "--cross_comparison_sample_limit", str(args.cross_comparison_sample_limit),
+    ] + (["--no_amp"] if args.no_amp else [])
+      + (["--float32_matmul_precision", args.float32_matmul_precision]
+         if args.float32_matmul_precision else []))
     run_stage1(stage1_args, _setup_logging=False)
 
     # --- Stage 2: Facilitator sampling ---

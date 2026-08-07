@@ -98,3 +98,21 @@ def test_embedding_pipeline(expect_error_context, device):
 
         remove_dir(OUTPUTS_DIR)
         assert not errors, "Errors occurred:\n{}".format("\n".join(errors))
+
+
+@pytest.mark.parametrize("extra_args, expected", [
+    [[], 0],
+    [["--cross_comparison_sample_limit", "1000"], 1000],
+])
+def test_cross_comparison_sample_limit_forwarded(extra_args, expected):
+    """The pipeline exposes Stage 1's cross-comparison cap, defaulting to off."""
+    args = parse_arguments([
+        "-i", "in.csv",
+        "-o", OUTPUTS_DIR,
+        "--pencl_weights", "weights/PenCL/BioM3_PenCL_epoch20.bin",
+        "--facilitator_weights", "weights/Facilitator/BioM3_Facilitator_epoch20.bin",
+        "--pencl_config", "configs/inference/stage1_PenCL.json",
+        "--facilitator_config", "configs/inference/stage2_Facilitator.json",
+        "--prefix", "test",
+    ] + extra_args)
+    assert args.cross_comparison_sample_limit == expected

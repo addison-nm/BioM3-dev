@@ -74,3 +74,35 @@ def test_entrypoint(
                 errors.append(msg)
         remove_dir(OUTPUTS_DIR)
         assert not errors, "Errors occurred:\n{}".format("\n".join(errors))
+
+
+@pytest.mark.parametrize("extra_args, expected", [
+    [[], 0],
+    [["--cross_comparison_sample_limit", "0"], 0],
+    [["--cross_comparison_sample_limit", "1000"], 1000],
+    [["--cross_comparison_sample_limit", "-1"], -1],
+])
+def test_cross_comparison_sample_limit_default(extra_args, expected):
+    """The O(n^2) cross-comparison metrics are off unless asked for."""
+    args = parse_arguments([
+        "-i", "None",
+        "-c", "configs/inference/stage1_PenCL.json",
+        "-m", "weights/PenCL/BioM3_PenCL_epoch20.bin",
+        "-o", "out.pt",
+    ] + extra_args)
+    assert args.cross_comparison_sample_limit == expected
+
+
+@pytest.mark.parametrize("extra_args, expected", [
+    [[], False],
+    [["--no_amp"], True],
+])
+def test_no_amp_flag(extra_args, expected):
+    """Autocast is on by default; --no_amp turns it off."""
+    args = parse_arguments([
+        "-i", "None",
+        "-c", "configs/inference/stage1_PenCL.json",
+        "-m", "weights/PenCL/BioM3_PenCL_epoch20.bin",
+        "-o", "out.pt",
+    ] + extra_args)
+    assert args.no_amp is expected

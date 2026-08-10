@@ -74,6 +74,11 @@ from biom3.core.run_utils import (
     write_manifest,
 )
 from biom3.backend.device import setup_logger, set_float32_matmul_precision
+from biom3.core.distributed import (
+    barrier,
+    init_distributed_if_launched,
+    is_main_process,
+)
 
 logger = setup_logger(__name__)
 
@@ -274,6 +279,51 @@ def compute_homology_matrix(z_p_tensor):
     return homology_matrix
 
 
+def _shard_path(output_path: str, rank: int) -> str:
+    return f"{output_path}.rank{rank}.shardtmp"
+
+
+def _merge_rank_shards(output_path: str, world_size: int):
+    """Concatenate per-rank shards in global row order and delete them.
+
+    Each rank writes the rows it embedded plus their global indices; sorting by
+    index reproduces the single-process row order regardless of world size.
+    """
+    idx, z_t, z_p, texts, seqs, accs = [], [], [], [], [], []
+    for r in range(world_size):
+        path = _shard_path(output_path, r)
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Missing shard from rank {r}: {path}")
+        shard = torch.load(path, weights_only=False, map_location="cpu")
+        if not shard["indices"]:
+            continue  # rank had no batches
+        idx.extend(shard["indices"])
+        z_t.append(shard["z_t"])
+        z_p.append(shard["z_p"])
+        texts.extend(shard["texts"])
+        seqs.extend(shard["sequences"])
+        accs.extend(shard["accessions"])
+
+    order = sorted(range(len(idx)), key=lambda i: idx[i])
+    if [idx[i] for i in order] != list(range(len(idx))):
+        raise RuntimeError(
+            f"Gathered {len(idx)} rows but indices are not a complete 0..N-1 set; "
+            "shards are incomplete or overlapping."
+        )
+
+    z_t = torch.cat(z_t)[order]
+    z_p = torch.cat(z_p)[order]
+    texts = [texts[i] for i in order]
+    seqs = [seqs[i] for i in order]
+    accs = [accs[i] for i in order]
+
+    for r in range(world_size):
+        os.remove(_shard_path(output_path, r))
+
+    logger.info("Merged %d rows from %d rank shard(s)", len(idx), world_size)
+    return z_t, z_p, texts, seqs, accs
+
+
 def main(args, _setup_logging=True):
     # ----- Suppress noisy library warnings -----
     warnings.filterwarnings("ignore", message=".*TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD.*")
@@ -286,11 +336,18 @@ def main(args, _setup_logging=True):
     num_workers = config_args_parser.num_workers
     load_from_checkpoint = config_args_parser.load_from_checkpoint
 
-    # Set up dual logging (console + file)
+    # Opt-in distributed: a no-op unless launched under mpiexec / torchrun, in
+    # which case this returns the per-rank device and the run shards by batch.
+    rank, local_rank, world_size, resolved_device = init_distributed_if_launched(
+        config_args_parser.device
+    )
+    is_main = is_main_process()
+
+    # Set up dual logging (console + file). Only the main rank owns the file.
     outdir = os.path.dirname(os.path.abspath(args.output_path))
     os.makedirs(outdir, exist_ok=True)
     file_handler = None
-    if _setup_logging:
+    if _setup_logging and is_main:
         log_path, file_handler = setup_file_logging(outdir)
     start_time = datetime.now()
     logger.info("=" * 60)
@@ -310,8 +367,13 @@ def main(args, _setup_logging=True):
         or getattr(config_args, "float32_matmul_precision", "high")
     )
 
-    # Set the device
-    device = torch.device(config_args_parser.device)
+    # Set the device (per-rank when distributed; unchanged single-process)
+    device = torch.device(resolved_device)
+    if world_size > 1:
+        logger.info(
+            "Distributed: rank %d/%d (local_rank %d) on %s",
+            rank, world_size, local_rank, resolved_device,
+        )
 
     # Infer loading strategy from file extension or specified flag:
     load_from_checkpoint = load_from_checkpoint or model_path.endswith('.ckpt')
@@ -336,10 +398,32 @@ def main(args, _setup_logging=True):
                 keep_default_na=False,  # empty string instead of nan
             )
 
+    # Shard by BATCH, not by row: every batch keeps exactly the members it would
+    # have had single-process, so per-row results are unchanged by world size.
+    # (Row-level sharding would repartition batches, and both the ESM batch
+    # converter's padding width and bf16 reduction order depend on batch
+    # contents.) With world_size == 1 this is the original sequential batching.
+    all_batches = [
+        list(range(i, min(i + batch_size, len(dataset))))
+        for i in range(0, len(dataset), batch_size)
+    ]
+    my_batches = all_batches[rank::world_size]
+    if world_size > len(all_batches) and is_main:
+        logger.warning(
+            "world_size=%d exceeds the %d batch(es) available; %d rank(s) will "
+            "sit idle. Lower batch_size or the rank count to use them.",
+            world_size, len(all_batches), world_size - len(all_batches),
+        )
+    if world_size > 1:
+        logger.info(
+            "Rank %d: %d of %d batches (%d rows)",
+            rank, len(my_batches), len(all_batches),
+            sum(len(b) for b in my_batches),
+        )
+
     loader = DataLoader(
         dataset,
-        batch_size=batch_size,
-        shuffle=False,
+        batch_sampler=my_batches,
         num_workers=num_workers,
         pin_memory=True,
         collate_fn=partial(prep.collate_fn, dataset=dataset, include_raw=True),
@@ -357,8 +441,10 @@ def main(args, _setup_logging=True):
     amp_dtype = torch.float16 if device.type == "cuda" else torch.bfloat16
     logger.info("autocast: %s", amp_dtype if use_amp else "disabled (fp32)")
 
+    index_list = [i for b in my_batches for i in b]
+
     with torch.inference_mode():
-        for item in tqdm.tqdm(loader):
+        for item in tqdm.tqdm(loader, disable=not is_main):
             x_t, x_p, texts, sequences, accessions = item
             x_t = x_t.to(device, non_blocking=True)
             x_p = x_p.to(device, non_blocking=True)
@@ -393,9 +479,34 @@ def main(args, _setup_logging=True):
     #         text_list.append(text_prompt)
     #         protein_list.append(protein_sequence)
 
-    # Stack all latent vectors
-    z_t_tensor = torch.vstack(z_t_list)  # Shape: (num_samples, latent_dim)
-    z_p_tensor = torch.vstack(z_p_list)  # Shape: (num_samples, latent_dim)
+    # Stack this rank's latent vectors. A rank gets no batches at all when
+    # len(all_batches) < world_size, so guard the empty case.
+    z_t_tensor = torch.vstack(z_t_list) if z_t_list else torch.empty(0)
+    z_p_tensor = torch.vstack(z_p_list) if z_p_list else torch.empty(0)
+
+    # Distributed: every rank writes its shard, then rank 0 merges in global row
+    # order and the others are done. Shards go via disk rather than
+    # gather_object_to_main because that helper is built on all_gather_object,
+    # which would materialise the whole dataset on every rank.
+    if world_size > 1:
+        torch.save(
+            {
+                "indices": index_list,
+                "z_t": z_t_tensor,
+                "z_p": z_p_tensor,
+                "texts": text_list,
+                "sequences": protein_list,
+                "accessions": acc_id_list,
+            },
+            _shard_path(args.output_path, rank),
+        )
+        barrier()
+        if not is_main:
+            return
+        z_t_tensor, z_p_tensor, text_list, protein_list, acc_id_list = (
+            _merge_rank_shards(args.output_path, world_size)
+        )
+
     text_prompt_array = np.array(
         [s.encode("utf-8") for s in text_list], dtype=object
     )

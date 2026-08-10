@@ -7,10 +7,10 @@ intermediate file paths automatically from --output_dir and --prefix.
 
 With --generate the terminal step is ProteoScribe sampling instead of HDF5
 compilation, giving CSV → Stage 1 → Stage 2 → Stage 3 generated sequences.
-Multi-GPU/multi-node sampling comes from running this entrypoint under
-scripts/launchers/container_{single,multi}node.sh: stages 1-2 are
-deterministic, so every rank computes identical embeddings, and the Stage 3
-sampler shards by rank with only rank 0 writing.
+Running this entrypoint under a launcher (scripts/launchers/*_{single,multi}node.sh)
+shards the work: Stage 1 splits batches across ranks and merges on rank 0,
+Stage 2 and the HDF5 compile run on rank 0 alone, and the Stage 3 sampler
+shards by rank. Run directly, it is an ordinary single-process pipeline.
 """
 
 import argparse
@@ -20,6 +20,7 @@ from argparse import Namespace
 from datetime import datetime
 
 from biom3.backend.device import setup_logger
+from biom3.core.distributed import barrier, is_main_process
 from biom3.core.helpers import load_json_config
 from biom3.core.run_utils import (
     get_biom3_version,
@@ -177,8 +178,10 @@ def main(args):
 
     os.makedirs(args.output_dir, exist_ok=True)
 
-    # Set up dual logging (console + file)
-    log_path, file_handler = setup_file_logging(args.output_dir)
+    # Set up dual logging (console + file). Only the main rank owns the file.
+    file_handler = None
+    if is_main_process():
+        log_path, file_handler = setup_file_logging(args.output_dir)
     start_time = datetime.now()
     logger.info("=" * 60)
     logger.info(
@@ -217,19 +220,27 @@ def main(args):
          if args.float32_matmul_precision else []))
     run_stage1(stage1_args, _setup_logging=False)
 
+    # Stage 1 shards across ranks when launched under a launcher and writes
+    # pencl_output on the main rank only; wait for it before reading.
+    barrier()
+
     # --- Stage 2: Facilitator sampling ---
-    logger.info("=" * 60)
-    logger.info("Stage 2: Facilitator sampling")
-    logger.info("=" * 60)
-    stage2_args = parse_stage2_args([
-        "-i", pencl_output,
-        "-c", args.facilitator_config,
-        "-m", args.facilitator_weights,
-        "-o", facilitator_output,
-        "--device", args.device,
-        "--mmd_sample_limit", str(args.mmd_sample_limit),
-    ])
-    run_stage2(stage2_args, _setup_logging=False)
+    # Main rank only: the Facilitator is a small MLP, so there is nothing to gain
+    # from sharding it, and every rank writing the same file would race.
+    if is_main_process():
+        logger.info("=" * 60)
+        logger.info("Stage 2: Facilitator sampling")
+        logger.info("=" * 60)
+        stage2_args = parse_stage2_args([
+            "-i", pencl_output,
+            "-c", args.facilitator_config,
+            "-m", args.facilitator_weights,
+            "-o", facilitator_output,
+            "--device", args.device,
+            "--mmd_sample_limit", str(args.mmd_sample_limit),
+        ])
+        run_stage2(stage2_args, _setup_logging=False)
+    barrier()
 
     if args.generate:
         # --- Stage 3: ProteoScribe sampling ---
@@ -258,19 +269,23 @@ def main(args):
         run_stage3(parse_stage3_args(stage3_argv), _setup_logging=False)
         final_output = generated_output
     else:
-        # --- Compile to HDF5 ---
-        logger.info("=" * 60)
-        logger.info("Compiling Stage 2 output to HDF5")
-        logger.info("=" * 60)
-        compile_args = parse_compile_args([
-            "-i", facilitator_output,
-            "-o", hdf5_output,
-            "--dataset_key", args.dataset_key,
-        ])
-        run_compile(compile_args, _setup_logging=False)
+        # --- Compile to HDF5 --- (main rank only; single small write)
+        if is_main_process():
+            logger.info("=" * 60)
+            logger.info("Compiling Stage 2 output to HDF5")
+            logger.info("=" * 60)
+            compile_args = parse_compile_args([
+                "-i", facilitator_output,
+                "-o", hdf5_output,
+                "--dataset_key", args.dataset_key,
+            ])
+            run_compile(compile_args, _setup_logging=False)
         final_output = hdf5_output
 
     logger.info("=" * 60)
+    if not is_main_process():
+        return
+
     logger.info("Pipeline complete. Output: %s", final_output)
     logger.info("=" * 60)
 

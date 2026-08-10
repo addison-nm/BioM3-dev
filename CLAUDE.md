@@ -54,6 +54,7 @@ src/biom3/
   Stage3/           # ProteoScribe: diffusion model, PL training, finetuning, sampling
   rl/               # RL post-training: GRPO, GDPO, DPO; rewards/ package, rollout, preference data
   pipeline/         # End-to-end embedding pipeline (Stage 1 → Stage 2 in one entrypoint)
+  geometry/         # Latent-manifold fitting + distance-from-manifold scoring
   split/            # Cluster-aware and stratified dataset splitting
   data_prep/        # HDF5 compilation from embeddings
   benchmarks/       # Stage 3 training/generation benchmarks + plotting
@@ -103,6 +104,9 @@ Data preparation:
 - `biom3_build_pfam_subsets` / `biom3_build_annotation_cache` → `biom3.dbio.__main__:*`
 - `biom3_compile_hdf5` → `biom3.data_prep.__main__:run_compile_hdf5`
 - `biom3_cluster_split` / `biom3_stratified_cluster_split` → `biom3.split.__main__:*`
+
+Analysis:
+- `biom3_fit_manifold` / `biom3_score_manifold` → `biom3.geometry.__main__:*` (see [docs/misc/manifold_distance.md](docs/misc/manifold_distance.md))
 
 Benchmarks and app:
 - `biom3_benchmark_stage3_generation` / `biom3_benchmark_stage3_training` / `biom3_plot_benchmark` → `biom3.benchmarks.__main__:*`

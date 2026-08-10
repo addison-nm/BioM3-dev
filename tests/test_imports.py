@@ -54,6 +54,16 @@ def test_dbio_imports():
     import biom3.dbio.pipelines.build_dataset
 
 
+def test_geometry_imports():
+    import biom3.geometry
+    import biom3.geometry.base
+    import biom3.geometry.gaussian
+    import biom3.geometry.manifold
+    import biom3.geometry.io
+    import biom3.geometry.run_fit_manifold
+    import biom3.geometry.run_score_manifold
+
+
 def test_viz_imports():
     import biom3.viz
     import biom3.viz.viewer

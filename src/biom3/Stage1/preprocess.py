@@ -137,6 +137,36 @@ class BatchedTextSeqPairingDataset(Dataset):
             self.accession_ids[idx],
         )
 
+# Set once per process the first time an over-length sequence is truncated.
+_LONG_SEQUENCE_WARNED = False
+
+
+def _warn_long_sequences_once(sequences, accessions, seq_max_length):
+    """Warn once per process that a sequence was too long to embed intact.
+
+    Stage 1 training pads to a fixed ``seq_max_length`` by concatenation
+    (``torch.ones((1, 1024 - n))``), which raises on anything longer -- so the
+    training data was filtered to ``seq_max_length - 2`` residues. Inference
+    truncates instead, which also drops the EOS token, so these rows are
+    embedded from a token pattern the model never saw.
+    """
+    global _LONG_SEQUENCE_WARNED
+    if _LONG_SEQUENCE_WARNED:
+        return
+    limit = seq_max_length - 2  # BOS + EOS
+    over = [(a, len(s)) for a, s in zip(accessions, sequences) if len(s) > limit]
+    if not over:
+        return
+    _LONG_SEQUENCE_WARNED = True
+    acc, length = over[0]
+    logger.warning(
+        "Sequence longer than %d residues encountered (%s: %d residues). It is "
+        "truncated to %d tokens, dropping the EOS token. Stage 1 training was "
+        "filtered to <= %d residues, so embedding may be out of distribution.",
+        limit, acc, length, seq_max_length, limit,
+    )
+
+
 def collate_fn(
         batch, 
         dataset: BatchedTextSeqPairingDataset, 
@@ -161,6 +191,7 @@ def collate_fn(
 
     # truncate to max model length, but keep dynamic padding from batch_converter
     if batch_tokens.shape[1] > dataset.seq_max_length:
+        _warn_long_sequences_once(sequences, accessions, dataset.seq_max_length)
         batch_tokens = batch_tokens[:, : dataset.seq_max_length]
 
     if include_raw:

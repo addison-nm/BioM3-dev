@@ -355,8 +355,8 @@ sequences and normalize their rewards within the group (no critic network):
 
 $$
 A_{q,i} = \frac{R_{q,i} - \mu_q}{\sigma_q + \varepsilon}, \qquad
-\mu_q = \operatorname{mean}_j R_{q,j}, \qquad
-\sigma_q = \operatorname{std}_j R_{q,j}
+\mu_q = \mathrm{mean}_j R_{q,j}, \qquad
+\sigma_q = \mathrm{std}_j R_{q,j}
 $$
 
 (`grpo.py:436-439`). Broadcast across every valid (non-`<PAD>`) token
@@ -365,11 +365,11 @@ position of sample `i`.
 **Probability ratio and PPO-clip loss**, per token, averaged over valid positions:
 
 $$
-\rho_{i,t} = \exp\!\big(\log \pi_\theta(y^i_t) - \log \pi_{\mathrm{ref}}(y^i_t)\big)
+\rho_{i,t} = \exp\big(\log \pi_\theta(y^i_t) - \log \pi_{\mathrm{ref}}(y^i_t)\big)
 $$
 
 $$
-L_{PG} = \operatorname{mean}_{i,t\ \mathrm{valid}} \Big[-\min\big(\rho_{i,t} A_i,\ \operatorname{clip}(\rho_{i,t},\ 1-\varepsilon,\ 1+\varepsilon)\, A_i\big)\Big]
+L_{PG} = \mathrm{mean}_{i,t\ \mathrm{valid}} \Big[-\min\big(\rho_{i,t} A_i,\ \mathrm{clip}(\rho_{i,t},\ 1-\varepsilon,\ 1+\varepsilon)\, A_i\big)\Big]
 $$
 
 (`grpo.py:444-450`). **Code-verified detail:** the ratio's denominator is
@@ -387,13 +387,13 @@ $$
 $$
 
 $$
-L_{KL} = \operatorname{mean}_{i,t\ \mathrm{valid}} \big[\exp(\Delta_{i,t}) - \Delta_{i,t} - 1\big]
+L_{KL} = \mathrm{mean}_{i,t\ \mathrm{valid}} \big[\exp(\Delta_{i,t}) - \Delta_{i,t} - 1\big]
 $$
 
 (`grpo.py:452-457`).
 
 **Total loss**: $L = L_{PG} + \beta \cdot L_{KL}$ (`grpo.py:459`), gradient-clipped to
-$\|g\|_2 \le \texttt{max\_grad\_norm}$ before the AdamW step.
+$\|g\|_2 \le$ `max_grad_norm` before the AdamW step.
 
 | Parameter | Default | Meaning |
 |---|---|---|
@@ -413,7 +413,7 @@ $\|g\|_2 \le \texttt{max\_grad\_norm}$ before the AdamW step.
 ICLR 2026, eq. 5) integrates over the diffusion time axis:
 
 $$
-L_{\mathrm{ELBO}}(y \mid z_c) = \int_0^1 \mathbb{E}_{y_t \sim \pi_t(\cdot \mid y)}\left[\frac{1}{t} \sum_i \mathbb{1}[y_t^i = M] \cdot \log \pi_\theta(y^i \mid y_t, z_c)\right] dt \;\le\; \log \pi_\theta(y \mid z_c)
+L_{\mathrm{ELBO}}(y \mid z_c) = \int_0^1 \mathbb{E}_{y_t \sim \pi_t(\cdot \mid y)}\left[\frac{1}{t} \sum_i \mathbb{1}[y_t^i = M] \cdot \log \pi_\theta(y^i \mid y_t, z_c)\right] dt \le \log \pi_\theta(y \mid z_c)
 $$
 
 a proper lower bound, unlike GRPO's single-step proxy. Naive double-MC
@@ -421,14 +421,14 @@ a proper lower bound, unlike GRPO's single-step proxy. Naive double-MC
 random `t` (paper Fig. 2a); **SDMC** replaces the outer integral with a
 deterministic quadrature so only the inner mask-sampling stays stochastic:
 
-1. Pick $N = \texttt{n\_quadrature}$ points $t_n \in (0, 1]$ with weights $w_n$
+1. Pick $N =$ `n_quadrature` points $t_n \in (0, 1]$ with weights $w_n$
    ($\sum_n w_n = 1$) — `quadrature_grid = "uniform"` uses midpoints
    $t_n = (n - 0.5)/N$; `"explicit"` takes `quadrature_points`/
    `quadrature_weights` verbatim (`_build_grid`).
 2. Map each $t_n$ (fraction masked) to a model time-index
-   $\mathrm{idx}_n = \operatorname{clamp}(\operatorname{round}((1-t_n)\cdot L),\ 0,\ L-1)$
+   $\mathrm{idx}_n = \mathrm{clamp}(\mathrm{round}((1-t_n)\cdot L),\ 0,\ L-1)$
    (revealed-position count).
-3. At each $\mathrm{idx}_n$, draw $K_{\mathrm{inner}} = \texttt{inner\_mc}$ random reveal-order
+3. At each $\mathrm{idx}_n$, draw $K_{\mathrm{inner}} =$ `inner_mc` random reveal-order
    corruptions $y_{t_n,k}$ of $y$, each revealing exactly $\mathrm{idx}_n$ positions
    (`_build_shared_corruptions`) — **shared across `π_old`, `π_new`, and
    (optionally) `π_ref`**, so the importance ratio isn't polluted by extra
@@ -439,7 +439,7 @@ $$
 \hat{L}_{\mathrm{ELBO}}(y \mid z_c) = \sum_n w_n \cdot \frac{1}{K_{\mathrm{inner}}} \sum_k \frac{1}{\max(t_n, \varepsilon_t)} \sum_i \mathbb{1}[y_{t_n,k}^i = M] \cdot \log \pi_\theta(y^i \mid y_{t_n,k}, z_c)
 $$
 
-(`_elbo_sdmc`, `gdpo.py:298-346`; $\varepsilon_t = \texttt{eps\_t}$ clamps the $1/t$ blow-up
+(`_elbo_sdmc`, `gdpo.py:298-346`; $\varepsilon_t =$ `eps_t` clamps the $1/t$ blow-up
 near $t \to 0$).
 
 **Per-step loop** (Alg. 1 of the paper):
@@ -460,7 +460,7 @@ paper-faithful default is the unnormalized `R − mean(R)`.
 (non-`<PAD>`) length:
 
 $$
-L_{PG} = \operatorname{mean}_g\left[\frac{1}{|y_g|} \cdot \max\big(-A_g r_g,\ -A_g \operatorname{clip}(r_g,\ 1-\varepsilon,\ 1+\varepsilon)\big)\right]
+L_{PG} = \mathrm{mean}_g\left[\frac{1}{|y_g|} \cdot \max\big(-A_g r_g,\ -A_g \mathrm{clip}(r_g,\ 1-\varepsilon,\ 1+\varepsilon)\big)\right]
 $$
 
 (`gdpo.py:918-924`).
@@ -469,7 +469,7 @@ $$
 - `"tokenwise_k3"` (default) — the same cheap k3 estimator as GRPO, one
   extra fully-masked forward through `π_θ` and `π_ref` (`_tokenwise_k3_kl`).
 - `"sdmc"` — a forward-KL surrogate reusing the same SDMC grid:
-  $L_{KL} = \operatorname{mean}_g(\mathrm{elbo}_{\mathrm{ref},g} - \mathrm{elbo}_{\mathrm{new},g})$,
+  $L_{KL} = \mathrm{mean}_g(\mathrm{elbo}_{\mathrm{ref},g} - \mathrm{elbo}_{\mathrm{new},g})$,
   i.e. one extra no-grad ELBO pass through `π_ref` per step (`gdpo.py:932-934`).
 
 **Total loss**: $L = L_{PG} + \beta \cdot L_{KL}$ (`gdpo.py:940`).
@@ -509,10 +509,10 @@ already generated and scored upstream. Both objectives use a
 length-normalized, `β`-scaled ELBO log-ratio as the implicit reward:
 
 $$
-\rho_\theta(y) = \beta \cdot \frac{\mathrm{ELBO}_\theta(y \mid z_c) - \mathrm{ELBO}_{\mathrm{ref}}(y \mid z_c)}{|y|} \quad (\text{if length\_normalize; else no } /|y|)
+\rho_\theta(y) = \beta \cdot \frac{\mathrm{ELBO}_\theta(y \mid z_c) - \mathrm{ELBO}_{\mathrm{ref}}(y \mid z_c)}{|y|}
 $$
 
-(`_paired_elbos` / `_weighted_elbos`, `dpo.py:128-188`).
+(if `length_normalize`; else no $/|y|$). (`_paired_elbos` / `_weighted_elbos`, `dpo.py:128-188`).
 
 **`paired`** — Bradley-Terry logistic loss (ProteinDPO eq. 10) on a
 chosen/rejected pair `(y_w, y_l)` per prompt group, picked either by
@@ -524,13 +524,14 @@ $$
 $$
 
 $$
-L = -\big[(1 - \mathrm{ls}) \cdot \log \sigma(\mathrm{margin}) + \mathrm{ls} \cdot \log \sigma(-\mathrm{margin})\big] \qquad (\mathrm{ls} = \texttt{label\_smoothing},\ \text{cDPO})
+L = -\big[(1 - \mathrm{ls}) \cdot \log \sigma(\mathrm{margin}) + \mathrm{ls} \cdot \log \sigma(-\mathrm{margin})\big]
 $$
 
-(`dpo.py:279-293`) — the standard DPO loss with the SDMC ELBO substituted
-for the exact log-likelihood ratio (Diffusion-DPO's substitution).
-$\mathrm{pref\_acc} = \operatorname{mean}(\mathrm{margin} > 0)$ (reference-relative accuracy) and
-$\mathrm{abs\_acc} = \operatorname{mean}(\mathrm{ELBO}_\theta(y_w) > \mathrm{ELBO}_\theta(y_l))$ (reference-free, does the
+($\mathrm{ls} =$ `label_smoothing`, cDPO). (`dpo.py:279-293`) — the standard DPO loss with
+the SDMC ELBO substituted for the exact log-likelihood ratio
+(Diffusion-DPO's substitution).
+`pref_acc = mean(margin > 0)` (reference-relative accuracy) and
+`abs_acc = mean(ELBO_θ(y_w) > ELBO_θ(y_l))` (reference-free, does the
 policy's own ELBO already rank them right) are logged as diagnostics.
 
 **`weighted`** — scalar-label objective (ProteinDPO eq. 15-17) on `K =
@@ -539,11 +540,13 @@ model's implicit-reward softmax to a Boltzmann target built from the raw
 scores at temperature `T`:
 
 $$
-\mathrm{target} = \operatorname{softmax}(\mathrm{score} / T) \qquad (T = \texttt{temperature})
+\mathrm{target} = \mathrm{softmax}(\mathrm{score} / T)
 $$
 
+($T =$ `temperature`)
+
 $$
-L = -\sum_k \mathrm{target}_k \cdot \log \operatorname{softmax}(\rho_\theta)_k
+L = -\sum_k \mathrm{target}_k \cdot \log \mathrm{softmax}(\rho_\theta)_k
 $$
 
 (`dpo.py:294-309`). `top1_agree` / `abs_top1_agree` are the reference-

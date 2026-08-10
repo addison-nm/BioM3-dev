@@ -1,6 +1,6 @@
 # BioM3 CLI Reference
 
-Reference for the eight core inference and training entrypoints declared in [pyproject.toml](../pyproject.toml). Each section gives the synopsis, required and optional arguments, the canonical config file (where applicable), and a representative example. For per-stage prose context (output layouts, metrics, per-machine job submission), see the deeper docs linked from each section.
+Reference for the core inference, training, and analysis entrypoints declared in [pyproject.toml](../pyproject.toml). Each section gives the synopsis, required and optional arguments, the canonical config file (where applicable), and a representative example. For per-stage prose context (output layouts, metrics, per-machine job submission), see the deeper docs linked from each section.
 
 Entrypoints covered elsewhere:
 
@@ -450,6 +450,54 @@ biom3_finetune_stage3 \
     --run_id my_lora_run \
     --use_lora True \
     --lora_r 16
+```
+
+---
+
+## Analysis Entrypoints
+
+### `biom3_fit_manifold` — fit a latent manifold to a reference set
+
+Fits a manifold to a reference cloud of embeddings and writes it as a single `.npz`, tagged with the method that produced it. Under the default method (`gaussian_shrinkage`: centroid + Ledoit-Wolf precision) fitting is the expensive half — a `D × D` shrinkage inverse — so do it once per reference set and score many query sets against the stored result.
+
+**Source:** [src/biom3/geometry/run_fit_manifold.py](../src/biom3/geometry/run_fit_manifold.py)
+**Deeper doc:** [misc/manifold_distance.md](misc/manifold_distance.md)
+
+| Arg | Type | Default | Description |
+|---|---|---|---|
+| `--reference` | str | *required* | Path to an `(M, D)` reference matrix (`.npy` or `.npz`). `M ≥ 8` under the default method. |
+| `--reference_key` | str | `None` | Array name to read when `--reference` is a multi-array `.npz`. |
+| `--method` | str | `gaussian_shrinkage` | Manifold fitting method; choices come from the method registry. |
+| `--label` | str | `""` | Free-form provenance string stored on the fitted manifold. |
+| `-o`, `--output` | str | *required* | Path to write the fitted manifold (`.npz`; the extension is appended if absent). |
+
+### `biom3_score_manifold` — score embeddings against a fitted manifold
+
+Scores each query against a stored manifold; lower means closer to it. The method is read from the manifold file. Under the default method the score is a Mahalanobis distance in units of reference-cloud standard deviations.
+
+**Source:** [src/biom3/geometry/run_score_manifold.py](../src/biom3/geometry/run_score_manifold.py)
+**Deeper doc:** [misc/manifold_distance.md](misc/manifold_distance.md)
+
+| Arg | Type | Default | Description |
+|---|---|---|---|
+| `--manifold` | str | *required* | Path to a manifold written by `biom3_fit_manifold`. |
+| `--queries` | str | *required* | Path to an `(N, D)` query matrix (`.npy` or `.npz`). |
+| `--queries_key` | str | `None` | Array name to read when `--queries` is a multi-array `.npz`. |
+| `--ids` | str | `None` | Text file of query identifiers, one per line, in row order. |
+| `--no_norm_check` | flag | off | Skip the query-vs-reference mean-norm sanity check (only for methods that perform one). |
+| `-o`, `--output` | str | *required* | Output path: CSV (`id`, `score`, and `band` for methods that carry a reference band), or the raw `(N,)` array if it ends in `.npy`. |
+
+```bash
+biom3_fit_manifold \
+    --reference zp_naturals.npy \
+    --label "PenCL z_p run1_trackC_step187000 / Sho1 naturals" \
+    -o manifold_sho1.npz
+
+biom3_score_manifold \
+    --manifold manifold_sho1.npz \
+    --queries zp_designs.npy \
+    --ids design_ids.txt \
+    -o scores.csv
 ```
 
 ---

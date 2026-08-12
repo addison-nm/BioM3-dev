@@ -127,6 +127,34 @@ def test_string_booleans_from_config_are_coerced():
     assert args.audit_additive_null is False
 
 
+def test_alpha_names_are_normalized():
+    """The named specs must be resolved before anything reads them numerically.
+
+    ``alpha_spec_uses_zp`` does ``float(spec)``, so leaving "zc" as a string
+    crashes the runner before training starts.
+    """
+    from biom3.Stage3.PL_wrapper import alpha_spec_uses_zp
+
+    args = parse_arguments(_base_argv(train_alpha="zc", eval_alpha="spread"))
+    assert args.train_alpha == 0.0
+    assert args.eval_alpha == "spread"
+    assert alpha_spec_uses_zp(args.train_alpha) is False
+
+    args = parse_arguments(_base_argv(train_alpha="zp"))
+    assert args.train_alpha == 1.0
+    assert alpha_spec_uses_zp(args.train_alpha) is True
+
+    args = parse_arguments(_base_argv(train_alpha="blend"))
+    assert args.train_alpha == "blend"
+    assert alpha_spec_uses_zp(args.train_alpha) is True
+
+
+def test_blend_is_rejected_for_eval_alpha():
+    """A resampled validation alpha makes val loss incomparable across epochs."""
+    with pytest.raises(ValueError, match="not the 'blend' training schedule"):
+        parse_arguments(_base_argv(eval_alpha="blend"))
+
+
 def test_record_schema_json_string_is_parsed():
     schema = {"sequences": {"from": "sequence"}}
     args = parse_arguments(_base_argv(record_schema=json.dumps(schema)))

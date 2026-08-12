@@ -140,6 +140,7 @@ def build_trainer(args, *, checkpoint_dir, logs_dir):
         precision=getattr(args, "precision", "bf16"),
         accumulate_grad_batches=getattr(args, "acc_grad_batches", 1),
         log_every_n_steps=getattr(args, "log_every_n_steps", 50),
+        limit_train_batches=getattr(args, "limit_train_batches", 1.0),
         limit_val_batches=getattr(args, "limit_val_batches", 1.0),
         callbacks=build_callbacks(args, checkpoint_dir),
         logger=CSVLogger(logs_dir, name="multidomain"),

@@ -1,0 +1,62 @@
+{
+  "description": "Component A on the luciferase v1 corpus: PF00501 (N, AMP-binding) + PF13193 (C, AMP-binding_C), 30,563 two-domain records. Captions in this corpus are pre-composed strings under `caption` rather than structured `fields`, so the schema reads them straight through; per-epoch re-composition and dropout are inert here because there is nothing left to compose.",
+  "tags": ["multidomain", "component_a", "luciferase"],
+  "_base_configs": ["./models/_base_ProteoScribe_multidomain.json"],
+
+  "expert_weights": [
+    "weights/ProteoScribe/expert_PF00501.pth",
+    "weights/ProteoScribe/expert_PF13193.pth"
+  ],
+  "domain_ids": ["PF00501", "PF13193"],
+  "num_domains": 2,
+  "coupling_topology": "all_pairs",
+
+  "train_experts": false,
+  "expert_prior_lambda": 0.0,
+  "audit_additive_null": true,
+
+  "finetune_data_path": "data/multidomain/luciferase_v1.jsonl",
+  "split_manifest_path": "data/multidomain/luciferase_v1_split.json",
+  "sequence_output_key": "sequences",
+  "caption_key": "captions",
+  "full_sequence_key": "sequence",
+  "domains_key": "domains",
+  "record_schema": {
+    "sequences": {
+      "compose": "map_domains",
+      "args": {"domains_key": "domains", "expect_k": 2,
+               "output": {"from": "sequence"}}
+    },
+    "captions": {
+      "compose": "map_domains",
+      "args": {"domains_key": "domains", "expect_k": 2,
+               "output": {"from": "caption"}}
+    }
+  },
+
+  "stage1_config_path": "configs/inference/stage1_PenCL.json",
+  "stage2_config_path": "configs/inference/stage2_Facilitator.json",
+  "pencl_weights": "weights/PenCL/run1_base_pencl.bin",
+  "facilitator_weights": "weights/Facilitator/run1_base_facilitator.bin",
+
+  "train_alpha": "zc",
+  "eval_alpha": "zc",
+
+  "seed": 0,
+  "epochs": 200,
+  "batch_size": 4,
+  "num_workers": 4,
+  "lr": 2.5e-5,
+  "weight_decay": 1e-6,
+  "precision": "bf16",
+  "devices_per_node": 1,
+  "num_nodes": 1,
+  "distributed_strategy": "deepspeed",
+  "log_every_n_steps": 10,
+  "save_top_k": 3,
+  "checkpoint_every_n_epochs": 10,
+
+  "output_root": "./outputs/multidomain_luciferase",
+  "checkpoints_folder": "checkpoints",
+  "runs_folder": "runs"
+}

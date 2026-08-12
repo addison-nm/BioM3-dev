@@ -55,7 +55,11 @@ from biom3.Stage3.multidomain.PL_wrapper import (
     PRIOR_WEIGHT,
     PL_ProtARDM_Multidomain,
 )
-from biom3.Stage3.PL_wrapper import alpha_spec_uses_zp
+from biom3.Stage3.PL_wrapper import (
+    alpha_spec_uses_zp,
+    normalize_alpha_spec,
+    resolve_eval_alpha,
+)
 
 logger = setup_logger(__name__)
 
@@ -136,6 +140,10 @@ def get_multidomain_args(parser):
                         type=str)
     parser.add_argument('--log_every_n_steps', default=50, type=int)
     parser.add_argument('--limit_val_batches', default=1.0, type=float)
+    parser.add_argument('--limit_train_batches', default=1.0, type=float,
+                        help='fraction of the train loader per epoch; a small '
+                             'value makes a smoke run reach validation and '
+                             'checkpointing without a full pass')
     parser.add_argument('--save_top_k', default=3, type=int)
     parser.add_argument('--checkpoint_every_n_epochs', default=None, type=int)
     parser.add_argument('--float32_matmul_precision', default='high', type=str)
@@ -187,6 +195,11 @@ def _coerce_args(args):
     for flag in ('train_experts', 'audit_additive_null', 'lazy_records',
                  'metrics_all_domains'):
         setattr(args, flag, _as_bool(getattr(args, flag)))
+
+    # Normalize the alpha names ("zc"/"zp"/"blend"/"spread") to the numeric form
+    # the rest of the pipeline expects; alpha_spec_uses_zp cannot read the names.
+    args.train_alpha = normalize_alpha_spec(args.train_alpha)
+    args.eval_alpha = resolve_eval_alpha(args.eval_alpha)
 
     if isinstance(args.record_schema, str):
         args.record_schema = json.loads(args.record_schema)
@@ -272,7 +285,7 @@ def _precompute_zp_lookup(args, stage1_args, data_module):
     return lookup
 
 
-def load_model(args, stage1_args, stage2_args, data_module):
+def load_model(args, stage1_args, stage2_args, data_module=None):
     if stage2_args.emb_dim != args.text_emb_dim:
         raise ValueError(
             f"Facilitator emb_dim={stage2_args.emb_dim} != text_emb_dim="
@@ -310,7 +323,8 @@ def load_model(args, stage1_args, stage2_args, data_module):
         stage1_args, stage2_args, args.pencl_weights, args.facilitator_weights)
 
     zp_lookup = None
-    if alpha_spec_uses_zp(args.train_alpha) or alpha_spec_uses_zp(args.eval_alpha):
+    if data_module is not None and (alpha_spec_uses_zp(args.train_alpha)
+                                    or alpha_spec_uses_zp(args.eval_alpha)):
         zp_lookup = _precompute_zp_lookup(args, stage1_args, data_module)
 
     PL_model = PL_ProtARDM_Multidomain(
@@ -374,7 +388,9 @@ def main(args):
 
     try:
         stage1_args, stage2_args = load_embedder_configs(args)
-        data_module = load_data(args, stage1_args)
+        # The audit is purely a property of the model, so it does not pay for
+        # loading the corpus, resolving the split manifest, or precomputing z_p.
+        data_module = None if args.audit_only else load_data(args, stage1_args)
         PL_model, spec = load_model(args, stage1_args, stage2_args, data_module)
 
         run_preflight_audit(args, PL_model, artifacts_dir)

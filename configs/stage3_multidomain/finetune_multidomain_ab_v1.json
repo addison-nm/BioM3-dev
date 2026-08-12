@@ -1,0 +1,14 @@
+{
+  "description": "Components A+B: the coupling plus full-weight expert adaptation, each expert regularized toward the weights it started from. Run this after the Component-A config has established a working baseline; it roughly doubles resident memory and lets the experts drift from their single-domain fold.",
+  "tags": ["multidomain", "component_ab"],
+  "_base_configs": ["./finetune_multidomain_v1.json"],
+
+  "train_experts": true,
+  "expert_prior_lambda": 1e-5,
+  "prior_mode": "weight",
+
+  "lr": 2.5e-5,
+  "epochs": 200,
+
+  "output_root": "./outputs/multidomain_ab"
+}

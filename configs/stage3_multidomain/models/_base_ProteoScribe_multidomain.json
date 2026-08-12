@@ -1,0 +1,27 @@
+{
+  "description": "Shared architecture for the composed multidomain decoder. Each domain canvas is driven by a ProteoScribe expert of exactly this shape, so it must match the architecture the per-family experts were finetuned under.",
+
+  "num_classes": 29,
+  "num_y_class_labels": 6,
+  "text_emb_dim": 512,
+  "image_size": 32,
+  "diffusion_steps": 1024,
+
+  "transformer_dim": 512,
+  "transformer_heads": 16,
+  "transformer_depth": 16,
+  "transformer_blocks": 1,
+  "transformer_dropout": 0.1,
+  "transformer_reversible": false,
+  "transformer_local_heads": 8,
+  "transformer_local_size": 128,
+
+  "num_steps": 1,
+  "actnorm": false,
+  "perm_channel": "none",
+  "perm_length": "reverse",
+  "input_dp_rate": 0.0,
+
+  "coupling_topology": "all_pairs",
+  "task": "proteins"
+}

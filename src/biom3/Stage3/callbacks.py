@@ -952,7 +952,11 @@ class TimeLimitCallback(pl.Callback):
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
         if self.fired:
             return
-        if (batch_idx + 1) % self.check_every_n_steps != 0:
+        # batch_idx restarts each epoch, so the modulo alone never fires for an
+        # epoch shorter than check_every_n_steps. Checking the epoch's last batch
+        # too keeps the deadline evaluated at least once per epoch at any length.
+        is_last_batch = (batch_idx + 1) == trainer.num_training_batches
+        if not is_last_batch and (batch_idx + 1) % self.check_every_n_steps != 0:
             return
         if trainer.global_rank == 0:
             elapsed = time.perf_counter() - self.start_monotonic

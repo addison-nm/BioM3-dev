@@ -83,6 +83,10 @@ def parse_arguments(args):
         help="Batch size for Stage 1 PenCL inference (default: 256)"
     )
     parser.add_argument(
+        "--stage2_batch_size", type=int, default=65536,
+        help="Batch size for Stage 2 Facilitator inference (default: 65536)."
+    )
+    parser.add_argument(
         "--num_workers", type=int, default=0,
         help="Number of dataloader workers for Stage 1 (default: 0)"
     )
@@ -237,6 +241,7 @@ def main(args):
             "-m", args.facilitator_weights,
             "-o", facilitator_output,
             "--device", args.device,
+            "--batch_size", str(args.stage2_batch_size),
             "--mmd_sample_limit", str(args.mmd_sample_limit),
         ])
         run_stage2(stage2_args, _setup_logging=False)

@@ -66,8 +66,10 @@ def parse_arguments(args):
     parser.add_argument('-o', '--output_data_path', type=str, required=True,
                         help="Path to save the output embeddings (e.g., Facilitator_test_outputs.pt)")
     
-    parser.add_argument('--device', type=str, default="cuda", 
+    parser.add_argument('--device', type=str, default="cuda",
                         choices=["cpu", "cuda", "xpu"], help="available device")
+    parser.add_argument('--batch_size', type=int, default=32,
+                        help="batch size")
     parser.add_argument("--mmd_sample_limit", type=int, default=-1,
                         help="limit on the number of samples used to compute MMD. If -1, use all")
     parser.add_argument("--float32_matmul_precision", type=str, default=None,
@@ -158,17 +160,35 @@ def main(args, _setup_logging=True):
     # Load input embeddings
     embedding_dataset = torch.load(args.input_data_path)
 
-    # Run inference to get facilitated embeddings
+    # Run inference to get facilitated embeddings.
+    z_t = embedding_dataset['z_t']
+    z_p = embedding_dataset['z_p']
+    batch_size = max(1, args.batch_size)
+    num_rows = len(z_t)
+
+    z_c_batches = []
+    sq_err_zc_zp = []
+    sq_err_zt_zp = []
     with torch.no_grad():
-        z_t = embedding_dataset['z_t'].to(device)
-        z_p = embedding_dataset['z_p'].to(device)
-        z_c = model(z_t)
-        embedding_dataset['z_c'] = z_c
+        for start in range(0, num_rows, batch_size):
+            end = min(start + batch_size, num_rows)
+            z_t_batch = z_t[start:end].to(device)
+            z_p_batch = z_p[start:end].to(device)
+            z_c_batch = model(z_t_batch)
+            z_c_batches.append(z_c_batch.cpu())
+            # Left on the device; .item() here would sync once per batch.
+            sq_err_zc_zp.append((z_c_batch - z_p_batch).pow(2).sum())
+            sq_err_zt_zp.append((z_t_batch - z_p_batch).pow(2).sum())
+
+    z_c = torch.cat(z_c_batches) if z_c_batches else z_t[:0]
+    embedding_dataset['z_c'] = z_c
 
     # Compute evaluation metrics
     # 1. MSE between embeddings
-    mse_zc_zp = F.mse_loss(z_c, z_p)
-    mse_zt_zp = F.mse_loss(z_t, z_p)
+    # Summed in fp64 and divided by the element count to match F.mse_loss.
+    num_elements = z_t.numel()
+    mse_zc_zp = (torch.stack(sq_err_zc_zp).double().sum() / num_elements).item() if num_elements else 0.0
+    mse_zt_zp = (torch.stack(sq_err_zt_zp).double().sum() / num_elements).item() if num_elements else 0.0
 
     # 2. Compute L2 norms for first batch
     batch_idx = 0
@@ -178,8 +198,8 @@ def main(args, _setup_logging=True):
 
     # 3. Compute MMD between embeddings
     k = min(mmd_sample_limit, len(z_t))
-    mmd_zc_zp = model.compute_mmd(z_c[0:k], z_p[0:k])
-    mmd_zp_zt = model.compute_mmd(z_p[0:k], z_t[0:k])
+    mmd_zc_zp = model.compute_mmd(z_c[0:k].to(device), z_p[0:k].to(device))
+    mmd_zp_zt = model.compute_mmd(z_p[0:k].to(device), z_t[0:k].to(device))
 
     # Print results
     logger.info("\n=== Facilitator Model Output ===")

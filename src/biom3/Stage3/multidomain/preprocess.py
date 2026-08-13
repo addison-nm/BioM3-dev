@@ -16,6 +16,27 @@ import torch
 from biom3.Stage3.preprocess import encode_protein_sequence
 
 
+def encode_captions(text_tokenizer, captions, text_max_length):
+    """Batch-encode captions to ``[N, text_max_length]`` input ids.
+
+    The one ``padding="max_length"`` call site in this subpackage, shared by the
+    training collate and the sampler. That is the configuration ProteoScribe's
+    conditioning embeddings were trained under; dynamic padding produces
+    different embeddings because no attention mask reaches the text encoder (see
+    docs/bug_reports/bert_embedding_mismatch.md).
+    """
+    encoded = text_tokenizer.batch_encode_plus(
+        list(captions),
+        truncation=True,
+        max_length=text_max_length,
+        padding="max_length",
+        return_tensors="pt",
+        return_attention_mask=False,
+        return_token_type_ids=False,
+    )
+    return encoded["input_ids"]
+
+
 def _check_canvas_fit(sequence, max_residues, label, index, domain):
     """Reject a domain too long for its canvas, before it becomes a shape error.
 
@@ -84,16 +105,9 @@ def make_multidomain_collate_fn(*, text_tokenizer, text_max_length, image_size,
             for sequence in flat_sequences
         ]).reshape(len(batch), num_domains, -1)
 
-        text_inputs = text_tokenizer.batch_encode_plus(
-            flat_captions,
-            truncation=True,
-            max_length=text_max_length,
-            padding="max_length",
-            return_tensors="pt",
-            return_attention_mask=False,
-            return_token_type_ids=False,
-        )
-        input_ids = text_inputs["input_ids"].reshape(len(batch), num_domains, -1)
+        input_ids = encode_captions(
+            text_tokenizer, flat_captions, text_max_length
+        ).reshape(len(batch), num_domains, -1)
 
         if include_sequences:
             return num_seqs, input_ids, flat_sequences

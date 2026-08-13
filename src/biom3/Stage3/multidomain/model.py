@@ -93,7 +93,12 @@ class MultiDomainProteoScribe(nn.Module):
         x_pos = transformer.axial_pos_emb(x_e).type(x_e.type())
         x_embed_axial = x_e + x_pos
 
-        y_emb = transformer.y_mlp(y_d).reshape(
+        # y_d arrives as the precomputed fp32 conditioning from the dataloader,
+        # so it needs the same cast the time embedding above gets: under
+        # DeepSpeed the parameters are bf16 and F.linear refuses the mismatch.
+        y_emb = transformer.y_mlp(
+            y_d.type([p.dtype for p in transformer.y_mlp.parameters()][0])
+        ).reshape(
             batch_size, 1, transformer.emb_dim, transformer.n_blocks, transformer.depth)
 
         return x_embed_axial, time_embed, y_emb

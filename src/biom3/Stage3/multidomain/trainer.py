@@ -21,17 +21,18 @@ failure observed on Aurora, so they are copied deliberately and pinned by
 import os
 
 from biom3.backend.device import BACKEND_NAME, _XPU, setup_logger
+from biom3.Stage3.callbacks import build_checkpoint_callbacks
 
 if BACKEND_NAME == _XPU:
     import lightning as pl
     from lightning import Trainer
-    from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint
+    from lightning.pytorch.callbacks import LearningRateMonitor
     from lightning.pytorch.loggers import CSVLogger
     from lightning.pytorch.strategies import DDPStrategy, DeepSpeedStrategy
 else:
     import pytorch_lightning as pl
     from pytorch_lightning import Trainer
-    from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
+    from pytorch_lightning.callbacks import LearningRateMonitor
     from pytorch_lightning.loggers import CSVLogger
     from pytorch_lightning.strategies import DDPStrategy, DeepSpeedStrategy
 
@@ -85,27 +86,33 @@ def build_callbacks(args, checkpoint_dir):
     ``save_last`` is what makes a preempted run resumable, and the periodic
     checkpoint is kept separate from the monitored one so a diverging val loss
     cannot leave a long run with nothing on disk.
-    """
-    monitored = ModelCheckpoint(
-        dirpath=checkpoint_dir,
-        filename="best-{epoch:03d}-{val_loss:.4f}",
-        monitor="val_loss",
-        mode="min",
-        save_top_k=getattr(args, "save_top_k", 3),
-        save_last=True,
-        auto_insert_metric_name=False,
-    )
-    callbacks = [monitored, LearningRateMonitor(logging_interval="step")]
 
-    every_n_epochs = getattr(args, "checkpoint_every_n_epochs", None)
-    if every_n_epochs:
-        callbacks.append(ModelCheckpoint(
-            dirpath=checkpoint_dir,
-            filename="epoch-{epoch:03d}",
-            every_n_epochs=every_n_epochs,
-            save_top_k=-1,
-            auto_insert_metric_name=False,
-        ))
+    Delegated to Stage 3's ``build_checkpoint_callbacks`` rather than built from
+    stock ``ModelCheckpoint``s, because two defects it already solves both bite
+    this path on Aurora:
+
+    * ``SyncSafeModelCheckpoint`` drops Lightning's ``reduce_boolean_decision``
+      consensus -- a ``ReduceOp.SUM`` all-reduce on an integer tensor, which on
+      XPU/CCL silently returns a wrong value. The ranks then disagree about
+      whether to save, and a collective save with only some ranks participating
+      leaves a truncated checkpoint behind.
+    * The periodic snapshot goes to a ``periodic/`` subdirectory rather than
+      sharing the monitored callback's ``dirpath``, where the ``save_top_k``
+      retention cap silently prunes it.
+
+    ``enable_version_counter=False`` there additionally stops the ``-v1``
+    duplicate a colliding ``last.ckpt`` write produces.
+    """
+    monitored, periodic = build_checkpoint_callbacks(
+        checkpoint_dir=checkpoint_dir,
+        periodic_every_n_epochs=getattr(args, "checkpoint_every_n_epochs", None),
+        primary_save_top_k=getattr(args, "save_top_k", 3),
+        use_sync_safe=(BACKEND_NAME == _XPU),
+    )
+    callbacks = list(monitored)
+    if periodic is not None:
+        callbacks.append(periodic)
+    callbacks.append(LearningRateMonitor(logging_interval="step"))
     return callbacks
 
 

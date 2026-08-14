@@ -21,18 +21,21 @@ failure observed on Aurora, so they are copied deliberately and pinned by
 import os
 
 from biom3.backend.device import BACKEND_NAME, _XPU, setup_logger
-from biom3.Stage3.callbacks import build_checkpoint_callbacks
+from biom3.Stage3.callbacks import (
+    BestArtifactSyncCallback,
+    build_checkpoint_callbacks,
+)
 
 if BACKEND_NAME == _XPU:
     import lightning as pl
     from lightning import Trainer
-    from lightning.pytorch.callbacks import LearningRateMonitor
+    from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint
     from lightning.pytorch.loggers import CSVLogger
     from lightning.pytorch.strategies import DDPStrategy, DeepSpeedStrategy
 else:
     import pytorch_lightning as pl
     from pytorch_lightning import Trainer
-    from pytorch_lightning.callbacks import LearningRateMonitor
+    from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
     from pytorch_lightning.loggers import CSVLogger
     from pytorch_lightning.strategies import DDPStrategy, DeepSpeedStrategy
 
@@ -80,7 +83,7 @@ def build_strategy(name, *, devices, num_nodes):
         f"unknown distributed_strategy {name!r}; expected {DEEPSPEED!r} or {DDP!r}")
 
 
-def build_callbacks(args, checkpoint_dir):
+def build_callbacks(args, checkpoint_dir, sync_fn=None):
     """Checkpointing plus an LR monitor.
 
     ``save_last`` is what makes a preempted run resumable, and the periodic
@@ -113,7 +116,31 @@ def build_callbacks(args, checkpoint_dir):
     if periodic is not None:
         callbacks.append(periodic)
     callbacks.append(LearningRateMonitor(logging_interval="step"))
+
+    # Without this the derived single-file weights only appear after fit()
+    # returns, so a walltime kill on a chained leg leaves a DeepSpeed directory
+    # and nothing that generation can load.
+    if sync_fn is not None and monitored:
+        callbacks.append(BestArtifactSyncCallback(
+            sync_fn=sync_fn,
+            primary_callback=monitored[0],
+            extra_callbacks=monitored[1:],
+            every_n_val=getattr(args, "artifact_sync_every_n_val", 1),
+        ))
     return callbacks
+
+
+def primary_checkpoint_callback(trainer):
+    """The monitored ``ModelCheckpoint`` whose best path drives derived weights.
+
+    Located by monitor rather than position: the periodic snapshot callback is
+    also a ``ModelCheckpoint`` but carries no ``monitor``, and it tracks recency
+    rather than quality.
+    """
+    monitored = [callback for callback in trainer.callbacks
+                 if isinstance(callback, ModelCheckpoint)
+                 and getattr(callback, "monitor", None)]
+    return monitored[0] if monitored else None
 
 
 def find_resume_checkpoint(checkpoint_dir):
@@ -124,7 +151,7 @@ def find_resume_checkpoint(checkpoint_dir):
     return None
 
 
-def build_trainer(args, *, checkpoint_dir, logs_dir):
+def build_trainer(args, *, checkpoint_dir, logs_dir, sync_fn=None):
     devices = int(getattr(args, "devices_per_node", 1))
     num_nodes = int(getattr(args, "num_nodes", 1))
     strategy = build_strategy(
@@ -149,7 +176,7 @@ def build_trainer(args, *, checkpoint_dir, logs_dir):
         log_every_n_steps=getattr(args, "log_every_n_steps", 50),
         limit_train_batches=getattr(args, "limit_train_batches", 1.0),
         limit_val_batches=getattr(args, "limit_val_batches", 1.0),
-        callbacks=build_callbacks(args, checkpoint_dir),
+        callbacks=build_callbacks(args, checkpoint_dir, sync_fn=sync_fn),
         logger=CSVLogger(logs_dir, name="multidomain"),
         # The data module attaches its own DistributedSampler with drop_last=True.
         use_distributed_sampler=False,

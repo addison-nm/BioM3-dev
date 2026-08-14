@@ -21,6 +21,7 @@ import argparse
 import json
 import logging
 import os
+import shutil
 import sys
 import time
 import warnings
@@ -50,6 +51,8 @@ from biom3.Stage3.multidomain.io import (
     ALL_PAIRS,
     MultiDomainSpec,
     build_from_spec,
+    consolidate_checkpoint,
+    extract_composed_state_dict,
 )
 from biom3.Stage3.multidomain.PL_wrapper import (
     PRIOR_WEIGHT,
@@ -363,6 +366,62 @@ def run_preflight_audit(args, PL_model, artifacts_dir):
     return report
 
 
+def save_derived_weights(args, checkpoint_dir, artifacts_dir, primary_callback):
+    """Emit the single-file artifacts a training run is consumed through.
+
+    Lightning's ``ModelCheckpoint`` leaves either a sharded DeepSpeed directory
+    or a single ``.ckpt``; neither is what downstream tooling reaches for. Two
+    files are derived from the best checkpoint, mirroring Stage 3:
+
+    ``single_model.best.pth``
+        Consolidated full Lightning checkpoint. **This is the generation
+        artifact** — it retains ``hyper_parameters``, so it carries the
+        ``MultiDomainSpec`` that ``build_multidomain_from_checkpoint`` rebuilds
+        the architecture from.
+    ``state_dict.best.pth``
+        Bare ``model.state_dict()``, for parity with Stage 3's convention. It
+        has no spec, so generation cannot load it; it is here for tooling that
+        wants raw weights.
+
+    Rank 0 only. A failure here is logged, not raised: the ``.ckpt`` is still on
+    disk and the artifacts are recoverable after the fact.
+    """
+    if get_global_rank() != 0:
+        return None
+    best_path = getattr(primary_callback, "best_model_path", None)
+    if not best_path or not os.path.exists(best_path):
+        logger.warning(
+            "No best checkpoint recorded; skipping derived weights. This is "
+            "expected when the run stopped before any validation completed."
+        )
+        return None
+
+    single_path = os.path.join(checkpoint_dir, "single_model.best.pth")
+    consolidate_checkpoint(best_path, single_path)
+
+    checkpoint = torch.load(single_path, map_location="cpu", weights_only=False)
+    state_dict = extract_composed_state_dict(checkpoint)
+    state_dict_path = os.path.join(checkpoint_dir, "state_dict.best.pth")
+    torch.save(state_dict, state_dict_path)
+    shutil.copy2(state_dict_path,
+                 os.path.join(artifacts_dir, "state_dict.best.pth"))
+
+    summary = {
+        "best_checkpoint": best_path,
+        "generation_artifact": single_path,
+        "state_dict": state_dict_path,
+        "monitor": getattr(primary_callback, "monitor", None),
+        "best_score": (float(primary_callback.best_model_score)
+                       if getattr(primary_callback, "best_model_score", None)
+                       is not None else None),
+    }
+    with open(os.path.join(artifacts_dir, "checkpoint_summary.json"), "w") as handle:
+        json.dump(summary, handle, indent=2)
+
+    logger.info("Generation artifact: %s", single_path)
+    return single_path
+
+
 def main(args):
     start_time = datetime.now()
     warnings.filterwarnings("ignore", message=".*TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD.*")
@@ -404,12 +463,30 @@ def main(args):
             with open(os.path.join(artifacts_dir, "spec.json"), "w") as handle:
                 json.dump(spec.to_dict(), handle, indent=2)
 
+        def sync_artifacts(primary_callback, extra_callbacks=None):
+            save_derived_weights(
+                args, checkpoint_dir, artifacts_dir, primary_callback)
+
         trainer = md_trainer.build_trainer(
-            args, checkpoint_dir=checkpoint_dir, logs_dir=logs_dir)
+            args, checkpoint_dir=checkpoint_dir, logs_dir=logs_dir,
+            sync_fn=sync_artifacts)
         resume = md_trainer.find_resume_checkpoint(checkpoint_dir)
         if resume:
             logger.info("Resuming from %s", resume)
         trainer.fit(PL_model, datamodule=data_module, ckpt_path=resume)
+
+        # Derived weights are what downstream tooling actually consumes; without
+        # this a DeepSpeed run leaves only sharded directories behind.
+        try:
+            save_derived_weights(
+                args, checkpoint_dir, artifacts_dir,
+                md_trainer.primary_checkpoint_callback(trainer),
+            )
+        except Exception as e:  # pragma: no cover - artifact export is non-fatal
+            logger.warning(
+                "Deriving single-file weights failed (%s). The checkpoint is "
+                "still on disk and can be consolidated after the fact.", e,
+            )
 
         elapsed = datetime.now() - start_time
         logger.info("Training finished in %s", elapsed)

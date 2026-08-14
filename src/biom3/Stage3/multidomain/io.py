@@ -215,6 +215,45 @@ def build_from_spec(spec: MultiDomainSpec, *, experts=None, template_args=None,
     return model
 
 
+def consolidate_checkpoint(src_checkpoint, dst_checkpoint):
+    """Materialize a single-file Lightning checkpoint from a training output.
+
+    DeepSpeed ZeRO-2 writes a sharded *directory*; DDP and single-device runs
+    write a single ``.ckpt``. The directory form needs a ZeRO->fp32 conversion,
+    which preserves the client state — and therefore the ``hyper_parameters``
+    holding this model's :class:`MultiDomainSpec`. That is what makes the
+    consolidated file loadable by :func:`build_multidomain_from_checkpoint`,
+    where a bare ``state_dict`` would not be: it carries no spec, so the
+    architecture could only be guessed.
+
+    Returns the destination path.
+    """
+    import contextlib
+    import io as _io
+    import shutil
+
+    from biom3.backend.device import BACKEND_NAME, _XPU
+
+    if os.path.isdir(src_checkpoint):
+        if BACKEND_NAME == _XPU:
+            from lightning.pytorch.utilities.deepspeed import (
+                convert_zero_checkpoint_to_fp32_state_dict)
+        else:
+            from pytorch_lightning.utilities.deepspeed import (
+                convert_zero_checkpoint_to_fp32_state_dict)
+        logger.info("Consolidating DeepSpeed checkpoint %s -> %s",
+                    src_checkpoint, dst_checkpoint)
+        # The converter prints its progress to stdout; keep the run log readable.
+        with contextlib.redirect_stdout(_io.StringIO()), \
+                contextlib.redirect_stderr(_io.StringIO()):
+            convert_zero_checkpoint_to_fp32_state_dict(src_checkpoint, dst_checkpoint)
+    else:
+        logger.info("Copying single-file checkpoint %s -> %s",
+                    src_checkpoint, dst_checkpoint)
+        shutil.copy2(src_checkpoint, dst_checkpoint)
+    return dst_checkpoint
+
+
 def state_dict_fingerprint(state_dict) -> str:
     """Stable digest over key names and shapes.
 

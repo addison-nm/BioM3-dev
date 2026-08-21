@@ -91,6 +91,13 @@ def parse_arguments(args):
         help="Number of dataloader workers for Stage 1 (default: 0)"
     )
     parser.add_argument(
+        "--text_padding", type=str, default="max_padding",
+        choices=["max_padding", "dynamic"],
+        help="Stage 1 caption padding. 'max_padding' pads to text_max_length, "
+             "matching training; 'dynamic' pads to the batch's longest caption, "
+             "which makes z_t depend on batch composition (default: max_padding)"
+    )
+    parser.add_argument(
         "--no_amp", action="store_true",
         help="Disable autocast in Stage 1 and run the forward pass in fp32 "
              "(default: autocast on, bf16 on xpu / fp16 on cuda)"
@@ -219,6 +226,7 @@ def main(args):
         "--batch_size", str(args.batch_size),
         "--num_workers", str(args.num_workers),
         "--cross_comparison_sample_limit", str(args.cross_comparison_sample_limit),
+        "--text_padding", args.text_padding,
     ] + (["--no_amp"] if args.no_amp else [])
       + (["--float32_matmul_precision", args.float32_matmul_precision]
          if args.float32_matmul_precision else []))

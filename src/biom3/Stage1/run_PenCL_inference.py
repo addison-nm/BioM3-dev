@@ -112,6 +112,12 @@ def parse_arguments(args):
                              "n x n fp32 matrix (~25 GB at n=80k), so -1 is only safe on "
                              "small datasets. Cross-comparison results are print-only; "
                              "saved embeddings are unaffected.")
+    parser.add_argument("--text_padding", type=str, default="max_padding",
+                        choices=["max_padding", "dynamic"],
+                        help="caption padding. 'max_padding' pads to "
+                             "text_max_length, matching training; 'dynamic' pads "
+                             "to the batch's longest caption, which makes z_t "
+                             "depend on batch composition.")
     parser.add_argument("--float32_matmul_precision", type=str, default=None,
                         choices=["highest", "high", "medium"],
                         help="fp32 matmul precision. 'high' (config default) enables "
@@ -360,6 +366,17 @@ def main(args, _setup_logging=True):
     config_dict = load_json_config(config_args_parser.config_path)
     raw_config = copy.deepcopy(config_dict)
     config_args = convert_to_namespace(config_dict)
+
+    # The dataset is built from config_args, not from the CLI namespace, so the
+    # padding mode has to be injected here to reach the collate_fn.
+    config_args.text_padding = config_args_parser.text_padding
+    if config_args.text_padding != "max_padding":
+        logger.warning(
+            "text_padding=%s: BioM3 training used max_padding, so z_t is "
+            "off-distribution here, and under dynamic padding z_t also depends "
+            "on batch composition rather than on the caption alone.",
+            config_args.text_padding,
+        )
 
     # fp32 matmul precision (TF32): CLI overrides config, config default is "high".
     set_float32_matmul_precision(

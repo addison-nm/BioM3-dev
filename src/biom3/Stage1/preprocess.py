@@ -102,6 +102,24 @@ def check_available_memory():
 # Added by A Howe
 #########################################################
 
+# Caption padding modes, mapped to the HF tokenizer's own values.
+#
+# 'max_padding' pads every caption to text_max_length. That is what ALL BioM3
+# training used, so it is the default and the in-distribution choice.
+# 'dynamic' pads only to the longest caption in the batch.
+#
+# The two are not interchangeable at inference. TextEncoder.forward calls the
+# BERT model with input_ids alone and no attention_mask, so the encoder attends
+# over every [PAD] and the padding length changes z_t. Under 'dynamic' the batch
+# composition therefore leaks into z_t: the same caption embeds differently
+# depending on what it was batched with, so results are not reproducible unless
+# batch ordering is fixed. Measured on the 179,679-row SH3 corpus, a max-padded
+# run and a dynamic-padded bank agree at z_t cosine median 0.982 with no row
+# reaching parity, while z_p is bit-identical.
+TEXT_PADDING_MODES = {"max_padding": "max_length", "dynamic": "longest"}
+DEFAULT_TEXT_PADDING = "max_padding"
+
+
 class BatchedTextSeqPairingDataset(Dataset):
     """
     Returns raw (text_caption, protein_sequence, accession_id).
@@ -117,6 +135,14 @@ class BatchedTextSeqPairingDataset(Dataset):
 
         self.text_max_length = args.text_max_length
         self.seq_max_length = 1024
+        # getattr, not args.text_padding: callers that build this from a bare
+        # config namespace (load_test_dataset) carry no such key.
+        self.text_padding = getattr(args, "text_padding", DEFAULT_TEXT_PADDING)
+        if self.text_padding not in TEXT_PADDING_MODES:
+            raise ValueError(
+                f"text_padding must be one of {sorted(TEXT_PADDING_MODES)}, "
+                f"got {self.text_padding!r}"
+            )
 
         # tokenizers (shared by collate_fn)
         self.text_tokenizer = AutoTokenizer.from_pretrained(
@@ -179,7 +205,7 @@ def collate_fn(
         list(texts),
         truncation=True,
         max_length=dataset.text_max_length,
-        padding="max_length",
+        padding=TEXT_PADDING_MODES[dataset.text_padding],
         return_tensors="pt",
         return_attention_mask=True,
         return_token_type_ids=False,

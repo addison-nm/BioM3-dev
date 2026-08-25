@@ -55,6 +55,7 @@ from biom3.rl.gdpo import (
     _elbo_sdmc,
     _gdpo_rollout,
     _resolve_rollout_devices,
+    _time_offset,
     _tokenwise_k3_kl,
     _write_debug_step,
 )
@@ -529,6 +530,7 @@ def gdpo_train_multinode(
 
     D = cfg3.diffusion_steps
     L_total = cfg3.sequence_length
+    t_offset = _time_offset(cfg3)
     eps = gdpo_cfg.eps
     beta = gdpo_cfg.beta
     B = gdpo_cfg.batch_size
@@ -538,9 +540,11 @@ def gdpo_train_multinode(
     idx_grid, t_floats, weights = _build_grid(gdpo_cfg, D, device)
     if rank == 0:
         logger.info(
-            "SDMC grid: N=%d t=%s w=%s idx=%s (D=%d, L_total=%d, inner_mc=%d, kl=%s)",
+            "SDMC grid: N=%d t=%s w=%s idx=%s (+offset %d → model t=%s) "
+            "(D=%d, L_total=%d, inner_mc=%d, kl=%s)",
             idx_grid.numel(), t_floats.tolist(), weights.tolist(),
-            idx_grid.tolist(), D, L_total, gdpo_cfg.inner_mc, gdpo_cfg.kl_estimator,
+            idx_grid.tolist(), t_offset, (idx_grid + t_offset).tolist(),
+            D, L_total, gdpo_cfg.inner_mc, gdpo_cfg.kl_estimator,
         )
 
     # ----- RolloutPool (per-rank, across local tiles) -----
@@ -610,6 +614,7 @@ def gdpo_train_multinode(
             "advantage_normalize": gdpo_cfg.advantage_normalize,
             "diffusion_budget": int(D),
             "sequence_length": int(L_total),
+            "time_offset": int(t_offset),
             "pre_unmask": bool(cfg3.pre_unmask),
             "pre_unmask_fill_with": getattr(cfg3, 'pre_unmask_fill_with', None),
             "base_reward": str(base_reward_name),
@@ -722,6 +727,7 @@ def gdpo_train_multinode(
                     inner_mc=gdpo_cfg.inner_mc,
                     device=device,
                     diffusion_budget=D,
+                    time_offset=t_offset,
                 )
                 elbo_old_local = _elbo_sdmc(
                     model=rollout_s3,
@@ -789,7 +795,9 @@ def gdpo_train_multinode(
                     BG_local, _ = local_ids.shape
                     x_masked = torch.full_like(local_ids, fill_id)
                     x_masked[:, :D] = MASK_ID
-                    t_steps = torch.zeros(BG_local, dtype=torch.long, device=device)
+                    t_steps = torch.full(
+                        (BG_local,), t_offset, dtype=torch.long, device=device
+                    )
                     do_ckpt = (
                         gdpo_cfg.gradient_checkpoint
                         and any(p.requires_grad for p in s3.parameters())

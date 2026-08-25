@@ -35,6 +35,7 @@ import biom3.Stage3.sampling_analysis as S3sample
 import biom3.Stage3.transformer_training_helper as S3train
 from biom3.Stage3.run_ProteoScribe_sample import (
     _build_initial_mask_state,
+    _pre_revealed_offset,
     _resolve_fill_token_id,
     load_pre_unmask_config,
 )
@@ -146,6 +147,21 @@ class GDPOConfig:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+def _time_offset(cfg3: Namespace) -> int:
+    """Positions already revealed when diffusion starts (0 unless pre_unmask).
+
+    Under pre_unmask the PAD tail ``[D, L_total)`` is revealed before the
+    first step, so the model's time index — which the training contract
+    defines as the number of revealed positions out of ``L_total`` — starts
+    at ``L_total - D`` rather than 0. Gated on ``pre_unmask`` to mirror
+    ``_build_initial_mask_state``, which only shifts its sampling path in
+    that branch; the two must agree or the path match never resolves.
+    """
+    if not getattr(cfg3, 'pre_unmask', False):
+        return 0
+    return _pre_revealed_offset(cfg3, cfg3.diffusion_steps)
+
+
 def _build_grid(
     cfg: GDPOConfig,
     L: int,
@@ -155,13 +171,19 @@ def _build_grid(
 
     ``L`` here is the **active diffusion budget** D (= ``cfg3.diffusion_steps``).
     Under pre_unmask the architectural sequence length may be larger;
-    only the first D positions are actually diffused over, so the time
-    embedding's domain is [0, D-1].
+    only the first D positions are actually diffused over.
+
+    Note ``idx_grid`` is a **content-reveal count** in [0, D-1], not a model
+    time index. The two coincide only when D == L_total; under pre_unmask the
+    model time index is ``idx + _time_offset(cfg3)``, and the callers apply
+    that shift. Keeping the count unshifted here matters because
+    ``_build_shared_corruptions`` also uses it to decide how many of the D
+    content positions to reveal — the same two-roles-of-one-counter trap that
+    produced the pre_unmask sampler bug.
 
     Returns:
-        idx_grid: LongTensor (N,) — model-time indices in [0, L-1] where
-            ``idx`` = number of revealed positions. idx = 0 ↔ fully masked
-            ↔ paper_t = 1; idx = L-1 ↔ paper_t ≈ 1/L.
+        idx_grid: LongTensor (N,) — revealed-content counts in [0, L-1].
+            idx = 0 ↔ fully masked ↔ paper_t = 1; idx = L-1 ↔ paper_t ≈ 1/L.
         t_floats: FloatTensor (N,) — paper_t ∈ (0, 1] used to scale the
             ``1/t`` factor in the SDMC integrand.
         weights: FloatTensor (N,) — quadrature weights summing to 1.
@@ -224,6 +246,7 @@ def _build_shared_corruptions(
     inner_mc: int,
     device: torch.device,
     diffusion_budget: Optional[int] = None,
+    time_offset: int = 0,
 ):
     """Sample masked corruptions ``y_t ~ π_t(·|y)`` once per (n, k).
 
@@ -237,7 +260,10 @@ def _build_shared_corruptions(
     Pre-unmask: if ``diffusion_budget`` (= D) is given and < L_total,
     only positions [0, D) participate in masking — positions [D, L_total)
     keep the rolled-out token (PAD by construction) and are treated as
-    permanently revealed.
+    permanently revealed. Those revealed positions also count toward the
+    model's time index, so ``time_offset`` (= L_total - D) is added to the
+    ``idx`` handed to the model while the masking itself still uses the
+    unshifted content count.
     """
     BG, L_total = ids.shape
     D = diffusion_budget if diffusion_budget is not None else L_total
@@ -248,7 +274,7 @@ def _build_shared_corruptions(
     for n in range(idx_grid.numel()):
         idx_n_scalar = int(idx_grid[n].item())
         idx_n_tensor = torch.full(
-            (BG, 1), idx_n_scalar, dtype=torch.long, device=device
+            (BG, 1), idx_n_scalar + time_offset, dtype=torch.long, device=device
         )
         for _ in range(max(1, inner_mc)):
             # Permute only the active diffusion region [0, D).
@@ -353,6 +379,7 @@ def _tokenwise_k3_kl(
     z_c_rep: torch.Tensor,         # (BG, emb_dim)
     diffusion_budget: Optional[int] = None,
     fill_id: int = PAD_ID,
+    time_offset: int = 0,
     gradient_checkpoint: bool = False,
 ) -> torch.Tensor:
     """Cheap k3 KL estimator on a single fully-masked forward pass.
@@ -363,7 +390,8 @@ def _tokenwise_k3_kl(
     Pre-unmask: when ``diffusion_budget`` (= D) is given and < L_total,
     positions [0, D) are MASK and positions [D, L_total) hold ``fill_id``
     (PAD). The KL average then naturally restricts to non-PAD positions
-    via ``valid = (ids_all != PAD_ID)``.
+    via ``valid = (ids_all != PAD_ID)``. That PAD tail is revealed, so the
+    state is at time ``time_offset`` (= L_total - D), not 0.
 
     With ``gradient_checkpoint=True`` and grad enabled on the trainable
     policy, the new-policy forward is wrapped in
@@ -377,7 +405,9 @@ def _tokenwise_k3_kl(
     D = diffusion_budget if diffusion_budget is not None else L_total
     x_masked = torch.full_like(ids_all, fill_id)
     x_masked[:, :D] = MASK_ID
-    t_steps = torch.zeros(BG, dtype=torch.long, device=ids_all.device)
+    t_steps = torch.full(
+        (BG,), time_offset, dtype=torch.long, device=ids_all.device
+    )
     do_ckpt = (
         gradient_checkpoint
         and torch.is_grad_enabled()
@@ -469,7 +499,9 @@ def _gdpo_rollout(
     Returns ``(K, L_total)`` int64 token IDs. Equivalent to
     ``biom3.rl.grpo.diffusion_rollout`` when pre_unmask is False;
     when True, only positions [0, D) are diffused over and positions
-    [D, L_total) are pre-filled with the configured fill token.
+    [D, L_total) are pre-filled with the configured fill token, and the
+    diffusion clock starts at ``_time_offset(cfg3)`` to match the
+    sampling-path values ``_build_initial_mask_state`` hands back.
     """
     L_total = getattr(cfg3, 'sequence_length', cfg3.diffusion_steps)
     if z_c.shape[0] == K:
@@ -488,7 +520,9 @@ def _gdpo_rollout(
         args=cfg3,
         model=s3,
         extract_digit_samples=init.float(),
-        extract_time=torch.zeros(K, dtype=torch.long, device=device),
+        extract_time=torch.full(
+            (K,), _time_offset(cfg3), dtype=torch.long, device=device
+        ),
         extract_digit_label=z_rep,
         sampling_path=sampling_path,
     )
@@ -720,6 +754,7 @@ def gdpo_train(
         open(debug_path, "w").close()
     D = cfg3.diffusion_steps                   # active diffusion budget
     L_total = cfg3.sequence_length             # full tensor length (may be > D under pre_unmask)
+    t_offset = _time_offset(cfg3)              # revealed PAD tail; 0 unless pre_unmask
     eps = gdpo_cfg.eps
     beta = gdpo_cfg.beta
     B = gdpo_cfg.batch_size
@@ -728,9 +763,11 @@ def gdpo_train(
 
     idx_grid, t_floats, weights = _build_grid(gdpo_cfg, D, device)
     logger.info(
-        "SDMC grid: N=%d t=%s w=%s idx=%s (D=%d, L_total=%d, inner_mc=%d, kl=%s)",
+        "SDMC grid: N=%d t=%s w=%s idx=%s (+offset %d → model t=%s) "
+        "(D=%d, L_total=%d, inner_mc=%d, kl=%s)",
         idx_grid.numel(), t_floats.tolist(), weights.tolist(),
-        idx_grid.tolist(), D, L_total, gdpo_cfg.inner_mc, gdpo_cfg.kl_estimator,
+        idx_grid.tolist(), t_offset, (idx_grid + t_offset).tolist(),
+        D, L_total, gdpo_cfg.inner_mc, gdpo_cfg.kl_estimator,
     )
 
     # Multi-device rollout pool. devices[0] is the master (gradient
@@ -776,6 +813,7 @@ def gdpo_train(
         "advantage_normalize": gdpo_cfg.advantage_normalize,
         "diffusion_budget": int(D),
         "sequence_length": int(L_total),
+        "time_offset": int(t_offset),
         "pre_unmask": bool(cfg3.pre_unmask),
         "pre_unmask_fill_with": getattr(cfg3, 'pre_unmask_fill_with', None),
     })
@@ -856,6 +894,7 @@ def gdpo_train(
                 inner_mc=gdpo_cfg.inner_mc,
                 device=device,
                 diffusion_budget=D,
+                time_offset=t_offset,
             )
             _stamp("corruptions")
 
@@ -927,6 +966,7 @@ def gdpo_train(
             kl_loss = _tokenwise_k3_kl(
                 s3, ref_s3, ids_all, z_cs_rep,
                 diffusion_budget=D, fill_id=fill_id,
+                time_offset=t_offset,
                 gradient_checkpoint=gdpo_cfg.gradient_checkpoint,
             )
         elif gdpo_cfg.kl_estimator == "sdmc":

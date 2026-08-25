@@ -100,6 +100,7 @@ class MultiDomainDataModule(pl.LightningDataModule):
         image_size,
         num_domains,
         split_manifest_path,
+        valid_size=None,
         sequence_key="sequences",
         caption_key="captions",
         full_sequence_key="sequence",
@@ -109,11 +110,12 @@ class MultiDomainDataModule(pl.LightningDataModule):
         needs_unique_sequences=False,
     ):
         super().__init__()
-        if split_manifest_path is None:
+        if split_manifest_path is None and valid_size is None:
             raise ValueError(
                 "multidomain finetuning requires split_manifest_path; build one "
                 "with biom3_stratified_cluster_split so homologous assemblies "
-                "cannot straddle the train/val boundary"
+                "cannot straddle the train/val boundary. Pass valid_size to opt "
+                "into a random split instead -- an ablation, not a default."
             )
         self.jsonl_path = jsonl_path
         self.record_schema = record_schema
@@ -126,6 +128,7 @@ class MultiDomainDataModule(pl.LightningDataModule):
         self.image_size = image_size
         self.num_domains = int(num_domains)
         self.split_manifest_path = split_manifest_path
+        self.valid_size = valid_size
         self.sequence_key = sequence_key
         self.caption_key = caption_key
         self.full_sequence_key = full_sequence_key
@@ -154,7 +157,17 @@ class MultiDomainDataModule(pl.LightningDataModule):
         )
 
         lengths = self._domain_lengths(source)
-        train_idx, val_idx, test_idx = self._manifest_split(source)
+        if self.valid_size is not None:
+            # Explicit CLI --valid_size overrides a manifest set in the config,
+            # per the usual precedence. Says so out loud: silently ignoring a
+            # configured manifest would misreport what the run measured.
+            if self.split_manifest_path is not None:
+                logger.warning(
+                    "valid_size=%s given, so the configured split manifest %s is "
+                    "IGNORED for this run", self.valid_size, self.split_manifest_path)
+            train_idx, val_idx, test_idx = self._random_split(source)
+        else:
+            train_idx, val_idx, test_idx = self._manifest_split(source)
         train_idx = self._filter_by_length(train_idx, lengths, "train")
         val_idx = self._filter_by_length(val_idx, lengths, "val")
 
@@ -239,6 +252,29 @@ class MultiDomainDataModule(pl.LightningDataModule):
         )
         logger.info("Using curated split manifest %s", self.split_manifest_path)
         return entry["train"], entry["val"], entry["test"]
+
+    def _random_split(self, source):
+        """Seeded random row split. Held-out numbers here are optimistic.
+
+        Every record is drawn from one Pfam family pair, so a random partition
+        puts near-identical homologs on both sides of the boundary and the
+        validation loss measures memorisation as much as generalisation. This
+        exists to quantify that gap against the cluster-packed manifest, not as
+        a way to train a model you intend to trust.
+        """
+        import random
+
+        indices = list(range(len(source)))
+        random.Random(self.seed).shuffle(indices)
+        n_val = int(round(len(indices) * self.valid_size))
+        val_idx, train_idx = indices[:n_val], indices[n_val:]
+        logger.warning(
+            "RANDOM split (valid_size=%s, seed=%s): %d train / %d val, no test "
+            "split. Homologous assemblies straddle the boundary -- treat every "
+            "held-out number as optimistic.",
+            self.valid_size, self.seed, len(train_idx), len(val_idx),
+        )
+        return train_idx, val_idx, []
 
     def _filter_by_length(self, indices, lengths, label):
         kept = [idx for idx in indices if lengths[idx] <= self.max_domain_length]

@@ -102,6 +102,11 @@ def get_multidomain_args(parser):
                         help='multidomain JSONL of {sequence, source, domains: [...]}')
     parser.add_argument('--split_manifest_path', default=None, type=str,
                         help='curated split manifest (required)')
+    parser.add_argument('--valid_size', default=None, type=float,
+                        help='Opt into a seeded RANDOM train/val split of this '
+                             'fraction instead of --split_manifest_path. An '
+                             'ablation: one family pair means homologs straddle '
+                             'the boundary, so held-out numbers read optimistic.')
     parser.add_argument('--record_schema', default=None, type=str,
                         help='output schema; both outputs go through map_domains')
     parser.add_argument('--compose_plugins', default=None,
@@ -263,6 +268,7 @@ def load_data(args, stage1_args):
         image_size=args.image_size,
         num_domains=args.num_domains,
         split_manifest_path=args.split_manifest_path,
+        valid_size=args.valid_size,
         sequence_key=args.sequence_output_key,
         caption_key=args.caption_key,
         full_sequence_key=args.full_sequence_key,

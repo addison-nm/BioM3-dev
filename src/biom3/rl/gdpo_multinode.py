@@ -65,6 +65,7 @@ from biom3.rl.grpo import (
     _PromptEncoder,
     decode_tokens,
 )
+from biom3.rl.rewards.manifold import bind_pencl_rewards
 from biom3.rl.io import (
     load_facilitator_frozen,
     load_pencl_frozen,
@@ -440,6 +441,10 @@ def gdpo_train_multinode(
     if rank == 0:
         logger.info("Loading Stage 1 (PenCL)...")
     s1 = load_pencl_frozen(cfg1, stage1_weights, device=str(device))
+    # Every rank scores its own shard, so every rank binds its own PenCL.
+    n_bound = bind_pencl_rewards(base_reward_fn, s1)
+    if rank == 0 and n_bound:
+        logger.info("Bound PenCL into z_p-based reward(s)")
     if rank == 0:
         logger.info("Loading Stage 2 (Facilitator)...")
     s2 = load_facilitator_frozen(cfg2, stage2_weights, device=str(device))

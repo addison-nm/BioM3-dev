@@ -18,6 +18,7 @@ from biom3.rl.rewards.base import Reward
 from biom3.rl.rewards.composite import CompositeReward
 from biom3.rl.rewards.diversity import DiversityReward
 from biom3.rl.rewards.esmfold import ESMFoldReward
+from biom3.rl.rewards.manifold import ManifoldReward
 from biom3.rl.rewards.registry import build_reward
 from biom3.rl.rewards.stub import StubReward
 from biom3.rl.rewards.surrogate import SurrogateReward
@@ -27,6 +28,7 @@ __all__ = [
     "Reward",
     "StubReward",
     "ESMFoldReward",
+    "ManifoldReward",
     "AAFractionReward",
     "SurrogateReward",
     "TsvLookupReward",

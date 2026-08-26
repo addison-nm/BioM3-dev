@@ -143,7 +143,26 @@ def get_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
 
     # Reward
     parser.add_argument("--reward", type=str, default="esmfold_plddt",
-                        choices=["esmfold_plddt", "stub"])
+                        choices=["esmfold_plddt", "stub", "manifold"])
+
+    # Manifold (d_E) reward. The embedder is not configured here: it is
+    # always PenCL z_p over the Stage 1 weights this run already loads,
+    # bound after Stage 1 comes up. Pointing the reward at a manifold
+    # fitted in a *different* Stage 1's z_p is the main way to get
+    # meaningless numbers — see docs/reinforcement_learning/manifold_reward.md.
+    parser.add_argument("--manifold_path", type=str, default=None,
+                        help="Fitted manifold .npz (biom3.geometry format). "
+                             "Required for --reward manifold.")
+    parser.add_argument("--manifold_transform", type=str, default="band",
+                        choices=["band", "neg", "clipped", "exp"],
+                        help="d_E -> reward map. 'band' and 'neg' are affine "
+                             "and so differ only by a constant factor in the "
+                             "group-relative advantage; 'clipped'/'exp' are not.")
+    parser.add_argument("--manifold_scale", type=float, default=1.0,
+                        help="Multiplier on the band p95 for 'clipped'/'exp'.")
+    parser.add_argument("--manifold_strict_norm", action="store_true",
+                        help="Abort if the first batch's mean ||z_p|| is far from "
+                             "the manifold's ref_mean_norm, instead of warning.")
 
     # Diversity reward (composite). When --diversity_weight > 0 the base
     # reward is wrapped in CompositeReward({reward: 1, diversity: w}); the
@@ -184,6 +203,18 @@ def _required(value, name):
     if value is None:
         raise ValueError(f"Missing required arg: --{name} (or set in --config_path JSON)")
     return value
+
+
+def _reward_kwargs(args) -> dict:
+    """Per-reward constructor kwargs. Empty for rewards that take none."""
+    if args.reward != "manifold":
+        return {}
+    return {
+        "manifold": _required(args.manifold_path, "manifold_path"),
+        "transform": args.manifold_transform,
+        "scale": args.manifold_scale,
+        "strict_norm": args.manifold_strict_norm,
+    }
 
 
 def main(args):
@@ -232,7 +263,7 @@ def main(args):
         rollout_devices=_parse_device_list(args.rollout_devices),
     )
 
-    base_reward_fn = build_reward(args.reward, device=device)
+    base_reward_fn = build_reward(args.reward, device=device, **_reward_kwargs(args))
 
     if is_launched():
         # Multi-node path: ranks shard rollout + base reward, rank 0

@@ -1,0 +1,19 @@
+{
+  "_base_configs": ["./gdpo_run1_sh3.json"],
+  "_overwrite_configs": [],
+
+  "reward": "manifold",
+  "manifold_path": "/flare/NLDesignProtein/ahowe/BioM3-dev-space/Sho1_manifold_reproduction/biom3_geometry/manifold_sho1_911_run1.npz",
+  "manifold_transform": "band",
+  "manifold_scale": 1.0,
+  "manifold_strict_norm": true,
+
+  "diversity_weight": 0.0,
+
+  "steps": 60,
+  "num_generations": 8,
+  "batch_size": 1,
+  "save_steps": 20,
+
+  "output_root": "./outputs/gdpo"
+}

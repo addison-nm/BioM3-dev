@@ -1,0 +1,132 @@
+#!/bin/bash -l
+#PBS -A NLDesignProtein
+#PBS -N gdpo_edist_sh3_prod_n8
+#PBS -l walltime=36:00:00
+#PBS -l select=8
+#PBS -l place=scatter
+#PBS -l filesystems=home:flare
+#PBS -q capacity
+#PBS -j oe
+# PBS -M <emailaddress>
+# PBS -m be
+
+# GDPO Stage 3 production run with the d_E manifold reward.
+#
+# Rewards generated sequences by their Mahalanobis distance from the 911
+# SHO1-ortholog manifold in PenCL z_p space. See
+# docs/reinforcement_learning/manifold_reward.md — in particular the
+# embedding-mismatch failure mode, which is quiet rather than loud.
+#
+# One rank per node (NGPU_PER_NODE=1 in the launcher); within each rank the
+# in-process RolloutPool fans rollouts across all 12 local Aurora tiles.
+#
+# ---------------------------------------------------------------------------
+# Sizing: why B=24, G=8, 8 nodes
+# ---------------------------------------------------------------------------
+# The multi-tile rollout carries a per-step fixed cost — broadcasting pi_old
+# (344 MB) to the 11 replica tiles plus thread-pool setup — that does NOT
+# shrink with node count. So node count only pays off if B*G grows with it.
+# Sizing rule: give every rank at least 2 sequences per tile,
+# i.e. B*G >= 24 * num_nodes.
+#
+#   nodes  B   G   BG    per rank  per tile   50 epochs
+#      4  12   8    96      24        2.0     2200 steps
+#      8  24   8   192      24        2.0     1100 steps   <-- this job
+#      8  12   8    96      12        1.0     2200 steps   (half-empty tiles)
+#     16  48   8   384      24        2.0      550 steps
+#
+# Wall-clock, measured through this same launcher (1 rank, 12 tiles, BG=32,
+# manifold reward): step 1 = 61.5 s (one-off: cross-rank fingerprints + the
+# lazy ESM alphabet load in TextSeqPairing_Dataset), steady state = 51.2 s.
+# Production runs 24 replicas/rank, slightly less rollout work than that
+# smoke, but adds a real cross-node gradient all-reduce (~350 MB/step) that
+# the ws=1 smoke did not exercise. Budgeting ~60 s/step:
+#
+#     1100 steps x ~60 s ~= 18 h
+#
+# 36 h requested — 2x headroom. An earlier estimate of ~12 h came from a
+# cost model fitted to single-node runs; the measured multinode step is
+# ~22% slower than that model predicted, so it is not used here.
+#
+# ---------------------------------------------------------------------------
+# "Epochs"
+# ---------------------------------------------------------------------------
+# GDPO has no epoch concept — it draws B prompts uniformly AT RANDOM WITH
+# REPLACEMENT each step (all ranks share prompt_rng = RandomState(seed + step),
+# so they agree on the draw). One "epoch" here means one prompt-set-equivalent
+# of draws: steps_per_epoch = ceil(num_prompts / B). Coverage is therefore
+# statistical, not guaranteed — over 50 epochs each prompt is drawn ~50 times
+# in expectation, but no prompt is promised. train_log.json records
+# batch_prompts_idx per step if you want to audit what was actually seen.
+
+projdir=${PBS_O_WORKDIR}  # Submit from the BioM3-dev directory
+cd ${projdir}
+
+module load frameworks
+source ./venvs/biom3-env/bin/activate
+
+# Configurations to edit
+config_path=./configs/grpo/gdpo_edist_sh3.json
+num_nodes=8                     # Must match #PBS -l select=... above
+prompts_path=./configs/grpo/prompts/sh3_v03_mixed_512.txt
+epochs=50
+
+batch_size=24                   # B — prompts per gradient step
+num_generations=8               # G — completions per prompt (advantage group size)
+
+# Weights: the frozen Run 1 base set + the SH3 blend decoder. Stage 1 MUST be
+# the checkpoint the manifold was fitted in (run1 Track C step_187000) — a
+# different Stage 1 makes every d_E meaningless without failing loudly.
+stage1_weights=./weights/Run1_frozen_ckpts/Run1_TrackC_step_187000_3b7e39f9.ckpt
+stage2_weights=./weights/Run1_frozen_ckpts/v3_mmd_full49M_final.ckpt
+stage3_init_weights=./weights/ProteoScribe/blend_sd142k_ep353_ep59.bin
+
+# d_E is minimised by generating something maximally typical — plausibly a
+# near-copy of a reference sequence. Set this > 0 to compose DiversityReward
+# against the manifold term. Left at 0 here so the first production run is a
+# clean single-objective baseline; watch band_position and div in the log and
+# raise it if the population collapses.
+diversity_weight=0.0
+
+# Constant configurations
+device=xpu
+
+# steps = epochs * ceil(num_prompts / batch_size).
+# num_prompts is derived with load_prompts' own rule (skip blanks and #
+# comments) rather than hardcoded — sh3_v03_mixed_512.txt is 520 lines but
+# 512 prompts, and a hardcoded count drifts silently when a file is edited.
+num_prompts=$(grep -cvE '^[[:space:]]*($|#)' "${prompts_path}")
+steps_per_epoch=$(( (num_prompts + batch_size - 1) / batch_size ))
+steps=$(( epochs * steps_per_epoch ))
+save_steps=$(( steps_per_epoch * 5 ))    # a checkpoint every 5 epochs
+
+echo "prompts=${num_prompts} from $(basename ${prompts_path})"
+echo "epochs=${epochs} x steps_per_epoch=${steps_per_epoch} -> steps=${steps}"
+echo "B=${batch_size} G=${num_generations} BG=$(( batch_size * num_generations ))"
+echo "save_steps=${save_steps}"
+
+# Construct the run ID
+datetime=$(date +%Y%m%d_%H%M%S)
+config_name=$(basename "${config_path}" .json)
+run_id=${config_name}_prod_n${num_nodes}_B${batch_size}_G${num_generations}_e${epochs}_V${datetime}
+
+# Direct output to log file
+mkdir -p logs
+log_fpath=logs/${run_id}.${PBS_JOBID}.o
+
+source environment.sh
+./scripts/gdpo_train_multinode.sh \
+    ${config_path} \
+    ${num_nodes} \
+    ${device} \
+    ${run_id} \
+    --batch_size ${batch_size} \
+    --num_generations ${num_generations} \
+    --prompts_path ${prompts_path} \
+    --stage1_weights ${stage1_weights} \
+    --stage2_weights ${stage2_weights} \
+    --stage3_init_weights ${stage3_init_weights} \
+    --diversity_weight ${diversity_weight} \
+    --steps ${steps} \
+    --save_steps ${save_steps} \
+> ${log_fpath} 2>&1

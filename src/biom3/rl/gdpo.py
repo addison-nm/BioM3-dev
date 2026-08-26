@@ -55,6 +55,7 @@ from biom3.rl.grpo import (
     diffusion_rollout,
     load_prompts,
 )
+from biom3.rl.rewards.manifold import bind_pencl_rewards
 from biom3.rl.io import (
     load_facilitator_frozen,
     load_pencl_frozen,
@@ -698,6 +699,10 @@ def gdpo_train(
 
     logger.info("Loading Stage 1 (PenCL)...")
     s1 = load_pencl_frozen(cfg1, stage1_weights, device=str(device))
+    # Rewards that embed sequences into z_p (ManifoldReward) reuse this
+    # PenCL rather than loading a second copy. No-op for other rewards.
+    if bind_pencl_rewards(reward_fn, s1):
+        logger.info("Bound PenCL into z_p-based reward(s)")
     logger.info("Loading Stage 2 (Facilitator)...")
     s2 = load_facilitator_frozen(cfg2, stage2_weights, device=str(device))
     logger.info("Loading Stage 3 (ProteoScribe, trainable)...")

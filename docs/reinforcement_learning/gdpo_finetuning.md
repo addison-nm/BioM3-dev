@@ -139,6 +139,29 @@ With the defaults (`N=3, L=128`):
 These are the reveal fractions the model is conditioned on when
 computing each contribution to the ELBO sum.
 
+**Under `pre_unmask`, `idx` is not the model's time index.** `idx_n` counts
+revealed positions among the `D` *content* positions, and the corruption
+sampler uses it that way. The PAD tail `[D, L_total)` is revealed too, so the
+model is conditioned on `idx_n + offset` where `offset = L_total − D`. With
+`D=128, L_total=1024` the grid above becomes model-`t` `[992, 928, 917]`. Both
+the rollout and the ELBO apply the shift; `idx_grid` itself stays unshifted
+because shifting it would corrupt the reveal count. See
+[the offset bug report](../bug_reports/2026-06-17_pre_unmask_time_offset.md) —
+conflating those two roles is what caused it.
+
+## Rewards
+
+`--reward` selects the objective: `esmfold_plddt` (folding confidence), `stub`
+(constant, for plumbing tests), or `manifold` (distance from a fitted latent
+manifold). The manifold reward has its own page —
+[manifold_reward.md](manifold_reward.md) — including the embedding-mismatch
+failure mode, which is quiet rather than loud and worth reading before use.
+
+`--diversity_weight > 0` wraps whichever base reward you chose in a
+`CompositeReward` with `DiversityReward`. Worth budgeting for from the start on
+any single-objective reward that a near-copy of a training sequence would
+maximise.
+
 ## Running
 
 Single-tile interactive (Aurora):

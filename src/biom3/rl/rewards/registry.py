@@ -5,6 +5,7 @@ import torch
 from biom3.rl.rewards.aa_fraction import AAFractionReward
 from biom3.rl.rewards.diversity import DiversityReward
 from biom3.rl.rewards.esmfold import ESMFoldReward
+from biom3.rl.rewards.manifold import ManifoldReward
 from biom3.rl.rewards.stub import StubReward
 from biom3.rl.rewards.tsv_lookup import TsvLookupReward
 
@@ -27,8 +28,10 @@ def build_reward(name: str, device: torch.device, **kwargs):
         return AAFractionReward(**kwargs)
     if name == "diversity":
         return DiversityReward(**kwargs)
+    if name == "manifold":
+        return ManifoldReward(**kwargs)
     raise ValueError(
         f"Unknown reward '{name}'. Known: esmfold_plddt, stub, tsv_lookup, "
-        "aa_fraction, diversity. For multi-objective use CompositeReward "
+        "aa_fraction, diversity, manifold. For multi-objective use CompositeReward "
         "directly; for SurrogateReward construct it in code (predictor + featurizer)."
     )

@@ -6,7 +6,7 @@ script (``scripts/train_grpo_surrogate.py``) calls a featurizer once on
 the full training set; the eval / inference path inside
 ``SurrogateReward`` calls it once per GRPO step on a small batch.
 
-Two implementations:
+Three implementations:
 
 - ``OneHotFeaturizer`` — pad/truncate to a fixed length, one-hot over
   the 20 canonical amino acids. CPU-only, no model deps.
@@ -17,6 +17,12 @@ Two implementations:
   batch converter, run forward at ``layer``, and mean-pool over residue
   positions. Returns ``(N, hidden_dim)`` — 1280 for the 33-layer 650M
   weights at ``weights/LLMs/esm2_t33_650M_UR50D.pt``.
+- ``PenCLZpFeaturizer`` — PenCL's *joint-latent* protein embedding
+  ``z_p``, i.e. the CLS token through the projection head. This is the
+  space Stage 1 aligns against text and the space
+  ``biom3.geometry`` manifolds are fitted in. Not interchangeable with
+  ``ESM2MeanPoolFeaturizer``: that one mean-pools raw ESM-2 residues and
+  never touches the projection head.
 """
 
 import os
@@ -163,9 +169,74 @@ class ESM2MeanPoolFeaturizer:
         return out
 
 
+class PenCLZpFeaturizer:
+    """Stage 1 joint-latent protein embedding ``z_p`` for each sequence.
+
+    Wraps an already-loaded ``pfam_PEN_CL`` (the one ``gdpo_train`` and
+    ``gdpo_train_multinode`` already hold for prompt encoding, so this
+    costs no extra weights) and reproduces the protein branch of its
+    forward: CLS token out of ``protein_encoder``, then
+    ``protein_projection``. Returns ``(N, emb_dim)`` float64 — float64
+    because the consumer is a Mahalanobis quadratic form.
+
+    Two properties are load-bearing when the output feeds
+    ``biom3.geometry``; both were measured against the 911 reference
+    vectors of ``manifold_sho1_911_run1.npz``:
+
+    - **fp32 only.** Stage 1 inference runs bf16 autocast on XPU by
+      default. At bf16 the cosine to the fp32 vector is still 0.99984,
+      but d_E moves by up to 8.68 against a band spanning 4.14-17.46 —
+      the Mahalanobis form amplifies exactly the low-variance directions
+      reduced precision perturbs. Autocast is therefore explicitly
+      disabled here rather than merely not enabled, so an ambient
+      autocast in a caller cannot silently change the numbers.
+    - **Padding mode is free.** Dynamic padding to the batch max and
+      padding to a fixed 1024 agree to cosine 1.000000 (ESM-2 masks pads
+      internally), so this uses dynamic padding — for SH3-length inputs
+      that is a ~70-token forward instead of a 1024-token one.
+
+    Sequences that clean to fewer than ``min_length`` residues get an
+    all-zero row; ``ManifoldReward`` maps those to the worst reward
+    rather than letting a degenerate rollout score well by accident.
+    """
+
+    def __init__(self, pencl, max_length: int = 1024, min_length: int = 1,
+                 batch_size: int = 32):
+        self.pencl = pencl
+        self.max_length = max_length
+        self.min_length = min_length
+        self.batch_size = batch_size
+        self._alphabet = pencl.protein_encoder.alphabet
+        self._batch_converter = self._alphabet.get_batch_converter()
+        self.device = next(pencl.parameters()).device
+        self.dim = int(pencl.protein_projection.projection.out_features)
+
+    @torch.no_grad()
+    def __call__(self, sequences: List[str]) -> np.ndarray:
+        out = np.zeros((len(sequences), self.dim), dtype=np.float64)
+        cleaned = [_clean(s)[: self.max_length] for s in sequences]
+        active = [(i, s) for i, s in enumerate(cleaned) if len(s) >= self.min_length]
+        if not active:
+            return out
+
+        for start in range(0, len(active), self.batch_size):
+            chunk = active[start : start + self.batch_size]
+            _, _, tokens = self._batch_converter([(f"s{i}", s) for i, s in chunk])
+            tokens = tokens.to(self.device)
+            # enabled=False, not "no autocast context" — see class docstring.
+            with torch.autocast(device_type=self.device.type, enabled=False):
+                z = self.pencl.protein_projection(self.pencl.protein_encoder(tokens))
+            z = z.float().cpu().numpy()
+            for (i, _), vec in zip(chunk, z):
+                out[i] = vec
+        return out
+
+
 def build_featurizer(name: str, **kwargs) -> Featurizer:
     if name == "onehot":
         return OneHotFeaturizer(**kwargs)
     if name == "esm2":
         return ESM2MeanPoolFeaturizer(**kwargs)
-    raise ValueError(f"Unknown featurizer '{name}'. Known: onehot, esm2")
+    if name == "pencl_zp":
+        return PenCLZpFeaturizer(**kwargs)
+    raise ValueError(f"Unknown featurizer '{name}'. Known: onehot, esm2, pencl_zp")

@@ -1,0 +1,28 @@
+{
+  "_base_configs": ["./_base_grpo.json"],
+  "_overwrite_configs": [],
+
+  "stage1_weights": "./weights/Run1_frozen_ckpts/Run1_TrackC_step_187000_3b7e39f9.ckpt",
+  "stage2_weights": "./weights/Run1_frozen_ckpts/v3_mmd_full49M_final.ckpt",
+  "stage3_init_weights": "./weights/ProteoScribe/blend_sd142k_ep353_ep59.bin",
+
+  "prompts_path": "./configs/grpo/prompts/sh3_v03_mixed_512.txt",
+
+  "steps": 60,
+  "num_generations": 8,
+  "batch_size": 1,
+  "save_steps": 50,
+
+  "n_quadrature": 4,
+  "quadrature_grid": "uniform",
+  "inner_mc": 1,
+  "eps_t": 1e-3,
+  "kl_estimator": "tokenwise_k3",
+  "use_old_policy_snapshot": true,
+  "advantage_normalize": false,
+
+  "pre_unmask": true,
+  "pre_unmask_config": "./configs/grpo/pre_unmask_sh3.json",
+
+  "output_root": "./outputs/gdpo"
+}

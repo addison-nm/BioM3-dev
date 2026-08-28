@@ -62,6 +62,28 @@ _LOGS_SUBDIR = "logs"
 _ARTIFACTS_SUBDIR = "artifacts"
 
 
+def parse_lr_scaling(value):
+    """Normalize --scale_learning_rate to a scaling mode.
+
+    Ported from Stage3/run_PL_training.py so both stages accept the same
+    vocabulary. Returns ``None`` (no scaling), ``'linear'`` (lr * n), or
+    ``'sqrt'`` (lr * sqrt(n)). Accepts booleans and the case-insensitive
+    strings true/false/linear/sqrt; ``True``/``'true'`` map to ``'linear'``
+    for backward compatibility.
+    """
+    if isinstance(value, bool):
+        return 'linear' if value else None
+    s = str(value).strip().lower()
+    if s in ('false', 'none', ''):
+        return None
+    if s in ('true', 'linear'):
+        return 'linear'
+    if s == 'sqrt':
+        return 'sqrt'
+    raise ValueError(
+        f"scale_learning_rate must be one of true/false/linear/sqrt, got {value!r}")
+
+
 def str_to_bool(s):
     if isinstance(s, bool):
         return s
@@ -157,8 +179,14 @@ def get_args(parser):
     parser.add_argument('--choose_optim', type=str, default='AdamW',
                         help="Optimizer name (e.g. 'AdamW').")
     parser.add_argument('--scale_learning_rate', type=str, default='False',
-                        help="'True'/'False'. When True, scale all learning "
-                             'rates by num_nodes * devices_per_node.')
+                        help="'false'/'linear'/'sqrt' (Stage3-compatible; 'true' "
+                             "means 'linear'). Scales all three learning rates by "
+                             'num_nodes * devices_per_node, relative to '
+                             '--lr_scale_baseline_ranks.')
+    parser.add_argument('--lr_scale_baseline_ranks', type=int, default=1,
+                        help='World size the base learning rates are defined at. '
+                             'Stage3 convention is 1. Run-1 Track B behaves as 96: '
+                             'its factor 2.3 = sqrt(512/96).')
 
     parser.add_argument('--precision', type=str, default='32',
                         help="Training precision: '32', '16', 'bf16', 'bf16-mixed'.")
@@ -342,7 +370,7 @@ def retrieve_all_args(args):
     args.trainable_seq = str_to_bool(args.trainable_seq)
     args.pretrained_text = str_to_bool(args.pretrained_text)
     args.trainable_text = str_to_bool(args.trainable_text)
-    args.scale_learning_rate = str_to_bool(args.scale_learning_rate)
+    args.scale_learning_rate = parse_lr_scaling(args.scale_learning_rate)
     args.wandb = str_to_bool(args.wandb)
     args.save_metrics_history = str_to_bool(args.save_metrics_history)
     args.metrics_history_all_ranks_val_loss = str_to_bool(
@@ -490,14 +518,17 @@ def train_model(args, PL_model, data_module):
     use_wandb = args.wandb
 
     if args.scale_learning_rate:
-        n = num_nodes * devices_per_node
+        n = (num_nodes * devices_per_node) / max(1, args.lr_scale_baseline_ranks)
+        factor = n ** 0.5 if args.scale_learning_rate == 'sqrt' else n
         logger.info(
-            "Scaling LRs by num_nodes x devices_per_node = %s x %s = %s",
-            num_nodes, devices_per_node, n,
+            "Scaling LRs (%s) by num_nodes x devices_per_node = %s x %s, "
+            "baseline_ranks=%s -> factor %.4g",
+            args.scale_learning_rate, num_nodes, devices_per_node,
+            args.lr_scale_baseline_ranks, factor,
         )
-        args.head_lr *= n
-        args.protein_encoder_lr *= n
-        args.text_encoder_lr *= n
+        args.head_lr *= factor
+        args.protein_encoder_lr *= factor
+        args.text_encoder_lr *= factor
 
     checkpoint_dir = os.path.join(output_root, checkpoints_folder, run_id)
     run_dir = os.path.join(output_root, runs_folder, run_id)

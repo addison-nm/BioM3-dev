@@ -21,7 +21,7 @@ pytestmark = [pytest.mark.slow]
 
 # Directory containing text files with command line arguments
 ARGS_DIR = os.path.join(DATDIR, "entrypoint_args")
-OUTPUTS_DIR = os.path.join(TMPDIR, "outputs")
+OUTPUTS_DIR = os.path.join(TMPDIR, "outputs", "stage1_inference")
 
 # Required weights that need to be downloaded to run entrypoint test
 REQUIRED_DOWNLOADS = [

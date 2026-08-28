@@ -51,7 +51,7 @@
 --text_emb_dim 512 
 --facilitator MMD 
 --run_id finetuning_args_v1 
---output_root outputs/logs 
+--output_root outputs/stage3_training/logs 
 --checkpoints_folder history 
 --pretrained_weights models/stage3/weights/minimodel1_weights1.pth 
 --wandb False 

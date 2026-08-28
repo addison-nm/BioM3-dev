@@ -51,7 +51,7 @@
 --text_emb_dim 512 
 --facilitator MMD 
 --run_id training_args_phase2_training_v1b 
---output_root outputs/logs 
+--output_root outputs/stage3_training/logs 
 --checkpoints_folder history 
---pretrained_weights outputs/logs/history/training_args_phase2_training_v1a/state_dict.best.pth
+--pretrained_weights outputs/stage3_training/logs/history/training_args_phase2_training_v1a/state_dict.best.pth
 --wandb False

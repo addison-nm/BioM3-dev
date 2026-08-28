@@ -18,7 +18,7 @@ from biom3.data_prep.compile_stage2_data_to_hdf5 import parse_arguments, main
 #####################
 
 INPUT_FPATH = os.path.join(DATDIR, "embeddings", "test_Facilitator_embeddings_with_acc_id.pt")
-OUTPUTS_DIR = os.path.join(TMPDIR, "outputs")
+OUTPUTS_DIR = os.path.join(TMPDIR, "outputs", "data_prep")
 
 
 ###############################################################################

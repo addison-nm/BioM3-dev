@@ -14,7 +14,7 @@
 --epochs 3 
 --valid_size 0.2 
 --enter_eval 100 
---resume_from_checkpoint outputs/logs/history/training_args_resume_from_checkpoint_v1a/last.ckpt
+--resume_from_checkpoint outputs/stage3_training/logs/history/training_args_resume_from_checkpoint_v1a/last.ckpt
 --batch_size 8 
 --model_option transformer 
 --diffusion_steps 1024 
@@ -51,7 +51,7 @@
 --text_emb_dim 512 
 --facilitator MMD 
 --run_id training_args_resume_from_checkpoint_v1b 
---output_root outputs/logs 
+--output_root outputs/stage3_training/logs 
 --checkpoints_folder history 
 --pretrained_weights None
 --wandb False

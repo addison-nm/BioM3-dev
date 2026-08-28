@@ -51,7 +51,7 @@
 --text_emb_dim 512 
 --facilitator MMD 
 --run_id training_args_v1a 
---output_root outputs/logs 
+--output_root outputs/stage3_training/logs 
 --checkpoints_folder history 
 --pretrained_weights None
 --wandb False

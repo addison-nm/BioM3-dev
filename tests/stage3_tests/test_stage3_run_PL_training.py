@@ -24,7 +24,7 @@ pytestmark = [pytest.mark.slow]
 
 # Directory containing text files with command line arguments
 ARGS_DIR = os.path.join(DATDIR, "entrypoint_args", "training")
-OUTPUTS_DIR = os.path.join(TMPDIR, "outputs")
+OUTPUTS_DIR = os.path.join(TMPDIR, "outputs", "stage3_training")
 
 # JSON training configs (relative to repo root, same as DATDIR)
 CONFIGS_DIR = "configs/stage3_training"
@@ -132,7 +132,7 @@ def test_train_from_scratch(
         f"{ARGS_DIR}/training_args_pretrained_weights_v1.txt", 
         False, 
         f"{DATDIR}/models/stage3/weights/minimodel1_weights1.pth",
-        f"{TMPDIR}/outputs/logs/history/training_args_pretrained_weights_v1/state_dict.pth"
+        f"{TMPDIR}/outputs/stage3_training/logs/history/training_args_pretrained_weights_v1/state_dict.pth"
     ],
     # Test that an error is raised when incompatible weights are specified.
     [
@@ -229,8 +229,8 @@ def test_train_from_pretrained_weights(
         f"{ARGS_DIR}/training_args_resume_from_checkpoint_v1a.txt", 
         f"{ARGS_DIR}/training_args_resume_from_checkpoint_v1b.txt", 
         False, 
-        f"{TMPDIR}/outputs/logs/history/training_args_resume_from_checkpoint_v1a/state_dict.pth",
-        f"{TMPDIR}/outputs/logs/history/training_args_resume_from_checkpoint_v1b/state_dict.pth"
+        f"{TMPDIR}/outputs/stage3_training/logs/history/training_args_resume_from_checkpoint_v1a/state_dict.pth",
+        f"{TMPDIR}/outputs/stage3_training/logs/history/training_args_resume_from_checkpoint_v1b/state_dict.pth"
     ],
 ])
 @pytest.mark.parametrize(
@@ -393,7 +393,7 @@ def test_resume_finetune_ignores_pretrained_weights(device):
     main(args_b)
 
     v1b_run_log_path = (
-        f"{TMPDIR}/outputs/logs/runs/"
+        f"{TMPDIR}/outputs/stage3_training/logs/runs/"
         f"finetune_resume_pretrained_v1b/artifacts/run.log"
     )
     with open(v1b_run_log_path) as f:
@@ -430,7 +430,7 @@ def test_resume_finetune_ignores_pretrained_weights(device):
         f"{ARGS_DIR}/finetuning_args_v1.txt",
         False,
         f"{DATDIR}/models/stage3/weights/minimodel1_weights1.pth",
-        f"{TMPDIR}/outputs/logs/history/finetuning_args_v1/state_dict.pth",
+        f"{TMPDIR}/outputs/stage3_training/logs/history/finetuning_args_v1/state_dict.pth",
     ],
 ])
 @pytest.mark.parametrize(
@@ -556,8 +556,8 @@ def test_finetuning(
         f"{ARGS_DIR}/training_args_phase2_training_v1a.txt", 
         f"{ARGS_DIR}/training_args_phase2_training_v1b.txt", 
         False, 
-        f"{TMPDIR}/outputs/logs/history/training_args_phase2_training_v1a/state_dict.best.pth",
-        f"{TMPDIR}/outputs/logs/history/training_args_phase2_training_v1b/state_dict.last.pth"
+        f"{TMPDIR}/outputs/stage3_training/logs/history/training_args_phase2_training_v1a/state_dict.best.pth",
+        f"{TMPDIR}/outputs/stage3_training/logs/history/training_args_phase2_training_v1b/state_dict.last.pth"
     ],
 ])
 @pytest.mark.parametrize(

@@ -244,3 +244,6 @@ __marimo__/
 
 # Local infra defaults for cloud launches (real bucket/registry) — not versioned
 configs/jobs/local.env
+
+# Local scratch analysis — not for commit
+/scratch/

@@ -4,9 +4,11 @@
 
   "reward": "manifold",
   "manifold_path": "/flare/NLDesignProtein/ahowe/BioM3-dev-space/Sho1_manifold_reproduction/biom3_geometry/manifold_sho1_911_run1.npz",
-  "manifold_transform": "band",
+  "manifold_transform": "exp",
   "manifold_scale": 1.0,
   "manifold_strict_norm": true,
+
+  "advantage_normalize": true,
 
   "diversity_weight": 0.0,
 

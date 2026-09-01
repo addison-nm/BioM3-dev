@@ -1,5 +1,6 @@
 # BioM3 — NVIDIA CUDA image (biom3:cuda) for commercial cloud (AWS / Mithril).
-# The Intel-XPU variant is docker/Dockerfile.xpu.
+# The Intel-XPU variant is docker/Dockerfile.xpu; the CPU-only inference variant
+# is docker/Dockerfile.cpu.
 #
 # One image per device, all uses: training (all stages), finetuning, generation,
 # and the streamlit app. The command is chosen at `docker run` time.
@@ -11,6 +12,15 @@
 # Choose the arch with `docker buildx build --platform linux/{amd64,arm64}`
 # (see docker/build.sh).
 #
+# TWO STAGES. The build stage needs a C/C++ toolchain and MPI headers (mpi4py is
+# the only source build); the runtime stage needs neither, so it starts from the
+# `base` CUDA image instead of `devel`. This matters a lot for size: the torch
+# cu129 wheel ships its OWN complete set of CUDA libraries in
+# site-packages/torch/lib (cudart, cublas, cuDNN, NCCL, cuFFT, cuSPARSE,
+# cuSOLVER, cuRAND, nvrtc, cuPTI) and resolves them through its RUNPATH, and
+# triton ships its own ptxas. A -cudnn-devel base therefore duplicates ~9.5 GB
+# of libraries, static archives and nvcc that nothing at run time opens.
+#
 # Build context is the BioM3-dev repo ROOT (so source + requirements are in
 # scope). Build with docker/build.sh, or:
 #   docker buildx build -f docker/Dockerfile.cuda -t biom3:cuda --load .
@@ -18,25 +28,30 @@
 # ALCF HPC (Polaris/Aurora) is NOT a target here — those use apptainer and a
 # different software stack (see docs/setup/setup_{polaris,aurora}.md).
 
-FROM nvidia/cuda:12.9.0-cudnn-devel-ubuntu24.04
+ARG CUDA_VERSION=12.9.0
+ARG UBUNTU_VERSION=ubuntu24.04
+
+# =============================================================================
+# Stage 1 — builder. Plain Ubuntu, not a CUDA image: every CUDA library in the
+# final venv arrives as part of a pip wheel, so no CUDA toolkit is needed to
+# assemble it.
+# =============================================================================
+FROM ubuntu:24.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1 \
-    BIOM3_MACHINE=container
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# System deps:
+# Build-only system deps:
 #  - python3.12: matches BioM3-dev's required Python (Ubuntu 24.04 ships 3.12).
 #  - build-essential, python3.12-dev: source builds for deps without wheels.
-#  - libopenmpi-dev, openmpi-bin: kept ONLY so mpi4py (in requirements) builds
-#    and imports. Multi-GPU launching uses torchrun, not mpiexec.
+#  - libopenmpi-dev: mpi4py (in requirements) is the one such build.
 #  - git, ca-certificates: pip may resolve git+https URLs from dependencies.
-#  - curl: fetches the oras binary below; also generally useful at run time.
+#  - curl: fetches the oras binary below.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         python3.12 python3.12-dev python3.12-venv \
         build-essential git ca-certificates curl \
-        libopenmpi-dev openmpi-bin \
+        libopenmpi-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # oras — pulls the GHCR weights bundle (see scripts/weights_bundle/ and the
@@ -88,10 +103,70 @@ COPY tests/    /app/tests/
 COPY configs/  /app/configs/
 
 # Editable install with the `app` extra so the same image can also serve
-# `biom3_app` (streamlit). Create the runtime mount points (empty in the image;
-# bind-mounted or synced at run time).
-RUN pip install -e ".[app]" \
-    && mkdir -p /app/weights /app/data /app/outputs /app/logs
+# `biom3_app` (streamlit). The .pth this writes points at /app/src, which the
+# runtime stage reproduces at the same path.
+RUN pip install -e ".[app]"
+
+# =============================================================================
+# Stage 2 — runtime. `base` carries libcudart plus cuda-compat (forward
+# compatibility for hosts on an older driver); libcuda itself is injected by the
+# NVIDIA Container Toolkit. Everything else comes from the venv.
+# =============================================================================
+FROM nvidia/cuda:${CUDA_VERSION}-base-${UBUNTU_VERSION} AS runtime
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1 \
+    BIOM3_MACHINE=container
+
+# Runtime system deps only — no C++ toolchain, no CUDA headers, no static
+# archives:
+#  - python3.12: the interpreter /opt/venv symlinks to.
+#  - cuda-nvcc: REQUIRED, not optional. `import deepspeed` probes
+#    $CUDA_HOME/bin/nvcc -V from op_builder's is_compatible() and raises
+#    FileNotFoundError without it, which would break every Stage 3 entry point
+#    (biom3.Stage3.PL_wrapper imports deepspeed at module scope). 553 MB, versus
+#    the 5.1 GB the full cuda-command-line-tools + dev packages cost.
+#  - openmpi-bin: libmpi.so.40 for mpi4py, and mpiexec for the multinode
+#    launchers. Multi-GPU on one node uses torchrun, not mpiexec.
+#  - libgomp1: OpenMP runtime for the scientific-stack wheels.
+#  - git, curl, ca-certificates: dependency fetches and the entrypoint's hooks.
+ARG CUDA_APT_SUFFIX=12-9
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3.12 \
+        cuda-nvcc-${CUDA_APT_SUFFIX} \
+        openmpi-bin libgomp1 \
+        git curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Escape hatch, off by default: DeepSpeed JIT-compiles cpu_adam against a C++
+# compiler and the CUDA headers on first use of DeepSpeedCPUAdam or ZeRO
+# optimizer/parameter offload. No BioM3 config takes that path (every
+# stage3_training config uses choose_optim=AdamW, and DeepSpeedStrategy is
+# constructed without offload), so the toolchain is omitted. Re-add it — and
+# ~2 GB — with `--build-arg INSTALL_BUILD_TOOLS=true`.
+ARG INSTALL_BUILD_TOOLS=false
+RUN if [ "$INSTALL_BUILD_TOOLS" = "true" ]; then \
+        apt-get update && apt-get install -y --no-install-recommends \
+            build-essential python3.12-dev \
+            cuda-cudart-dev-${CUDA_APT_SUFFIX} \
+            libcublas-dev-${CUDA_APT_SUFFIX} \
+            libcurand-dev-${CUDA_APT_SUFFIX} \
+        && rm -rf /var/lib/apt/lists/*; \
+    fi
+
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+COPY --from=builder /usr/local/bin/oras /usr/local/bin/oras
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /app /app
+
+WORKDIR /app
+
+# Runtime mount points (empty in the image; bind-mounted or synced at run time).
+RUN mkdir -p /app/weights /app/data /app/outputs /app/logs
 
 # Entrypoint from the repo's docker/ directory.
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh

@@ -1,0 +1,119 @@
+# BioM3 — CPU-only inference image (biom3:cpu).
+#
+# A small image for quick, hardware-free access to the inference tools: Stage 1
+# / Stage 2 embedding, manifold fitting and scoring, and Stage 3 sampling. The
+# device-bearing images are docker/Dockerfile.{cuda,xpu}.
+#
+# NOT a training image. requirements/container-cpu.txt omits tensorboard, optuna
+# and mpi4py, so `biom3_train_*` and the scripts/*_train_*.sh wrappers are out of
+# scope here — use the cuda or xpu variant for those. Entry points that DO
+# work:
+#   biom3_embedding_pipeline   biom3_PenCL_inference   biom3_Facilitator_sample
+#   biom3_ProteoScribe_sample  biom3_fit_manifold      biom3_score_manifold
+#   biom3_compile_hdf5         biom3_cluster_split     biom3_csv_to_parquet
+#
+# Arch-portable exactly as the cuda variant is: the CPU torch index serves both
+# x86_64 and aarch64 wheels, so `--platform linux/{amd64,arm64}` both work.
+#
+# Build context is the BioM3-dev repo ROOT. Build with
+# `docker/build.sh --variant cpu`, or:
+#   docker buildx build -f docker/Dockerfile.cpu -t biom3:cpu --load .
+
+ARG UBUNTU_VERSION=24.04
+
+# =============================================================================
+# Stage 1 — builder. Toolchain here only; nothing in this set builds from
+# source once mpi4py is out of the requirements, but python3.12-dev keeps a
+# missing wheel from failing the build.
+# =============================================================================
+FROM ubuntu:${UBUNTU_VERSION} AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3.12 python3.12-dev python3.12-venv \
+        build-essential git ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# oras — pulls the GHCR weights bundle (BIOM3_WEIGHTS_BUNDLE in
+# docker/entrypoint.sh), which is the main way this image gets weights.
+ARG ORAS_VERSION=1.3.3
+ARG TARGETARCH
+RUN curl -fsSL -o /tmp/oras.tar.gz \
+        "https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_${TARGETARCH}.tar.gz" \
+    && tar -xzf /tmp/oras.tar.gz -C /usr/local/bin oras \
+    && rm /tmp/oras.tar.gz \
+    && oras version
+
+ENV VIRTUAL_ENV=/opt/venv
+RUN python3.12 -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+RUN pip install --upgrade pip setuptools wheel
+
+# CPU torch, from the cpu index — this is what keeps the image small. It must
+# come before the requirements so dependency resolution cannot pull a CUDA
+# wheel (and its ~5 GB of bundled CUDA libraries) back in.
+RUN pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+
+WORKDIR /app
+COPY requirements/ /app/requirements/
+RUN pip install -r requirements/container-cpu.txt
+
+# Optional: bake awscli in for the entrypoint's S3 sync hook (see the cuda
+# variant). Off by default; bind-mounts and the GHCR bundle need no cloud tools.
+ARG INSTALL_AWSCLI=false
+RUN if [ "$INSTALL_AWSCLI" = "true" ]; then pip install awscli; fi
+
+# BioM3 source. Explicit paths (no `COPY . .`) so weights/, data/, outputs/,
+# logs/ and jobs/ are never baked in. No `[app]` extra here — streamlit,
+# py3Dmol and imageio-ffmpeg are ~110 MB and biom3_app is served by the cuda
+# image.
+COPY pyproject.toml environment.sh README.md /app/
+COPY src/      /app/src/
+COPY scripts/  /app/scripts/
+COPY tests/    /app/tests/
+COPY configs/  /app/configs/
+
+RUN pip install -e .
+
+# Verify: streamlit is the one thing biom3.app needs and this image omits, so its
+# test module is the single exclusion.
+#   docker run --rm biom3:cpu pytest tests/ --quick \
+#       --ignore=tests/viz_tests/test_data_browser.py
+
+# =============================================================================
+# Stage 2 — runtime.
+# =============================================================================
+FROM ubuntu:${UBUNTU_VERSION} AS runtime
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1 \
+    BIOM3_MACHINE=container
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3.12 \
+        libgomp1 \
+        git curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+COPY --from=builder /usr/local/bin/oras /usr/local/bin/oras
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /app /app
+
+WORKDIR /app
+
+RUN mkdir -p /app/weights /app/data /app/outputs /app/logs
+
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["bash"]

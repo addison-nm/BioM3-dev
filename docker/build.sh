@@ -19,8 +19,9 @@
 #   docker/build.sh [--variant V] [--platform P] [--tag T] [--awscli] [--push]
 #                   [--release [--repo R] [--allow-dirty]] [-- <buildx args>]
 #
-#   --variant V    cuda | xpu (default: cuda). Selects docker/Dockerfile.<V>
+#   --variant V    cuda | cpu | xpu (default: cuda). Selects docker/Dockerfile.<V>
 #                  and defaults the tag to biom3:<V>. xpu is amd64-only.
+#                  cpu is the slim CPU-only inference image (no training).
 #   --platform P   linux/amd64 | linux/arm64 | linux/amd64,linux/arm64
 #                  (default: builder's native platform, or every architecture
 #                  the variant supports under --release). Cross-arch builds
@@ -70,14 +71,14 @@ while [[ $# -gt 0 ]]; do
         --repo)        REPO="$2"; shift 2 ;;
         --allow-dirty) ALLOW_DIRTY=1; shift ;;
         --)            shift; EXTRA=("$@"); break ;;
-        -h|--help)     sed -n '3,44p' "$0"; exit 0 ;;
+        -h|--help)     sed -n '3,45p' "$0"; exit 0 ;;
         *)             echo "Unknown arg: $1" >&2; exit 1 ;;
     esac
 done
 
 case "${VARIANT}" in
-    cuda|xpu|xpu-oneapi) ;;
-    *) echo "ERROR: --variant must be cuda, xpu or xpu-oneapi (got '${VARIANT}')." >&2; exit 1 ;;
+    cuda|cpu|xpu|xpu-oneapi) ;;
+    *) echo "ERROR: --variant must be cuda, cpu, xpu or xpu-oneapi (got '${VARIANT}')." >&2; exit 1 ;;
 esac
 
 DOCKERFILE="${SCRIPT_DIR}/Dockerfile.${VARIANT}"

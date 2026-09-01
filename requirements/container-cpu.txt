@@ -1,0 +1,47 @@
+# Slim CPU inference set for docker/Dockerfile.cpu.
+#
+# Scope: Stage 1/2 embedding, the geometry manifold tools, and Stage 3 sampling.
+# NOT training — this set omits tensorboard, optuna and mpi4py, so the
+# `biom3_train_*` entry points and scripts/*_train_*.sh are out of scope.
+# It also omits streamlit, so biom3_app does not run here.
+#
+# For a full CPU *development* environment (whole pytest suite, training
+# imports) use requirements/cpu.txt instead. Install torch from the CPU index
+# before this file; see docker/Dockerfile.cpu.
+
+# Foundational
+setuptools==79.0.1
+numpy==2.2.6
+scipy==1.16.2
+pandas==2.3.3
+
+# Numeric / data
+dask==2026.1.2            # biom3.Stage1.preprocess
+scikit-learn==1.7.2       # biom3.Stage1.PL_wrapper metrics
+h5py==3.14                # biom3.data_prep HDF5 compilation
+pyarrow                   # biom3.dbio parquet I/O
+matplotlib==3.10.6
+imageio==2.37.0           # biom3.Stage3.animation_tools
+py3Dmol                   # biom3.viz.viewer
+wandb                     # imported by biom3.Stage3.run_PL_training at module scope
+
+# Model stack
+torchmetrics
+pytorch-lightning
+transformers==4.48.1
+deepspeed==0.17           # imported by biom3.Stage3.PL_wrapper (JIT ops unused)
+fair-esm==2.0.0
+
+# Model building blocks
+axial-positional-embedding==0.3.12
+linear-attention-transformer==0.19.1
+
+# Bioinformatics
+biopython==1.85
+
+# Utilities
+pytest==8.4               # `pytest tests/ --quick` inside the image
+tqdm==4.67
+psutil                    # biom3.backend.device
+pyyaml
+omegaconf

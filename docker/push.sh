@@ -26,10 +26,10 @@
 # the org. See cloud/README.md for the full one-time runbook.
 #
 # USAGE:
-#   docker/push.sh [--variant cuda|xpu|xpu-oneapi] [--repo R] [--local-tag T] [--allow-dirty]
+#   docker/push.sh [--variant cuda|cpu|xpu|xpu-oneapi] [--repo R] [--local-tag T] [--allow-dirty]
 #                  [--force-dev]
 #
-#   --variant V    cuda | xpu (default cuda) -> pushes biom3:<V> as <V>-<sha> + <V>-dev
+#   --variant V    cuda | cpu | xpu (default cuda) -> pushes biom3:<V> as <V>-<sha> + <V>-dev
 #   --repo R       registry repo WITHOUT the tag
 #                  (default: ghcr.io/natural-machine/biom3)
 #   --local-tag T  local image to push (default: biom3:<variant>)

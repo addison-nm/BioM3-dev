@@ -23,7 +23,8 @@ to run at `docker run` time. Built per architecture:
 
 | File | Purpose |
 | ---- | ------- |
-| `Dockerfile.cuda` | The NVIDIA image: `nvidia/cuda:12.9` → py3.12 → torch 2.8 (cu129) → BioM3 (`pip install -e .[app]`). |
+| `Dockerfile.cuda` | The NVIDIA image: `nvidia/cuda:12.9-base` → py3.12 → torch 2.8 (cu129) → BioM3 (`pip install -e .[app]`). Two-stage: the toolchain lives in a throwaway builder, and the runtime starts from `base` rather than `devel` because the torch wheel already ships every CUDA library it opens. |
+| `Dockerfile.cpu` | The slim CPU-only **inference** image: `ubuntu:24.04` → py3.12 → torch 2.8 (cpu) → BioM3, from `requirements/container-cpu.txt`. Embedding, manifold fitting/scoring and Stage 3 sampling. **Not a training image** (no wandb/tensorboard/mpi4py) and no streamlit `app` extra. |
 | `Dockerfile.xpu` | The Intel XPU variant, for Aurora single-node. Ubuntu + pip wheels. **amd64 only** — there are no arm64 Intel GPU wheels. |
 | `Dockerfile.xpu-oneapi` | Second Aurora variant, built on `intel/oneapi-hpckit` so the container's Intel MPI matches the host launcher's. Exists because multi-node collectives never complete in the `xpu` image. **amd64 only.** |
 | `Dockerfile.<variant>.dockerignore` | Trims the build context (BuildKit picks it up per-Dockerfile). |
@@ -37,8 +38,8 @@ to run at `docker run` time. Built per architecture:
 
 ## Build
 
-Requires Docker with BuildKit/buildx. The image is ~18–21 GB on disk (~10–12 GB
-compressed in the registry); the first build downloads the ~3 GB torch cu129 wheel.
+Requires Docker with BuildKit/buildx. The cuda image is ~8.6 GB on disk, the cpu
+image ~1.9 GB; the first cuda build downloads the ~3 GB torch cu129 wheel.
 Subsequent builds reuse the buildx layer cache.
 
 ```bash
@@ -51,6 +52,9 @@ docker/build.sh --platform linux/arm64
 
 # Bake in awscli for the S3 sync hook (off by default):
 docker/build.sh --awscli
+
+# The slim CPU-only inference image:
+docker/build.sh --variant cpu           # tags biom3:cpu
 
 # The Intel XPU variants (amd64 only):
 docker/build.sh --variant xpu           # single-node, validated
@@ -292,8 +296,16 @@ entrypoint syncs into the container's own dirs. Two caveats for the disk-less mo
   /`MASTER_ADDR`/`MASTER_PORT`. BioM3 already reads these
   ([`core/_dist_env.py`](../src/biom3/core/_dist_env.py)) and PyTorch Lightning
   auto-detects the torchelastic environment (it does not re-spawn).
-- OpenMPI is in the image only so `mpi4py` (a pinned dependency) builds; it is not used
-  to launch.
+- OpenMPI is in the image only so `mpi4py` (a pinned dependency) builds and imports;
+  it is not used to launch. The runtime stage carries just `openmpi-bin`; the
+  headers live in the builder stage.
+- `cuda-nvcc` is in the runtime stage and is **required**, not optional: `import
+  deepspeed` probes `$CUDA_HOME/bin/nvcc -V` from its op-builder compatibility scan
+  and raises `FileNotFoundError` without it, which would break every Stage 3 entry
+  point. The rest of the CUDA toolkit is absent — the torch wheel ships its own
+  cudart/cuBLAS/cuDNN/NCCL/cuFFT/cuSPARSE/cuSOLVER/cuRAND/nvrtc in
+  `site-packages/torch/lib` and resolves them through its RUNPATH, and triton ships
+  its own `ptxas`.
 
 ## Quick local sanity check (no GPU required)
 
@@ -301,6 +313,16 @@ entrypoint syncs into the container's own dirs. Two caveats for the disk-less mo
 docker/build.sh
 docker run --rm biom3:cuda python -c "import biom3, torch; print(torch.__version__)"
 docker run --rm biom3:cuda pytest tests/ --quick
+```
+
+For the cpu variant, exclude the one test module that needs `streamlit` (the `app`
+extra is not installed there):
+
+```bash
+docker/build.sh --variant cpu
+docker run --rm biom3:cpu python -c "import biom3, torch; print(torch.__version__)"
+docker run --rm biom3:cpu pytest tests/ --quick \
+    --ignore=tests/viz_tests/test_data_browser.py
 ```
 
 ## Multi-node training (SkyPilot)

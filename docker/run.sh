@@ -30,14 +30,17 @@
 #
 # ENV (all optional):
 #   BIOM3_IMAGE        image tag (default: biom3:cuda)
-#   BIOM3_DEVICE_KIND  cuda | xpu (default: inferred from the image tag) —
-#                      selects --gpus (cuda) vs --device /dev/dri (xpu)
+#   BIOM3_DEVICE_KIND  cuda | xpu | cpu (default: inferred from the image tag) —
+#                      selects --gpus (cuda), --device /dev/dri (xpu), or no
+#                      device flags at all (cpu)
 #   BIOM3_GPUS         value for --gpus on cuda (default: all; "none" omits it)
 #   BIOM3_WEIGHTS_DIR  host weights dir  (default: ./weights, mounted ro)
 #   BIOM3_DATA_DIR     host data dir     (default: ./data,    mounted ro)
 #   BIOM3_OUTPUTS_DIR  host outputs dir  (default: ./outputs, mounted rw)
 #   BIOM3_CONFIGS_DIR  host configs dir  (optional; overrides baked-in configs)
-#   Forwarded if set:  WANDB_API_KEY, NGPU, AWS_* and BIOM3_*_URI / sync vars.
+#   Forwarded if set:  WANDB_API_KEY, NGPU, AWS_*, BIOM3_*_URI / sync vars and
+#                      the GHCR weights-bundle vars (BIOM3_WEIGHTS_BUNDLE,
+#                      BIOM3_WEIGHTS_BUNDLE_REPO, GHCR_TOKEN, GHCR_USER).
 #
 #=============================================================================
 set -euo pipefail
@@ -54,6 +57,8 @@ if [[ -n "${BIOM3_DEVICE_KIND:-}" ]]; then
     DEVICE_KIND="${BIOM3_DEVICE_KIND}"
 elif [[ "${IMAGE}" == *:xpu || "${IMAGE}" == *:xpu-* ]]; then
     DEVICE_KIND="xpu"
+elif [[ "${IMAGE}" == *:cpu || "${IMAGE}" == *:cpu-* ]]; then
+    DEVICE_KIND="cpu"
 else
     DEVICE_KIND="cuda"
 fi
@@ -69,7 +74,7 @@ if [[ "${DEVICE_KIND}" == "xpu" ]]; then
         gid="$(getent group "${grp}" 2>/dev/null | cut -d: -f3)"
         [[ -n "${gid}" ]] && ARGS+=(--group-add "${gid}")
     done
-elif [[ "${GPUS}" != "none" ]]; then
+elif [[ "${DEVICE_KIND}" != "cpu" && "${GPUS}" != "none" ]]; then
     ARGS+=(--gpus "${GPUS}")
 fi
 
@@ -85,6 +90,7 @@ ARGS+=(-v "${O}:/app/outputs")
 # Forward env vars that are set in the caller's environment.
 for v in WANDB_API_KEY NGPU \
          BIOM3_WEIGHTS_URI BIOM3_DATA_URI BIOM3_WEIGHTS_INCLUDES \
+         BIOM3_WEIGHTS_BUNDLE BIOM3_WEIGHTS_BUNDLE_REPO GHCR_TOKEN GHCR_USER \
          BIOM3_SYNC_MODE BIOM3_SYNC_CMD BIOM3_SYNC_CMD_OUT BIOM3_OUTPUTS_PUSH_URI \
          AWS_ENDPOINT_URL AWS_PROFILE AWS_REGION AWS_DEFAULT_REGION \
          AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN; do

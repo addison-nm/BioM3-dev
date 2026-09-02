@@ -241,10 +241,15 @@ def get_model(args, data_shape, num_classes):
     transformer_local_heads = args.transformer_local_heads
     transformer_local_size = args.transformer_local_size
     transformer_reversible = args.transformer_reversible
-    diffusion_steps = args.diffusion_steps
+
+    # Architectural sequence length. ``sequence_length`` is set by callers that
+    # override ``diffusion_steps`` with a smaller sampling budget (pre-unmask);
+    # the model graph and the time conditioning must stay at the length the
+    # weights were trained at.
+    seq_len = int(getattr(args, 'sequence_length', None) or args.diffusion_steps)
 
     C, _ = num_classes, data_shape[0]*data_shape[1]
-    L = args.diffusion_steps
+    L = seq_len
 
     logger.info('Data shape index 0: %s', L)
     current_shape = (L,)
@@ -261,7 +266,7 @@ def get_model(args, data_shape, num_classes):
                     depth=transformer_depth,
                     n_blocks=transformer_blocks,
                     max_seq_len=L,
-                    num_timesteps=diffusion_steps,
+                    num_timesteps=seq_len,
                     causal=False, # no autoregression
                     ff_dropout=0, # dropout for feedforward NN
                     attn_layer_dropout=input_dp_rate, # dropout right after self-att layer

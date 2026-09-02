@@ -284,3 +284,42 @@ def test_confidence_path_time_index_offset():
         row = final[b, 0]
         assert (row[:D] == FAVORED_ID).all()
         assert (row[D:] == PAD_ID).all()
+
+
+def _model_args(**kwargs):
+    """Minimal architecture args for build_model_ProteoScribe."""
+    defaults = {
+        "input_dp_rate": 0.0,
+        "transformer_dim": 32,
+        "transformer_heads": 2,
+        "transformer_depth": 1,
+        "transformer_blocks": 1,
+        "transformer_local_heads": 1,
+        "transformer_local_size": 8,
+        "transformer_reversible": False,
+        "text_emb_dim": 8,
+        "num_classes": len(TOKENS),
+        "image_size": 8,
+        "diffusion_steps": 64,
+    }
+    defaults.update(kwargs)
+    return argparse.Namespace(**defaults)
+
+
+def test_model_built_at_sequence_length_not_budget():
+    """Regression guard: when diffusion_steps has been overridden with a
+    pre-unmask budget, the model graph and time conditioning must still be
+    built at the architectural sequence_length. A budget that is not a
+    multiple of the local attention window (13 % 8) previously tripped the
+    divisibility assert in LinearAttentionTransformerEmbedding."""
+    from biom3.Stage3.io import build_model_ProteoScribe
+
+    baseline = build_model_ProteoScribe(_model_args()).transformer
+    pre_unmask = build_model_ProteoScribe(
+        _model_args(diffusion_steps=13, sequence_length=64)
+    ).transformer
+
+    assert pre_unmask.max_seq_len == 64
+    assert pre_unmask.time_pos_emb.num_steps == 64.0
+    assert [tuple(w.shape) for w in pre_unmask.axial_pos_emb.weights] == \
+           [tuple(w.shape) for w in baseline.axial_pos_emb.weights]

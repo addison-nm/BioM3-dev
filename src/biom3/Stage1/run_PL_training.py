@@ -34,7 +34,7 @@ if BACKEND_NAME == _XPU:
     from lightning.pytorch.callbacks import (
         LearningRateMonitor, DeviceStatsMonitor, EarlyStopping,
     )
-    from lightning.pytorch.strategies import SingleDeviceStrategy
+    from lightning.pytorch.strategies import SingleDeviceStrategy, DDPStrategy
 else:
     import pytorch_lightning as pl
     from pytorch_lightning import Trainer
@@ -42,7 +42,7 @@ else:
     from pytorch_lightning.callbacks import (
         LearningRateMonitor, DeviceStatsMonitor, EarlyStopping,
     )
-    from pytorch_lightning.strategies import SingleDeviceStrategy
+    from pytorch_lightning.strategies import SingleDeviceStrategy, DDPStrategy
 
 import biom3.Stage1.preprocess as prep
 import biom3.Stage1.model as mod
@@ -608,13 +608,31 @@ def train_model(args, PL_model, data_module):
             verbose=True,
         ))
 
-    if args.device == 'cuda' and (devices_per_node > 1 or num_nodes > 1):
-        strategy = 'ddp'
-    elif args.device == 'xpu' and devices_per_node == 1 and num_nodes == 1:
-        # Aurora Lightning's _choose_strategy() falls back to
-        # SingleDeviceStrategy(device="cpu") for XPU because 'xpu' isn't in its
-        # CUDA/MPS/GPU branch; that makes trainer.strategy.root_device report
-        # CPU and breaks DeviceStatsMonitor. Pin the strategy explicitly.
+    _world = num_nodes * devices_per_node
+    if _world > 1:
+        # Explicitly configured DDP, mirroring Stage3/run_PL_training.py. Do NOT
+        # fall back to strategy='auto' on XPU: Lightning's _choose_strategy()
+        # does not know about 'xpu', and an unconfigured multi-device XPU run
+        # hangs in Trainer.__init__ (observed on 2 nodes x 12 tiles, 8+ minutes
+        # with idle GPUs).
+        #
+        # process_group_backend='xccl': frameworks/2025.3.1 removed
+        #   oneccl-bindings-for-pytorch and replaced the 'ccl' backend with
+        #   torch's native 'xccl'.
+        # static_graph=True: the autograd graph is stable across iterations, so
+        #   DDP precomputes the gradient-bucket ready order at step 0. Without
+        #   it, ranks fire bucket allreduces in different orders on oneCCL and
+        #   deadlock on a mismatched collective.
+        # gradient_as_bucket_view=True: small memory win, pairs with static_graph.
+        strategy = DDPStrategy(
+            process_group_backend='xccl' if args.device == 'xpu' else None,
+            static_graph=True,
+            gradient_as_bucket_view=True,
+        )
+    elif args.device == 'xpu':
+        # Single device. Lightning's _choose_strategy() falls back to
+        # SingleDeviceStrategy(device="cpu") for XPU, which makes
+        # trainer.strategy.root_device report CPU and breaks DeviceStatsMonitor.
         strategy = SingleDeviceStrategy(device=torch.device('xpu'))
     else:
         strategy = 'auto'

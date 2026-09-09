@@ -539,7 +539,9 @@ class pfam_PEN_CL(nn.Module):
         protein_loss = (-targets_cols_T * F.log_softmax(ml_cols.T, dim=-1)).sum(1)
 
         loss = (protein_loss + text_loss) / 2.0
-        return loss.mean(), ml_rows.detach()
+        # Return both slices: metrics need the transpose direction, and the full
+        # M x M matrix the dense path returns does not exist here by design.
+        return loss.mean(), (ml_rows.detach(), ml_cols.detach())
 
     def inter_row_logsumexp(
             self,

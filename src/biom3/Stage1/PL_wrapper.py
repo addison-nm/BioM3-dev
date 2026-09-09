@@ -82,7 +82,33 @@ def _sharded_inter_intra(model, z_p_all, z_t_all, micro_batch, gather_fn):
         z_p_all, z_t_all, N, row_index, row_logZ)
     loss_intra, cosine = model.compute_intra_loss_sharded(
         z_p_all, N, row_index)
-    return loss_align, logits, loss_intra, cosine
+    return loss_align, logits, loss_intra, cosine, row_index
+
+
+
+def _performance_metrics_sharded(module, logits_rows, logits_cols, row_index):
+    """performance_metrics() for row-sharded logits.
+
+    logits_rows [R, M]: this rank's text anchors against every protein.
+    logits_cols [M, R]: every text against this rank's protein anchors.
+
+    The dense version assumes a square matrix whose diagonal is the correct
+    pairing (y_true = arange(M)). Here local row k is global row row_index[k],
+    so the correct column is row_index[k], not k.
+    """
+    lr = logits_rows.cpu().float()
+    lc = logits_cols.cpu().float()
+    p_text = F.softmax(lr, dim=-1)        # [R, M] text anchor -> proteins
+    p_seq = F.softmax(lc.T, dim=-1)       # [R, M] protein anchor -> texts
+    p_tot = (p_seq + p_text) / 2
+    y_true = row_index.detach().cpu()
+    out = {}
+    for pred, source in ((torch.argmax(p_text, dim=-1), 'text'),
+                         (torch.argmax(p_seq, dim=-1), 'seq'),
+                         (torch.argmax(p_tot, dim=-1), 'total')):
+        out.update(module.compute_class_metrics(outputs=pred, targets=y_true,
+                                                source=source))
+    return out
 
 
 ######################
@@ -1085,7 +1111,7 @@ class pfam_PL_PEN_CL(pl.LightningModule):
         # Compute inter-modal loss.
         _impl = getattr(self.script_args, 'contrastive_impl', 'dense')
         if _impl == 'sharded':
-            loss_align, logits, loss_intra, cosine_similarity = _sharded_inter_intra(
+            loss_align, logits, loss_intra, cosine_similarity, _rows = _sharded_inter_intra(
                 self.model, z_p_all, z_t_all, z_t_swiss.shape[0],
                 lambda t: self.all_gather(t, sync_grads=True),
             )
@@ -1164,7 +1190,11 @@ class pfam_PL_PEN_CL(pl.LightningModule):
         self.log('train_loss_seq_mask', loss_sequence_mask, prog_bar=False, on_step=True, on_epoch=True, sync_dist=True)
 
         # Compute and log additional performance metrics.
-        metric_dict = self.performance_metrics(logits=logits)
+        if _impl == 'sharded':
+            # sharded logits are (rows [R,M], cols [M,R]), not a square matrix
+            metric_dict = _performance_metrics_sharded(self, logits[0], logits[1], _rows)
+        else:
+            metric_dict = self.performance_metrics(logits=logits)
         for key in metric_dict:
             values = metric_dict[key]
             final_key = 'train_' + key

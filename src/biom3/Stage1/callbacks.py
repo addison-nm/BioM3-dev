@@ -79,15 +79,28 @@ def _collect(logged, spec):
     return out
 
 
-def _collect_lr(logged):
-    """LearningRateMonitor keys look like 'lr-AdamW/pg1'. Store one column per
-    parameter group: Stage 1 has three (protein encoder, text encoder, heads)
-    with rates three orders of magnitude apart, so a single number would hide
-    what is actually happening."""
+def _collect_lr(trainer):
+    """Read the learning rate straight off the optimizers.
+
+    Not from LearningRateMonitor's logged keys: it does populate
+    callback_metrics, but under names it derives itself ("lr-AdamW",
+    "lr-AdamW/pg1", ...) which vary with optimizer count, scheduler presence and
+    whether param groups carry a `name`. Reading param_groups is unambiguous and
+    depends on no naming convention.
+
+    One column per group. Stage 1 has three (protein encoder 1e-4, text encoder
+    1e-6, projection heads 1e-3) spanning three orders of magnitude, so a single
+    number would hide what is actually happening.
+    """
     out = {}
-    for k, v in logged.items():
-        if k.startswith("lr-"):
-            out["lr_" + k[3:].replace("/", "_")] = _num(v)
+    try:
+        for oi, opt in enumerate(trainer.optimizers):
+            prefix = "lr" if len(trainer.optimizers) == 1 else f"lr_opt{oi}"
+            for gi, pg in enumerate(opt.param_groups):
+                if "lr" in pg:
+                    out[f"{prefix}_pg{gi}"] = float(pg["lr"])
+    except Exception:
+        pass
     return out
 
 
@@ -103,7 +116,7 @@ class Stage1MetricsHistoryCallback(MetricsHistoryCallback):
         record = {"global_step": trainer.global_step,
                   "epoch": trainer.current_epoch, "source": "step"}
         record.update(_collect(logged, TRAIN_METRICS))
-        record.update(_collect_lr(logged))
+        record.update(_collect_lr(trainer))
         self.train_step_metrics.append(record)
         self._pending_train_jsonl.append(record)
 
@@ -116,7 +129,7 @@ class Stage1MetricsHistoryCallback(MetricsHistoryCallback):
             record = {"global_step": trainer.global_step,
                       "epoch": epoch, "source": "epoch"}
             record.update(_collect(logged, TRAIN_METRICS))
-            record.update(_collect_lr(logged))
+            record.update(_collect_lr(trainer))
             self.train_step_metrics.append(record)
             self._pending_train_jsonl.append(record)
         self._flush_pending_train_jsonl()

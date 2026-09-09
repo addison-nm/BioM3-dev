@@ -583,8 +583,10 @@ def train_model(args, PL_model, data_module):
     callbacks = checkpoint_callbacks + callbacks
 
     if args.save_metrics_history:
-        from biom3.Stage3.callbacks import MetricsHistoryCallback
-        callbacks.append(MetricsHistoryCallback(
+        # Stage 1 subclass: explicit metric list. Stage 3's version harvests by
+        # prefix and silently drops Stage 1's `valid_*` metrics and the LR.
+        from biom3.Stage1.callbacks import Stage1MetricsHistoryCallback
+        callbacks.append(Stage1MetricsHistoryCallback(
             output_dir=artifacts_dir,
             save_ranks=args.metrics_history_ranks,
             every_n_steps=args.metrics_history_every_n_steps,

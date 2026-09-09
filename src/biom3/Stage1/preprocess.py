@@ -855,24 +855,35 @@ class Pfam_DataModule(LightningDataModule):
         directory_path = os.path.dirname(self.args.pfam_data_path)
         return f"{directory_path}/pfam_temp_splits"
 
+    # Only global rank 0 writes the shards. The default (True) runs prepare_data
+    # on local rank 0 of EVERY node, so on 2+ nodes several ranks would write the
+    # same split_pfam_rank_*.csv files concurrently. The splits live on shared
+    # Lustre, so one writer is both correct and sufficient.
+    prepare_data_per_node = False
+
     def prepare_data(self):
+        """Write one pfam shard per rank. Runs on global rank 0 ONLY.
+
+        Deliberately contains NO collectives. Lightning calls this hook on a
+        single rank (see _DataConnector.prepare_data) and then everyone meets at
+        `strategy.barrier("pre_setup")` before any setup() runs, so the shards
+        are guaranteed on disk before any rank reads them.
+
+        An earlier version called dist.barrier() here. That worked only because
+        Stage 1 ran under SingleDeviceStrategy, where every rank is its own world
+        of one and therefore every rank ran prepare_data. Under real DDP it
+        deadlocks: rank 0 waits on a barrier the other 23 ranks never reach.
+        """
         import torch.distributed as dist
 
-        # Use real distributed world_size (not PL's, which sees 1 in mpiexec mode)
+        # Real distributed world size: this must match the number of shards the
+        # ranks will later look for in setup().
         if dist.is_initialized():
             num_gpus = dist.get_world_size()
-            my_rank = dist.get_rank()
         else:
             num_gpus = self.trainer.world_size if self.trainer else 1
-            my_rank = 0
 
         splits_dir = self._resolve_splits_dir()
-
-        # Only rank 0 does the splitting; other ranks wait
-        if my_rank != 0:
-            logger.info("Rank %s: waiting for rank 0 to prepare data splits...", my_rank)
-            dist.barrier()
-            return
 
         logger.info('Upload Pfam Database and split it over %s dataframes', num_gpus)
         # Load Swiss-Prot data
@@ -901,10 +912,8 @@ class Pfam_DataModule(LightningDataModule):
         # After saving the splits to disk
         del pfam_df, df
         gc.collect()
-
-        # Signal other ranks that splits are ready
-        if dist.is_initialized():
-            dist.barrier()
+        # No barrier here: Lightning's strategy.barrier("pre_setup") runs between
+        # prepare_data and setup, and only this rank executes prepare_data.
 
     def setup(self, stage=None):
 

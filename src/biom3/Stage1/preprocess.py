@@ -719,6 +719,12 @@ class Pfam_TextSeqPairing_Dataset(Dataset):
         pfam_text_data = self.caption_tokenizer(batch_captions=[pfam_text_captions])
         pfam_protein_data = self.protein_tokenizer(batch_sequences=pfam_batch_sequences)
 
+        # attention_mask marks real tokens vs the [PAD]s added to reach
+        # text_max_length. The tokenizer already returns it
+        # (return_attention_mask=True); it was previously discarded here, so
+        # BERT attended over the padding and z_t carried a caption-length
+        # signal. Captions stay padded to a fixed length -- the default collate
+        # needs uniform shapes -- and the mask handles the pads.
         return (
                 text_data['input_ids'],
                 protein_data['protein_sequence_tokens'],
@@ -728,7 +734,9 @@ class Pfam_TextSeqPairing_Dataset(Dataset):
                 pfam_protein_data['protein_sequence_tokens'],
                 pfam_text_data['input_ids_masked'],
                 pfam_protein_data['protein_sequence_tokens_masked'],
-                bool_pfam_vector
+                bool_pfam_vector,
+                text_data['attention_mask'],
+                pfam_text_data['attention_mask']
         )
 
 

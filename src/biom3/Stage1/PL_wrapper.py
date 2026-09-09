@@ -978,7 +978,8 @@ class pfam_PL_PEN_CL(pl.LightningModule):
             self,
             x_t: torch.Tensor,
             x_p: torch.Tensor,
-            compute_masked_logits: bool=False
+            compute_masked_logits: bool=False,
+            x_t_mask: torch.Tensor=None
         ) -> (
                 torch.Tensor,
                 torch.Tensor,
@@ -988,7 +989,8 @@ class pfam_PL_PEN_CL(pl.LightningModule):
         outputs = self.model(
                         x_t=x_t,
                         x_s=x_p,
-                        compute_masked_logits=compute_masked_logits
+                        compute_masked_logits=compute_masked_logits,
+                        x_t_mask=x_t_mask
         )
         
         if compute_masked_logits:
@@ -1053,9 +1055,11 @@ class pfam_PL_PEN_CL(pl.LightningModule):
 
         # Check if the batch is a list and split data if so.
         if isinstance(batch, list):
+            # NB: *_mask_batch are the masked-LM corrupted tokens; *_attn_mask
+            # are the BERT attention masks marking real tokens vs [PAD].
             text_batch, protein_batch, text_mask_batch, protein_mask_batch, \
             pfam_text_batch, pfam_protein_batch, pfam_text_mask_batch, pfam_protein_mask_batch, \
-            bool_pfam_vector = batch
+            bool_pfam_vector, text_attn_mask, pfam_text_attn_mask = batch
     
 
         #print(f'rank={dist.get_rank()}: text size {text_batch.shape}')
@@ -1065,7 +1069,8 @@ class pfam_PL_PEN_CL(pl.LightningModule):
         z_t_swiss, z_p_swiss = self(
             x_t=text_batch,
             x_p=protein_batch,
-            compute_masked_logits=False
+            compute_masked_logits=False,
+            x_t_mask=text_attn_mask
         )
         # Timer end and log
         #end_time_forward_pass = time.time()
@@ -1078,7 +1083,8 @@ class pfam_PL_PEN_CL(pl.LightningModule):
         z_t_pfam, z_p_pfam = self(
             x_t=pfam_text_batch,
             x_p=pfam_protein_batch,
-            compute_masked_logits=False
+            compute_masked_logits=False,
+            x_t_mask=pfam_text_attn_mask
         )
         _safe_barrier()
         
@@ -1146,7 +1152,8 @@ class pfam_PL_PEN_CL(pl.LightningModule):
         logits_t_mask, logits_s_mask = self(
             x_t=all_text_mask_batch,
             x_p=all_protein_mask_batch,
-            compute_masked_logits=True
+            compute_masked_logits=True,
+            x_t_mask=torch.cat((text_attn_mask, pfam_text_attn_mask), dim=0)
         )
         #end_time_mask_comp = time.time()
         #print(f"Rank={dist.get_rank()}: Time taken for mask predictions: {end_time_mask_comp - start_time_mask_comp} seconds.")
@@ -1240,16 +1247,19 @@ class pfam_PL_PEN_CL(pl.LightningModule):
 
         if isinstance(batch, list):
             # split the data
+            # NB: *_mask_batch are the masked-LM corrupted tokens; *_attn_mask
+            # are the BERT attention masks marking real tokens vs [PAD].
             text_batch, protein_batch, text_mask_batch, protein_mask_batch, \
             pfam_text_batch, pfam_protein_batch, pfam_text_mask_batch, pfam_protein_mask_batch, \
-            bool_pfam_vector = batch
+            bool_pfam_vector, text_attn_mask, pfam_text_attn_mask = batch
 
         
         # forward pass over the swiss-prot data
         z_t_swiss, z_p_swiss = self(
                                   x_t=text_batch,
                                   x_p=protein_batch,
-                                  compute_masked_logits=False
+                                  compute_masked_logits=False,
+                                  x_t_mask=text_attn_mask
         )
         _safe_barrier() # wait till all GPUs catch up...
      
@@ -1266,7 +1276,8 @@ class pfam_PL_PEN_CL(pl.LightningModule):
         z_t_pfam, z_p_pfam = self(
                                 x_t=pfam_text_batch,
                                 x_p=pfam_protein_batch,
-                                compute_masked_logits=False
+                                compute_masked_logits=False,
+                                x_t_mask=pfam_text_attn_mask
         )
         _safe_barrier() # wait till all GPUs catch up...
         
@@ -1306,7 +1317,8 @@ class pfam_PL_PEN_CL(pl.LightningModule):
         logits_t_mask, logits_s_mask = self(
                     x_t=all_text_mask_batch,
                     x_p=all_protein_mask_batch,
-                    compute_masked_logits=True
+                    compute_masked_logits=True,
+                    x_t_mask=torch.cat((text_attn_mask, pfam_text_attn_mask), dim=0)
         )
 
         # compute mask language loss for biomedical expert model

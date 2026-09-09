@@ -114,20 +114,32 @@ class TextEncoder(nn.Module):
         # for the downstream latent alignment.
         self.target_token_idx = 0
 
-    def forward(self, inputs: torch.Tensor, compute_logits: bool=False) -> torch.Tensor:
+    def forward(self, inputs: torch.Tensor, compute_logits: bool=False,
+                attention_mask: torch.Tensor=None) -> torch.Tensor:
+        """Encode a batch of tokenised captions.
+
+        Captions are padded to a fixed text_max_length so every tensor in the
+        batch has the same shape (the DataLoader's default collate requires
+        that). `attention_mask` marks the real tokens; without it BERT attends
+        over every [PAD], so the hidden state -- and therefore z_t -- varies
+        with how much padding a caption happened to receive, injecting caption
+        length as a signal. Passing the mask is the standard fix and is what
+        the tokenizer already returns.
+        """
         # drop channel depth
         inputs = inputs.squeeze(1)
-        
+        if attention_mask is not None:
+            attention_mask = attention_mask.squeeze(1)
+
         if compute_logits:
             # compute the masked language model logits
-            #sequence_output = outputs.last_hidden_state
-            outputs = self.model(inputs)
+            outputs = self.model(inputs, attention_mask=attention_mask)
             logits = outputs.logits
             return logits
-        
+
         else:
             # Use the underlying BERT model directly to skip the MLM head
-            outputs = self.model.bert(inputs)
+            outputs = self.model.bert(inputs, attention_mask=attention_mask)
             return outputs.last_hidden_state[:, self.target_token_idx, :]
 
 
@@ -204,13 +216,15 @@ class PEN_CL(nn.Module):
             self,
             x_t: torch.Tensor,
             x_s: torch.Tensor,
-            compute_masked_logits: bool=False
+            compute_masked_logits: bool=False,
+            x_t_mask: torch.Tensor=None
         ) -> dict:
 
         if compute_masked_logits:
             # forward pass for computing logits for masked langauge objective
             protein_logits = self.protein_encoder(x_s, compute_logits=True)
-            text_logits = self.text_encoder(x_t, compute_logits=True)
+            text_logits = self.text_encoder(x_t, compute_logits=True,
+                                            attention_mask=x_t_mask)
 
             return {
                     'text_masked_logits': text_logits,
@@ -220,7 +234,8 @@ class PEN_CL(nn.Module):
         else:
             # split the tuple into 2 dicts... 
             # getting protein sequence and text inputs ...
-            z_t = self.text_encoder(x_t, compute_logits=False)
+            z_t = self.text_encoder(x_t, compute_logits=False,
+                                    attention_mask=x_t_mask)
             z_s = self.protein_encoder(x_s, compute_logits=False)
 
             # "joint" sequence and text embedding (with same dimension)
@@ -365,13 +380,15 @@ class pfam_PEN_CL(nn.Module):
             self,
             x_t: torch.Tensor,
             x_s: torch.Tensor,
-            compute_masked_logits: bool=False
+            compute_masked_logits: bool=False,
+            x_t_mask: torch.Tensor=None
         ) -> dict:
 
         if compute_masked_logits:
             # forward pass for computing logits for masked langauge objective
             protein_logits = self.protein_encoder(x_s, compute_logits=True)
-            text_logits = self.text_encoder(x_t, compute_logits=True)
+            text_logits = self.text_encoder(x_t, compute_logits=True,
+                                            attention_mask=x_t_mask)
 
             return {
                     'text_masked_logits': text_logits,
@@ -381,7 +398,8 @@ class pfam_PEN_CL(nn.Module):
         else:
             # split the tuple into 2 dicts... 
             # getting protein sequence and text inputs ...
-            z_t = self.text_encoder(x_t, compute_logits=False)
+            z_t = self.text_encoder(x_t, compute_logits=False,
+                                    attention_mask=x_t_mask)
             z_s = self.protein_encoder(x_s, compute_logits=False)
 
             # "joint" sequence and text embedding (with same dimension)

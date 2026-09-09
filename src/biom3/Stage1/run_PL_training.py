@@ -183,6 +183,15 @@ def get_args(parser):
                              "means 'linear'). Scales all three learning rates by "
                              'num_nodes * devices_per_node, relative to '
                              '--lr_scale_baseline_ranks.')
+    parser.add_argument('--contrastive_impl', type=str, default='dense',
+                        choices=['dense', 'sharded'],
+                        help="Contrastive loss implementation. 'dense' builds the "
+                             'full M x M similarity matrix on every rank, which is '
+                             'O(world_size^2): ~2 GB at 512 ranks, 32 GB at 2048. '
+                             "'sharded' computes only this rank's rows against all "
+                             'candidates, O(world_size). Mathematically identical '
+                             '(tests/stage1_tests/test_sharded_contrastive.py checks '
+                             'values and gradients); prefer it past a few hundred ranks.')
     parser.add_argument('--lr_scale_baseline_ranks', type=int, default=1,
                         help='World size the base learning rates are defined at. '
                              'Stage3 convention is 1. Run-1 Track B behaves as 96: '

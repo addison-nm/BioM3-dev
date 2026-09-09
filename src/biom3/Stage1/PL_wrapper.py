@@ -38,6 +38,53 @@ def _safe_barrier():
         dist.barrier()
 
 
+
+def _contrastive_row_index(module, micro_batch, world_size, rank, device):
+    """Global row indices this rank owns in the gathered [2*W*B, D] batch.
+
+    all_gather returns [W, B, D] and the caller does .view(-1, D), so the layout
+    is rank-major: rank r owns Swiss-Prot rows [r*B, (r+1)*B) and, after the
+    Swiss/Pfam concat, Pfam rows [N + r*B, N + (r+1)*B) with N = W*B.
+    """
+    N = world_size * micro_batch
+    swiss = torch.arange(rank * micro_batch, (rank + 1) * micro_batch, device=device)
+    return torch.cat([swiss, swiss + N])
+
+
+def _sharded_inter_intra(model, z_p_all, z_t_all, micro_batch, gather_fn):
+    """Row-sharded L_GC and L_PFC, equal to the dense pair (see
+    tests/stage1_tests/test_sharded_contrastive.py -- values AND gradients).
+
+    The dense path builds the full M x M similarity matrix on every rank, which
+    is O(W^2): ~2 GB at 512 ranks, 32 GB at 2048. This computes only this rank's
+    [2B, M] rows.
+    """
+    import torch.distributed as dist
+
+    M = z_p_all.shape[0]
+    N = M // 2
+    world_size = dist.get_world_size() if dist.is_initialized() else 1
+    rank = dist.get_rank() if dist.is_initialized() else 0
+    row_index = _contrastive_row_index(model, micro_batch, world_size, rank,
+                                       z_p_all.device)
+
+    # targets is a ROW-wise softmax and the protein-side term consumes targets.T,
+    # so every column entry needs a different row's normaliser. Each rank can
+    # only compute its own rows' normalisers; gather them. sync_grads=True is
+    # required -- targets is differentiable in the dense path, so detaching here
+    # would match the forward and silently change the backward.
+    lz = model.inter_row_logsumexp(z_p_all, z_t_all, row_index)      # [2B]
+    lz_swiss = gather_fn(lz[:micro_batch]).reshape(-1)               # [N]
+    lz_pfam = gather_fn(lz[micro_batch:]).reshape(-1)                # [N]
+    row_logZ = torch.cat([lz_swiss, lz_pfam])                        # [M]
+
+    loss_align, logits = model.compute_inter_loss_sharded(
+        z_p_all, z_t_all, N, row_index, row_logZ)
+    loss_intra, cosine = model.compute_intra_loss_sharded(
+        z_p_all, N, row_index)
+    return loss_align, logits, loss_intra, cosine
+
+
 ######################
 # Default PL wrapper #
 ######################
@@ -1036,21 +1083,29 @@ class pfam_PL_PEN_CL(pl.LightningModule):
         #start_time_loss_computation = time.time()
 
         # Compute inter-modal loss.
-        loss_align, logits = self.model.compute_inter_loss(
-            protein_embeddings=z_p_all,
-            text_embeddings=z_t_all,
-            batch_size=z_p_all.shape[0] // 2
-        )
+        _impl = getattr(self.script_args, 'contrastive_impl', 'dense')
+        if _impl == 'sharded':
+            loss_align, logits, loss_intra, cosine_similarity = _sharded_inter_intra(
+                self.model, z_p_all, z_t_all, z_t_swiss.shape[0],
+                lambda t: self.all_gather(t, sync_grads=True),
+            )
+        else:
+            loss_align, logits = self.model.compute_inter_loss(
+                protein_embeddings=z_p_all,
+                text_embeddings=z_t_all,
+                batch_size=z_p_all.shape[0] // 2
+            )
         # Timer end and log
         #end_time_loss_computation = time.time()
         #print(f"Rank={dist.get_rank()}: Time taken for loss computation: {end_time_loss_computation - start_time_loss_computation} seconds.")
 
 
-        # Compute intra-modal loss.
-        loss_intra, cosine_similarity = self.model.compute_intra_loss(
-            protein_embeddings=z_p_all,
-            batch_size=z_p_all.shape[0] // 2
-        )
+        # Compute intra-modal loss (the sharded branch already produced it).
+        if _impl != 'sharded':
+            loss_intra, cosine_similarity = self.model.compute_intra_loss(
+                protein_embeddings=z_p_all,
+                batch_size=z_p_all.shape[0] // 2
+            )
 
         # Concatenate batches for masked language modeling.
         all_text_batch = torch.cat((text_batch, pfam_text_batch), dim=0)

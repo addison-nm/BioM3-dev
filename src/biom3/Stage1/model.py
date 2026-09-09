@@ -319,8 +319,15 @@ class PEN_CL(nn.Module):
 
         for ii, target_mask_sample in enumerate(targets_masked):
             
-            # locate mask positions 
-            masked_positions = (target_mask_sample == mask_token_id).tolist()
+            # locate mask positions. Keep this a 1-D bool TENSOR: the old
+            # `.tolist()` produced a nested list (target_mask_sample is
+            # [1, seq_len]), and indexing a 1-D tensor with a nested list is the
+            # deprecated "non-tuple sequence for multidimensional indexing" path.
+            # PyTorch warns that it will become x[torch.tensor(seq)], which on a
+            # 1-D tensor raises "too many indices" -- so this was a future hard
+            # failure, not just noise. .tolist() also forced a device->host sync
+            # on every loop iteration.
+            masked_positions = (target_mask_sample == mask_token_id).reshape(-1)
             # extract the loss values at those masked positions
             loss_mask_sample = loss_mask[ii][masked_positions]
             
@@ -328,10 +335,14 @@ class PEN_CL(nn.Module):
             if loss_mask_sample.numel() > 0:
                 batch_loss.append(torch.mean(loss_mask_sample).unsqueeze(0))
         
-        if len(loss_mask_sample) > 0:
+        # Guard on batch_loss, not on loss_mask_sample. The latter is the last
+        # loop variable: if the final sample happened to have no masked
+        # positions, every other sample's loss was silently discarded and this
+        # returned 0.0. It also raised NameError when the batch was empty.
+        if batch_loss:
             loss_mask_mean = torch.mean(torch.cat(batch_loss))
         else:
-            # handle the case where there are no masked positions in any sample 
+            # no masked positions anywhere in the batch
             loss_mask_mean = torch.tensor(0.0, device=logits_masked.device)
 
 
@@ -735,8 +746,15 @@ class pfam_PEN_CL(nn.Module):
 
         for ii, target_mask_sample in enumerate(targets_masked):
             
-            # locate mask positions 
-            masked_positions = (target_mask_sample == mask_token_id).tolist()
+            # locate mask positions. Keep this a 1-D bool TENSOR: the old
+            # `.tolist()` produced a nested list (target_mask_sample is
+            # [1, seq_len]), and indexing a 1-D tensor with a nested list is the
+            # deprecated "non-tuple sequence for multidimensional indexing" path.
+            # PyTorch warns that it will become x[torch.tensor(seq)], which on a
+            # 1-D tensor raises "too many indices" -- so this was a future hard
+            # failure, not just noise. .tolist() also forced a device->host sync
+            # on every loop iteration.
+            masked_positions = (target_mask_sample == mask_token_id).reshape(-1)
             # extract the loss values at those masked positions
             loss_mask_sample = loss_mask[ii][masked_positions]
             
@@ -744,10 +762,14 @@ class pfam_PEN_CL(nn.Module):
             if loss_mask_sample.numel() > 0:
                 batch_loss.append(torch.mean(loss_mask_sample).unsqueeze(0))
         
-        if len(loss_mask_sample) > 0:
+        # Guard on batch_loss, not on loss_mask_sample. The latter is the last
+        # loop variable: if the final sample happened to have no masked
+        # positions, every other sample's loss was silently discarded and this
+        # returned 0.0. It also raised NameError when the batch was empty.
+        if batch_loss:
             loss_mask_mean = torch.mean(torch.cat(batch_loss))
         else:
-            # handle the case where there are no masked positions in any sample 
+            # no masked positions anywhere in the batch
             loss_mask_mean = torch.tensor(0.0, device=logits_masked.device)
 
         return loss_mask_mean

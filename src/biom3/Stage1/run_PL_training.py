@@ -95,6 +95,19 @@ def str_to_bool(s):
         raise ValueError("Input must be 'True' or 'False'")
 
 
+def none_or_int(s):
+    """None / 'None' -> None; otherwise an int. For the checkpoint cadences.
+
+    These had no argparse type, so `--checkpoint_every_n_epochs 1` arrived as
+    the string '1' and reached ModelCheckpoint(every_n_epochs='1'), while an
+    integer from a JSON config raised in nonestr_to_none. No job had set either
+    until the run2 configs asked for a checkpoint every epoch.
+    """
+    if s is None or (isinstance(s, str) and s.lower() == 'none'):
+        return None
+    return int(s)
+
+
 def nonestr_to_none(s):
     if isinstance(s, str):
         if s.lower() == 'none':
@@ -404,8 +417,8 @@ def retrieve_all_args(args):
     args.resume_from_checkpoint = nonestr_to_none(args.resume_from_checkpoint)
     args.pretrained_weights = nonestr_to_none(args.pretrained_weights)
     args.early_stopping_metric = nonestr_to_none(args.early_stopping_metric)
-    args.checkpoint_every_n_steps = nonestr_to_none(args.checkpoint_every_n_steps)
-    args.checkpoint_every_n_epochs = nonestr_to_none(args.checkpoint_every_n_epochs)
+    args.checkpoint_every_n_steps = none_or_int(args.checkpoint_every_n_steps)
+    args.checkpoint_every_n_epochs = none_or_int(args.checkpoint_every_n_epochs)
 
     # Auto-derive model_type from dataset_type if user left it at the default
     if args.dataset_type in ('pfam', 'pfam_ablated') and args.model_type == 'default':

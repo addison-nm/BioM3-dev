@@ -38,6 +38,167 @@ def _safe_barrier():
         dist.barrier()
 
 
+
+class _GatherGrad(torch.autograd.Function):
+    """all_gather whose backward is ONE collective, not an all-to-all.
+
+    torch.distributed.nn.functional.all_gather -- what
+    LightningModule.all_gather(sync_grads=True) ultimately calls -- reduces its
+    gradient with reduce_scatter only when the backend is NCCL. For every other
+    backend it emulates reduce_scatter with an all-to-all of world_size tensors
+    (torch/distributed/nn/functional.py::_AllGather.backward). Aurora runs xccl,
+    so every gathered tensor took the emulation path: an all-to-all is O(W)
+    messages per rank, hence O(W^2) across the fabric, once per gather per step.
+
+    That is the quadratic term in the measured s_step = 7.21 + 1.93e-4*W^2
+    (8.85s at 96 ranks, 35.71s at 384 -- 4x the ranks bought no throughput).
+
+    The gradient of an all_gather is each rank's slice of the incoming gradient
+    summed over ranks, so one all_reduce and a slice is exact. all_reduce moves
+    twice what reduce_scatter would, which is irrelevant next to removing W^2,
+    and unlike reduce_scatter it is known to work on every backend we run.
+    """
+
+    @staticmethod
+    def forward(ctx, tensor, group):
+        ctx.group = group
+        ctx.rank = dist.get_rank(group=group)
+        world = dist.get_world_size(group=group)
+        tensor = tensor.contiguous()
+        out = tensor.new_empty((world,) + tuple(tensor.shape))
+        dist.all_gather_into_tensor(out, tensor, group=group)
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_out):
+        grad_out = grad_out.contiguous()
+        dist.all_reduce(grad_out, op=dist.ReduceOp.SUM, group=ctx.group)
+        return grad_out[ctx.rank], None
+
+
+def _gather_with_grad(tensor, group=None):
+    """[B, ...] on each rank -> [W, B, ...] everywhere, gradients intact.
+
+    Matches LightningModule.all_gather(sync_grads=True) in shape and value, and
+    like it returns a leading axis of 1 when not running distributed.
+    """
+    if not (dist.is_available() and dist.is_initialized()):
+        return tensor.unsqueeze(0)
+    return _GatherGrad.apply(tensor, group)
+
+
+def _log_reduced(module, scalars, prog_bar_keys=(), on_step=True, on_epoch=True):
+    """self.log() every scalar, but with ONE cross-rank reduction for all of them.
+
+    Lightning's sync_dist=True issues a separate collective per logged value.
+    The Pfam training step logs 18 (5 losses + 12 sklearn metrics + memory), and
+    at scale it is the NUMBER of collectives, not their payload, that costs:
+    measured s_step went 8.85s at 96 ranks to 35.71s at 384. Stacking the
+    scalars into a single all_reduce yields identical values -- Lightning's
+    default sync_dist reduction is also a mean -- for one collective, not 18.
+    """
+    keys = list(scalars)
+    vals = torch.stack([
+        torch.as_tensor(scalars[k], dtype=torch.float32,
+                        device=module.device).detach().reshape(())
+        for k in keys
+    ])
+    if dist.is_available() and dist.is_initialized():
+        dist.all_reduce(vals, op=dist.ReduceOp.SUM)
+        vals = vals / dist.get_world_size()
+    for k, v in zip(keys, vals):
+        module.log(k, v, prog_bar=(k in prog_bar_keys or 'f1' in k),
+                   on_step=on_step, on_epoch=on_epoch, sync_dist=False)
+
+
+def _gather_four(module, a, b, c, d):
+    """all_gather four [B, D] tensors in one collective, preserving layout.
+
+    A [W, B, D] gather viewed as (-1, D) is rank-major; so is slicing a
+    [W, 4B, D] gather on the middle axis. The results are bit-identical to four
+    separate gathers, for a quarter of the collectives.
+    """
+    B, D = a.shape[0], a.shape[-1]
+    fused = torch.cat((a, b, c, d), dim=0)
+    out = _gather_with_grad(fused).reshape(-1, 4 * B, D)
+    return tuple(out[:, i * B:(i + 1) * B, :].reshape(-1, D) for i in range(4))
+
+
+def _contrastive_row_index(module, micro_batch, world_size, rank, device):
+    """Global row indices this rank owns in the gathered [2*W*B, D] batch.
+
+    all_gather returns [W, B, D] and the caller does .view(-1, D), so the layout
+    is rank-major: rank r owns Swiss-Prot rows [r*B, (r+1)*B) and, after the
+    Swiss/Pfam concat, Pfam rows [N + r*B, N + (r+1)*B) with N = W*B.
+    """
+    N = world_size * micro_batch
+    swiss = torch.arange(rank * micro_batch, (rank + 1) * micro_batch, device=device)
+    return torch.cat([swiss, swiss + N])
+
+
+def _sharded_inter_intra(model, z_p_all, z_t_all, micro_batch, gather_fn):
+    """Row-sharded L_GC and L_PFC, equal to the dense pair (see
+    tests/stage1_tests/test_sharded_contrastive.py -- values AND gradients).
+
+    The dense path builds the full M x M similarity matrix on every rank, which
+    is O(W^2): ~2 GB at 512 ranks, 32 GB at 2048. This computes only this rank's
+    [2B, M] rows.
+    """
+    import torch.distributed as dist
+
+    M = z_p_all.shape[0]
+    N = M // 2
+    world_size = dist.get_world_size() if dist.is_initialized() else 1
+    rank = dist.get_rank() if dist.is_initialized() else 0
+    row_index = _contrastive_row_index(model, micro_batch, world_size, rank,
+                                       z_p_all.device)
+
+    # targets is a ROW-wise softmax and the protein-side term consumes targets.T,
+    # so every column entry needs a different row's normaliser. Each rank can
+    # only compute its own rows' normalisers; gather them. sync_grads=True is
+    # required -- targets is differentiable in the dense path, so detaching here
+    # would match the forward and silently change the backward.
+    lz = model.inter_row_logsumexp(z_p_all, z_t_all, row_index)      # [2B]
+    # One gather, not two: gathering [2B] gives [W, 2B], and column-slicing that
+    # is exactly what gathering the two halves separately produced.
+    lz_all = gather_fn(lz).reshape(-1, 2 * micro_batch)              # [W, 2B]
+    lz_swiss = lz_all[:, :micro_batch].reshape(-1)                   # [N]
+    lz_pfam = lz_all[:, micro_batch:].reshape(-1)                    # [N]
+    row_logZ = torch.cat([lz_swiss, lz_pfam])                        # [M]
+
+    loss_align, logits = model.compute_inter_loss_sharded(
+        z_p_all, z_t_all, N, row_index, row_logZ)
+    loss_intra, cosine = model.compute_intra_loss_sharded(
+        z_p_all, N, row_index)
+    return loss_align, logits, loss_intra, cosine, row_index
+
+
+
+def _performance_metrics_sharded(module, logits_rows, logits_cols, row_index):
+    """performance_metrics() for row-sharded logits.
+
+    logits_rows [R, M]: this rank's text anchors against every protein.
+    logits_cols [M, R]: every text against this rank's protein anchors.
+
+    The dense version assumes a square matrix whose diagonal is the correct
+    pairing (y_true = arange(M)). Here local row k is global row row_index[k],
+    so the correct column is row_index[k], not k.
+    """
+    lr = logits_rows.cpu().float()
+    lc = logits_cols.cpu().float()
+    p_text = F.softmax(lr, dim=-1)        # [R, M] text anchor -> proteins
+    p_seq = F.softmax(lc.T, dim=-1)       # [R, M] protein anchor -> texts
+    p_tot = (p_seq + p_text) / 2
+    y_true = row_index.detach().cpu()
+    out = {}
+    for pred, source in ((torch.argmax(p_text, dim=-1), 'text'),
+                         (torch.argmax(p_seq, dim=-1), 'seq'),
+                         (torch.argmax(p_tot, dim=-1), 'total')):
+        out.update(module.compute_class_metrics(outputs=pred, targets=y_true,
+                                                source=source))
+    return out
+
+
 ######################
 # Default PL wrapper #
 ######################
@@ -905,7 +1066,8 @@ class pfam_PL_PEN_CL(pl.LightningModule):
             self,
             x_t: torch.Tensor,
             x_p: torch.Tensor,
-            compute_masked_logits: bool=False
+            compute_masked_logits: bool=False,
+            x_t_mask: torch.Tensor=None
         ) -> (
                 torch.Tensor,
                 torch.Tensor,
@@ -915,7 +1077,8 @@ class pfam_PL_PEN_CL(pl.LightningModule):
         outputs = self.model(
                         x_t=x_t,
                         x_s=x_p,
-                        compute_masked_logits=compute_masked_logits
+                        compute_masked_logits=compute_masked_logits,
+                        x_t_mask=x_t_mask
         )
         
         if compute_masked_logits:
@@ -980,9 +1143,11 @@ class pfam_PL_PEN_CL(pl.LightningModule):
 
         # Check if the batch is a list and split data if so.
         if isinstance(batch, list):
+            # NB: *_mask_batch are the masked-LM corrupted tokens; *_attn_mask
+            # are the BERT attention masks marking real tokens vs [PAD].
             text_batch, protein_batch, text_mask_batch, protein_mask_batch, \
             pfam_text_batch, pfam_protein_batch, pfam_text_mask_batch, pfam_protein_mask_batch, \
-            bool_pfam_vector = batch
+            bool_pfam_vector, text_attn_mask, pfam_text_attn_mask = batch
     
 
         #print(f'rank={dist.get_rank()}: text size {text_batch.shape}')
@@ -992,41 +1157,26 @@ class pfam_PL_PEN_CL(pl.LightningModule):
         z_t_swiss, z_p_swiss = self(
             x_t=text_batch,
             x_p=protein_batch,
-            compute_masked_logits=False
+            compute_masked_logits=False,
+            x_t_mask=text_attn_mask
         )
         # Timer end and log
         #end_time_forward_pass = time.time()
         #print(f"Rank={dist.get_rank()}: Time taken for Swiss-Prot forward pass: {end_time_forward_pass - start_time_forward_pass} seconds.")
 
-        # Ensure all GPUs are synchronized.
-        _safe_barrier()
-
-        # Forward pass with Pfam data.
+        # Forward pass with Pfam data. The barriers Run 1 placed around these
+        # forwards are removed: all_gather is itself a synchronisation point, so
+        # they bought nothing and cost a collective each.
         z_t_pfam, z_p_pfam = self(
             x_t=pfam_text_batch,
             x_p=pfam_protein_batch,
-            compute_masked_logits=False
+            compute_masked_logits=False,
+            x_t_mask=pfam_text_attn_mask
         )
-        _safe_barrier()
-        
-        #Gather tensors from all GPUs.
-        z_t_swiss_all = self.all_gather(z_t_swiss, sync_grads=True)
-        _safe_barrier()
-        z_p_swiss_all = self.all_gather(z_p_swiss, sync_grads=True)
 
-        # Reshape the embeddings.
-        z_t_swiss_all = z_t_swiss_all.view(-1, z_t_swiss.shape[-1])
-        z_p_swiss_all = z_p_swiss_all.view(-1, z_p_swiss.shape[-1])
-
-
-        # Gather tensors from all GPUs.
-        z_t_pfam_all = self.all_gather(z_t_pfam, sync_grads=True)
-        _safe_barrier()
-        z_p_pfam_all = self.all_gather(z_p_pfam, sync_grads=True)
-
-        # Reshape the embeddings.
-        z_t_pfam_all = z_t_pfam_all.view(-1, z_t_pfam.shape[-1])
-        z_p_pfam_all = z_p_pfam_all.view(-1, z_p_pfam.shape[-1])
+        # Gather all four embedding sets from all GPUs in one collective.
+        z_t_swiss_all, z_p_swiss_all, z_t_pfam_all, z_p_pfam_all = _gather_four(
+            self, z_t_swiss, z_p_swiss, z_t_pfam, z_p_pfam)
 
         # Concatenate Swiss-Prot and Pfam embeddings.
         z_t_all = torch.cat((z_t_swiss_all, z_t_pfam_all), dim=0)
@@ -1036,21 +1186,29 @@ class pfam_PL_PEN_CL(pl.LightningModule):
         #start_time_loss_computation = time.time()
 
         # Compute inter-modal loss.
-        loss_align, logits = self.model.compute_inter_loss(
-            protein_embeddings=z_p_all,
-            text_embeddings=z_t_all,
-            batch_size=z_p_all.shape[0] // 2
-        )
+        _impl = getattr(self.script_args, 'contrastive_impl', 'dense')
+        if _impl == 'sharded':
+            loss_align, logits, loss_intra, cosine_similarity, _rows = _sharded_inter_intra(
+                self.model, z_p_all, z_t_all, z_t_swiss.shape[0],
+                _gather_with_grad,
+            )
+        else:
+            loss_align, logits = self.model.compute_inter_loss(
+                protein_embeddings=z_p_all,
+                text_embeddings=z_t_all,
+                batch_size=z_p_all.shape[0] // 2
+            )
         # Timer end and log
         #end_time_loss_computation = time.time()
         #print(f"Rank={dist.get_rank()}: Time taken for loss computation: {end_time_loss_computation - start_time_loss_computation} seconds.")
 
 
-        # Compute intra-modal loss.
-        loss_intra, cosine_similarity = self.model.compute_intra_loss(
-            protein_embeddings=z_p_all,
-            batch_size=z_p_all.shape[0] // 2
-        )
+        # Compute intra-modal loss (the sharded branch already produced it).
+        if _impl != 'sharded':
+            loss_intra, cosine_similarity = self.model.compute_intra_loss(
+                protein_embeddings=z_p_all,
+                batch_size=z_p_all.shape[0] // 2
+            )
 
         # Concatenate batches for masked language modeling.
         all_text_batch = torch.cat((text_batch, pfam_text_batch), dim=0)
@@ -1065,7 +1223,8 @@ class pfam_PL_PEN_CL(pl.LightningModule):
         logits_t_mask, logits_s_mask = self(
             x_t=all_text_mask_batch,
             x_p=all_protein_mask_batch,
-            compute_masked_logits=True
+            compute_masked_logits=True,
+            x_t_mask=torch.cat((text_attn_mask, pfam_text_attn_mask), dim=0)
         )
         #end_time_mask_comp = time.time()
         #print(f"Rank={dist.get_rank()}: Time taken for mask predictions: {end_time_mask_comp - start_time_mask_comp} seconds.")
@@ -1101,28 +1260,29 @@ class pfam_PL_PEN_CL(pl.LightningModule):
             sys.stderr.write("Unexpected dataset_type value\n")
             sys.exit(1)
 
-        # Log the individual and total loss values.
-        self.log('train_loss', loss, prog_bar=True, on_step=True, on_epoch=True, sync_dist=True)
-        self.log('train_loss_align', loss_align, prog_bar=True, on_step=True, on_epoch=True, sync_dist=True)
-        self.log('train_loss_intra', loss_intra, prog_bar=True, on_step=True, on_epoch=True, sync_dist=True)
-        self.log('train_loss_text_mask', loss_text_mask, prog_bar=False, on_step=True, on_epoch=True, sync_dist=True)
-        self.log('train_loss_seq_mask', loss_sequence_mask, prog_bar=False, on_step=True, on_epoch=True, sync_dist=True)
+        # Compute additional performance metrics.
+        if _impl == 'sharded':
+            # sharded logits are (rows [R,M], cols [M,R]), not a square matrix
+            metric_dict = _performance_metrics_sharded(self, logits[0], logits[1], _rows)
+        else:
+            metric_dict = self.performance_metrics(logits=logits)
 
-        # Compute and log additional performance metrics.
-        metric_dict = self.performance_metrics(logits=logits)
-        for key in metric_dict:
-            values = metric_dict[key]
-            final_key = 'train_' + key
-            self.log(final_key, metric_dict[key], prog_bar=True if 'f1' in key else False, on_step=True, on_epoch=True, sync_dist=True)
-
-        # Log GPU memory usage at the beginning of the training.
+        # Every scalar below used to carry sync_dist=True -- 18 collectives per
+        # step. One reduction covers all of them; the logged values are the same.
+        scalars = {
+            'train_loss': loss,
+            'train_loss_align': loss_align,
+            'train_loss_intra': loss_intra,
+            'train_loss_text_mask': loss_text_mask,
+            'train_loss_seq_mask': loss_sequence_mask,
+        }
+        for key, value in metric_dict.items():
+            scalars['train_' + key] = value
+        scalars['memory_usage'] = print_memory_usage()
         if batch_idx == 0:
-            gpu_memory_usage = print_gpu_initialization()
-            self.log(f'gpu_memory_usage', gpu_memory_usage, sync_dist=True)
-        
-        # log CPU memory
-        memory_usage = print_memory_usage()
-        self.log(f'memory_usage', memory_usage, sync_dist=True)
+            scalars['gpu_memory_usage'] = print_gpu_initialization()
+        _log_reduced(self, scalars, prog_bar_keys=(
+            'train_loss', 'train_loss_align', 'train_loss_intra'))
  
         return {'loss': loss}
 
@@ -1155,61 +1315,60 @@ class pfam_PL_PEN_CL(pl.LightningModule):
 
         if isinstance(batch, list):
             # split the data
+            # NB: *_mask_batch are the masked-LM corrupted tokens; *_attn_mask
+            # are the BERT attention masks marking real tokens vs [PAD].
             text_batch, protein_batch, text_mask_batch, protein_mask_batch, \
             pfam_text_batch, pfam_protein_batch, pfam_text_mask_batch, pfam_protein_mask_batch, \
-            bool_pfam_vector = batch
+            bool_pfam_vector, text_attn_mask, pfam_text_attn_mask = batch
 
         
         # forward pass over the swiss-prot data
         z_t_swiss, z_p_swiss = self(
                                   x_t=text_batch,
                                   x_p=protein_batch,
-                                  compute_masked_logits=False
+                                  compute_masked_logits=False,
+                                  x_t_mask=text_attn_mask
         )
-        _safe_barrier() # wait till all GPUs catch up...
-     
-        # gather all tensors
-        z_t_swiss_all = self.all_gather(z_t_swiss, sync_grads=True)
-        _safe_barrier()    
-        z_p_swiss_all = self.all_gather(z_p_swiss, sync_grads=True)
-
-        # stack the embeddings
-        z_t_swiss_all = z_t_swiss_all.view(-1, z_t_swiss.shape[-1])
-        z_p_swiss_all = z_p_swiss_all.view(-1, z_p_swiss.shape[-1])
 
         # foward pass over the pfam data
         z_t_pfam, z_p_pfam = self(
                                 x_t=pfam_text_batch,
                                 x_p=pfam_protein_batch,
-                                compute_masked_logits=False
+                                compute_masked_logits=False,
+                                x_t_mask=pfam_text_attn_mask
         )
-        _safe_barrier() # wait till all GPUs catch up...
-        
-        # gather all tensors
-        z_t_pfam_all = self.all_gather(z_t_pfam, sync_grads=True)
-        _safe_barrier()
-        z_p_pfam_all = self.all_gather(z_p_pfam, sync_grads=True)
-        
-        # stack the embeddings
-        z_t_pfam_all = z_t_pfam_all.view(-1, z_t_pfam.shape[-1])
-        z_p_pfam_all = z_p_pfam_all.view(-1, z_p_pfam.shape[-1])
+
+        # gather all four embedding sets in one collective (see _gather_four)
+        z_t_swiss_all, z_p_swiss_all, z_t_pfam_all, z_p_pfam_all = _gather_four(
+            self, z_t_swiss, z_p_swiss, z_t_pfam, z_p_pfam)
            
         # concatenate swiss-prot <> pfam embeddings
         z_t_all = torch.cat((z_t_swiss_all, z_t_pfam_all), dim=0)
         z_p_all = torch.cat((z_p_swiss_all, z_p_pfam_all), dim=0)
 
-        # compute inter-modal loss values     
-        loss_align, logits = self.model.compute_inter_loss(
-                                            protein_embeddings=z_p_all,
-                                            text_embeddings=z_t_all,
-                                            batch_size=z_p_all.shape[0] // 2
-        )
+        # Validation must take the same sharded branch as training. The dense
+        # call below it builds the full M x M matrix on EVERY rank, M = 2*W*B:
+        # 151 MB at 384 ranks, 2.4 GB at 1536 -- an O(W^2) ceiling that has
+        # nothing to do with the model size.
+        _impl = getattr(self.script_args, 'contrastive_impl', 'dense')
+        if _impl == 'sharded':
+            loss_align, logits, loss_intra, cosine_similarity, _rows = _sharded_inter_intra(
+                self.model, z_p_all, z_t_all, z_t_swiss.shape[0],
+                _gather_with_grad,
+            )
+        else:
+            # compute inter-modal loss values
+            loss_align, logits = self.model.compute_inter_loss(
+                                                protein_embeddings=z_p_all,
+                                                text_embeddings=z_t_all,
+                                                batch_size=z_p_all.shape[0] // 2
+            )
 
-        # compute intra-modal loss values
-        loss_intra, cosine_similarity = self.model.compute_intra_loss(
-                                            protein_embeddings=z_p_all,
-                                            batch_size=z_p_all.shape[0] // 2
-        )
+            # compute intra-modal loss values
+            loss_intra, cosine_similarity = self.model.compute_intra_loss(
+                                                protein_embeddings=z_p_all,
+                                                batch_size=z_p_all.shape[0] // 2
+            )
 
         # concatenate batch samples
         all_text_batch = torch.cat((text_batch, pfam_text_batch), dim=0)
@@ -1221,7 +1380,8 @@ class pfam_PL_PEN_CL(pl.LightningModule):
         logits_t_mask, logits_s_mask = self(
                     x_t=all_text_mask_batch,
                     x_p=all_protein_mask_batch,
-                    compute_masked_logits=True
+                    compute_masked_logits=True,
+                    x_t_mask=torch.cat((text_attn_mask, pfam_text_attn_mask), dim=0)
         )
 
         # compute mask language loss for biomedical expert model
@@ -1258,22 +1418,25 @@ class pfam_PL_PEN_CL(pl.LightningModule):
             sys.exit(1)
 
      
-        # track loss ...
-        self.log('valid_loss', loss, prog_bar=True, on_step=True, on_epoch=True, sync_dist=True)
-        self.log('valid_loss_align', loss_align, prog_bar=True, on_step=True, on_epoch=True, sync_dist=True)
-        self.log('valid_loss_intra', loss_intra, prog_bar=True, on_step=True, on_epoch=True, sync_dist=True)
-        self.log('valid_loss_text_mask', loss_text_mask, prog_bar=False, on_step=True, on_epoch=True, sync_dist=True)
-        self.log('valid_loss_seq_mask', loss_sequence_mask, prog_bar=False, on_step=True, on_epoch=True, sync_dist=True)
-        # log CPU memory
-        memory_usage = print_memory_usage()
-        self.log(f'memory_usage', memory_usage, sync_dist=True)
- 
         # track metrics
-        metric_dict = self.performance_metrics(logits=logits.detach().cpu())
-        for key in metric_dict:
-            values = metric_dict[key]
-            final_key = 'valid_' + key
-            self.log(final_key, metric_dict[key], prog_bar=True if 'f1' in key else False, on_step=True, on_epoch=True, sync_dist=True)
+        if _impl == 'sharded':
+            metric_dict = _performance_metrics_sharded(self, logits[0], logits[1], _rows)
+        else:
+            metric_dict = self.performance_metrics(logits=logits.detach().cpu())
+
+        # one reduction for all of them, as in training_step
+        scalars = {
+            'valid_loss': loss,
+            'valid_loss_align': loss_align,
+            'valid_loss_intra': loss_intra,
+            'valid_loss_text_mask': loss_text_mask,
+            'valid_loss_seq_mask': loss_sequence_mask,
+        }
+        for key, value in metric_dict.items():
+            scalars['valid_' + key] = value
+        scalars['memory_usage'] = print_memory_usage()
+        _log_reduced(self, scalars, prog_bar_keys=(
+            'valid_loss', 'valid_loss_align', 'valid_loss_intra'))
 
 
         # collect joint embedding

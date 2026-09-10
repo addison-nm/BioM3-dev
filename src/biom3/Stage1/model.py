@@ -114,20 +114,32 @@ class TextEncoder(nn.Module):
         # for the downstream latent alignment.
         self.target_token_idx = 0
 
-    def forward(self, inputs: torch.Tensor, compute_logits: bool=False) -> torch.Tensor:
+    def forward(self, inputs: torch.Tensor, compute_logits: bool=False,
+                attention_mask: torch.Tensor=None) -> torch.Tensor:
+        """Encode a batch of tokenised captions.
+
+        Captions are padded to a fixed text_max_length so every tensor in the
+        batch has the same shape (the DataLoader's default collate requires
+        that). `attention_mask` marks the real tokens; without it BERT attends
+        over every [PAD], so the hidden state -- and therefore z_t -- varies
+        with how much padding a caption happened to receive, injecting caption
+        length as a signal. Passing the mask is the standard fix and is what
+        the tokenizer already returns.
+        """
         # drop channel depth
         inputs = inputs.squeeze(1)
-        
+        if attention_mask is not None:
+            attention_mask = attention_mask.squeeze(1)
+
         if compute_logits:
             # compute the masked language model logits
-            #sequence_output = outputs.last_hidden_state
-            outputs = self.model(inputs)
+            outputs = self.model(inputs, attention_mask=attention_mask)
             logits = outputs.logits
             return logits
-        
+
         else:
             # Use the underlying BERT model directly to skip the MLM head
-            outputs = self.model.bert(inputs)
+            outputs = self.model.bert(inputs, attention_mask=attention_mask)
             return outputs.last_hidden_state[:, self.target_token_idx, :]
 
 
@@ -204,13 +216,15 @@ class PEN_CL(nn.Module):
             self,
             x_t: torch.Tensor,
             x_s: torch.Tensor,
-            compute_masked_logits: bool=False
+            compute_masked_logits: bool=False,
+            x_t_mask: torch.Tensor=None
         ) -> dict:
 
         if compute_masked_logits:
             # forward pass for computing logits for masked langauge objective
             protein_logits = self.protein_encoder(x_s, compute_logits=True)
-            text_logits = self.text_encoder(x_t, compute_logits=True)
+            text_logits = self.text_encoder(x_t, compute_logits=True,
+                                            attention_mask=x_t_mask)
 
             return {
                     'text_masked_logits': text_logits,
@@ -220,7 +234,8 @@ class PEN_CL(nn.Module):
         else:
             # split the tuple into 2 dicts... 
             # getting protein sequence and text inputs ...
-            z_t = self.text_encoder(x_t, compute_logits=False)
+            z_t = self.text_encoder(x_t, compute_logits=False,
+                                    attention_mask=x_t_mask)
             z_s = self.protein_encoder(x_s, compute_logits=False)
 
             # "joint" sequence and text embedding (with same dimension)
@@ -304,8 +319,15 @@ class PEN_CL(nn.Module):
 
         for ii, target_mask_sample in enumerate(targets_masked):
             
-            # locate mask positions 
-            masked_positions = (target_mask_sample == mask_token_id).tolist()
+            # locate mask positions. Keep this a 1-D bool TENSOR: the old
+            # `.tolist()` produced a nested list (target_mask_sample is
+            # [1, seq_len]), and indexing a 1-D tensor with a nested list is the
+            # deprecated "non-tuple sequence for multidimensional indexing" path.
+            # PyTorch warns that it will become x[torch.tensor(seq)], which on a
+            # 1-D tensor raises "too many indices" -- so this was a future hard
+            # failure, not just noise. .tolist() also forced a device->host sync
+            # on every loop iteration.
+            masked_positions = (target_mask_sample == mask_token_id).reshape(-1)
             # extract the loss values at those masked positions
             loss_mask_sample = loss_mask[ii][masked_positions]
             
@@ -313,10 +335,14 @@ class PEN_CL(nn.Module):
             if loss_mask_sample.numel() > 0:
                 batch_loss.append(torch.mean(loss_mask_sample).unsqueeze(0))
         
-        if len(loss_mask_sample) > 0:
+        # Guard on batch_loss, not on loss_mask_sample. The latter is the last
+        # loop variable: if the final sample happened to have no masked
+        # positions, every other sample's loss was silently discarded and this
+        # returned 0.0. It also raised NameError when the batch was empty.
+        if batch_loss:
             loss_mask_mean = torch.mean(torch.cat(batch_loss))
         else:
-            # handle the case where there are no masked positions in any sample 
+            # no masked positions anywhere in the batch
             loss_mask_mean = torch.tensor(0.0, device=logits_masked.device)
 
 
@@ -365,13 +391,15 @@ class pfam_PEN_CL(nn.Module):
             self,
             x_t: torch.Tensor,
             x_s: torch.Tensor,
-            compute_masked_logits: bool=False
+            compute_masked_logits: bool=False,
+            x_t_mask: torch.Tensor=None
         ) -> dict:
 
         if compute_masked_logits:
             # forward pass for computing logits for masked langauge objective
             protein_logits = self.protein_encoder(x_s, compute_logits=True)
-            text_logits = self.text_encoder(x_t, compute_logits=True)
+            text_logits = self.text_encoder(x_t, compute_logits=True,
+                                            attention_mask=x_t_mask)
 
             return {
                     'text_masked_logits': text_logits,
@@ -381,7 +409,8 @@ class pfam_PEN_CL(nn.Module):
         else:
             # split the tuple into 2 dicts... 
             # getting protein sequence and text inputs ...
-            z_t = self.text_encoder(x_t, compute_logits=False)
+            z_t = self.text_encoder(x_t, compute_logits=False,
+                                    attention_mask=x_t_mask)
             z_s = self.protein_encoder(x_s, compute_logits=False)
 
             # "joint" sequence and text embedding (with same dimension)
@@ -458,6 +487,127 @@ class pfam_PEN_CL(nn.Module):
             mask_logits.detach().cpu()
         )
 
+
+    # ------------------------------------------------------------------
+    # Row-sharded contrastive losses.
+    #
+    # The dense implementations above materialise the full M x M similarity
+    # matrix on EVERY rank, where M = 2 * world_size * micro_batch. That is
+    # O(W^2) per rank: 2 GB of activations at 512 ranks, 32 GB at 2048, 512 GB
+    # at 8192 -- i.e. unusable beyond ~1k ranks.
+    #
+    # InfoNCE decomposes by anchor row, so a rank only needs the rows it owns,
+    # each against ALL candidates: [2B, M] instead of [M, M]. That is O(W) per
+    # rank -- 2 MB at 2048 ranks. The result is mathematically identical; see
+    # tests/stage1_tests/test_sharded_contrastive.py for the equivalence check.
+    #
+    # `row_index` holds this rank's global row indices into the gathered batch.
+    # ------------------------------------------------------------------
+
+    def _homolog_mask_rows(self, row_index, M):
+        """mask[row_index, :] for the inter-loss homolog mask, without building M x M.
+
+        The dense mask marks (i, i+N) and (i+N, i): a Swiss-Prot entry and the
+        Pfam homolog curated to match it. Those are false negatives and are
+        excluded from the contrastive denominator.
+        """
+        N = M // 2
+        out = torch.zeros((row_index.numel(), M), dtype=torch.bool,
+                          device=row_index.device)
+        partner = torch.where(row_index < N, row_index + N, row_index - N)
+        out[torch.arange(row_index.numel(), device=row_index.device), partner] = True
+        return out
+
+    def _homolog_mask_cols(self, col_index, M):
+        """mask[:, col_index] -- the transpose slice, same rule."""
+        N = M // 2
+        out = torch.zeros((M, col_index.numel()), dtype=torch.bool,
+                          device=col_index.device)
+        partner = torch.where(col_index < N, col_index + N, col_index - N)
+        out[partner, torch.arange(col_index.numel(), device=col_index.device)] = True
+        return out
+
+    def compute_inter_loss_sharded(
+            self,
+            protein_embeddings: torch.Tensor,
+            text_embeddings: torch.Tensor,
+            batch_size: int,
+            row_index: torch.Tensor,
+            row_logZ: torch.Tensor,
+        ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Row-sharded equivalent of compute_inter_loss.
+
+        `row_logZ` is logsumexp((mp + mt) / 2tau) for EVERY row of the gathered
+        batch -- shape [M]. Each rank can only compute this for its own rows, so
+        the caller all_gathers it. It is needed because `targets` is a row-wise
+        softmax and the protein-side term consumes targets.T, i.e. COLUMN slices
+        of a row-normalised matrix: every column entry belongs to a different
+        row's normaliser.
+        """
+        z_p, z_t = protein_embeddings, text_embeddings
+        M = z_p.shape[0]
+        tau = self.temperature
+        two_tau = 2.0 * tau
+
+        mask_rows = self._homolog_mask_rows(row_index, M)          # [R, M]
+        mask_cols = self._homolog_mask_cols(row_index, M)          # [M, R]
+
+        # --- text side: this rank's rows against all candidates ---
+        ml_rows = self.set_inf((z_t[row_index] @ z_p.T) / tau, mask_rows)
+        s_rows = self.set_inf(z_p[row_index] @ z_p.T, mask_rows) \
+               + self.set_inf(z_t[row_index] @ z_t.T, mask_rows)
+        targets_rows = F.softmax(s_rows / two_tau, dim=-1)          # [R, M]
+        text_loss = (-targets_rows * F.log_softmax(ml_rows, dim=-1)).sum(1)
+
+        # --- protein side: same rows of the TRANSPOSE ---
+        ml_cols = self.set_inf((z_t @ z_p[row_index].T) / tau, mask_cols)   # [M, R]
+        s_cols = self.set_inf(z_p @ z_p[row_index].T, mask_cols) \
+               + self.set_inf(z_t @ z_t[row_index].T, mask_cols)
+        # targets.T[r, j] = targets[j, r] = exp(s[j, r]/2tau - logZ[j])
+        targets_cols_T = torch.exp(s_cols / two_tau - row_logZ.unsqueeze(1)).T  # [R, M]
+        protein_loss = (-targets_cols_T * F.log_softmax(ml_cols.T, dim=-1)).sum(1)
+
+        loss = (protein_loss + text_loss) / 2.0
+        # Return both slices: metrics need the transpose direction, and the full
+        # M x M matrix the dense path returns does not exist here by design.
+        return loss.mean(), (ml_rows.detach(), ml_cols.detach())
+
+    def inter_row_logsumexp(
+            self,
+            protein_embeddings: torch.Tensor,
+            text_embeddings: torch.Tensor,
+            row_index: torch.Tensor,
+        ) -> torch.Tensor:
+        """logsumexp((mp + mt)/2tau) for this rank's rows -- all_gather this."""
+        z_p, z_t = protein_embeddings, text_embeddings
+        M = z_p.shape[0]
+        mask_rows = self._homolog_mask_rows(row_index, M)
+        s_rows = self.set_inf(z_p[row_index] @ z_p.T, mask_rows) \
+               + self.set_inf(z_t[row_index] @ z_t.T, mask_rows)
+        return torch.logsumexp(s_rows / (2.0 * self.temperature), dim=-1)
+
+    def compute_intra_loss_sharded(
+            self,
+            protein_embeddings: torch.Tensor,
+            batch_size: int,
+            row_index: torch.Tensor,
+        ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Row-sharded equivalent of compute_intra_loss. Rows only -- no transpose."""
+        z_p = protein_embeddings
+        M = z_p.shape[0]
+        R = row_index.numel()
+        ar = torch.arange(R, device=z_p.device)
+
+        cs = (z_p[row_index] @ z_p.T) / self.temperature            # [R, M]
+        self_mask = torch.zeros((R, M), dtype=torch.bool, device=z_p.device)
+        self_mask[ar, row_index] = True                             # exclude i == j
+        cs = self.set_inf(cs, self_mask)
+
+        # dense pos_mask = eye(M).roll(M//2, dims=0): row i pairs with (i - M//2) % M
+        pos_col = (row_index - M // 2) % M
+        pos = cs[ar, pos_col]
+        nll = -pos + torch.logsumexp(cs, dim=-1)
+        return nll.mean(), cs.detach()
 
     def compute_intra_loss(  
             self,
@@ -596,8 +746,15 @@ class pfam_PEN_CL(nn.Module):
 
         for ii, target_mask_sample in enumerate(targets_masked):
             
-            # locate mask positions 
-            masked_positions = (target_mask_sample == mask_token_id).tolist()
+            # locate mask positions. Keep this a 1-D bool TENSOR: the old
+            # `.tolist()` produced a nested list (target_mask_sample is
+            # [1, seq_len]), and indexing a 1-D tensor with a nested list is the
+            # deprecated "non-tuple sequence for multidimensional indexing" path.
+            # PyTorch warns that it will become x[torch.tensor(seq)], which on a
+            # 1-D tensor raises "too many indices" -- so this was a future hard
+            # failure, not just noise. .tolist() also forced a device->host sync
+            # on every loop iteration.
+            masked_positions = (target_mask_sample == mask_token_id).reshape(-1)
             # extract the loss values at those masked positions
             loss_mask_sample = loss_mask[ii][masked_positions]
             
@@ -605,10 +762,14 @@ class pfam_PEN_CL(nn.Module):
             if loss_mask_sample.numel() > 0:
                 batch_loss.append(torch.mean(loss_mask_sample).unsqueeze(0))
         
-        if len(loss_mask_sample) > 0:
+        # Guard on batch_loss, not on loss_mask_sample. The latter is the last
+        # loop variable: if the final sample happened to have no masked
+        # positions, every other sample's loss was silently discarded and this
+        # returned 0.0. It also raised NameError when the batch was empty.
+        if batch_loss:
             loss_mask_mean = torch.mean(torch.cat(batch_loss))
         else:
-            # handle the case where there are no masked positions in any sample 
+            # no masked positions anywhere in the batch
             loss_mask_mean = torch.tensor(0.0, device=logits_masked.device)
 
         return loss_mask_mean

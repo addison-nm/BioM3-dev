@@ -39,6 +39,54 @@ def _safe_barrier():
 
 
 
+class _GatherGrad(torch.autograd.Function):
+    """all_gather whose backward is ONE collective, not an all-to-all.
+
+    torch.distributed.nn.functional.all_gather -- what
+    LightningModule.all_gather(sync_grads=True) ultimately calls -- reduces its
+    gradient with reduce_scatter only when the backend is NCCL. For every other
+    backend it emulates reduce_scatter with an all-to-all of world_size tensors
+    (torch/distributed/nn/functional.py::_AllGather.backward). Aurora runs xccl,
+    so every gathered tensor took the emulation path: an all-to-all is O(W)
+    messages per rank, hence O(W^2) across the fabric, once per gather per step.
+
+    That is the quadratic term in the measured s_step = 7.21 + 1.93e-4*W^2
+    (8.85s at 96 ranks, 35.71s at 384 -- 4x the ranks bought no throughput).
+
+    The gradient of an all_gather is each rank's slice of the incoming gradient
+    summed over ranks, so one all_reduce and a slice is exact. all_reduce moves
+    twice what reduce_scatter would, which is irrelevant next to removing W^2,
+    and unlike reduce_scatter it is known to work on every backend we run.
+    """
+
+    @staticmethod
+    def forward(ctx, tensor, group):
+        ctx.group = group
+        ctx.rank = dist.get_rank(group=group)
+        world = dist.get_world_size(group=group)
+        tensor = tensor.contiguous()
+        out = tensor.new_empty((world,) + tuple(tensor.shape))
+        dist.all_gather_into_tensor(out, tensor, group=group)
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_out):
+        grad_out = grad_out.contiguous()
+        dist.all_reduce(grad_out, op=dist.ReduceOp.SUM, group=ctx.group)
+        return grad_out[ctx.rank], None
+
+
+def _gather_with_grad(tensor, group=None):
+    """[B, ...] on each rank -> [W, B, ...] everywhere, gradients intact.
+
+    Matches LightningModule.all_gather(sync_grads=True) in shape and value, and
+    like it returns a leading axis of 1 when not running distributed.
+    """
+    if not (dist.is_available() and dist.is_initialized()):
+        return tensor.unsqueeze(0)
+    return _GatherGrad.apply(tensor, group)
+
+
 def _log_reduced(module, scalars, prog_bar_keys=(), on_step=True, on_epoch=True):
     """self.log() every scalar, but with ONE cross-rank reduction for all of them.
 
@@ -72,7 +120,7 @@ def _gather_four(module, a, b, c, d):
     """
     B, D = a.shape[0], a.shape[-1]
     fused = torch.cat((a, b, c, d), dim=0)
-    out = module.all_gather(fused, sync_grads=True).reshape(-1, 4 * B, D)
+    out = _gather_with_grad(fused).reshape(-1, 4 * B, D)
     return tuple(out[:, i * B:(i + 1) * B, :].reshape(-1, D) for i in range(4))
 
 
@@ -1142,7 +1190,7 @@ class pfam_PL_PEN_CL(pl.LightningModule):
         if _impl == 'sharded':
             loss_align, logits, loss_intra, cosine_similarity, _rows = _sharded_inter_intra(
                 self.model, z_p_all, z_t_all, z_t_swiss.shape[0],
-                lambda t: self.all_gather(t, sync_grads=True),
+                _gather_with_grad,
             )
         else:
             loss_align, logits = self.model.compute_inter_loss(
@@ -1306,7 +1354,7 @@ class pfam_PL_PEN_CL(pl.LightningModule):
         if _impl == 'sharded':
             loss_align, logits, loss_intra, cosine_similarity, _rows = _sharded_inter_intra(
                 self.model, z_p_all, z_t_all, z_t_swiss.shape[0],
-                lambda t: self.all_gather(t, sync_grads=True),
+                _gather_with_grad,
             )
         else:
             # compute inter-modal loss values

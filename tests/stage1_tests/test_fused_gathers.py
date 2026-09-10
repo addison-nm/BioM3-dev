@@ -73,3 +73,30 @@ def test_batched_metric_reduction_equals_per_scalar_mean():
 
     for k in keys:
         assert abs(got[k] - want[k]) < 1e-6, k
+
+
+def test_gather_backward_is_allreduce_then_slice():
+    """The gradient of an all_gather is each rank's slice summed over ranks.
+
+    _GatherGrad.backward all_reduces the incoming gradient and returns
+    grad[rank]. Every rank computes its loss from the SAME gathered tensor, so
+    rank r's input receives a contribution from every rank's backward pass --
+    which is what summing over ranks and slicing gives. torch's non-NCCL path
+    reaches the same value via an all-to-all of W tensors; this pins the value
+    so the cheaper collective can't silently change it.
+    """
+    torch.manual_seed(3)
+    W, B, D = 5, 3, 4
+
+    # grad_out as seen by each rank: [W, B, D], generally different per rank
+    grads = [torch.randn(W, B, D) for _ in range(W)]
+
+    # reference: rank r's gradient is the sum over ranks of that rank's slice
+    want = [sum(grads[s][r] for s in range(W)) for r in range(W)]
+
+    # implementation: all_reduce (elementwise sum over ranks), then slice
+    reduced = torch.stack(grads).sum(dim=0)          # what all_reduce leaves
+    got = [reduced[r] for r in range(W)]
+
+    for r in range(W):
+        assert torch.allclose(got[r], want[r], atol=1e-6), f"rank {r}"

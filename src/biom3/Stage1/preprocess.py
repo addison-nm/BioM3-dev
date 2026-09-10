@@ -658,7 +658,16 @@ class Pfam_TextSeqPairing_Dataset(Dataset):
         queried_pfam_label = random.choice(pfam_labels)  # Directly get a random element
         temp_df = self.grouped_pfam_df.get_group(queried_pfam_label)
 
-        sampled_row = temp_df.sample(n=1, random_state=self.script_args.seed).iloc[0]
+        # Draw the homolog uniformly at random from the family, using the same
+        # RNG as the family choice above. This used to be
+        # temp_df.sample(n=1, random_state=self.script_args.seed), which builds
+        # a fresh generator from the run seed on EVERY call and so returned the
+        # same row for a given family every time: on rank 0 of a 24-rank mid
+        # run only 4,294 of the shard's 143,077 Pfam rows (3%) were ever used.
+        # Reproducibility comes from seeding once per run (run_PL_training
+        # seeds random/numpy/torch), and DataLoader workers reseed `random`
+        # per worker, so draws stay independent across workers too.
+        sampled_row = temp_df.iloc[random.randrange(len(temp_df))]
         accession_id = str(sampled_row['id'])
         Xp_pfam = str(sampled_row['sequence'])
         Xt_pfam = str(sampled_row['[final]text_caption'])

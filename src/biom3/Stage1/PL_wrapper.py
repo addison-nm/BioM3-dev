@@ -39,6 +39,43 @@ def _safe_barrier():
 
 
 
+def _log_reduced(module, scalars, prog_bar_keys=(), on_step=True, on_epoch=True):
+    """self.log() every scalar, but with ONE cross-rank reduction for all of them.
+
+    Lightning's sync_dist=True issues a separate collective per logged value.
+    The Pfam training step logs 18 (5 losses + 12 sklearn metrics + memory), and
+    at scale it is the NUMBER of collectives, not their payload, that costs:
+    measured s_step went 8.85s at 96 ranks to 35.71s at 384. Stacking the
+    scalars into a single all_reduce yields identical values -- Lightning's
+    default sync_dist reduction is also a mean -- for one collective, not 18.
+    """
+    keys = list(scalars)
+    vals = torch.stack([
+        torch.as_tensor(scalars[k], dtype=torch.float32,
+                        device=module.device).detach().reshape(())
+        for k in keys
+    ])
+    if dist.is_available() and dist.is_initialized():
+        dist.all_reduce(vals, op=dist.ReduceOp.SUM)
+        vals = vals / dist.get_world_size()
+    for k, v in zip(keys, vals):
+        module.log(k, v, prog_bar=(k in prog_bar_keys or 'f1' in k),
+                   on_step=on_step, on_epoch=on_epoch, sync_dist=False)
+
+
+def _gather_four(module, a, b, c, d):
+    """all_gather four [B, D] tensors in one collective, preserving layout.
+
+    A [W, B, D] gather viewed as (-1, D) is rank-major; so is slicing a
+    [W, 4B, D] gather on the middle axis. The results are bit-identical to four
+    separate gathers, for a quarter of the collectives.
+    """
+    B, D = a.shape[0], a.shape[-1]
+    fused = torch.cat((a, b, c, d), dim=0)
+    out = module.all_gather(fused, sync_grads=True).reshape(-1, 4 * B, D)
+    return tuple(out[:, i * B:(i + 1) * B, :].reshape(-1, D) for i in range(4))
+
+
 def _contrastive_row_index(module, micro_batch, world_size, rank, device):
     """Global row indices this rank owns in the gathered [2*W*B, D] batch.
 
@@ -74,8 +111,11 @@ def _sharded_inter_intra(model, z_p_all, z_t_all, micro_batch, gather_fn):
     # required -- targets is differentiable in the dense path, so detaching here
     # would match the forward and silently change the backward.
     lz = model.inter_row_logsumexp(z_p_all, z_t_all, row_index)      # [2B]
-    lz_swiss = gather_fn(lz[:micro_batch]).reshape(-1)               # [N]
-    lz_pfam = gather_fn(lz[micro_batch:]).reshape(-1)                # [N]
+    # One gather, not two: gathering [2B] gives [W, 2B], and column-slicing that
+    # is exactly what gathering the two halves separately produced.
+    lz_all = gather_fn(lz).reshape(-1, 2 * micro_batch)              # [W, 2B]
+    lz_swiss = lz_all[:, :micro_batch].reshape(-1)                   # [N]
+    lz_pfam = lz_all[:, micro_batch:].reshape(-1)                    # [N]
     row_logZ = torch.cat([lz_swiss, lz_pfam])                        # [M]
 
     loss_align, logits = model.compute_inter_loss_sharded(
@@ -1076,36 +1116,19 @@ class pfam_PL_PEN_CL(pl.LightningModule):
         #end_time_forward_pass = time.time()
         #print(f"Rank={dist.get_rank()}: Time taken for Swiss-Prot forward pass: {end_time_forward_pass - start_time_forward_pass} seconds.")
 
-        # Ensure all GPUs are synchronized.
-        _safe_barrier()
-
-        # Forward pass with Pfam data.
+        # Forward pass with Pfam data. The barriers Run 1 placed around these
+        # forwards are removed: all_gather is itself a synchronisation point, so
+        # they bought nothing and cost a collective each.
         z_t_pfam, z_p_pfam = self(
             x_t=pfam_text_batch,
             x_p=pfam_protein_batch,
             compute_masked_logits=False,
             x_t_mask=pfam_text_attn_mask
         )
-        _safe_barrier()
-        
-        #Gather tensors from all GPUs.
-        z_t_swiss_all = self.all_gather(z_t_swiss, sync_grads=True)
-        _safe_barrier()
-        z_p_swiss_all = self.all_gather(z_p_swiss, sync_grads=True)
 
-        # Reshape the embeddings.
-        z_t_swiss_all = z_t_swiss_all.view(-1, z_t_swiss.shape[-1])
-        z_p_swiss_all = z_p_swiss_all.view(-1, z_p_swiss.shape[-1])
-
-
-        # Gather tensors from all GPUs.
-        z_t_pfam_all = self.all_gather(z_t_pfam, sync_grads=True)
-        _safe_barrier()
-        z_p_pfam_all = self.all_gather(z_p_pfam, sync_grads=True)
-
-        # Reshape the embeddings.
-        z_t_pfam_all = z_t_pfam_all.view(-1, z_t_pfam.shape[-1])
-        z_p_pfam_all = z_p_pfam_all.view(-1, z_p_pfam.shape[-1])
+        # Gather all four embedding sets from all GPUs in one collective.
+        z_t_swiss_all, z_p_swiss_all, z_t_pfam_all, z_p_pfam_all = _gather_four(
+            self, z_t_swiss, z_p_swiss, z_t_pfam, z_p_pfam)
 
         # Concatenate Swiss-Prot and Pfam embeddings.
         z_t_all = torch.cat((z_t_swiss_all, z_t_pfam_all), dim=0)
@@ -1189,32 +1212,29 @@ class pfam_PL_PEN_CL(pl.LightningModule):
             sys.stderr.write("Unexpected dataset_type value\n")
             sys.exit(1)
 
-        # Log the individual and total loss values.
-        self.log('train_loss', loss, prog_bar=True, on_step=True, on_epoch=True, sync_dist=True)
-        self.log('train_loss_align', loss_align, prog_bar=True, on_step=True, on_epoch=True, sync_dist=True)
-        self.log('train_loss_intra', loss_intra, prog_bar=True, on_step=True, on_epoch=True, sync_dist=True)
-        self.log('train_loss_text_mask', loss_text_mask, prog_bar=False, on_step=True, on_epoch=True, sync_dist=True)
-        self.log('train_loss_seq_mask', loss_sequence_mask, prog_bar=False, on_step=True, on_epoch=True, sync_dist=True)
-
-        # Compute and log additional performance metrics.
+        # Compute additional performance metrics.
         if _impl == 'sharded':
             # sharded logits are (rows [R,M], cols [M,R]), not a square matrix
             metric_dict = _performance_metrics_sharded(self, logits[0], logits[1], _rows)
         else:
             metric_dict = self.performance_metrics(logits=logits)
-        for key in metric_dict:
-            values = metric_dict[key]
-            final_key = 'train_' + key
-            self.log(final_key, metric_dict[key], prog_bar=True if 'f1' in key else False, on_step=True, on_epoch=True, sync_dist=True)
 
-        # Log GPU memory usage at the beginning of the training.
+        # Every scalar below used to carry sync_dist=True -- 18 collectives per
+        # step. One reduction covers all of them; the logged values are the same.
+        scalars = {
+            'train_loss': loss,
+            'train_loss_align': loss_align,
+            'train_loss_intra': loss_intra,
+            'train_loss_text_mask': loss_text_mask,
+            'train_loss_seq_mask': loss_sequence_mask,
+        }
+        for key, value in metric_dict.items():
+            scalars['train_' + key] = value
+        scalars['memory_usage'] = print_memory_usage()
         if batch_idx == 0:
-            gpu_memory_usage = print_gpu_initialization()
-            self.log(f'gpu_memory_usage', gpu_memory_usage, sync_dist=True)
-        
-        # log CPU memory
-        memory_usage = print_memory_usage()
-        self.log(f'memory_usage', memory_usage, sync_dist=True)
+            scalars['gpu_memory_usage'] = print_gpu_initialization()
+        _log_reduced(self, scalars, prog_bar_keys=(
+            'train_loss', 'train_loss_align', 'train_loss_intra'))
  
         return {'loss': loss}
 
@@ -1261,16 +1281,6 @@ class pfam_PL_PEN_CL(pl.LightningModule):
                                   compute_masked_logits=False,
                                   x_t_mask=text_attn_mask
         )
-        _safe_barrier() # wait till all GPUs catch up...
-     
-        # gather all tensors
-        z_t_swiss_all = self.all_gather(z_t_swiss, sync_grads=True)
-        _safe_barrier()    
-        z_p_swiss_all = self.all_gather(z_p_swiss, sync_grads=True)
-
-        # stack the embeddings
-        z_t_swiss_all = z_t_swiss_all.view(-1, z_t_swiss.shape[-1])
-        z_p_swiss_all = z_p_swiss_all.view(-1, z_p_swiss.shape[-1])
 
         # foward pass over the pfam data
         z_t_pfam, z_p_pfam = self(
@@ -1279,33 +1289,38 @@ class pfam_PL_PEN_CL(pl.LightningModule):
                                 compute_masked_logits=False,
                                 x_t_mask=pfam_text_attn_mask
         )
-        _safe_barrier() # wait till all GPUs catch up...
-        
-        # gather all tensors
-        z_t_pfam_all = self.all_gather(z_t_pfam, sync_grads=True)
-        _safe_barrier()
-        z_p_pfam_all = self.all_gather(z_p_pfam, sync_grads=True)
-        
-        # stack the embeddings
-        z_t_pfam_all = z_t_pfam_all.view(-1, z_t_pfam.shape[-1])
-        z_p_pfam_all = z_p_pfam_all.view(-1, z_p_pfam.shape[-1])
+
+        # gather all four embedding sets in one collective (see _gather_four)
+        z_t_swiss_all, z_p_swiss_all, z_t_pfam_all, z_p_pfam_all = _gather_four(
+            self, z_t_swiss, z_p_swiss, z_t_pfam, z_p_pfam)
            
         # concatenate swiss-prot <> pfam embeddings
         z_t_all = torch.cat((z_t_swiss_all, z_t_pfam_all), dim=0)
         z_p_all = torch.cat((z_p_swiss_all, z_p_pfam_all), dim=0)
 
-        # compute inter-modal loss values     
-        loss_align, logits = self.model.compute_inter_loss(
-                                            protein_embeddings=z_p_all,
-                                            text_embeddings=z_t_all,
-                                            batch_size=z_p_all.shape[0] // 2
-        )
+        # Validation must take the same sharded branch as training. The dense
+        # call below it builds the full M x M matrix on EVERY rank, M = 2*W*B:
+        # 151 MB at 384 ranks, 2.4 GB at 1536 -- an O(W^2) ceiling that has
+        # nothing to do with the model size.
+        _impl = getattr(self.script_args, 'contrastive_impl', 'dense')
+        if _impl == 'sharded':
+            loss_align, logits, loss_intra, cosine_similarity, _rows = _sharded_inter_intra(
+                self.model, z_p_all, z_t_all, z_t_swiss.shape[0],
+                lambda t: self.all_gather(t, sync_grads=True),
+            )
+        else:
+            # compute inter-modal loss values
+            loss_align, logits = self.model.compute_inter_loss(
+                                                protein_embeddings=z_p_all,
+                                                text_embeddings=z_t_all,
+                                                batch_size=z_p_all.shape[0] // 2
+            )
 
-        # compute intra-modal loss values
-        loss_intra, cosine_similarity = self.model.compute_intra_loss(
-                                            protein_embeddings=z_p_all,
-                                            batch_size=z_p_all.shape[0] // 2
-        )
+            # compute intra-modal loss values
+            loss_intra, cosine_similarity = self.model.compute_intra_loss(
+                                                protein_embeddings=z_p_all,
+                                                batch_size=z_p_all.shape[0] // 2
+            )
 
         # concatenate batch samples
         all_text_batch = torch.cat((text_batch, pfam_text_batch), dim=0)
@@ -1355,22 +1370,25 @@ class pfam_PL_PEN_CL(pl.LightningModule):
             sys.exit(1)
 
      
-        # track loss ...
-        self.log('valid_loss', loss, prog_bar=True, on_step=True, on_epoch=True, sync_dist=True)
-        self.log('valid_loss_align', loss_align, prog_bar=True, on_step=True, on_epoch=True, sync_dist=True)
-        self.log('valid_loss_intra', loss_intra, prog_bar=True, on_step=True, on_epoch=True, sync_dist=True)
-        self.log('valid_loss_text_mask', loss_text_mask, prog_bar=False, on_step=True, on_epoch=True, sync_dist=True)
-        self.log('valid_loss_seq_mask', loss_sequence_mask, prog_bar=False, on_step=True, on_epoch=True, sync_dist=True)
-        # log CPU memory
-        memory_usage = print_memory_usage()
-        self.log(f'memory_usage', memory_usage, sync_dist=True)
- 
         # track metrics
-        metric_dict = self.performance_metrics(logits=logits.detach().cpu())
-        for key in metric_dict:
-            values = metric_dict[key]
-            final_key = 'valid_' + key
-            self.log(final_key, metric_dict[key], prog_bar=True if 'f1' in key else False, on_step=True, on_epoch=True, sync_dist=True)
+        if _impl == 'sharded':
+            metric_dict = _performance_metrics_sharded(self, logits[0], logits[1], _rows)
+        else:
+            metric_dict = self.performance_metrics(logits=logits.detach().cpu())
+
+        # one reduction for all of them, as in training_step
+        scalars = {
+            'valid_loss': loss,
+            'valid_loss_align': loss_align,
+            'valid_loss_intra': loss_intra,
+            'valid_loss_text_mask': loss_text_mask,
+            'valid_loss_seq_mask': loss_sequence_mask,
+        }
+        for key, value in metric_dict.items():
+            scalars['valid_' + key] = value
+        scalars['memory_usage'] = print_memory_usage()
+        _log_reduced(self, scalars, prog_bar_keys=(
+            'valid_loss', 'valid_loss_align', 'valid_loss_intra'))
 
 
         # collect joint embedding

@@ -3,7 +3,10 @@
 The requirement, stated concretely: take three short captions of different
 lengths. Embed caption 1 in a batch with caption 2, then embed caption 1 again
 in a batch with caption 3, where 3 is longer than 2. Caption 1's embedding must
-be identical in both cases -- and identical again when embedded alone.
+be bitwise identical in both cases. Embedded alone (batch size 1 rather than 2)
+it must agree to within float rounding: CPU matmul kernels are not batch-size
+invariant at the bit level, so a lone row can differ by ~1 float32 ulp even
+though its input is identical.
 
 Why this can fail: captions are padded so every tensor in a batch has the same
 shape. If BERT is called without an attention_mask it attends over the [PAD]
@@ -26,6 +29,11 @@ import torch
 from transformers import AutoTokenizer
 
 from biom3.Stage1.model import TextEncoder, ProjectionHead
+
+# The three comparisons made for each padding mode.
+SAME_BATCH_SIZE = "C1 in [C1,C2] vs [C1,C3]"    # the stated requirement
+ALONE = "C1 in [C1,C2] vs alone"                # batch size 2 vs 1
+LARGER_BATCH = "C1 in [C1,C2,C3] vs [C1,C2]"    # batch size 3 vs 2
 
 TEXT_MODEL = ("/flare/NLDesignProtein/ahowe/BioM3-dev-space/BioM3-dev/weights/LLMs/"
               "BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext")
@@ -96,11 +104,11 @@ def run(verbose=True):
         with12 = _z_t(tok, enc, proj, [C1, C2], args, padding)[0:1]
         with13 = _z_t(tok, enc, proj, [C1, C3], args, padding)[0:1]
         with123 = _z_t(tok, enc, proj, [C1, C2, C3], args, padding)[0:1]
-        r = []
-        r.append(_report("C1 in [C1,C2] vs [C1,C3]", with12, with13))
-        r.append(_report("C1 in [C1,C2] vs alone", with12, alone))
-        r.append(_report("C1 in [C1,C2,C3] vs [C1,C2]", with123, with12))
-        results[padding] = r
+        results[padding] = {
+            SAME_BATCH_SIZE: _report(SAME_BATCH_SIZE, with12, with13),
+            ALONE: _report(ALONE, with12, alone),
+            LARGER_BATCH: _report(LARGER_BATCH, with123, with12),
+        }
 
     if verbose:
         print(f"\n  control: padding='longest' WITHOUT the mask")
@@ -112,14 +120,24 @@ def run(verbose=True):
 
 def test_zt_is_padding_and_batch_invariant():
     results = run(verbose=False)
-    # max_length is what training uses: every caption pads identically, so the
-    # embedding must be bitwise identical.
-    for same, md in results["max_length"]:
-        assert same, f"max_length padding not bitwise invariant (max|diff|={md})"
+    mx = results["max_length"]
+    # max_length is what training uses: every caption pads to the same length,
+    # so caption 1's input row is identical in every batch. With the batch size
+    # held fixed the embedding must be bitwise identical -- this is the
+    # requirement as stated.
+    for name in (SAME_BATCH_SIZE, LARGER_BATCH):
+        same, md = mx[name]
+        assert same, f"max_length, {name}: not bitwise identical (max|diff|={md})"
+    # Alone, the batch dimension drops from 2 to 1 and the CPU matmul can take a
+    # different kernel path; measured 3.6e-07 to 4.8e-07, i.e. ~1 float32 ulp.
+    # That is rounding, not padding leaking through: without the mask the same
+    # comparison differs by ~1.2.
+    same, md = mx[ALONE]
+    assert md < 1e-5, f"max_length, {ALONE}: max|diff|={md}"
     # longest: tensor shapes genuinely differ between batches, so allow float
     # reassociation but require agreement far below any meaningful scale.
-    for same, md in results["longest"]:
-        assert md < 1e-5, f"longest padding not invariant (max|diff|={md})"
+    for name, (same, md) in results["longest"].items():
+        assert md < 1e-5, f"longest, {name}: max|diff|={md}"
 
 
 if __name__ == "__main__":

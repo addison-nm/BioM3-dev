@@ -303,6 +303,13 @@ def get_model_args(parser):
                              'trainable_text=True.')
     parser.add_argument('--text_encoder_embedding', type=int, default=768,
                         help='Text encoder hidden dim (must match text_model_path).')
+    parser.add_argument('--text_padding', type=str, default='max_padding',
+                        choices=['max_padding', 'dynamic'],
+                        help="Caption padding for training. 'max_padding' pads every "
+                             "caption to text_max_length (Run 1); 'dynamic' crops each "
+                             "batch to its longest caption, rounded up to a multiple of "
+                             "64. BERT gets the attention mask either way, so z_t is the "
+                             "same to float rounding; dynamic just skips the [PAD] compute.")
     parser.add_argument('--text_max_length', type=int, default=512,
                         help='Max BERT token length. Must be 512 (training '
                              'pad-to-max contract — see docs/bug_reports/).')

@@ -1,5 +1,6 @@
 import torch
 from torch.utils.data import random_split, Dataset, DataLoader, Subset, ConcatDataset
+from torch.utils.data import default_collate
 import pandas as pd
 import random
 import ast
@@ -13,6 +14,10 @@ import time
 import copy
 import re
 import zlib
+import json
+from datetime import datetime
+
+import numpy as np
 
 import esm
 from esm import pretrained
@@ -836,6 +841,94 @@ class Default_DataModule(LightningDataModule):
 ###################
 
 
+# Caption tensors in a Pfam_TextSeqPairing_Dataset item: Swiss-Prot input_ids,
+# its MLM-masked copy, Pfam input_ids, its masked copy, and the two attention
+# masks. Every item is tokenized to text_max_length; see collate_dynamic_text.
+_PFAM_ITEM_TEXT_FIELDS = (0, 2, 4, 6, 9, 10)
+_PFAM_ITEM_ATTN_FIELDS = (9, 10)
+DYNAMIC_PAD_MULTIPLE = 64
+
+
+def collate_dynamic_text(batch, multiple=DYNAMIC_PAD_MULTIPLE):
+    """Collate, then crop every caption tensor to the batch's longest caption.
+
+    Items are still tokenized to text_max_length (512), so default_collate can
+    stack them; the columns past the longest real caption are all [PAD] and are
+    dropped here. That is exactly padding='longest', and since BERT is given the
+    attention mask, the embedding is unchanged to float rounding (the padding
+    invariance test). MLM masking never touches [PAD], so no masked token is
+    lost either. The length is rounded up to `multiple` so the XPU kernels see
+    at most 512/multiple distinct text shapes instead of one per length.
+
+    Swiss-Prot and Pfam captions are cropped to one common length because the
+    MLM forward concatenates them along the batch dimension.
+    """
+    out = list(default_collate(batch))
+    attn = torch.cat([out[i] for i in _PFAM_ITEM_ATTN_FIELDS], dim=0)
+    longest = int(attn.sum(dim=-1).max())
+    length = min(attn.shape[-1], -(-longest // multiple) * multiple)
+    for i in _PFAM_ITEM_TEXT_FIELDS:
+        out[i] = out[i][..., :length]
+    return out
+
+
+PFAM_SPLITS_MANIFEST = "pfam_splits_manifest.json"
+
+
+def _pfam_source_fingerprint(pfam_data_path):
+    st = os.stat(pfam_data_path)
+    return {"source_path": os.path.abspath(pfam_data_path),
+            "source_size": st.st_size, "source_mtime": st.st_mtime}
+
+
+def pfam_splits_status(splits_dir, pfam_data_path, num_shards):
+    """'reuse' if splits_dir holds a complete set of shards written from this
+    Pfam file for this world size; 'write' if it holds no manifest.
+
+    A manifest that does NOT match raises instead of regenerating: a pre-sharded
+    directory is never overwritten with a different layout behind your back.
+    """
+    path = os.path.join(splits_dir, PFAM_SPLITS_MANIFEST)
+    if not os.path.exists(path):
+        return "write"
+    with open(path) as fh:
+        manifest = json.load(fh)
+    want = dict(_pfam_source_fingerprint(pfam_data_path), num_shards=num_shards)
+    mismatch = {k: (manifest.get(k), v) for k, v in want.items() if manifest.get(k) != v}
+    if mismatch:
+        raise ValueError(
+            f"{path} does not match this run (manifest, run): {mismatch}. "
+            "Refusing to reuse or overwrite it; point pfam_splits_dir elsewhere.")
+    missing = [ii for ii in range(num_shards)
+               if not os.path.exists(os.path.join(splits_dir, f"split_pfam_rank_{ii}.csv"))]
+    if missing:
+        raise ValueError(f"{splits_dir}: manifest present but {len(missing)} shard(s) "
+                         f"missing, first is rank {missing[0]}")
+    return "reuse"
+
+
+def write_pfam_splits(pfam_df, splits_dir, num_shards, pfam_data_path):
+    """One shard per rank (row i -> rank i % num_shards), then the manifest.
+
+    The shard loop is unchanged from prepare_data, so a pre-written directory is
+    byte-for-byte what training would have written itself. The manifest is
+    written last, so an interrupted write is never mistaken for a complete one.
+    """
+    os.makedirs(splits_dir, exist_ok=True)
+    assignments = np.arange(len(pfam_df)) % num_shards
+    for ii in range(num_shards):
+        split_df = pfam_df.iloc[assignments == ii]
+        split_df.to_csv(f"{splits_dir}/split_pfam_rank_{ii}.csv", index=False)
+        if ii == 0 or ii == num_shards - 1:
+            logger.info("  Split %s: %s rows", ii, len(split_df))
+    manifest = dict(_pfam_source_fingerprint(pfam_data_path), num_shards=num_shards,
+                    total_rows=int(len(pfam_df)),
+                    created=datetime.now().isoformat(timespec="seconds"))
+    with open(os.path.join(splits_dir, PFAM_SPLITS_MANIFEST), "w") as fh:
+        json.dump(manifest, fh, indent=1)
+    logger.info("Saved %s Pfam splits to %s/", num_shards, splits_dir)
+
+
 def split_by_accession(df, id_col, valid_size, seed):
     """Train/valid split in which every row of an accession lands on ONE side.
 
@@ -959,6 +1052,14 @@ class Pfam_DataModule(LightningDataModule):
 
         splits_dir = self._resolve_splits_dir()
 
+        # Shards written ahead of time (biom3.Stage1.preshard_pfam) are reused:
+        # at 3,072 ranks writing them here costs ~87 min of every job while
+        # every other rank waits.
+        if pfam_splits_status(splits_dir, self.args.pfam_data_path, num_gpus) == "reuse":
+            logger.info("Reusing %s pre-written Pfam splits in %s (manifest matches)",
+                        num_gpus, splits_dir)
+            return
+
         logger.info('Upload Pfam Database and split it over %s dataframes', num_gpus)
         # Load Swiss-Prot data
         df = self.load_swiss_prot()
@@ -972,16 +1073,7 @@ class Pfam_DataModule(LightningDataModule):
 
         # Fast modular split: assign each row to a rank based on index
         # This is ~100x faster than stratified_split on 44M rows
-        import numpy as np
-        os.makedirs(splits_dir, exist_ok=True)
-        assignments = np.arange(len(pfam_df)) % num_gpus
-        for ii in range(num_gpus):
-            split_df = pfam_df.iloc[assignments == ii]
-            split_df.to_csv(f"{splits_dir}/split_pfam_rank_{ii}.csv", index=False)
-            if ii == 0 or ii == num_gpus - 1:
-                logger.info("  Split %s: %s rows", ii, len(split_df))
-
-        logger.info("Saved %s Pfam splits to %s/", num_gpus, splits_dir)
+        write_pfam_splits(pfam_df, splits_dir, num_gpus, self.args.pfam_data_path)
 
         # After saving the splits to disk
         del pfam_df, df
@@ -1147,13 +1239,22 @@ class Pfam_DataModule(LightningDataModule):
         return smaller_dfs
 
 
+    def _collate_fn(self):
+        # 'dynamic' crops each batch's captions to its longest (rounded up to a
+        # multiple of 64); 'max_padding' keeps every caption at text_max_length.
+        mode = getattr(self.args, 'text_padding', DEFAULT_TEXT_PADDING)
+        if mode not in TEXT_PADDING_MODES:
+            raise ValueError(f"text_padding must be one of {sorted(TEXT_PADDING_MODES)}, got {mode!r}")
+        return collate_dynamic_text if mode == 'dynamic' else None
+
     def train_dataloader(self):
         return DataLoader(
                 self.train_dataset,
                 batch_size=self.args.batch_size,
                 num_workers=self.args.num_workers,
                 shuffle=True,
-                pin_memory=True
+                pin_memory=True,
+                collate_fn=self._collate_fn(),
         )
 
     def val_dataloader(self):
@@ -1161,7 +1262,8 @@ class Pfam_DataModule(LightningDataModule):
                 self.valid_dataset,
                 batch_size=self.args.batch_size,
                 num_workers=self.args.num_workers,
-                pin_memory=True
+                pin_memory=True,
+                collate_fn=self._collate_fn(),
         )
 
     def test_dataloader(self):

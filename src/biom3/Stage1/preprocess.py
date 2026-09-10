@@ -12,6 +12,7 @@ import psutil
 import time
 import copy
 import re
+import zlib
 
 import esm
 from esm import pretrained
@@ -835,6 +836,62 @@ class Default_DataModule(LightningDataModule):
 ###################
 
 
+def split_by_accession(df, id_col, valid_size, seed):
+    """Train/valid split in which every row of an accession lands on ONE side.
+
+    Swiss-Prot has ~8.9 caption variants per accession (5,051,255 rows over
+    569,516 accessions). The previous split, train_test_split over rows, sent
+    variants of the same protein to both sides; and because it ran on each
+    rank's shard-filtered table, the same row could be train on one rank and
+    valid on another. Neither validation set was held out.
+
+    The side is a pure function of (seed, accession): crc32 is stable across
+    processes, unlike hash(). So every rank agrees, whatever rows its Pfam
+    shard lets it keep, and whatever order they arrive in.
+    """
+    threshold = int(valid_size * 2**32)
+    accessions = df[id_col].astype(str)
+    valid_accessions = {
+        a for a in accessions.unique()
+        if zlib.crc32(f"{seed}:{a}".encode()) < threshold
+    }
+    is_valid = accessions.isin(valid_accessions)
+    return df[~is_valid], df[is_valid]
+
+
+def equalize_across_ranks(train_df, valid_df, seed, device=None):
+    """Trim every rank's train and valid frames to the smallest size on any rank.
+
+    Each rank keeps only the Swiss-Prot rows whose Pfam families all appear in
+    its own shard. Rare families reach only some ranks, so on the full dataset
+    the per-rank tables differ in length, Lightning's DistributedSampler hands
+    each rank ceil(len/W) samples, and ranks run different numbers of steps per
+    epoch. The first rank to finish goes on to validation and checkpointing
+    while the others are still issuing training collectives: a hang, or
+    mismatched collectives. The capped mid set never showed it (every family
+    reaches every rank) and every study run was capped at 20 steps.
+
+    Shuffles before trimming so the rows dropped are random, not the tail.
+    Returns the trimmed frames and a [W, 2] tensor of the original per-rank
+    (train, valid) sizes.
+    """
+    import torch.distributed as dist
+    sizes = [len(train_df), len(valid_df)]
+    if not (dist.is_available() and dist.is_initialized()):
+        return train_df, valid_df, torch.tensor([sizes])
+    # float32 so this is the same all_gather the training step already uses on
+    # xccl; row counts are exact in float32 below 2**24.
+    assert max(sizes) < 2**24, sizes
+    local = torch.tensor(sizes, dtype=torch.float32, device=device)
+    gathered = [torch.empty_like(local) for _ in range(dist.get_world_size())]
+    dist.all_gather(gathered, local)
+    per_rank = torch.stack(gathered).to(torch.long).cpu()
+    n_train, n_valid = per_rank.min(dim=0).values.tolist()
+    train_df = train_df.sample(frac=1.0, random_state=seed).iloc[:n_train]
+    valid_df = valid_df.sample(frac=1.0, random_state=seed).iloc[:n_valid]
+    return train_df, valid_df, per_rank
+
+
 class Pfam_DataModule(LightningDataModule):
     def __init__(self, args):
         super().__init__()
@@ -970,12 +1027,23 @@ class Pfam_DataModule(LightningDataModule):
         pfam_unique_labels = set(pfam_df['pfam_label'].tolist())
         df = df[df['pfam_label'].apply(lambda x: all(label in pfam_unique_labels for label in ast.literal_eval(x)))]
 
-        # Split the dataframe into train and valid sets
-        train_df, valid_df = train_test_split(
-            df,
-            test_size=self.args.valid_size,
-            random_state=self.args.seed
-        )
+        # Split by accession, identically on every rank (see split_by_accession).
+        train_df, valid_df = split_by_accession(
+            df, self.args.id_keyword, self.args.valid_size, self.args.seed)
+
+        # Every rank must run the same number of steps (see equalize_across_ranks).
+        device = self.trainer.strategy.root_device if self.trainer is not None else None
+        train_df, valid_df, per_rank = equalize_across_ranks(
+            train_df, valid_df, self.args.seed, device=device)
+        if gpu_idx == 0:
+            for col, name, kept in ((0, "train", len(train_df)), (1, "valid", len(valid_df))):
+                sizes = per_rank[:, col]
+                logger.info(
+                    "Swiss-Prot %s rows per rank after shard filtering: min %d, max %d, "
+                    "mean %.0f over %d ranks; every rank uses %d (trims up to %d rows, %.2f%%)",
+                    name, sizes.min().item(), sizes.max().item(), sizes.float().mean().item(),
+                    len(sizes), kept, sizes.max().item() - kept,
+                    100.0 * (sizes.max().item() - kept) / max(1, sizes.max().item()))
 
         logger.info("Available memory after pfam_df: %s GB", check_available_memory())
 

@@ -120,6 +120,18 @@ def parse_arguments(args):
                         help="Per-position metric boxes to add to the animation. "
                              "Currently supported: 'confidence' (derived from "
                              "--store_probabilities). Multiple metrics are stacked.")
+    parser.add_argument('--save_animation_frames', action='store_true', default=False,
+                        help="Also save the per-step token trajectory for each "
+                             "animated (prompt, replica) as a JSON record "
+                             "(token vocab + frames[step][position] token "
+                             "indices, index 0 == '-' being the still-masked "
+                             "state), next to the GIF in --animation_dir. "
+                             "Lightweight and faithful to the realized path; "
+                             "intended for downstream interactive rendering.")
+    parser.add_argument('--no_gif', action='store_true', default=False,
+                        help="Skip rendering GIF animations. Useful with "
+                             "--save_animation_frames when only the trajectory "
+                             "data is wanted and the (slow, large) GIF is not.")
     parser.add_argument('--store_probabilities', action='store_true', default=False,
                         help="Store per-step conditional probabilities for each "
                              "(prompt, replica) pair as .npz files. "
@@ -205,18 +217,26 @@ def parse_animate_replicas(value):
 
 
 def resolve_animate_prompts(parsed, num_prompts):
-    """Resolve parsed prompt spec to a set of indices, or None if animation is off."""
+    """Resolve parsed prompt spec to a set of indices, or None if animation is off.
+
+    Out-of-range indices are dropped with a warning rather than raised, so a
+    caller asking to animate "the first N" without knowing the run's exact
+    prompt count (as a dispatcher expanding a count into 0..N-1 does) caps to
+    what exists instead of failing the job at Stage 3. When nothing valid
+    remains, animation is off. Mirrors resolve_animate_replicas' clamping.
+    """
     if parsed is None:
         return None
     if parsed == 'all':
         return set(range(num_prompts))
-    invalid = [i for i in parsed if not (0 <= i < num_prompts)]
-    if invalid:
-        raise ValueError(
-            f"--animate_prompts indices out of range: {invalid} "
-            f"(valid range: 0–{num_prompts - 1})"
+    valid = {i for i in parsed if 0 <= i < num_prompts}
+    dropped = [i for i in parsed if not (0 <= i < num_prompts)]
+    if dropped:
+        logger.warning(
+            "--animate_prompts indices out of range dropped: %s (valid range 0–%d)",
+            dropped, num_prompts - 1,
         )
-    return set(parsed)
+    return valid or None
 
 
 def resolve_animate_replicas(parsed, num_replicas):
@@ -232,6 +252,33 @@ def resolve_animate_replicas(parsed, num_replicas):
         )
         parsed = num_replicas
     return set(range(parsed))
+
+
+def save_animation_frames(animation_frames, tokens, animation_dir):
+    """Write one JSON trajectory record per animated (prompt, replica) pair.
+
+    Each ``prompt_{p}_replica_{r}.json`` carries the token vocabulary and
+    ``frames[step][position]`` token indices (index 0 == '-', the still-masked
+    state that resolves to a residue as the step count rises). The frames are
+    the realized sampled path, faithful in a way an argmax over stored
+    probabilities would not be. Returns the paths written, in iteration order.
+    """
+    os.makedirs(animation_dir, exist_ok=True)
+    written = []
+    for (p_idx, r_idx), frames in animation_frames.items():
+        record = {
+            "prompt_index": int(p_idx),
+            "replica_index": int(r_idx),
+            "tokens": list(tokens),
+            "frames": [np.asarray(f).astype(int).tolist() for f in frames],
+        }
+        json_path = os.path.join(
+            animation_dir, f"prompt_{p_idx}_replica_{r_idx}.json")
+        with open(json_path, "w") as fh:
+            json.dump(record, fh, separators=(",", ":"))
+        logger.info("Animation frames saved: %s (%d steps)", json_path, len(frames))
+        written.append(json_path)
+    return written
 
 
 _PRE_UNMASK_SUPPORTED_STRATEGIES = ("last_k",)
@@ -926,41 +973,47 @@ def main(args, _setup_logging=True):
                         fh.write(f">{prompt_key}_replica_{r_idx} seed={seed}\n{seq}\n")
             logger.info("Merged FASTA written to %s", merged_path)
 
-    # Generate GIF animations
+    # Save / render animations for the selected (prompt, replica) pairs.
     if animation_frames:
         animation_dir = config_args_parser.animation_dir or os.path.join(outdir, "animations")
-        animation_style = getattr(config_args_parser, 'animation_style', 'brightness')
-        requested_metrics = getattr(config_args_parser, 'animation_metrics', None) or []
-        if (animation_style != 'brightness' or requested_metrics) and not stored_probs:
-            logger.warning("--animation_style=%s / --animation_metrics requires "
-                           "--store_probabilities; falling back to default animation",
-                           animation_style)
         os.makedirs(animation_dir, exist_ok=True)
-        logger.info("Saving %d animation(s) to %s", len(animation_frames), animation_dir)
-        for (p_idx, r_idx), frames in animation_frames.items():
-            gif_path = os.path.join(animation_dir, f"prompt_{p_idx}_replica_{r_idx}.gif")
-            frame_probs = stored_probs.get((p_idx, r_idx)) if stored_probs else None
 
-            # Build metric annotations for this (prompt, replica)
-            metrics = []
-            if frame_probs is not None and requested_metrics:
-                for name in requested_metrics:
-                    if name == "confidence":
-                        metrics.append(
-                            Stage3_ani_tools.confidence_metric(frame_probs))
-                    else:
-                        logger.warning("Unknown animation metric %r, skipping", name)
+        # Per-step token trajectory, for downstream interactive rendering.
+        if getattr(config_args_parser, 'save_animation_frames', False):
+            save_animation_frames(animation_frames, tokens, animation_dir)
 
-            Stage3_ani_tools.generate_sequence_animation(
-                frames=frames,
-                tokens=tokens,
-                output_path=gif_path,
-                probs=frame_probs,
-                prob_style=animation_style,
-                metrics=metrics or None,
-                title=f"Prompt {p_idx} \u00b7 Replica {r_idx}",
-            )
-            logger.info("Animation saved: %s", gif_path)
+        if not getattr(config_args_parser, 'no_gif', False):
+            animation_style = getattr(config_args_parser, 'animation_style', 'brightness')
+            requested_metrics = getattr(config_args_parser, 'animation_metrics', None) or []
+            if (animation_style != 'brightness' or requested_metrics) and not stored_probs:
+                logger.warning("--animation_style=%s / --animation_metrics requires "
+                               "--store_probabilities; falling back to default animation",
+                               animation_style)
+            logger.info("Saving %d GIF animation(s) to %s", len(animation_frames), animation_dir)
+            for (p_idx, r_idx), frames in animation_frames.items():
+                gif_path = os.path.join(animation_dir, f"prompt_{p_idx}_replica_{r_idx}.gif")
+                frame_probs = stored_probs.get((p_idx, r_idx)) if stored_probs else None
+
+                # Build metric annotations for this (prompt, replica)
+                metrics = []
+                if frame_probs is not None and requested_metrics:
+                    for name in requested_metrics:
+                        if name == "confidence":
+                            metrics.append(
+                                Stage3_ani_tools.confidence_metric(frame_probs))
+                        else:
+                            logger.warning("Unknown animation metric %r, skipping", name)
+
+                Stage3_ani_tools.generate_sequence_animation(
+                    frames=frames,
+                    tokens=tokens,
+                    output_path=gif_path,
+                    probs=frame_probs,
+                    prob_style=animation_style,
+                    metrics=metrics or None,
+                    title=f"Prompt {p_idx} \u00b7 Replica {r_idx}",
+                )
+                logger.info("Animation saved: %s", gif_path)
 
     # Save per-step conditional probabilities
     if stored_probs:

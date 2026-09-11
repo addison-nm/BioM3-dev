@@ -285,3 +285,55 @@ def test_random_argmax_output_token_range(mini_model_and_args):
     final = mask_list[-1]
     assert np.all(final >= 0)
     assert np.all(final < args.num_classes)
+
+
+# ---------------------------------------------------------------------------
+#  Tests: per-step token probability recording
+# ---------------------------------------------------------------------------
+
+def test_token_prob_recorder_matches_the_stored_distributions(mini_model_and_args):
+    """The recorder holds p(token then at each position), for the named rows only.
+
+    Checked against the full stored table of the same run, so the two come from
+    one pass of the model: every recorded value must be the stored probability
+    of the token that position's frame actually holds.
+    """
+    model, args = mini_model_and_args
+    torch.manual_seed(7)
+    np.random.seed(7)
+    batch_size = 2
+    recorder = Stage3_sample_tools.TokenProbRecorder(rows=[1])
+    # Sampling runs under no_grad in production (batch_stage3_generate_sequences
+    # is decorated), which is what keeps the recorded buffers plain tensors.
+    with torch.no_grad():
+        mask_list, _, stored = Stage3_sample_tools.batch_generate_denoised_sampled(
+            args=args,
+            model=model,
+            extract_digit_samples=torch.zeros(batch_size, args.diffusion_steps),
+            extract_time=torch.zeros(batch_size).long(),
+            extract_digit_label=torch.randn(batch_size, args.text_emb_dim),
+            sampling_path=torch.stack(
+                [torch.randperm(args.diffusion_steps) for _ in range(batch_size)]
+            ),
+            sample_seeds=[11, 12],
+            store_probabilities=True,
+            token_prob_recorder=recorder,
+        )
+
+    steps, seq_len = args.diffusion_steps, mask_list[0].shape[-1]
+    row = recorder.row(1)
+    assert row.values.shape == (steps, seq_len)
+    assert row.placed_at.shape == (seq_len,)
+    # Nothing is pre-revealed here, so every position is placed exactly once.
+    assert sorted(row.placed_at.tolist()) == list(range(steps))
+
+    for step in range(steps):
+        frame = mask_list[step][1][0]
+        expected = stored[step, 1, np.arange(seq_len), frame]
+        np.testing.assert_allclose(row.values[step], expected, atol=1e-3)
+
+    # The value at a position's own placement step is the one its token was
+    # drawn with, so it is a real probability, not an untouched buffer slot.
+    placed_values = row.values[row.placed_at, np.arange(seq_len)]
+    assert np.all(placed_values > 0)
+    assert np.all(placed_values <= 1)

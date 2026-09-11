@@ -6,7 +6,7 @@ import math
 from dataclasses import dataclass
 from tqdm import tqdm
 import time
-from typing import Optional
+from typing import NamedTuple, Optional, Sequence
 
 import torch
 import torch.nn as nn
@@ -56,6 +56,40 @@ def _inference_autocast(device):
     return torch.autocast(device_type=device_type, dtype=torch.bfloat16, enabled=enabled)
 
 
+class TokenProbRow(NamedTuple):
+    """One sequence's recording: ``values`` [steps, seq_len], ``placed_at`` [seq_len]."""
+    values: np.ndarray
+    placed_at: np.ndarray
+
+
+@dataclass
+class TokenProbRecorder:
+    """Opt-in record of how probable the token at each position was, per step.
+
+    Pass one to a batched sampler naming the batch rows to record; the sampler
+    fills ``values`` and ``placed_at`` before returning. Rows not named cost
+    nothing, and a sampler called without a recorder runs exactly as before.
+
+    ``values[step, k, pos]`` is the model's probability, at that step, for the
+    token sitting at ``pos`` of row ``rows[k]`` once the step's unmasking is
+    done. On the step a position is unmasked that is the probability its token
+    was drawn with. On later steps it is the model's reading of a position it
+    can now see in its own input, which training never scores (the loss covers
+    masked positions only), so those values are out-of-sample.
+
+    ``placed_at[k, pos]`` is the step ``pos`` was unmasked at, or -1 for a
+    position that was never sampled (an in-painting template residue, say).
+    """
+    rows: Sequence[int]
+    values: Optional[np.ndarray] = None
+    placed_at: Optional[np.ndarray] = None
+
+    def row(self, batch_row: int) -> TokenProbRow:
+        """The recorded arrays for one row of the batch."""
+        k = list(self.rows).index(batch_row)
+        return TokenProbRow(values=self.values[:, k], placed_at=self.placed_at[k])
+
+
 @dataclass
 class _SamplingState:
     """Pre-allocated GPU buffers and per-call state shared by both batched samplers.
@@ -80,6 +114,10 @@ class _SamplingState:
     all_time_idx: torch.Tensor
     all_probs: Optional[torch.Tensor]
     gumbel_buffer: Optional[torch.Tensor]
+    token_prob_recorder: Optional[TokenProbRecorder]
+    token_prob_rows: Optional[torch.Tensor]
+    token_probs: Optional[torch.Tensor]
+    placed_at: Optional[torch.Tensor]
 
 
 def _init_sampling_state(
@@ -88,6 +126,7 @@ def _init_sampling_state(
     extract_time: torch.Tensor,
     extract_digit_label: torch.Tensor,
     store_probabilities: bool,
+    token_prob_recorder: Optional[TokenProbRecorder] = None,
 ) -> _SamplingState:
     """Move inputs to device and pre-allocate the per-step output buffers.
 
@@ -125,6 +164,22 @@ def _init_sampling_state(
             dtype=torch.float32, device=args.device,
         )
 
+    token_prob_rows = token_probs = placed_at = None
+    if token_prob_recorder is not None and len(token_prob_recorder.rows):
+        token_prob_rows = torch.as_tensor(
+            list(token_prob_recorder.rows), dtype=torch.long, device=args.device,
+        )
+        # fp16 holds ~2 MB per recorded sequence at 1024 steps x 1024 positions,
+        # and still carries more precision than the bf16 forward pass.
+        token_probs = torch.empty(
+            max_diffusion_step, token_prob_rows.numel(), seq_len,
+            dtype=torch.float16, device=args.device,
+        )
+        placed_at = torch.full(
+            (token_prob_rows.numel(), seq_len), -1,
+            dtype=torch.int32, device=args.device,
+        )
+
     gumbel_buffer: Optional[torch.Tensor] = None
     if token_strategy == "sample":
         # Reused each step via in-place fill. See docs/gumbel_max_sampling.md.
@@ -146,7 +201,31 @@ def _init_sampling_state(
         all_time_idx=all_time_idx,
         all_probs=all_probs,
         gumbel_buffer=gumbel_buffer,
+        token_prob_recorder=token_prob_recorder,
+        token_prob_rows=token_prob_rows,
+        token_probs=token_probs,
+        placed_at=placed_at,
     )
+
+
+def _record_token_probs(state, logits, current_location, step) -> None:
+    """Record the probability of the token now at each position, recorded rows only.
+
+    Call after the step's unmasking, so the position just filled carries the
+    probability its token was drawn with rather than the probability of the
+    mask it replaced. No-op unless the caller passed a ``TokenProbRecorder``.
+    """
+    if state.token_probs is None:
+        return
+    rows = state.token_prob_rows
+    probs = F.softmax(logits[rows], dim=-1)
+    tokens_now = state.temp_mask_realization[rows, 0].long().unsqueeze(-1)
+    state.token_probs[step] = (
+        probs.gather(-1, tokens_now).squeeze(-1).to(state.token_probs.dtype)
+    )
+    state.placed_at[
+        torch.arange(rows.numel(), device=rows.device), current_location[rows]
+    ] = step
 
 
 def _forward_logits(
@@ -224,6 +303,9 @@ def _drain_sampling_state(state: _SamplingState):
     optimization (vs. four .cpu() syncs per diffusion step).
     """
     L = state.max_diffusion_step
+    if state.token_probs is not None:
+        state.token_prob_recorder.values = state.token_probs.cpu().numpy()
+        state.token_prob_recorder.placed_at = state.placed_at.cpu().numpy()
     all_realizations_np = state.all_realizations.cpu().numpy()
     all_time_idx_np = state.all_time_idx.cpu().numpy()
     mask_realization_list = [all_realizations_np[i] for i in range(L)]
@@ -241,6 +323,7 @@ def batch_generate_denoised_sampled(
         sampling_path: torch.Tensor,
         store_probabilities: bool = False,
         sample_seeds: Optional[list] = None,
+        token_prob_recorder: Optional[TokenProbRecorder] = None,
     ) -> tuple[list, list, np.ndarray | None]:
     """Random-path unmasking: at each step, unmask the position selected by
     the per-batch sampling permutation. Token selection is governed by
@@ -251,6 +334,9 @@ def batch_generate_denoised_sampled(
     Gumbel noise for each row is drawn from a per-row generator seeded
     from ``(seed, step)`` — per-(prompt, replica) sampling is
     reproducible independently of world size or batch packing.
+
+    ``token_prob_recorder`` is filled in place when given; see
+    ``TokenProbRecorder``.
     """
 
     # Ensure batch dimension consistency across input tensors
@@ -263,7 +349,7 @@ def batch_generate_denoised_sampled(
 
     state = _init_sampling_state(
         args, extract_digit_samples, extract_time, extract_digit_label,
-        store_probabilities,
+        store_probabilities, token_prob_recorder,
     )
     temp_sampling_path = sampling_path.to(args.device)
     # Per-step device_synchronize is only useful for tqdm progress accuracy.
@@ -298,6 +384,8 @@ def batch_generate_denoised_sampled(
                 next_temp_realization[state.batch_idx, current_location]
             )
 
+            _record_token_probs(state, logits, current_location, ii)
+
             # Store on GPU
             state.all_realizations[ii] = state.temp_mask_realization
             state.all_time_idx[ii] = state.temp_idx
@@ -323,6 +411,7 @@ def batch_generate_denoised_sampled_confidence(
         store_probabilities: bool = False,
         skip_pad: bool = False,
         sample_seeds: Optional[list] = None,
+        token_prob_recorder: Optional[TokenProbRecorder] = None,
     ) -> tuple[list, list, np.ndarray | None]:
     """Confidence-based unmasking: at each step, unmask the position where the
     model's max class probability is highest among still-masked positions.
@@ -335,10 +424,13 @@ def batch_generate_denoised_sampled_confidence(
     Token selection is controlled by ``args.token_strategy``:
         - ``"argmax"``: deterministic (take the most-likely token)
         - ``"sample"``: stochastic (Gumbel-max trick)
+
+    ``token_prob_recorder`` is filled in place when given; see
+    ``TokenProbRecorder``.
     """
     state = _init_sampling_state(
         args, extract_digit_samples, extract_time, extract_digit_label,
-        store_probabilities,
+        store_probabilities, token_prob_recorder,
     )
     sync_per_step = int(getattr(args, "_world_size", 1)) <= 1
 
@@ -384,6 +476,8 @@ def batch_generate_denoised_sampled_confidence(
                 chosen_tokens = sampled[state.batch_idx, current_location]
 
             state.temp_mask_realization[state.batch_idx, 0, current_location] = chosen_tokens
+
+            _record_token_probs(state, logits, current_location, ii)
 
             # Store on GPU
             state.all_realizations[ii] = state.temp_mask_realization

@@ -14,6 +14,7 @@ from biom3.Stage3.run_ProteoScribe_sample import (
     resolve_animate_prompts,
     save_animation_frames,
 )
+from biom3.Stage3.sampling_analysis import TokenProbRow
 
 
 def test_writes_one_record_per_pair_with_realized_path(tmp_path):
@@ -36,6 +37,40 @@ def test_writes_one_record_per_pair_with_realized_path(tmp_path):
     assert rec['frames'] == [[1, 0, 4], [1, 2, 4]]
     # Plain Python ints, so the record is JSON-native (no numpy scalars).
     assert all(isinstance(v, int) for step in rec['frames'] for v in step)
+    # Nothing recorded, nothing written: the field only appears when asked for.
+    assert 'confidence' not in rec
+
+
+def test_confidence_series_runs_from_the_step_a_residue_was_placed(tmp_path):
+    tokens = ['-', '<START>', 'A', 'C', '<END>', '<PAD>']
+    # Position 0 is a pre-revealed <START>; 1 holds 'A' from step 0; 2 holds 'C'
+    # from step 2; 3 holds <PAD> from step 1.
+    frames = [
+        np.array([1, 2, 0, 0]),
+        np.array([1, 2, 0, 5]),
+        np.array([1, 2, 3, 5]),
+    ]
+    token_probs = TokenProbRow(
+        values=np.array([
+            [0.9, 0.8, 0.1, 0.2],
+            [0.9, 0.75, 0.15, 0.6],
+            [0.9, 0.7, 0.55, 0.65],
+        ], dtype=np.float16),
+        placed_at=np.array([-1, 0, 2, 1], dtype=np.int32),
+    )
+
+    save_animation_frames(
+        {(0, 0): frames}, tokens, str(tmp_path),
+        confidence={(0, 0): token_probs},
+    )
+
+    rec = json.loads((tmp_path / 'prompt_0_replica_0.json').read_text())
+    assert rec['confidence'] == [
+        None,                 # <START>: structural, and never sampled
+        [0.8, 0.75, 0.7],     # placed at step 0, so one value per step
+        [0.55],               # placed at the last step, so a single value
+        None,                 # <PAD>: not an amino acid
+    ]
 
 
 def test_empty_selection_writes_nothing(tmp_path):
